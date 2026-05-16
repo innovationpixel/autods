@@ -1,5 +1,5 @@
-import Markup from './jsx/route/index';
-import './jsx/index.css';
+import Markup from './routes/index';
+import './index2.css';
 import 'swiper/css';
 import 'swiper/css/pagination';
 import 'swiper/css/free-mode';
