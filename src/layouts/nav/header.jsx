@@ -287,7 +287,7 @@ function Header({ onNote }) {
 														</div>
 													</li>
 													<li>
-														<Link to="/page-login">
+														<Link to="/user/login">
 															<div className="icon-box-lg"> {SVGICON.logout} <p> Logout </p> </div>
 														</Link>
 													</li>

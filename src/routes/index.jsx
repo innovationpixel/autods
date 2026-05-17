@@ -1,9 +1,12 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
-import { Routes, Route, Outlet } from 'react-router-dom';
+import { Routes, Route, Outlet, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import Nav from '../layouts/nav';
 import Footer from '../layouts/Footer';
 import ScrollToTop from '../elements/scrolltotop';
+import PrivateRoute from '../components/PrivateRoute';
+import { checkAutoLogin } from '../store/actions/AuthActions';
 
 // Pages
 import Home from '../pages/dashboard/Home';
@@ -32,13 +35,20 @@ import { formsRoutes } from './forms.routes';
 import { tablesRoutes } from './tables.routes';
 
 const Markup = () => {
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        checkAutoLogin(dispatch, navigate);
+    }, []);
+
     return (
         <>
             <Routes>
-                {/* Auth — no layout */}
-                <Route path="/page-login" element={<Login />} />
-                <Route path="/page-register" element={<Registration />} />
-                <Route path="/page-lock-screen" element={<LockScreen />} />
+                {/* Public auth routes — no layout */}
+                <Route path="/user/login" element={<Login />} />
+                <Route path="/user/register" element={<Registration />} />
+                <Route path="/user/lock-screen" element={<LockScreen />} />
 
                 {/* Standalone error pages — no layout */}
                 <Route path="/page-error-400" element={<Error400 />} />
@@ -47,57 +57,57 @@ const Markup = () => {
                 <Route path="/page-error-500" element={<Error500 />} />
                 <Route path="/page-error-503" element={<Error503 />} />
 
-                {/* Home — standalone (has its own built-in sidebar/layout) */}
-                <Route path="/" element={<Home />} />
+                {/* All protected app routes */}
+                <Route element={<PrivateRoute />}>
+                    <Route path="/" element={<Home />} />
 
-                {/* All app routes — wrapped in MainLayout */}
-                <Route element={<MainLayout />}>
+                    <Route element={<MainLayout />}>
+                        {dashboardRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {accountRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {aikitRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {cmsRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {profileRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {ecommerceRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {appsRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {chartsRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {bootstrapRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {pluginsRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {formsRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
+                        {tablesRoutes.map((r) => (
+                            <Route key={r.path} path={r.path} element={r.element} />
+                        ))}
 
-                    {dashboardRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {accountRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {aikitRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {cmsRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {profileRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {ecommerceRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {appsRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {chartsRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {bootstrapRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {pluginsRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {formsRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-                    {tablesRoutes.map((r) => (
-                        <Route key={r.path} path={r.path} element={r.element} />
-                    ))}
-
-                    {/* In-layout error/misc pages */}
-                    <Route path="/lock-screen" element={<LockScreen />} />
-                    <Route path="/error-400" element={<Error400 />} />
-                    <Route path="/error-403" element={<Error403 />} />
-                    <Route path="/error-404" element={<Error404 />} />
-                    <Route path="/error-500" element={<Error500 />} />
-                    <Route path="/error-503" element={<Error503 />} />
-                    <Route path="/empty-page" element={<EmptyPage />} />
+                        {/* In-layout error/misc pages */}
+                        <Route path="/lock-screen" element={<LockScreen />} />
+                        <Route path="/error-400" element={<Error400 />} />
+                        <Route path="/error-403" element={<Error403 />} />
+                        <Route path="/error-404" element={<Error404 />} />
+                        <Route path="/error-500" element={<Error500 />} />
+                        <Route path="/error-503" element={<Error503 />} />
+                        <Route path="/empty-page" element={<EmptyPage />} />
+                    </Route>
                 </Route>
             </Routes>
             <ScrollToTop />

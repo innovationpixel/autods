@@ -204,8 +204,8 @@ export const MenuList = [
     {
         title: 'Pages', iconStyle: <i className="flaticon-file" />, classsChange: 'mm-collapse',
         content: [
-            { title: 'Login', to: 'page-login' },
-            { title: 'Register', to: 'page-register' },
+            { title: 'Login', to: 'user/login' },
+            { title: 'Register', to: 'user/register' },
             {
                 title: 'Error', hasMenu: true,
                 content: [
@@ -216,7 +216,7 @@ export const MenuList = [
                     { title: 'Error 503', to: 'page-error-503' },
                 ]
             },
-            { title: 'Lock Screen', to: 'page-lock-screen', },
+            { title: 'Lock Screen', to: 'user/lock-screen', },
             { title: 'Empty Page', to: 'empty-page', }
         ]
     },

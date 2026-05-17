@@ -3,17 +3,12 @@ import {
     LOGIN_CONFIRMED_ACTION,
     LOGIN_FAILED_ACTION,
     LOGOUT_ACTION,
-    SIGNUP_CONFIRMED_ACTION,
-    SIGNUP_FAILED_ACTION,
 } from '../actions/AuthActions';
 
 const initialState = {
     auth: {
-        email: '',
-        idToken: '',
-        localId: '',
-        expiresIn: '',
-        refreshToken: '',
+        token: '',
+        user: null,
     },
     errorMessage: '',
     successMessage: '',
@@ -21,19 +16,13 @@ const initialState = {
 };
 
 export function AuthReducer(state = initialState, action) {
-    if (action.type === SIGNUP_CONFIRMED_ACTION) {
-        return {
-            ...state,
-            auth: action.payload,
-            errorMessage: '',
-            successMessage: 'Signup Successfully Completed',
-            showLoading: false,
-        };
-    }
     if (action.type === LOGIN_CONFIRMED_ACTION) {
         return {
             ...state,
-            auth: action.payload,
+            auth: {
+                token: action.payload.access_token,
+                user: action.payload.user,
+            },
             errorMessage: '',
             successMessage: 'Login Successfully Completed',
             showLoading: false,
@@ -43,22 +32,14 @@ export function AuthReducer(state = initialState, action) {
     if (action.type === LOGOUT_ACTION) {
         return {
             ...state,
+            auth: { token: '', user: null },
             errorMessage: '',
             successMessage: '',
-            auth: {
-                email: '',
-                idToken: '',
-                localId: '',
-                expiresIn: '',
-                refreshToken: '',
-            },
+            showLoading: false,
         };
     }
 
-    if (
-        action.type === SIGNUP_FAILED_ACTION ||
-        action.type === LOGIN_FAILED_ACTION
-    ) {
+    if (action.type === LOGIN_FAILED_ACTION) {
         return {
             ...state,
             errorMessage: action.payload,
@@ -73,7 +54,6 @@ export function AuthReducer(state = initialState, action) {
             showLoading: action.payload,
         };
     }
+
     return state;
 }
-
-    

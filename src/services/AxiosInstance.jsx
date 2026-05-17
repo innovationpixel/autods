@@ -1,16 +1,29 @@
 import axios from 'axios';
-import { store } from '../store/store';
+import { BASE_URL } from '../config/api';
 
 const axiosInstance = axios.create({
-    baseURL: `https://react-course-b798e-default-rtdb.firebaseio.com/`,
+    baseURL: BASE_URL,
+    headers: { 'Content-Type': 'application/json' },
 });
 
 axiosInstance.interceptors.request.use((config) => {
-    const state = store.getState();
-    const token = state.auth.auth.idToken;
-    config.params = config.params || {};
-    config.params['auth'] = token;
+    const token = localStorage.getItem('token');
+    if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+    }
     return config;
 });
+
+axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/user/login';
+        }
+        return Promise.reject(error);
+    }
+);
 
 export default axiosInstance;

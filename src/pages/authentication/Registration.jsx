@@ -26,12 +26,10 @@ function Register(props) {
     if (email === '') {
       errorObj.email = 'Email is Required';
       error = true;
-      swal('Oops', errorObj.email, "error");
     }
     if (password === '') {
       errorObj.password = 'Password is Required';
       error = true;
-      swal('Oops', errorObj.password, "error");
     }
     setErrors(errorObj);
     if (error) return;
@@ -105,7 +103,7 @@ function Register(props) {
                       </div>
                     </form>
                     <div className="new-account mt-3">
-                      <p>Already have an account? <Link className="text-primary" to="/page-login">Sign in</Link></p>
+                      <p>Already have an account? <Link className="text-primary" to="/user/login">Sign in</Link></p>
                     </div>
                   </div>
                 </div>

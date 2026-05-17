@@ -1,85 +1,32 @@
-import axios from 'axios';
-import swal from "sweetalert";
-import {
-    loginConfirmedAction,
-    Logout,
-} from '../store/actions/AuthActions';
-
-export function signUp(email, password) {
-    //axios call
-    const postData = {
-        email,
-        password,
-        returnSecureToken: true,
-    };
-    return axios.post(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyD3RPAp3nuETDn9OQimqn_YF6zdzqWITII`,
-        postData,
-    );
-}
+import axiosInstance from './AxiosInstance';
 
 export function login(email, password) {
-    const postData = {
-        email,
-        password,
-        returnSecureToken: true,
-    };
-    return axios.post(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyD3RPAp3nuETDn9OQimqn_YF6zdzqWITII`,
-        postData,
-    );
+    return axiosInstance.post('/auth/login', { email, password });
 }
 
-export function formatError(errorResponse) {
-    switch (errorResponse.error.message) {
-        case 'EMAIL_EXISTS':
-            swal("Oops", "Email already exists", "error");
-            break;
-        case 'EMAIL_NOT_FOUND':
-           swal("Oops", "Email not found", "error",{ button: "Try Again!",});
-           break;
-        case 'INVALID_PASSWORD':
-            swal("Oops", "Invalid Password", "error",{ button: "Try Again!",});
-            break;
-        case 'USER_DISABLED':
-            return 'User Disabled';
-
-        default:
-            return '';
-    }
+export function logout() {
+    return axiosInstance.post('/auth/logout');
 }
 
-export function saveTokenInLocalStorage(tokenDetails) {
-    tokenDetails.expireDate = new Date(
-        new Date().getTime() + tokenDetails.expiresIn * 1000,
-    );
-    localStorage.setItem('userDetails', JSON.stringify(tokenDetails));
+export function getMe() {
+    return axiosInstance.get('/auth/me');
 }
 
-export function runLogoutTimer(dispatch, timer, navigate) {
-    setTimeout(() => {
-        dispatch(Logout(navigate));
-    }, timer);
+export function saveSession(data) {
+    localStorage.setItem('token', data.access_token);
+    localStorage.setItem('user', JSON.stringify(data.user));
 }
 
-export function checkAutoLogin(dispatch, navigate) {
-    const tokenDetailsString = localStorage.getItem('userDetails');
-    let tokenDetails = '';
-    if (!tokenDetailsString) {
-        dispatch(Logout(navigate));
-		return;
-    }
+export function clearSession() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+}
 
-    tokenDetails = JSON.parse(tokenDetailsString);
-    let expireDate = new Date(tokenDetails.expireDate);
-    let todaysDate = new Date();
+export function getStoredUser() {
+    const raw = localStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+}
 
-    if (todaysDate > expireDate) {
-        dispatch(Logout(navigate));
-        return;
-    }
-		
-    dispatch(loginConfirmedAction(tokenDetails));
-    const timer = expireDate.getTime() - todaysDate.getTime();
-    runLogoutTimer(dispatch, timer, navigate);
+export function getStoredToken() {
+    return localStorage.getItem('token');
 }
