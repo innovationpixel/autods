@@ -6,6 +6,7 @@ import {
     getStoredUser,
     getStoredToken,
 } from '../../services/AuthService';
+import { toast } from '../../utils/toast';
 
 export const LOGIN_CONFIRMED_ACTION  = '[login action] confirmed login';
 export const LOGIN_FAILED_ACTION     = '[login action] failed login';
@@ -18,12 +19,14 @@ export function loginAction(email, password, navigate) {
             .then((response) => {
                 saveSession(response.data);
                 dispatch(loginConfirmedAction(response.data));
+                toast.success('Logged in successfully.');
                 navigate('/');
             })
             .catch((error) => {
                 const message =
                     error.response?.data?.message || 'Login failed. Please try again.';
                 dispatch(loginFailedAction(message));
+                toast.error(message);
             });
     };
 }
@@ -33,6 +36,7 @@ export function logoutAction(navigate) {
         logout().finally(() => {
             clearSession();
             dispatch({ type: LOGOUT_ACTION });
+            toast.info('You have been logged out.');
             navigate('/user/login');
         });
     };

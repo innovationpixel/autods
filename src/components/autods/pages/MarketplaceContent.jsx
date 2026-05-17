@@ -1,8 +1,12 @@
-import { LuChevronDown, LuSearch, LuSlidersHorizontal, LuSparkles } from "react-icons/lu";
+import { useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { LuChevronDown, LuLoader, LuSearch, LuSlidersHorizontal, LuSparkles } from "react-icons/lu";
 import CarouselSection from "../CarouselSection";
 import ProductCard from "../ProductCard";
 import SelectField from "../SelectField";
 import { categoryFilters, filterOptions, filterPills } from "../constants";
+import { searchMarketplaceAction } from "../../../store/actions/EbayActions";
+import { selectMarketplaceItems, selectMarketplaceLoading, selectMarketplaceError } from "../../../store/selectors/EbaySelectors";
 
 function MarketplaceContent({
   keywordSearch,
@@ -32,6 +36,52 @@ function MarketplaceContent({
   openProductsView,
   resetMarketplaceView,
 }) {
+  const dispatch     = useDispatch();
+  const ebayItems    = useSelector(selectMarketplaceItems);
+  const ebayLoading  = useSelector(selectMarketplaceLoading);
+  const ebayError    = useSelector(selectMarketplaceError);
+  const searchTimer  = useRef(null);
+
+  // Debounced eBay search when keyword or filters change
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      const params = {
+        q: keywordSearch,
+        ships_to: shipsTo !== "All" ? shipsTo : undefined,
+        sort: sortBy === "Lowest Price" ? "price" : sortBy === "Newest" ? "-itemCreationDate" : undefined,
+        limit: 20,
+      };
+      if (priceRange && priceRange !== "All") {
+        const [min, max] = priceRange.replace("$", "").split(" - ");
+        if (min) params.price_min = min;
+        if (max) params.price_max = max;
+      }
+      dispatch(searchMarketplaceAction(params));
+    }, 500);
+
+    return () => clearTimeout(searchTimer.current);
+  }, [dispatch, keywordSearch, shipsTo, priceRange, sortBy]);
+
+  // Map eBay API items to ProductCard shape
+  const ebayProductCards = ebayItems.map((item) => ({
+    id: item.id,
+    vendor: item.seller ?? "eBay",
+    title: item.title,
+    price: `$${Number(item.price ?? 0).toFixed(2)}`,
+    shipping: item.shipping === "0" ? "Free Shipping" : `$${Number(item.shipping ?? 0).toFixed(2)} Shipping`,
+    shippingDays: 5,
+    category: item.category_name ?? "General",
+    shipsFrom: "eBay",
+    image: item.image_url ?? "https://via.placeholder.com/300x300?text=No+Image",
+    shippingTag: "eBay Listing",
+    listingUrl: item.listing_url,
+    marketplace: "ebay",
+  }));
+
+  // When eBay results are present, show them instead of static catalog
+  const showEbayResults = ebayItems.length > 0 || ebayLoading || (keywordSearch && keywordSearch.trim().length > 0);
+
   return (
     <>
       <section className="marketplace-search-panel card-wrapper">
@@ -172,19 +222,45 @@ function MarketplaceContent({
       </section>
 
       <div className="marketplace-sections">
-        {expandedProductsTitle ? (
+        {ebayLoading ? (
+          <div className="marketplace-products__empty">
+            <LuLoader style={{ animation: "spin 1s linear infinite", fontSize: 28 }} />
+            <p>Searching eBay marketplace…</p>
+          </div>
+        ) : ebayError ? (
+          <div className="marketplace-products__empty">
+            <LuSlidersHorizontal />
+            <p style={{ color: "#991b1b" }}>{ebayError}</p>
+          </div>
+        ) : showEbayResults ? (
+          <section className="marketplace-expanded-products">
+            <div className="marketplace-expanded-products__head">
+              <h2 className="marketplace-section__title">
+                eBay Marketplace — {ebayProductCards.length} result{ebayProductCards.length !== 1 ? "s" : ""}
+                {keywordSearch ? ` for "${keywordSearch}"` : ""}
+              </h2>
+            </div>
+            {ebayProductCards.length ? (
+              <div className="marketplace-expanded-products__grid">
+                {ebayProductCards.map((item) => (
+                  <ProductCard item={item} key={item.id} />
+                ))}
+              </div>
+            ) : (
+              <div className="marketplace-products__empty">
+                <LuSlidersHorizontal />
+                <p>No eBay results found. Try a different keyword or adjust your filters.</p>
+              </div>
+            )}
+          </section>
+        ) : expandedProductsTitle ? (
           <section className="marketplace-expanded-products">
             <div className="marketplace-expanded-products__head">
               <h2 className="marketplace-section__title">{expandedProductsTitle}</h2>
-              <button
-                type="button"
-                className="marketplace-section__see-more"
-                onClick={resetMarketplaceView}
-              >
+              <button type="button" className="marketplace-section__see-more" onClick={resetMarketplaceView}>
                 Back to all categories
               </button>
             </div>
-
             {visibleProducts.length ? (
               <div className="marketplace-expanded-products__grid">
                 {visibleProducts.map((item) => (

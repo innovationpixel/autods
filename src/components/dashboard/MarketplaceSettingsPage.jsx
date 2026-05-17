@@ -1,14 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
+  LuBadgeCheck,
   LuChevronDown,
   LuCopy,
   LuEllipsisVertical,
+  LuLink,
+  LuUnplug,
+  LuLoader,
   LuMapPin,
   LuPencil,
   LuPlus,
   LuRefreshCcw,
   LuX,
 } from "react-icons/lu";
+import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction } from "../../store/actions/EbayActions";
+import { getEbayAuthUrl } from "../../services/EbayService";
+import { selectEbayConnection, selectEbaySyncing } from "../../store/selectors/EbaySelectors";
+import { toast } from "../../utils/toast";
 
 const settingsPrimaryTabs = [
   "Supplier Settings",
@@ -444,6 +453,10 @@ function buildPricingSummary(pricing) {
 }
 
 export default function MarketplaceSettingsPage() {
+  const dispatch = useDispatch();
+  const ebayConnection = useSelector(selectEbayConnection);
+  const ebaySyncing    = useSelector(selectEbaySyncing);
+
   const [activePrimaryTab, setActivePrimaryTab] = useState("Supplier Settings");
   const [activeInnerTab, setActiveInnerTab] = useState("Lister");
   const [selectedStore, setSelectedStore] = useState(storeOptions[0]);
@@ -455,6 +468,8 @@ export default function MarketplaceSettingsPage() {
   const [messageDraft, setMessageDraft] = useState("");
   const [inactiveSubscriptionModalOpen, setInactiveSubscriptionModalOpen] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
+  const [ebayConnecting, setEbayConnecting] = useState(false);
+  const popupRef = useRef(null);
 
   useEffect(() => {
     if (!saveNotice) {
@@ -507,6 +522,148 @@ export default function MarketplaceSettingsPage() {
       documentElement.style.touchAction = previousHtmlTouchAction;
     };
   }, [inactiveSubscriptionModalOpen]);
+
+  // ─── eBay connection ────────────────────────────────────────────────────────
+  useEffect(() => {
+    dispatch(fetchEbayStatus());
+  }, [dispatch]);
+
+  // Detect redirect back from eBay OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("ebay");
+    if (status === "connected") {
+      toast.success("eBay account connected successfully!");
+      setActivePrimaryTab("Store Settings");
+      dispatch(fetchEbayStatus());
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (status === "error") {
+      const reason = params.get("reason") ?? "Unknown error";
+      toast.error(`eBay connection failed: ${reason}`);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [dispatch]);
+
+  const connectEbay = async () => {
+    try {
+      setEbayConnecting(true);
+      const res = await getEbayAuthUrl();
+      const authUrl = res.data.url;
+      const popup = window.open(authUrl, "ebay_oauth", "width=600,height=700,left=200,top=100");
+      popupRef.current = popup;
+
+      const timer = setInterval(() => {
+        if (!popup || popup.closed) {
+          clearInterval(timer);
+          setEbayConnecting(false);
+          dispatch(fetchEbayStatus());
+        }
+      }, 800);
+    } catch (err) {
+      const msg = err.response?.data?.error ?? "Failed to start eBay authorization.";
+      toast.error(msg);
+      setEbayConnecting(false);
+    }
+  };
+
+  const disconnectEbay = () => {
+    if (!window.confirm("Disconnect your eBay account? Your synced listings will remain in the database.")) return;
+    dispatch(disconnectEbayAction());
+  };
+
+  const syncNow = () => {
+    dispatch(syncEbayListingsAction());
+  };
+
+  const renderStoreSettingsTab = () => (
+    <div className="marketplace-settings__store-settings card-wrapper">
+      <div className="marketplace-settings__store-settings-header">
+        <h3>Connected Marketplaces</h3>
+        <p>Connect your eBay seller account to sync your listings, manage products, and track performance.</p>
+      </div>
+
+      <div className="marketplace-settings__ebay-card">
+        <div className="marketplace-settings__ebay-logo">
+          <span style={{ fontWeight: 900, fontSize: 28, letterSpacing: -1 }}>
+            <span style={{ color: "#E53238" }}>e</span>
+            <span style={{ color: "#0064D2" }}>B</span>
+            <span style={{ color: "#F5AF02" }}>a</span>
+            <span style={{ color: "#86B817" }}>y</span>
+          </span>
+        </div>
+
+        <div className="marketplace-settings__ebay-info">
+          {ebayConnection.loading ? (
+            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading">
+              <LuLoader className="spin-icon" />
+              <span>Checking connection status…</span>
+            </div>
+          ) : ebayConnection.connected ? (
+            <>
+              <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
+                <LuBadgeCheck />
+                <span>Connected as <strong>{ebayConnection.ebay_username ?? "eBay Seller"}</strong></span>
+              </div>
+              <p className="marketplace-settings__ebay-sub">
+                Site: {ebayConnection.site_id ?? "EBAY_US"} &nbsp;·&nbsp;
+                Connected: {ebayConnection.connected_at ? new Date(ebayConnection.connected_at).toLocaleDateString() : "—"}
+              </p>
+            </>
+          ) : (
+            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected">
+              <LuUnplug />
+              <span>Not connected — connect your eBay seller account to start syncing.</span>
+            </div>
+          )}
+        </div>
+
+        <div className="marketplace-settings__ebay-actions">
+          {ebayConnection.connected ? (
+            <>
+              <button
+                type="button"
+                className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--sync"
+                onClick={syncNow}
+                disabled={ebaySyncing}
+              >
+                {ebaySyncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+                <span>{ebaySyncing ? "Syncing…" : "Sync Listings"}</span>
+              </button>
+              <button
+                type="button"
+                className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
+                onClick={disconnectEbay}
+              >
+                <LuUnplug />
+                <span>Disconnect</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+              onClick={connectEbay}
+              disabled={ebayConnecting}
+            >
+              {ebayConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+              <span>{ebayConnecting ? "Opening eBay…" : "Connect eBay"}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="marketplace-settings__store-settings-note">
+        <strong>How it works:</strong>
+        <ol>
+          <li>Click <em>Connect eBay</em> — a popup will open with the eBay authorization page.</li>
+          <li>Log in with your eBay seller account and grant access.</li>
+          <li>Return here and click <em>Sync Listings</em> to import your active eBay listings.</li>
+          <li>Your products, drafts, and orders will now show live data from your eBay account.</li>
+        </ol>
+        <p>You can only connect one eBay account per workspace. To switch accounts, disconnect first.</p>
+      </div>
+    </div>
+  );
 
   const activeSupplier = suppliers.find((supplier) => supplier.id === activeSupplierId) || suppliers[0];
   const currentSettings = activeSupplier?.settings || createInitialSupplierSettings();
@@ -1537,6 +1694,8 @@ export default function MarketplaceSettingsPage() {
         renderPlansAddOnsTab()
       ) : activePrimaryTab === "Account & Billing" ? (
         renderAccountBillingTab()
+      ) : activePrimaryTab === "Store Settings" ? (
+        renderStoreSettingsTab()
       ) : (
         <SettingsPlaceholder title={activePrimaryTab} />
       )}

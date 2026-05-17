@@ -1,228 +1,146 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { toast } from "../../../utils/toast";
 import {
-  LuBadgeCheck,
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
   LuEllipsisVertical,
   LuExternalLink,
   LuInbox,
+  LuLink,
+  LuLoader,
   LuMenu,
   LuPencil,
   LuPlay,
+  LuRefreshCcw,
   LuSlidersHorizontal,
   LuSparkles,
   LuStore,
-  LuX,
 } from "react-icons/lu";
-import { buildPaginationItems, formatDisplayDate, rewriteProductTitle } from "../helpers";
-import { initialProductAlerts, initialProducts } from "../constants";
+import { buildPaginationItems, formatDisplayDate } from "../helpers";
+import {
+  selectEbayConnected,
+  selectEbayListings,
+  selectEbayListingsMeta,
+  selectEbayListingsLoading,
+  selectEbayListingsError,
+  selectEbaySyncing,
+} from "../../../store/selectors/EbaySelectors";
+import {
+  fetchEbayListings,
+  syncEbayListingsAction,
+} from "../../../store/actions/EbayActions";
 
 function ProductsContent({ searchQuery }) {
-  const [products, setProducts] = useState(initialProducts);
-  const [alerts, setAlerts] = useState(initialProductAlerts);
-  const [showFilters, setShowFilters] = useState(false);
+  const dispatch = useDispatch();
+  const connected  = useSelector(selectEbayConnected);
+  const listings   = useSelector(selectEbayListings);
+  const meta       = useSelector(selectEbayListingsMeta);
+  const loading    = useSelector(selectEbayListingsLoading);
+  const error      = useSelector(selectEbayListingsError);
+  const syncing    = useSelector(selectEbaySyncing);
+
+  const [showFilters, setShowFilters]         = useState(false);
   const [showTutorialNote, setShowTutorialNote] = useState(false);
-  const [historyVisible, setHistoryVisible] = useState(false);
-  const [pageSize, setPageSize] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [sortDirection, setSortDirection] = useState("desc");
-  const [filterDate, setFilterDate] = useState("All Dates");
-  const [notice, setNotice] = useState("");
-  const [openMenuId, setOpenMenuId] = useState("");
-  const [tableView, setTableView] = useState("compact");
+  const [historyVisible, setHistoryVisible]   = useState(false);
+  const [pageSize, setPageSize]               = useState(20);
+  const [currentPage, setCurrentPage]         = useState(1);
+  const [selectedIds, setSelectedIds]         = useState([]);
+  const [sortDirection, setSortDirection]     = useState("desc");
+  const [filterStatus, setFilterStatus]       = useState("All");
+  const [openMenuId, setOpenMenuId]           = useState("");
+  const [tableView, setTableView]             = useState("compact");
   const tableScrollRef = useRef(null);
 
   useEffect(() => {
+    if (connected) {
+      dispatch(fetchEbayListings({ page: currentPage, limit: pageSize, status: filterStatus === "All" ? "" : filterStatus.toLowerCase(), q: searchQuery }));
+    }
+  }, [dispatch, connected, currentPage, pageSize, filterStatus, searchQuery]);
+
+  useEffect(() => {
     const closeMenus = () => setOpenMenuId("");
-
     document.addEventListener("click", closeMenus);
-
     return () => document.removeEventListener("click", closeMenus);
   }, []);
 
-  const filteredProducts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    const visible = products.filter((item) => {
-      if (filterDate !== "All Dates" && item.uploaded !== filterDate) {
-        return false;
-      }
-
-      if (!query) {
-        return true;
-      }
-
-      return [
-        item.title,
-        item.uploaded,
-        item.priceBuy,
-        item.priceSell,
-        item.itemBuy,
-        item.itemSell,
-        item.store,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query);
-    });
-
-    return visible.sort((left, right) =>
-      sortDirection === "desc"
-        ? right.uploaded.localeCompare(left.uploaded)
-        : left.uploaded.localeCompare(right.uploaded),
-    );
-  }, [filterDate, products, searchQuery, sortDirection]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredProducts.length, pageSize]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
-  const visibleProducts = filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const allVisibleSelected =
-    visibleProducts.length > 0 && visibleProducts.every((item) => selectedIds.includes(item.id));
+  const totalPages = meta?.last_page ?? 1;
+  const totalCount = meta?.total ?? listings.length;
+  const allVisibleSelected = listings.length > 0 && listings.every((item) => selectedIds.includes(item.id));
   const paginationItems = buildPaginationItems(currentPage, totalPages);
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
-      setSelectedIds((current) => current.filter((id) => !visibleProducts.some((item) => item.id === id)));
+      setSelectedIds((cur) => cur.filter((id) => !listings.some((item) => item.id === id)));
       return;
     }
-
-    setSelectedIds((current) => [...new Set([...current, ...visibleProducts.map((item) => item.id)])]);
+    setSelectedIds((cur) => [...new Set([...cur, ...listings.map((item) => item.id)])]);
   };
 
-  const toggleSelectOne = (productId) => {
-    setSelectedIds((current) =>
-      current.includes(productId) ? current.filter((id) => id !== productId) : [...current, productId],
-    );
-  };
-
-  const dismissAlert = (alertId) => {
-    setAlerts((current) => current.filter((item) => item.id !== alertId));
+  const toggleSelectOne = (id) => {
+    setSelectedIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
   const applyBulkAction = (action) => {
     if (!selectedIds.length) {
-      setNotice("Select at least one product to use bulk actions.");
+      toast.warn("Select at least one product to use bulk actions.");
       return;
     }
-
-    if (action === "relist") {
-      setNotice(`${selectedIds.length} products marked for relist.`);
-    }
-
-    if (action === "delete") {
-      setProducts((current) => current.filter((item) => !selectedIds.includes(item.id)));
-      setNotice(`${selectedIds.length} products removed from the table.`);
-      setSelectedIds([]);
-    }
-
-    if (action === "rewrite") {
-      setProducts((current) =>
-        current.map((item) =>
-          selectedIds.includes(item.id)
-            ? {
-                ...item,
-                title: rewriteProductTitle(item.title),
-              }
-            : item,
-        ),
-      );
-      setNotice(`${selectedIds.length} product titles rewritten with AI.`);
-    }
-
-    if (action === "edit") {
-      setNotice(`${selectedIds.length} products opened for bulk edit.`);
-    }
+    const labels = {
+      relist: `${selectedIds.length} products marked for relist.`,
+      delete: `${selectedIds.length} products deleted.`,
+      rewrite: `${selectedIds.length} product titles queued for AI rewrite.`,
+      edit: `${selectedIds.length} products opened for bulk edit.`,
+    };
+    toast.info(labels[action] ?? "Action applied.");
   };
 
-  const handleProductAction = (productId, action) => {
-    if (action === "request-sourcing") {
-      setProducts((current) =>
-        current.map((item) =>
-          item.id === productId
-            ? {
-                ...item,
-                sourcingRequested: !item.sourcingRequested,
-              }
-            : item,
-        ),
-      );
-      setNotice(`Sourcing state updated for ${productId.replace("product-", "product #")}.`);
-    }
-
-    if (action === "open-editor") {
-      setNotice(`Editor opened for ${productId.replace("product-", "product #")}.`);
-    }
-
-    if (action === "delete") {
-      setProducts((current) => current.filter((item) => item.id !== productId));
-      setSelectedIds((current) => current.filter((id) => id !== productId));
-      setNotice(`${productId.replace("product-", "Product #")} deleted.`);
-    }
-
-    if (action === "menu-edit") {
-      setNotice(`${productId.replace("product-", "Product #")} ready for manual editing.`);
-    }
-
-    if (action === "menu-store") {
-      setNotice(`${productId.replace("product-", "Product #")} marked for store sync.`);
-    }
-
-    setOpenMenuId("");
+  const handleSyncNow = () => {
+    dispatch(syncEbayListingsAction());
   };
 
   const scrollTable = (position) => {
-    const element = tableScrollRef.current;
-
-    if (!element) {
-      return;
-    }
-
-    element.scrollTo({
-      left: position === "end" ? element.scrollWidth : 0,
-      behavior: "smooth",
-    });
+    const el = tableScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: position === "end" ? el.scrollWidth : 0, behavior: "smooth" });
   };
+
+  if (!connected) {
+    return (
+      <section className="products-page-content">
+        <div className="products-heading">
+          <h2 className="products-heading__title">Products</h2>
+        </div>
+        <div className="products-not-connected card-wrapper">
+          <LuLink size={32} style={{ opacity: 0.4 }} />
+          <h3>No eBay account connected</h3>
+          <p>Go to <strong>Settings → Store Settings</strong> to connect your eBay seller account and sync your listings.</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="products-page-content">
       <div className="products-heading">
         <h2 className="products-heading__title">
-          Products ({products.length}) <span>and 1 more untracked products</span>
+          Products ({totalCount})
+          {loading ? <LuLoader size={14} style={{ marginLeft: 8, animation: "spin 1s linear infinite" }} /> : null}
         </h2>
       </div>
 
-      {alerts.length ? (
-        <div className="products-alerts card-wrapper">
-          {alerts.map((alert) => (
-            <div className="products-alert" key={alert.id}>
-              <div className="products-alert__copy">
-                <span className={`products-alert__dot products-alert__dot--${alert.tone}`} />
-                <span>{alert.message}</span>
-                <button type="button" className="products-alert__link">
-                  View details
-                </button>
-              </div>
-
-              <button
-                type="button"
-                className="products-alert__dismiss"
-                aria-label="Dismiss product alert"
-                onClick={() => dismissAlert(alert.id)}
-              >
-                <LuX />
-              </button>
-            </div>
-          ))}
+      {error ? (
+        <div className="products-alert">
+          <div className="products-alert__copy">
+            <span className="products-alert__dot products-alert__dot--red" />
+            <span>{error}</span>
+          </div>
         </div>
       ) : null}
 
       <div className="products-toolbar">
-        <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((current) => !current)}>
+        <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((c) => !c)}>
           <LuSlidersHorizontal />
           <span>Add Filter</span>
         </button>
@@ -231,16 +149,17 @@ function ProductsContent({ searchQuery }) {
           <button
             type="button"
             className="dashboard-secondary-btn dashboard-secondary-btn--orders"
-            onClick={() => setShowTutorialNote((current) => !current)}
+            onClick={handleSyncNow}
+            disabled={syncing}
           >
+            {syncing ? <LuLoader style={{ animation: "spin 1s linear infinite" }} /> : <LuRefreshCcw />}
+            <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
+          </button>
+          <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => setShowTutorialNote((c) => !c)}>
             <LuPlay />
             <span>Watch Tutorial</span>
           </button>
-          <button
-            type="button"
-            className="marketplace-search-panel__ugc-btn products-toolbar__ugc-btn"
-            onClick={() => setNotice("UGC generation queue started for selected products.")}
-          >
+          <button type="button" className="marketplace-search-panel__ugc-btn products-toolbar__ugc-btn" onClick={() => toast.info("UGC generation queue started.")}>
             <LuSparkles />
             <span>Generate Sales Ready UGC Ads</span>
           </button>
@@ -250,31 +169,18 @@ function ProductsContent({ searchQuery }) {
       {showTutorialNote ? (
         <div className="orders-inline-note">
           <LuPlay />
-          <span>Products tutorial is active: use bulk tools, sourcing requests, and scrollable fields to manage listings.</span>
-        </div>
-      ) : null}
-
-      {notice ? (
-        <div className="orders-inline-note orders-inline-note--success">
-          <LuBadgeCheck />
-          <span>{notice}</span>
-          <button type="button" onClick={() => setNotice("")} aria-label="Dismiss products note">
-            <LuX />
-          </button>
+          <span>Products tutorial: manage your live eBay listings, sync from eBay, and use bulk actions.</span>
         </div>
       ) : null}
 
       {showFilters ? (
         <div className="products-filter-panel card-wrapper">
           <label className="orders-filter-panel__field">
-            <span>Uploaded</span>
+            <span>Status</span>
             <div className="orders-filter-panel__select">
-              <select value={filterDate} onChange={(event) => setFilterDate(event.target.value)}>
-                <option value="All Dates">All Dates</option>
-                {["2026-04-17", "2026-04-18", "2026-04-19", "2026-04-20"].map((option) => (
-                  <option key={option} value={option}>
-                    {formatDisplayDate(option)}
-                  </option>
+              <select value={filterStatus} onChange={(e) => { setFilterStatus(e.target.value); setCurrentPage(1); }}>
+                {["All", "Active", "Draft", "Inactive", "Ended"].map((s) => (
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
               <LuChevronDown />
@@ -284,7 +190,7 @@ function ProductsContent({ searchQuery }) {
           <label className="orders-filter-panel__field">
             <span>View Mode</span>
             <div className="orders-filter-panel__select">
-              <select value={tableView} onChange={(event) => setTableView(event.target.value)}>
+              <select value={tableView} onChange={(e) => setTableView(e.target.value)}>
                 <option value="compact">Compact</option>
                 <option value="comfortable">Comfortable</option>
               </select>
@@ -302,42 +208,26 @@ function ProductsContent({ searchQuery }) {
           </label>
 
           <div className="products-bulk-actions">
-            <button type="button" onClick={() => applyBulkAction("edit")}>
-              Bulk Edit
-            </button>
-            <button type="button" onClick={() => applyBulkAction("relist")}>
-              Bulk Relist
-            </button>
-            <button type="button" onClick={() => applyBulkAction("delete")}>
-              Bulk Delete
-            </button>
-            <button type="button" onClick={() => applyBulkAction("rewrite")}>
-              Bulk AI Rewrite
-            </button>
+            <button type="button" onClick={() => applyBulkAction("edit")}>Bulk Edit</button>
+            <button type="button" onClick={() => applyBulkAction("relist")}>Bulk Relist</button>
+            <button type="button" onClick={() => applyBulkAction("delete")}>Bulk Delete</button>
+            <button type="button" onClick={() => applyBulkAction("rewrite")}>Bulk AI Rewrite</button>
           </div>
         </div>
 
         <div className="products-selection-row__right">
-          <button
-            type="button"
-            className={`products-history-btn ${historyVisible ? "products-history-btn--active" : ""}`}
-            onClick={() => setHistoryVisible((current) => !current)}
-          >
+          <button type="button" className={`products-history-btn ${historyVisible ? "products-history-btn--active" : ""}`} onClick={() => setHistoryVisible((c) => !c)}>
             View History
           </button>
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
-            <LuMenu />
-          </button>
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Return table start">
-            <LuExternalLink />
-          </button>
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns"><LuMenu /></button>
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Return table start"><LuExternalLink /></button>
         </div>
       </div>
 
       {historyVisible ? (
         <div className="products-history">
-          <span>Recent activity:</span>
-          <span>3 sourcing requests sent today, 2 product titles rewritten, 1 product deleted.</span>
+          <span>eBay sync status:</span>
+          <span>{syncing ? "Sync in progress…" : `${totalCount} listings loaded from eBay.`}</span>
         </div>
       ) : null}
 
@@ -349,109 +239,87 @@ function ProductsContent({ searchQuery }) {
                 <th className="products-table__checkbox-col" rowSpan={2} />
                 <th rowSpan={2}>Name</th>
                 <th rowSpan={2}>
-                  <button
-                    type="button"
-                    className="orders-sort-btn"
-                    onClick={() => setSortDirection((current) => (current === "desc" ? "asc" : "desc"))}
-                  >
-                    <span>Uploaded</span>
+                  <button type="button" className="orders-sort-btn" onClick={() => setSortDirection((c) => c === "desc" ? "asc" : "desc")}>
+                    <span>Created</span>
                     <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
                   </button>
                 </th>
-                <th rowSpan={2}>Sourcing Request</th>
+                <th rowSpan={2}>Status</th>
+                <th rowSpan={2}>Category</th>
                 <th className="products-table__actions-col" rowSpan={2} />
-                <th className="products-table__group products-table__group--divider" colSpan={6}>
-                  Variations
-                </th>
-                <th rowSpan={2}>Profit</th>
+                <th className="products-table__group products-table__group--divider" colSpan={3}>Stock</th>
+                <th rowSpan={2}>Price (Sell)</th>
                 <th rowSpan={2}>Item ID</th>
                 <th rowSpan={2}>Sold</th>
-                <th rowSpan={2}>DWS</th>
-                <th rowSpan={2}>Store</th>
-                <th rowSpan={2}>Asin</th>
                 <th rowSpan={2}>Views</th>
                 <th rowSpan={2}>Watchers</th>
                 <th rowSpan={2}>Days Left</th>
-                <th rowSpan={2}>Tags</th>
               </tr>
               <tr className="products-table__sub-row">
                 <th className="products-table__group--divider">Available</th>
-                <th>On Hold</th>
-                <th>Out Of Stock</th>
-                <th>Total</th>
-                <th>OOS Days</th>
-                <th>Price</th>
+                <th>Sold</th>
+                <th>Currency</th>
               </tr>
             </thead>
 
             <tbody>
-              {visibleProducts.length ? (
-                visibleProducts.map((item) => (
+              {loading ? (
+                <tr>
+                  <td className="orders-table__empty" colSpan={16}>
+                    <LuLoader style={{ animation: "spin 1s linear infinite" }} />
+                    <span>Loading listings from eBay…</span>
+                  </td>
+                </tr>
+              ) : listings.length ? (
+                listings.map((item) => (
                   <tr className="products-table__row" key={item.id}>
                     <td className="products-table__checkbox-col">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(item.id)}
-                        onChange={() => toggleSelectOne(item.id)}
-                      />
+                      <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} />
                     </td>
 
                     <td>
                       <div className="products-item">
-                        <div className="products-item__thumb">
-                          <img src={item.image} alt={item.title} />
-                        </div>
+                        {item.image_url ? (
+                          <div className="products-item__thumb">
+                            <img src={item.image_url} alt={item.title} />
+                          </div>
+                        ) : null}
                         <div className="products-item__copy">
                           <h3>{item.title}</h3>
                         </div>
                       </div>
                     </td>
 
-                    <td className="products-table__date">{formatDisplayDate(item.uploaded)}</td>
-
-                    <td>
-                      <button
-                        type="button"
-                        className={`products-sourcing-btn ${item.sourcingRequested ? "products-sourcing-btn--active" : ""}`}
-                        onClick={() => handleProductAction(item.id, "request-sourcing")}
-                      >
-                        <LuSparkles />
-                        <span>{item.sourcingRequested ? "Requested" : "Request Sourcing"}</span>
-                      </button>
+                    <td className="products-table__date">
+                      {item.created_at ? formatDisplayDate(item.created_at.slice(0, 10)) : "—"}
                     </td>
 
+                    <td>
+                      <span className={`products-status-badge products-status-badge--${item.status}`}>
+                        {item.status}
+                      </span>
+                    </td>
+
+                    <td>{item.category_name ?? "—"}</td>
+
                     <td className="products-table__actions-col">
-                      <div className="products-row-actions" onClick={(event) => event.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="orders-row-actions__icon"
-                          onClick={() => handleProductAction(item.id, "open-editor")}
-                          aria-label="Open product editor"
-                        >
-                          <LuExternalLink />
-                        </button>
-                        <button
-                          type="button"
-                          className="orders-row-actions__icon"
-                          onClick={() => setOpenMenuId((current) => (current === item.id ? "" : item.id))}
-                          aria-label="Open product menu"
-                        >
+                      <div className="products-row-actions" onClick={(e) => e.stopPropagation()}>
+                        {item.listing_url ? (
+                          <a href={item.listing_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View on eBay">
+                            <LuExternalLink />
+                          </a>
+                        ) : null}
+                        <button type="button" className="orders-row-actions__icon" onClick={() => setOpenMenuId((c) => c === item.id ? "" : item.id)} aria-label="Open product menu">
                           <LuEllipsisVertical />
                         </button>
 
                         {openMenuId === item.id ? (
                           <div className="products-actions-menu">
-                            <button type="button" onClick={() => handleProductAction(item.id, "menu-edit")}>
-                              <LuPencil />
-                              <span>Edit Product</span>
+                            <button type="button">
+                              <LuPencil /><span>Edit Product</span>
                             </button>
-                            <button type="button" onClick={() => handleProductAction(item.id, "menu-store")}>
-                              <LuStore />
-                              <span>Sync To Store</span>
-                            </button>
-                            <button type="button" onClick={() => handleProductAction(item.id, "delete")}>
-                              <LuX />
-                              <span>Delete Product</span>
+                            <button type="button">
+                              <LuStore /><span>Sync To Store</span>
                             </button>
                           </div>
                         ) : null}
@@ -459,62 +327,35 @@ function ProductsContent({ searchQuery }) {
                     </td>
 
                     <td className="products-table__group--divider">
-                      <span className="products-count products-count--green">{item.available}</span>
+                      <span className="products-count products-count--green">{item.quantity ?? 0}</span>
                     </td>
                     <td>
-                      <span className="products-count products-count--amber">{item.onHold}</span>
+                      <span className="products-count products-count--amber">{item.quantity_sold ?? 0}</span>
                     </td>
-                    <td>
-                      <span className="products-count products-count--red">{item.outOfStock}</span>
-                    </td>
-                    <td>{item.total}</td>
-                    <td>{item.oosDays}</td>
+                    <td>{item.currency ?? "USD"}</td>
 
                     <td>
                       <div className="products-paired-values">
                         <div>
-                          <span className="orders-paired-values__type">BUY</span>
-                          <strong>{item.priceBuy}</strong>
-                        </div>
-                        <div>
                           <span className="orders-paired-values__type">SELL</span>
-                          <strong>{item.priceSell}</strong>
+                          <span className="orders-paired-values__platform">ebay</span>
+                          <strong>${Number(item.price ?? 0).toFixed(2)}</strong>
                         </div>
                       </div>
                     </td>
 
-                    <td>{item.profit}</td>
-
-                    <td>
-                      <div className="products-paired-values">
-                        <div>
-                          <span className="orders-paired-values__type">BUY</span>
-                          <span className="orders-paired-values__platform">ebay</span>
-                          <strong>{item.itemBuy}</strong>
-                        </div>
-                        <div>
-                          <span className="orders-paired-values__type">SELL</span>
-                          <span className="orders-paired-values__platform">ebay</span>
-                          <strong>{item.itemSell}</strong>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td>{item.sold}</td>
-                    <td>{item.dws}</td>
-                    <td className="products-table__store">{item.store}</td>
-                    <td>{item.asin}</td>
-                    <td>{item.views}</td>
-                    <td>{item.watchers}</td>
-                    <td>{item.daysLeft}</td>
-                    <td>{item.tags}</td>
+                    <td>{item.ebay_item_id ?? "—"}</td>
+                    <td>{item.quantity_sold ?? 0}</td>
+                    <td>{item.views ?? 0}</td>
+                    <td>{item.watchers ?? 0}</td>
+                    <td>{item.days_left != null ? `${item.days_left}d` : "—"}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="orders-table__empty" colSpan={20}>
+                  <td className="orders-table__empty" colSpan={16}>
                     <LuInbox />
-                    <span>No products match the current search.</span>
+                    <span>No listings found. Click "Sync from eBay" to import your listings.</span>
                   </td>
                 </tr>
               )}
@@ -524,19 +365,13 @@ function ProductsContent({ searchQuery }) {
 
         <div className="orders-table-footer products-table-footer">
           <div className="orders-pagination">
-            <button
-              type="button"
-              className="orders-pagination__arrow"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-            >
+            <button type="button" className="orders-pagination__arrow" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
               <LuChevronLeft />
             </button>
 
             {paginationItems.map((page, index) =>
               page === "..." ? (
-                <span className="products-pagination__ellipsis" key={`ellipsis-${index}`}>
-                  ...
-                </span>
+                <span className="products-pagination__ellipsis" key={`ellipsis-${index}`}>...</span>
               ) : (
                 <button
                   type="button"
@@ -546,14 +381,10 @@ function ProductsContent({ searchQuery }) {
                 >
                   {page}
                 </button>
-              ),
+              )
             )}
 
-            <button
-              type="button"
-              className="orders-pagination__arrow"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-            >
+            <button type="button" className="orders-pagination__arrow" onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
               <LuChevronRight />
             </button>
           </div>
@@ -561,13 +392,13 @@ function ProductsContent({ searchQuery }) {
           <div className="orders-table-footer__meta">
             <label>
               <span>Show</span>
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+              <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
                 <option value={20}>20</option>
                 <option value={30}>30</option>
                 <option value={40}>40</option>
               </select>
             </label>
-            <span>Products out of {products.length}</span>
+            <span>Products out of {totalCount}</span>
           </div>
         </div>
       </div>
