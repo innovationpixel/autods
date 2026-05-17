@@ -59,7 +59,17 @@ const Markup = () => {
 
                 {/* All protected app routes */}
                 <Route element={<PrivateRoute />}>
+                    {/* MarketplaceDashboard pages — component has its own layout */}
                     <Route path="/" element={<Home />} />
+                    <Route path="/marketplace" element={<Home />} />
+                    <Route path="/print-on-demand" element={<Home />} />
+                    <Route path="/orders" element={<Home />} />
+                    <Route path="/products" element={<Home />} />
+                    <Route path="/drafts" element={<Home />} />
+                    <Route path="/customer-support" element={<Home />} />
+                    <Route path="/support-center" element={<Home />} />
+                    <Route path="/wallet" element={<Home />} />
+                    <Route path="/settings" element={<Home />} />
 
                     <Route element={<MainLayout />}>
                         {dashboardRoutes.map((r) => (

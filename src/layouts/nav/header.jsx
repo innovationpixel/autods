@@ -1,12 +1,16 @@
 import { useContext } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Dropdown } from "react-bootstrap";
+import { useDispatch } from "react-redux";
 import { IMAGES, SVGICON } from "../../constants/theme";
 import { ThemeContext } from "../../context/ThemeContext";
+import { logoutAction } from "../../store/actions/AuthActions";
 import fscreen from "fscreen";
 
 function Header({ onNote }) {
 	const { background, changeBackground } = useContext(ThemeContext);
+	const dispatch = useDispatch();
+	const navigate = useNavigate();
 	const handleThemeMode = () => {
 		if (background.value === 'dark') {
 			changeBackground({ value: "light", label: "Light" });
@@ -287,9 +291,13 @@ function Header({ onNote }) {
 														</div>
 													</li>
 													<li>
-														<Link to="/user/login">
-															<div className="icon-box-lg"> {SVGICON.logout} <p> Logout </p> </div>
-														</Link>
+														<div
+															className="icon-box-lg"
+															style={{ cursor: 'pointer' }}
+															onClick={() => dispatch(logoutAction(navigate))}
+														>
+															{SVGICON.logout} <p> Logout </p>
+														</div>
 													</li>
 												</ul>
 											</div>
