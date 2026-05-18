@@ -19,6 +19,7 @@ import Error503 from '../pages/error/Error503';
 import EmptyPage from '../pages/error/emptypage';
 import Login from '../pages/authentication/Login';
 import Registration from '../pages/authentication/Registration';
+import OAuthCallback from '../pages/OAuthCallback';
 
 // Feature route arrays
 import { dashboardRoutes } from './dashboard.routes';
@@ -49,6 +50,7 @@ const Markup = () => {
                 <Route path="/user/login" element={<Login />} />
                 <Route path="/user/register" element={<Registration />} />
                 <Route path="/user/lock-screen" element={<LockScreen />} />
+                <Route path="/oauth/callback" element={<OAuthCallback />} />
 
                 {/* Standalone error pages — no layout */}
                 <Route path="/page-error-400" element={<Error400 />} />

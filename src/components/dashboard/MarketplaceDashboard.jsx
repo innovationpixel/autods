@@ -1,4 +1,5 @@
 ﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaTiktok } from "react-icons/fa6";
 import {
@@ -56,6 +57,7 @@ import {
   LuTrash2,
   LuX,
   LuZap,
+  LuLoader,
 } from "react-icons/lu";
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
@@ -75,6 +77,8 @@ import ProductsContent from '../autods/pages/ProductsContent';
 import DraftsContent from '../autods/pages/DraftsContent';
 import HelpCenterContent from '../autods/pages/HelpCenterContent';
 import WalletContent from '../autods/pages/WalletContent';
+import { searchAliExpressAction } from '../../store/actions/AliExpressActions';
+import { selectAliItems, selectAliLoading, selectAliError, selectAliRequiresAuth } from '../../store/selectors/AliExpressSelectors';
 const catalogSections = [
   {
     key: "outdoors",
@@ -557,8 +561,33 @@ const marketplaceSections = [
   ...catalogSections.filter((section) => section.key === "outdoors"),
   ...generatedCategorySections,
 ];
+const ALIEXPRESS_CATEGORY_MAP = {
+  "Toys & Hobbies":             "1511",
+  "Home & Garden":              "13",
+  "Home Improvements & Tools":  "1420",
+  "Outdoors":                   "100006792",
+  "Sports & Fitness":           "18",
+  "Pets":                       "322",
+  "Electronics & Gadgets":      "44",
+  "Clothing, Shoes & Jewelry":  "3",
+  "Beauty & Personal Care":     "66",
+  "Automotive & Motorcycle":    "34",
+};
+
+const ALIEXPRESS_SORT_MAP = {
+  "By Relevance":   "",
+  "Newest":         "newest",
+  "Fastest Shipping": "popular",
+  "Lowest Price":   "price",
+};
+
 const MarketplaceDashboard = () => {
   const { background, changeBackground } = useContext(ThemeContext);
+  const dispatch   = useDispatch();
+  const aliItems        = useSelector(selectAliItems);
+  const aliLoading      = useSelector(selectAliLoading);
+  const aliError        = useSelector(selectAliError);
+  const aliRequiresAuth = useSelector(selectAliRequiresAuth);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activePage = pathname === "/" ? "dashboard" : pathname.slice(1);
@@ -615,6 +644,7 @@ const MarketplaceDashboard = () => {
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
   const balanceMenuRef = useRef(null);
+  const aliSearchTimer = useRef(null);
 
   useEffect(() => {
     const closeHeaderPopovers = (event) => {
@@ -696,6 +726,41 @@ const MarketplaceDashboard = () => {
       documentElement.style.touchAction = previousHtmlTouchAction;
     };
   }, [addProductModalOpen, aiCreditsModalOpen, loadBalanceModalOpen, notificationsModalOpen, notificationsOpen, storeSwitcherOpen]);
+
+  // AliExpress real-time search — fires whenever the marketplace page is active and any filter changes
+  useEffect(() => {
+    if (activePage !== "marketplace") return;
+    if (aliSearchTimer.current) clearTimeout(aliSearchTimer.current);
+
+    aliSearchTimer.current = setTimeout(() => {
+      const categoryId = ALIEXPRESS_CATEGORY_MAP[activeCategory];
+
+      let keywords = keywordSearch.trim();
+      if (activeSubfilter) keywords = `${activeSubfilter} ${keywords}`.trim();
+      if (!keywords && activeCategory && activeCategory !== "All Categories") {
+        keywords = activeCategory;
+      }
+      if (!keywords) keywords = "trending";
+
+      let sort = ALIEXPRESS_SORT_MAP[sortBy] ?? "";
+      if (selectedPill === "Best Sellers") sort = "popular";
+      if (selectedPill === "Fast Shipping") sort = "price";
+
+      const params = { q: keywords, sort, limit: 20, ships_to: shipsTo };
+
+      if (categoryId) params.category_id = categoryId;
+
+      if (priceRange !== "Select Price Range") {
+        const parts = priceRange.replace(/\$/g, "").split(" - ");
+        if (parts[0]) params.price_min = parseFloat(parts[0]);
+        if (parts[1]) params.price_max = parseFloat(parts[1]);
+      }
+
+      dispatch(searchAliExpressAction(params));
+    }, 500);
+
+    return () => clearTimeout(aliSearchTimer.current);
+  }, [activePage, dispatch, keywordSearch, shipsTo, priceRange, sortBy, activeCategory, activeSubfilter, selectedPill]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
@@ -2401,40 +2466,65 @@ const MarketplaceDashboard = () => {
                 </section>
 
                 <div className="marketplace-sections">
-                  {expandedProductsTitle ? (
+                  {aliLoading ? (
+                    <div className="marketplace-products__empty">
+                      <LuLoader style={{ animation: "spin 1s linear infinite", fontSize: 28 }} />
+                      <p>Searching AliExpress…</p>
+                    </div>
+                  ) : aliRequiresAuth ? (
+                    <div className="marketplace-products__empty">
+                      <LuStore style={{ fontSize: 40, color: "#f97316" }} />
+                      <p style={{ fontWeight: 600, fontSize: 16 }}>Connect your AliExpress account</p>
+                      <p style={{ color: "#6b7280", marginTop: 4 }}>
+                        Link your AliExpress DS account to browse and import products.
+                      </p>
+                      <button
+                        className="btn btn-primary mt-3"
+                        onClick={() => navigate("/settings?tab=store")}
+                      >
+                        Go to Settings
+                      </button>
+                    </div>
+                  ) : aliError ? (
+                    <div className="marketplace-products__empty">
+                      <LuSlidersHorizontal />
+                      <p style={{ color: "#991b1b" }}>{aliError}</p>
+                    </div>
+                  ) : aliItems.length > 0 ? (
                     <section className="marketplace-expanded-products">
                       <div className="marketplace-expanded-products__head">
-                        <h2 className="marketplace-section__title">{expandedProductsTitle}</h2>
-                        <button
-                          type="button"
-                          className="marketplace-section__see-more"
-                          onClick={resetMarketplaceView}
-                        >
-                          Back to all categories
-                        </button>
+                        <h2 className="marketplace-section__title">
+                          AliExpress&nbsp;—&nbsp;
+                          {activeCategory !== "All Categories" ? activeCategory : "Trending Products"}
+                          {keywordSearch ? ` matching "${keywordSearch}"` : ""}
+                          &nbsp;({aliItems.length} result{aliItems.length !== 1 ? "s" : ""})
+                        </h2>
                       </div>
-
-                      {visibleProducts.length ? (
-                        <div className="marketplace-expanded-products__grid">
-                          {visibleProducts.map((item) => (
-                            <ProductCard item={item} key={item.id} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="marketplace-products__empty">
-                          <LuSlidersHorizontal />
-                          <p>No products match the current filters.</p>
-                        </div>
-                      )}
+                      <div className="marketplace-expanded-products__grid">
+                        {aliItems.map((item) => (
+                          <ProductCard
+                            key={item.id}
+                            item={{
+                              id: item.id,
+                              vendor: item.seller ?? "AliExpress",
+                              title: item.title,
+                              price: `$${Number(item.price ?? 0).toFixed(2)}`,
+                              shipping: item.sold_count > 0 ? `${Number(item.sold_count).toLocaleString()} sold` : "Ships from China",
+                              shippingDays: 10,
+                              image: item.image_url,
+                              gallery: Array.isArray(item.images) && item.images.length > 1 ? item.images : undefined,
+                              shippingTag: "AliExpress",
+                              listingUrl: item.listing_url,
+                              marketplace: "aliexpress",
+                            }}
+                          />
+                        ))}
+                      </div>
                     </section>
-                  ) : visibleSections.length ? (
-                    visibleSections.map((section) => (
-                      <CarouselSection key={section.key} onSeeMore={openProductsView} section={section} />
-                    ))
                   ) : (
                     <div className="marketplace-products__empty">
                       <LuSlidersHorizontal />
-                      <p>No products match the current filters.</p>
+                      <p>No AliExpress products found. Try adjusting your search or filters.</p>
                     </div>
                   )}
                 </div>

@@ -1,10 +1,13 @@
 import {
     login,
+    register,
     logout,
     saveSession,
     clearSession,
     getStoredUser,
     getStoredToken,
+    updateProfile,
+    getMe,
 } from '../../services/AuthService';
 import { toast } from '../../utils/toast';
 
@@ -33,31 +36,90 @@ export function loginAction(email, password, navigate) {
 
 export function logoutAction(navigate) {
     return (dispatch) => {
-        logout().finally(() => {
-            clearSession();
-            dispatch({ type: LOGOUT_ACTION });
-            toast.info('You have been logged out.');
-            navigate('/user/login');
-        });
+        clearSession();
+        dispatch({ type: LOGOUT_ACTION });
+        toast.info('You have been logged out.');
+        navigate('/user/login');
+        logout().catch(() => {});
     };
 }
 
 export function checkAutoLogin(dispatch, navigate) {
     const token = getStoredToken();
-    const user = getStoredUser();
+    const user  = getStoredUser();
 
     if (!token || !user) {
         clearSession();
-        navigate('/user/login');
         return;
     }
 
+    // Hydrate Redux immediately from localStorage so the UI renders without flicker
     dispatch(loginConfirmedAction({ access_token: token, user }));
+
+    // Then fetch fresh user data from the server to ensure name/email are current
+    getMe()
+        .then((res) => {
+            const fresh = res.data;
+            // Only update if something actually changed to avoid spurious re-renders
+            if (
+                fresh.name  !== user.name  ||
+                fresh.email !== user.email ||
+                fresh.role  !== user.role
+            ) {
+                saveSession({ access_token: token, user: fresh });
+                dispatch(loginConfirmedAction({ access_token: token, user: fresh }));
+            }
+        })
+        .catch(() => {
+            // Token is invalid / expired — clear session and redirect to login
+            clearSession();
+            dispatch({ type: LOGOUT_ACTION });
+            navigate('/user/login');
+        });
+
+    if (window.location.pathname === '/user/login') {
+        navigate('/');
+    }
 }
 
-export function signupAction(email, password, navigate) {
+export function signupAction(name, email, password, passwordConfirmation, navigate) {
     return (dispatch) => {
-        dispatch(loginFailedAction('Registration is not yet implemented.'));
+        dispatch(loadingToggleAction(true));
+        register(name, email, password, passwordConfirmation)
+            .then((response) => {
+                saveSession(response.data);
+                dispatch(loginConfirmedAction(response.data));
+                toast.success('Account created successfully!');
+                navigate('/');
+            })
+            .catch((error) => {
+                const message =
+                    error.response?.data?.message ||
+                    Object.values(error.response?.data?.errors ?? {})[0]?.[0] ||
+                    'Registration failed. Please try again.';
+                dispatch(loginFailedAction(message));
+                toast.error(message);
+            })
+            .finally(() => dispatch(loadingToggleAction(false)));
+    };
+}
+
+export function updateProfileAction(payload) {
+    return (dispatch) => {
+        return updateProfile(payload)
+            .then((response) => {
+                const user = response.data.user;
+                const stored = getStoredUser();
+                saveSession({ access_token: getStoredToken(), user: { ...stored, ...user } });
+                dispatch({ type: LOGIN_CONFIRMED_ACTION, payload: { access_token: getStoredToken(), user: { ...stored, ...user } } });
+                toast.success('Profile updated successfully.');
+                return response.data;
+            })
+            .catch((error) => {
+                const message = error.response?.data?.message || 'Failed to update profile.';
+                toast.error(message);
+                throw error;
+            });
     };
 }
 

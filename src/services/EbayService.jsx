@@ -1,29 +1,33 @@
 import axiosInstance from './AxiosInstance';
 
-// eBay connection status
+// eBay connection status — returns { connected, connections: [] }
 export const getEbayStatus = () =>
     axiosInstance.get('/ebay/status');
 
-// Get eBay OAuth authorization URL (opens popup/redirect)
+// Get eBay OAuth authorization URL
 export const getEbayAuthUrl = () =>
     axiosInstance.get('/ebay/auth-url');
 
-// Disconnect eBay account
-export const disconnectEbay = () =>
-    axiosInstance.delete('/ebay/disconnect');
+// Disconnect a specific eBay account by connection ID
+export const disconnectEbayConnection = (id) =>
+    axiosInstance.delete(`/ebay/connections/${id}`);
 
-// Seller's own eBay listings (Products page)
+// Set a connection as primary
+export const setEbayPrimary = (id) =>
+    axiosInstance.patch(`/ebay/connections/${id}/primary`);
+
+// Sync listings for a specific connection
+export const syncEbayListings = (id) =>
+    axiosInstance.post(`/ebay/connections/${id}/sync`);
+
+// Seller's own eBay listings — pass connectionId to scope to one account
 export const getEbayListings = (params = {}) =>
     axiosInstance.get('/ebay/listings', { params });
 
-// Sync listings from eBay (pull latest from eBay API)
-export const syncEbayListings = () =>
-    axiosInstance.post('/ebay/listings/sync');
-
-// Draft listings (Drafts page)
+// Draft listings
 export const getEbayDrafts = (params = {}) =>
     axiosInstance.get('/ebay/drafts', { params });
 
-// Browse eBay marketplace (Marketplace page)
+// Browse eBay marketplace
 export const searchEbayMarketplace = (params = {}) =>
     axiosInstance.get('/ebay/marketplace/search', { params });

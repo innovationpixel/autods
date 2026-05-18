@@ -1,9 +1,11 @@
 import axios from 'axios';
 import { BASE_URL } from '../config/api';
+import { clearSession } from './AuthService';
 
 const axiosInstance = axios.create({
     baseURL: BASE_URL,
     headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
 });
 
 axiosInstance.interceptors.request.use((config) => {
@@ -17,9 +19,8 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
+        if (error.response?.status === 401 && !error.response?.data?.requires_auth) {
+            clearSession();
             window.location.href = '/user/login';
         }
         return Promise.reject(error);

@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { IMAGES, SVGICON } from "../../constants/theme";
 import { ThemeContext } from "../../context/ThemeContext";
 import { logoutAction } from "../../store/actions/AuthActions";
+import { getStoredUser } from "../../services/AuthService";
 import fscreen from "fscreen";
 
 function Header({ onNote }) {
@@ -12,7 +13,7 @@ function Header({ onNote }) {
 	const dispatch = useDispatch();
 	const navigate = useNavigate();
 
-	const user = useSelector((state) => state.auth.auth.user);
+	const user = useSelector((state) => state.auth.auth.user) || getStoredUser();
 	const userName  = user?.name  ?? "User";
 	const userEmail = user?.email ?? "";
 	const userInitials = userName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);

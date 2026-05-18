@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useLocation } from "react-router-dom";
 import {
   LuBadgeCheck,
   LuChevronDown,
@@ -14,9 +15,14 @@ import {
   LuRefreshCcw,
   LuX,
 } from "react-icons/lu";
-import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction } from "../../store/actions/EbayActions";
+import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
+import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/actions/AliExpressActions";
+import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl } from "../../services/EbayService";
-import { selectEbayConnection, selectEbaySyncing } from "../../store/selectors/EbaySelectors";
+import { getAliExpressAuthUrl } from "../../services/AliExpressService";
+import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
+import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
+import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 
 const settingsPrimaryTabs = [
@@ -34,27 +40,8 @@ const settingsPrimaryTabs = [
 
 const settingsInnerTabs = ["Lister", "Pricing", "Orders", "General"];
 
-const storeOptions = [
-  "nrf-enterprise_inc-llc-au",
-  "sheikh002-au",
-  "storefront-global-us",
-];
 
-const plansOverviewCards = [
-  {
-    id: "ebay-plan",
-    name: "eBay",
-    logo: "ebay",
-    current: true,
-    summary: "Master 10K | $345.90/mo",
-    metrics: [
-      { label: "Started On:", value: "April 15, 2026" },
-      { label: "Variations:", value: "14777/10000" },
-      { label: "Stores:", value: "2/500" },
-    ],
-    secondaryAction: "Cancel",
-    primaryAction: "Upgrade Plan",
-  },
+const staticPlanCards = [
   {
     id: "shopify-plan",
     name: "Shopify",
@@ -66,7 +53,7 @@ const plansOverviewCards = [
     id: "amazon-plan",
     name: "Amazon",
     logo: "a",
-    copy: "AutoDS automates your product listings, prices, customer orders, price/stock monitoring, and more, so you can invest your growing your Amazon business.",
+    copy: "AutoDS automates your product listings, prices, customer orders, price/stock monitoring, and more.",
     primaryAction: "Buy plan",
   },
   {
@@ -87,7 +74,7 @@ const plansOverviewCards = [
     id: "woocommerce-plan",
     name: "WooCommerce",
     logo: "woo",
-    copy: "AutoDS automates your product listings, product editing, image optimization, customer orders, pricing, and stock monitoring from 25+ global suppliers.",
+    copy: "AutoDS automates your product listings, product editing, image optimization, customer orders, pricing, and stock monitoring.",
     primaryAction: "Buy plan",
   },
 ];
@@ -123,14 +110,6 @@ const settingsAddOns = [
   },
 ];
 
-const accountBillingHistory = [
-  {
-    date: "Apr 15, 2026",
-    id: "A-171242-8736",
-    type: "eBay Plan",
-    amount: "$0.00",
-  },
-];
 
 const supplierTemplates = [
   { id: "ebay-au", label: "eBay AU", badge: "ebay" },
@@ -454,21 +433,35 @@ function buildPricingSummary(pricing) {
 
 export default function MarketplaceSettingsPage() {
   const dispatch = useDispatch();
-  const ebayConnection = useSelector(selectEbayConnection);
-  const ebaySyncing    = useSelector(selectEbaySyncing);
+  const { search } = useLocation();
+  const ebayConnections        = useSelector(selectEbayConnections);
+  const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
+  const ebaySyncingIds         = useSelector(selectEbaySyncingIds);
+  const aliConnection          = useSelector(selectAliConnection);
+  const user                   = useSelector(selectUser);
 
-  const [activePrimaryTab, setActivePrimaryTab] = useState("Supplier Settings");
+  const initialTab = useMemo(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    if (tab === "store") return "Store Settings";
+    return "Supplier Settings";
+  }, [search]);
+
+  const [activePrimaryTab, setActivePrimaryTab] = useState(initialTab);
   const [activeInnerTab, setActiveInnerTab] = useState("Lister");
-  const [selectedStore, setSelectedStore] = useState(storeOptions[0]);
+  const primaryEbayConnection = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0] ?? null;
+  const storeOptions = ebayConnections.length > 0
+    ? ebayConnections.map((c) => c.ebay_username ?? `eBay Account ${c.id}`)
+    : ["No store connected"];
+  const selectedStore = storeOptions[0];
   const [suppliers, setSuppliers] = useState(createInitialSuppliers);
   const [activeSupplierId, setActiveSupplierId] = useState(supplierTemplates[0].id);
   const [itemSpecificDraft, setItemSpecificDraft] = useState({ name: "", description: "" });
   const [editAllItemSpecifics, setEditAllItemSpecifics] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
-  const [inactiveSubscriptionModalOpen, setInactiveSubscriptionModalOpen] = useState(false);
   const [saveNotice, setSaveNotice] = useState("");
   const [ebayConnecting, setEbayConnecting] = useState(false);
+  const [aliConnecting, setAliConnecting] = useState(false);
   const popupRef = useRef(null);
 
   useEffect(() => {
@@ -490,178 +483,274 @@ export default function MarketplaceSettingsPage() {
     setEditAllItemSpecifics(false);
   }, [activeInnerTab, activePrimaryTab, activeSupplierId]);
 
-  useEffect(() => {
-    if (activePrimaryTab === "Account & Billing") {
-      setInactiveSubscriptionModalOpen(true);
-      return;
-    }
-
-    setInactiveSubscriptionModalOpen(false);
-  }, [activePrimaryTab]);
-
-  useEffect(() => {
-    if (!inactiveSubscriptionModalOpen) {
-      return undefined;
-    }
-
-    const { body, documentElement } = document;
-    const previousBodyOverflow = body.style.overflow;
-    const previousBodyTouchAction = body.style.touchAction;
-    const previousHtmlOverflow = documentElement.style.overflow;
-    const previousHtmlTouchAction = documentElement.style.touchAction;
-
-    body.style.overflow = "hidden";
-    body.style.touchAction = "none";
-    documentElement.style.overflow = "hidden";
-    documentElement.style.touchAction = "none";
-
-    return () => {
-      body.style.overflow = previousBodyOverflow;
-      body.style.touchAction = previousBodyTouchAction;
-      documentElement.style.overflow = previousHtmlOverflow;
-      documentElement.style.touchAction = previousHtmlTouchAction;
-    };
-  }, [inactiveSubscriptionModalOpen]);
-
-  // ─── eBay connection ────────────────────────────────────────────────────────
+  // ─── eBay + AliExpress connection status ─────────────────────────────────────
   useEffect(() => {
     dispatch(fetchEbayStatus());
+    dispatch(fetchAliExpressStatus());
   }, [dispatch]);
 
-  // Detect redirect back from eBay OAuth
+  // Listen for OAuth postMessage from the /oauth/callback popup
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const status = params.get("ebay");
-    if (status === "connected") {
-      toast.success("eBay account connected successfully!");
-      setActivePrimaryTab("Store Settings");
-      dispatch(fetchEbayStatus());
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (status === "error") {
-      const reason = params.get("reason") ?? "Unknown error";
-      toast.error(`eBay connection failed: ${reason}`);
-      window.history.replaceState({}, "", window.location.pathname);
-    }
+    const handleOAuthMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      const { type, platform, status, reason } = event.data ?? {};
+      if (type !== 'OAUTH_CALLBACK') return;
+
+      if (platform === 'ebay') {
+        setEbayConnecting(false);
+        if (status === 'connected') {
+          toast.success('eBay account connected successfully!');
+          dispatch(fetchEbayStatus());
+        } else {
+          toast.error(`eBay connection failed: ${reason ?? 'Unknown error'}`);
+        }
+      }
+
+      if (platform === 'aliexpress') {
+        setAliConnecting(false);
+        if (status === 'connected') {
+          toast.success('AliExpress account connected successfully!');
+          dispatch(fetchAliExpressStatus());
+        } else {
+          toast.error(`AliExpress connection failed: ${reason ?? 'Unknown error'}`);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+    return () => window.removeEventListener('message', handleOAuthMessage);
   }, [dispatch]);
+
+  const openOAuthPopup = (url, name) => {
+    const width  = 620;
+    const height = 720;
+    const left   = Math.round(window.screenX + (window.outerWidth  - width)  / 2);
+    const top    = Math.round(window.screenY + (window.outerHeight - height) / 2);
+    return window.open(url, name, `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1`);
+  };
 
   const connectEbay = async () => {
     try {
       setEbayConnecting(true);
-      const res = await getEbayAuthUrl();
-      const authUrl = res.data.url;
-      const popup = window.open(authUrl, "ebay_oauth", "width=600,height=700,left=200,top=100");
+      const res    = await getEbayAuthUrl();
+      const popup  = openOAuthPopup(res.data.url, 'ebay_oauth');
       popupRef.current = popup;
 
-      const timer = setInterval(() => {
+      // Fallback: if popup closes without sending postMessage (e.g. user closes manually)
+      const poll = setInterval(() => {
         if (!popup || popup.closed) {
-          clearInterval(timer);
+          clearInterval(poll);
           setEbayConnecting(false);
           dispatch(fetchEbayStatus());
         }
       }, 800);
     } catch (err) {
-      const msg = err.response?.data?.error ?? "Failed to start eBay authorization.";
-      toast.error(msg);
       setEbayConnecting(false);
+      toast.error(err.response?.data?.error ?? 'Failed to start eBay authorization.');
     }
   };
 
-  const disconnectEbay = () => {
-    if (!window.confirm("Disconnect your eBay account? Your synced listings will remain in the database.")) return;
-    dispatch(disconnectEbayAction());
+  const disconnectEbay = (id) => {
+    if (!window.confirm('Disconnect this eBay account? Synced listings from it will remain in the database.')) return;
+    dispatch(disconnectEbayAction(id));
   };
 
-  const syncNow = () => {
-    dispatch(syncEbayListingsAction());
+  const setPrimaryEbay = (id) => dispatch(setEbayPrimaryAction(id));
+
+  const connectAliExpress = async () => {
+    try {
+      setAliConnecting(true);
+      const res   = await getAliExpressAuthUrl();
+      const popup = openOAuthPopup(res.data.url, 'aliexpress_oauth');
+      popupRef.current = popup;
+
+      const poll = setInterval(() => {
+        if (!popup || popup.closed) {
+          clearInterval(poll);
+          setAliConnecting(false);
+          dispatch(fetchAliExpressStatus());
+        }
+      }, 800);
+    } catch (err) {
+      setAliConnecting(false);
+      toast.error(err.response?.data?.error ?? 'Failed to start AliExpress authorization.');
+    }
   };
+
+  const disconnectAliExpress = () => {
+    if (!window.confirm('Disconnect your AliExpress account?')) return;
+    dispatch(disconnectAliExpressAction());
+  };
+
+  const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
 
   const renderStoreSettingsTab = () => (
     <div className="marketplace-settings__store-settings card-wrapper">
+
+      {/* ── eBay section ─────────────────────────────────────────────────────── */}
       <div className="marketplace-settings__store-settings-header">
-        <h3>Connected Marketplaces</h3>
-        <p>Connect your eBay seller account to sync your listings, manage products, and track performance.</p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>
+              <span style={{ fontWeight: 900, letterSpacing: -1, marginRight: 8 }}>
+                <span style={{ color: "#E53238" }}>e</span>
+                <span style={{ color: "#0064D2" }}>B</span>
+                <span style={{ color: "#F5AF02" }}>a</span>
+                <span style={{ color: "#86B817" }}>y</span>
+              </span>
+              Accounts
+            </h3>
+            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
+              Connect multiple eBay seller accounts. Use the <em>Primary</em> badge to set which account is used by default.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+            onClick={connectEbay}
+            disabled={ebayConnecting}
+            style={{ flexShrink: 0 }}
+          >
+            {ebayConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+            <span>{ebayConnecting ? "Opening eBay…" : "Add eBay Account"}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="marketplace-settings__ebay-card">
-        <div className="marketplace-settings__ebay-logo">
-          <span style={{ fontWeight: 900, fontSize: 28, letterSpacing: -1 }}>
-            <span style={{ color: "#E53238" }}>e</span>
-            <span style={{ color: "#0064D2" }}>B</span>
-            <span style={{ color: "#F5AF02" }}>a</span>
-            <span style={{ color: "#86B817" }}>y</span>
-          </span>
+      {/* Connected eBay accounts list */}
+      {ebayConnectionsLoading ? (
+        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading" style={{ padding: "16px 0" }}>
+          <LuLoader className="spin-icon" />
+          <span>Checking connection status…</span>
         </div>
+      ) : ebayConnections.length === 0 ? (
+        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
+          <LuUnplug />
+          <span>No eBay accounts connected. Click <em>Add eBay Account</em> to get started.</span>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+          {ebayConnections.map((conn) => {
+            const isSyncing = ebaySyncingIds.includes(conn.id);
+            return (
+              <div key={conn.id} className="marketplace-settings__ebay-card" style={{ background: conn.is_primary ? "#f0fdf4" : undefined, border: conn.is_primary ? "1px solid #bbf7d0" : undefined }}>
+                <div className="marketplace-settings__ebay-info">
+                  <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
+                    <LuBadgeCheck />
+                    <span>
+                      <strong>{conn.ebay_username ?? "eBay Seller"}</strong>
+                      {conn.is_primary && (
+                        <span style={{ marginLeft: 8, fontSize: 11, background: "#065f46", color: "#fff", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>
+                          PRIMARY
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <p className="marketplace-settings__ebay-sub">
+                    Site: {conn.site_id ?? "EBAY_US"}&nbsp;·&nbsp;
+                    Connected: {conn.connected_at ? new Date(conn.connected_at).toLocaleDateString() : "—"}
+                  </p>
+                </div>
 
-        <div className="marketplace-settings__ebay-info">
-          {ebayConnection.loading ? (
-            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading">
-              <LuLoader className="spin-icon" />
-              <span>Checking connection status…</span>
-            </div>
-          ) : ebayConnection.connected ? (
-            <>
-              <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
-                <LuBadgeCheck />
-                <span>Connected as <strong>{ebayConnection.ebay_username ?? "eBay Seller"}</strong></span>
+                <div className="marketplace-settings__ebay-actions">
+                  {!conn.is_primary && (
+                    <button
+                      type="button"
+                      className="marketplace-settings__ebay-btn"
+                      style={{ background: "#f3f4f6", color: "#374151" }}
+                      onClick={() => setPrimaryEbay(conn.id)}
+                    >
+                      Set Primary
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--sync"
+                    onClick={() => syncNow(conn.id)}
+                    disabled={isSyncing}
+                  >
+                    {isSyncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+                    <span>{isSyncing ? "Syncing…" : "Sync"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
+                    onClick={() => disconnectEbay(conn.id)}
+                  >
+                    <LuUnplug />
+                    <span>Disconnect</span>
+                  </button>
+                </div>
               </div>
-              <p className="marketplace-settings__ebay-sub">
-                Site: {ebayConnection.site_id ?? "EBAY_US"} &nbsp;·&nbsp;
-                Connected: {ebayConnection.connected_at ? new Date(ebayConnection.connected_at).toLocaleDateString() : "—"}
-              </p>
-            </>
-          ) : (
-            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected">
-              <LuUnplug />
-              <span>Not connected — connect your eBay seller account to start syncing.</span>
-            </div>
-          )}
+            );
+          })}
         </div>
+      )}
 
-        <div className="marketplace-settings__ebay-actions">
-          {ebayConnection.connected ? (
-            <>
-              <button
-                type="button"
-                className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--sync"
-                onClick={syncNow}
-                disabled={ebaySyncing}
-              >
-                {ebaySyncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
-                <span>{ebaySyncing ? "Syncing…" : "Sync Listings"}</span>
-              </button>
-              <button
-                type="button"
-                className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
-                onClick={disconnectEbay}
-              >
-                <LuUnplug />
-                <span>Disconnect</span>
-              </button>
-            </>
-          ) : (
+      {/* ── AliExpress section ───────────────────────────────────────────────── */}
+      <div className="marketplace-settings__store-settings-header" style={{ marginTop: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#e43226" }}>
+              Ali<span style={{ color: "#ff6a00" }}>Express</span>
+            </h3>
+            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
+              Authorize your AliExpress DS account to browse and import supplier products.
+            </p>
+          </div>
+          {!aliConnection.connected && (
             <button
               type="button"
               className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
-              onClick={connectEbay}
-              disabled={ebayConnecting}
+              onClick={connectAliExpress}
+              disabled={aliConnecting}
+              style={{ flexShrink: 0 }}
             >
-              {ebayConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
-              <span>{ebayConnecting ? "Opening eBay…" : "Connect eBay"}</span>
+              {aliConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+              <span>{aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}</span>
             </button>
           )}
         </div>
       </div>
 
-      <div className="marketplace-settings__store-settings-note">
-        <strong>How it works:</strong>
-        <ol>
-          <li>Click <em>Connect eBay</em> — a popup will open with the eBay authorization page.</li>
-          <li>Log in with your eBay seller account and grant access.</li>
-          <li>Return here and click <em>Sync Listings</em> to import your active eBay listings.</li>
-          <li>Your products, drafts, and orders will now show live data from your eBay account.</li>
-        </ol>
-        <p>You can only connect one eBay account per workspace. To switch accounts, disconnect first.</p>
-      </div>
+      {aliConnection.loading ? (
+        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading" style={{ padding: "16px 0" }}>
+          <LuLoader className="spin-icon" />
+          <span>Checking connection status…</span>
+        </div>
+      ) : aliConnection.connected ? (
+        <div className="marketplace-settings__ebay-card" style={{ marginTop: 12, background: "#fff7f0", border: "1px solid #fed7aa" }}>
+          <div className="marketplace-settings__ebay-info">
+            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
+              <LuBadgeCheck style={{ color: "#c2410c" }} />
+              <span>
+                Connected as <strong>{aliConnection.ae_user_nick ?? aliConnection.ae_account ?? "AliExpress Seller"}</strong>
+              </span>
+            </div>
+            {aliConnection.ae_account && (
+              <p className="marketplace-settings__ebay-sub">
+                Account: {aliConnection.ae_account}&nbsp;·&nbsp;
+                Connected: {aliConnection.connected_at ? new Date(aliConnection.connected_at).toLocaleDateString() : "—"}
+              </p>
+            )}
+          </div>
+          <div className="marketplace-settings__ebay-actions">
+            <button
+              type="button"
+              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
+              onClick={disconnectAliExpress}
+            >
+              <LuUnplug />
+              <span>Disconnect</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
+          <LuUnplug />
+          <span>Not connected — click <em>Connect AliExpress</em> above to enable supplier access.</span>
+        </div>
+      )}
     </div>
   );
 
@@ -854,10 +943,6 @@ export default function MarketplaceSettingsPage() {
     setSaveNotice(`${activeInnerTab} settings saved for ${activeSupplier.label}.`);
   };
 
-  const openPlansAndAddOns = () => {
-    setInactiveSubscriptionModalOpen(false);
-    setActivePrimaryTab("Plans & Add-ons");
-  };
 
   const renderListerTab = () => (
     <div className="marketplace-settings__tab-panel">
@@ -1372,13 +1457,43 @@ export default function MarketplaceSettingsPage() {
     </div>
   );
 
-  const renderPlansAddOnsTab = () => (
+  const renderPlansAddOnsTab = () => {
+    const ebayConnected = ebayConnections.length > 0;
+    const ebayCard = ebayConnected
+      ? {
+          id: "ebay-plan",
+          name: "eBay",
+          logo: "ebay",
+          current: true,
+          summary: ebayConnections.length === 1
+            ? (primaryEbayConnection?.ebay_username ? `Connected as ${primaryEbayConnection.ebay_username}` : "Connected")
+            : `${ebayConnections.length} accounts connected`,
+          metrics: [
+            { label: "Accounts:", value: String(ebayConnections.length) },
+            { label: "Primary:", value: primaryEbayConnection?.ebay_username ?? "—" },
+            { label: "Site:", value: primaryEbayConnection?.site_id ?? "—" },
+          ],
+          secondaryAction: "Manage Accounts",
+          primaryAction: "Add Account",
+        }
+      : {
+          id: "ebay-plan",
+          name: "eBay",
+          logo: "ebay",
+          current: false,
+          copy: "Connect your eBay seller account to sync listings, manage products, and track performance.",
+          primaryAction: "Connect eBay",
+        };
+
+    const allPlans = [ebayCard, ...staticPlanCards];
+
+    return (
     <section className="marketplace-settings__full-panel card-wrapper">
       <div className="marketplace-settings__plans-layout">
         <div className="marketplace-settings__plans-main">
           <div className="marketplace-settings__plans-heading">My Plans</div>
           <div className="marketplace-settings__plans-grid">
-            {plansOverviewCards.map((plan) => (
+            {allPlans.map((plan) => (
               <article
                 className={`marketplace-settings__plan-card ${plan.current ? "marketplace-settings__plan-card--current" : ""}`}
                 key={plan.id}
@@ -1406,7 +1521,13 @@ export default function MarketplaceSettingsPage() {
 
                 <div className="marketplace-settings__plan-actions">
                   {plan.secondaryAction ? (
-                    <button type="button" className="marketplace-settings__plan-link">
+                    <button
+                      type="button"
+                      className="marketplace-settings__plan-link"
+                      onClick={plan.id === "ebay-plan" && plan.secondaryAction === "Manage Accounts"
+                        ? () => setActivePrimaryTab("Store Settings")
+                        : undefined}
+                    >
                       {plan.secondaryAction}
                     </button>
                   ) : (
@@ -1415,8 +1536,10 @@ export default function MarketplaceSettingsPage() {
                   <button
                     type="button"
                     className={plan.current ? "marketplace-settings__plan-btn marketplace-settings__plan-btn--outline" : "marketplace-settings__plan-btn"}
+                    onClick={plan.id === "ebay-plan" ? connectEbay : undefined}
+                    disabled={plan.id === "ebay-plan" && ebayConnecting}
                   >
-                    {plan.primaryAction}
+                    {plan.id === "ebay-plan" && ebayConnecting ? "Opening eBay…" : plan.primaryAction}
                   </button>
                 </div>
               </article>
@@ -1463,16 +1586,132 @@ export default function MarketplaceSettingsPage() {
         </aside>
       </div>
     </section>
-  );
+    );
+  };
+
+  const [profileName, setProfileName] = useState(user?.name ?? "");
+  const [profileEmail, setProfileEmail] = useState(user?.email ?? "");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const saveProfile = async () => {
+    if (newPassword && newPassword !== confirmPassword) {
+      toast.error("New passwords do not match.");
+      return;
+    }
+    if (newPassword && newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
+    setProfileSaving(true);
+    try {
+      const payload = {};
+      if (profileName !== user?.name)   payload.name  = profileName;
+      if (profileEmail !== user?.email) payload.email = profileEmail;
+      if (newPassword) {
+        payload.current_password  = currentPassword;
+        payload.password          = newPassword;
+        payload.password_confirmation = confirmPassword;
+      }
+      if (!Object.keys(payload).length) {
+        toast.info("No changes to save.");
+        return;
+      }
+      await dispatch(updateProfileAction(payload));
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   const renderAccountBillingTab = () => (
     <section className="marketplace-settings__full-panel marketplace-settings__billing-page card-wrapper">
       <div className="marketplace-settings__billing-section">
         <h3>Account Details</h3>
-        <div className="marketplace-settings__billing-inline">
-          <span>roselime9900@gmail.com</span>
-          <button type="button">Manage Email</button>
-          <button type="button">Change Password</button>
+        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
+          <div>
+            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              Full Name
+            </label>
+            <input
+              className="marketplace-settings__control"
+              type="text"
+              value={profileName}
+              onChange={(e) => setProfileName(e.target.value)}
+              placeholder="Your name"
+            />
+          </div>
+          <div>
+            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              Email Address
+            </label>
+            <input
+              className="marketplace-settings__control"
+              type="email"
+              value={profileEmail}
+              onChange={(e) => setProfileEmail(e.target.value)}
+              placeholder="your@email.com"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="marketplace-settings__billing-section">
+        <h3>Change Password</h3>
+        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
+          <div>
+            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              Current Password
+            </label>
+            <input
+              className="marketplace-settings__control"
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Enter current password"
+              autoComplete="current-password"
+            />
+          </div>
+          <div>
+            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              New Password
+            </label>
+            <input
+              className="marketplace-settings__control"
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+          </div>
+          <div>
+            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
+              Confirm New Password
+            </label>
+            <input
+              className="marketplace-settings__control"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              autoComplete="new-password"
+            />
+          </div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <button
+            type="button"
+            className="marketplace-settings__save-btn"
+            onClick={saveProfile}
+            disabled={profileSaving}
+          >
+            {profileSaving ? "Saving…" : "Save Changes"}
+          </button>
         </div>
       </div>
 
@@ -1492,7 +1731,6 @@ export default function MarketplaceSettingsPage() {
       <div className="marketplace-settings__billing-section">
         <div className="marketplace-settings__billing-head">
           <h3>Payment History</h3>
-          <button type="button">See All</button>
         </div>
         <div className="marketplace-settings__billing-history">
           <div className="marketplace-settings__billing-history-head">
@@ -1501,91 +1739,11 @@ export default function MarketplaceSettingsPage() {
             <span>Type</span>
             <span>Total</span>
           </div>
-          {accountBillingHistory.map((item) => (
-            <div className="marketplace-settings__billing-history-row" key={item.id}>
-              <span>{item.date}</span>
-              <span>{item.id}</span>
-              <span>{item.type}</span>
-              <strong>{item.amount}</strong>
-            </div>
-          ))}
+          <div style={{ padding: "20px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+            No payment history yet.
+          </div>
         </div>
       </div>
-
-      {inactiveSubscriptionModalOpen ? (
-        <div className="marketplace-settings__plan-modal-layer" role="dialog" aria-modal="true" aria-label="Inactive subscription">
-          <button
-            type="button"
-            className="marketplace-settings__modal-backdrop"
-            aria-label="Close inactive subscription"
-            onClick={() => setInactiveSubscriptionModalOpen(false)}
-          />
-
-          <section className="marketplace-settings__plan-modal">
-            <button
-              type="button"
-              className="marketplace-settings__modal-close"
-              aria-label="Close"
-              onClick={() => setInactiveSubscriptionModalOpen(false)}
-            >
-              <LuX />
-            </button>
-
-            <div className="marketplace-settings__plan-illustration" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
-
-            <h3>Your store activities are temporarily inactive with limited access</h3>
-            <p>
-              Your account is currently inactive, which affects your subscriptions. To regain access to your subscription plans,
-              <strong> reactivate your account.</strong>
-            </p>
-
-            <div className="marketplace-settings__plan-modal-list">
-              <div className="marketplace-settings__plan-modal-row">
-                <div className="marketplace-settings__plan-modal-main">
-                  <span className="marketplace-settings__plan-modal-badge">ebay</span>
-                  <strong>eBay Plan</strong>
-                  <em>Failed Payment</em>
-                </div>
-                <span className="marketplace-settings__plan-modal-price">$345.9/mo</span>
-                <button type="button" className="marketplace-settings__plan-link">
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-            <div className="marketplace-settings__plan-modal-subtitle">Your add-ons:</div>
-
-            <div className="marketplace-settings__plan-modal-list">
-              <div className="marketplace-settings__plan-modal-row marketplace-settings__plan-modal-row--addon">
-                <div className="marketplace-settings__plan-modal-main">
-                  <span className="marketplace-settings__plan-modal-addon-icon">+</span>
-                  <div>
-                    <strong>Orders Processor</strong>
-                    <span>Automate your orders and tracking updates</span>
-                  </div>
-                </div>
-                <span className="marketplace-settings__plan-modal-price">$9.9/mo</span>
-                <button type="button" className="marketplace-settings__plan-link">
-                  Cancel
-                </button>
-              </div>
-            </div>
-
-            <div className="marketplace-settings__plan-modal-actions">
-              <button type="button" className="marketplace-settings__plan-modal-link" onClick={openPlansAndAddOns}>
-                Select another plan
-              </button>
-              <button type="button" className="marketplace-settings__modal-btn marketplace-settings__modal-btn--primary">
-                Reactivate Account
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
     </section>
   );
 
@@ -1627,7 +1785,7 @@ export default function MarketplaceSettingsPage() {
               <SettingsSelect
                 value={selectedStore}
                 options={storeOptions}
-                onChange={(event) => setSelectedStore(event.target.value)}
+                onChange={() => {}}
               />
             </SettingsField>
 
