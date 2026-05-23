@@ -16,7 +16,11 @@ import {
 
 const handleAliError = (err) => {
     const data = err.response?.data ?? {};
-    return { error: data.error ?? 'AliExpress request failed.', requires_auth: data.requires_auth ?? false };
+    return {
+        error: data.error ?? 'AliExpress request failed.',
+        requires_auth: data.requires_auth ?? false,
+        credentials_missing: data.credentials_missing ?? false,
+    };
 };
 
 export const searchAliExpressAction = (params = {}) => (dispatch) => {

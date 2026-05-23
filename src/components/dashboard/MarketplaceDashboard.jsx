@@ -1,4 +1,4 @@
-﻿import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaTiktok } from "react-icons/fa6";
@@ -64,7 +64,7 @@ import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
-import { storeSwitcherItems, sidebarGroups, filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT } from '../autods/constants';
+import { sidebarGroups, filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT } from '../autods/constants';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
@@ -77,8 +77,33 @@ import ProductsContent from '../autods/pages/ProductsContent';
 import DraftsContent from '../autods/pages/DraftsContent';
 import HelpCenterContent from '../autods/pages/HelpCenterContent';
 import WalletContent from '../autods/pages/WalletContent';
-import { searchAliExpressAction } from '../../store/actions/AliExpressActions';
-import { selectAliItems, selectAliLoading, selectAliError, selectAliRequiresAuth } from '../../store/selectors/AliExpressSelectors';
+import { fetchEbayStatus, disconnectEbayAction } from '../../store/actions/EbayActions';
+import { selectEbayConnections, selectEbayConnectionsLoading } from '../../store/selectors/EbaySelectors';
+import { getEbayAuthUrl } from '../../services/EbayService';
+import {
+  mapEbayConnectionToStore,
+  parseEbayConnectionId,
+} from '../../utils/ebayStore';
+import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
+import { useOAuthHandler } from '../../hooks/useOAuthHandler';
+import {
+  openOAuthPopup,
+  openAliExpressOAuth,
+  watchOAuthPopup,
+  markOAuthReturnOrigin,
+  ALIEXPRESS_OAUTH_HINT,
+} from '../../utils/oauthBridge';
+import {
+  selectAliItems,
+  selectAliLoading,
+  selectAliError,
+  selectAliRequiresAuth,
+  selectAliCredentialsMissing,
+  selectAliConnected,
+  selectAliCredentialsConfigured,
+} from '../../store/selectors/AliExpressSelectors';
+import { getAliExpressAuthUrl } from '../../services/AliExpressService';
+import { toast } from '../../utils/toast';
 const catalogSections = [
   {
     key: "outdoors",
@@ -575,10 +600,10 @@ const ALIEXPRESS_CATEGORY_MAP = {
 };
 
 const ALIEXPRESS_SORT_MAP = {
-  "By Relevance":   "",
-  "Newest":         "newest",
-  "Fastest Shipping": "popular",
-  "Lowest Price":   "price",
+  "By Relevance":     "volumeDesc",
+  "Newest":           "volumeDesc",
+  "Fastest Shipping": "volumeAsc",
+  "Lowest Price":     "priceAsc",
 };
 
 const MarketplaceDashboard = () => {
@@ -588,6 +613,14 @@ const MarketplaceDashboard = () => {
   const aliLoading      = useSelector(selectAliLoading);
   const aliError        = useSelector(selectAliError);
   const aliRequiresAuth = useSelector(selectAliRequiresAuth);
+  const aliCredentialsMissing = useSelector(selectAliCredentialsMissing);
+  const aliConnected    = useSelector(selectAliConnected);
+  const aliCredentialsConfigured = useSelector(selectAliCredentialsConfigured);
+  const ebayConnections = useSelector(selectEbayConnections);
+  const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
+  const [aliConnecting, setAliConnecting] = useState(false);
+  const [ebayConnecting, setEbayConnecting] = useState(false);
+  const [storeOverrides, setStoreOverrides] = useState({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activePage = pathname === "/" ? "dashboard" : pathname.slice(1);
@@ -617,10 +650,9 @@ const MarketplaceDashboard = () => {
     popular: 0,
     "best-sellers": 0,
   });
-  const [stores, setStores] = useState(storeSwitcherItems);
-  const [sidebarStoreId, setSidebarStoreId] = useState(storeSwitcherItems[0].id);
-  const [selectedStoreIds, setSelectedStoreIds] = useState(storeSwitcherItems.map((store) => store.id));
-  const [pendingSelectedStoreIds, setPendingSelectedStoreIds] = useState(storeSwitcherItems.map((store) => store.id));
+  const [sidebarStoreId, setSidebarStoreId] = useState('');
+  const [selectedStoreIds, setSelectedStoreIds] = useState([]);
+  const [pendingSelectedStoreIds, setPendingSelectedStoreIds] = useState([]);
   const [storeSwitcherSearch, setStoreSwitcherSearch] = useState("");
   const [storeSwitcherMenuId, setStoreSwitcherMenuId] = useState("");
   const [renamingStoreId, setRenamingStoreId] = useState("");
@@ -727,40 +759,169 @@ const MarketplaceDashboard = () => {
     };
   }, [addProductModalOpen, aiCreditsModalOpen, loadBalanceModalOpen, notificationsModalOpen, notificationsOpen, storeSwitcherOpen]);
 
-  // AliExpress real-time search — fires whenever the marketplace page is active and any filter changes
+  useEffect(() => {
+    dispatch(fetchEbayStatus());
+    dispatch(fetchAliExpressStatus());
+  }, [dispatch]);
+
+  const stores = useMemo(
+    () =>
+      ebayConnections.map((connection) => {
+        const base = mapEbayConnectionToStore(connection);
+        const override = storeOverrides[base.id] ?? {};
+
+        return {
+          ...base,
+          ...override,
+          sidebarName:
+            sidebarStoreId === base.id && override.sidebarName
+              ? override.sidebarName
+              : override.sidebarName ?? base.sidebarName,
+        };
+      }),
+    [ebayConnections, storeOverrides, sidebarStoreId],
+  );
+
+  const connectionIdsKey = ebayConnections.map((c) => c.id).join(',');
+
+  useEffect(() => {
+    if (!ebayConnections.length) {
+      setSidebarStoreId('');
+      setSelectedStoreIds([]);
+      setPendingSelectedStoreIds([]);
+      return;
+    }
+
+    const ids = ebayConnections.map((c) => mapEbayConnectionToStore(c).id);
+    const primary = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0];
+    const primaryStoreId = mapEbayConnectionToStore(primary).id;
+
+    setSelectedStoreIds((prev) => {
+      const valid = prev.filter((id) => ids.includes(id));
+      return valid.length ? valid : ids;
+    });
+
+    setPendingSelectedStoreIds((prev) => {
+      const valid = prev.filter((id) => ids.includes(id));
+      return valid.length ? valid : ids;
+    });
+
+    setSidebarStoreId((prev) => (prev && ids.includes(prev) ? prev : primaryStoreId));
+  }, [connectionIdsKey, ebayConnections]);
+
+  const oauthHandlers = useMemo(
+    () => ({
+      onEbayConnected: () => {
+        dispatch(fetchEbayStatus());
+      },
+      onEbayError: () => {
+        dispatch(fetchEbayStatus());
+      },
+      onAliConnected: () => {
+        setAliConnecting(false);
+        dispatch(fetchAliExpressStatus());
+      },
+      onAliError: () => setAliConnecting(false),
+    }),
+    [dispatch],
+  );
+
+  useOAuthHandler(oauthHandlers);
+
+  const connectEbay = async () => {
+    try {
+      setEbayConnecting(true);
+      markOAuthReturnOrigin();
+      const res = await getEbayAuthUrl();
+      const popup = openOAuthPopup(res.data.url, 'ebay_oauth');
+
+      if (!popup) {
+        setEbayConnecting(false);
+        toast.error('Browser blocked the eBay window. Allow popups for this site and try again.');
+        return;
+      }
+
+      watchOAuthPopup(popup, () => {
+        setEbayConnecting(false);
+        dispatch(fetchEbayStatus());
+      });
+    } catch (err) {
+      setEbayConnecting(false);
+      toast.error(err.response?.data?.error ?? 'Failed to start eBay authorization.');
+    }
+  };
+
+  const connectAliExpress = async () => {
+    try {
+      setAliConnecting(true);
+      markOAuthReturnOrigin();
+      const res = await getAliExpressAuthUrl();
+      const popup = openAliExpressOAuth(res.data.url);
+
+      if (!popup) {
+        setAliConnecting(false);
+        toast.error("Browser blocked the AliExpress window. Allow popups for this site and try again.");
+        return;
+      }
+
+      toast.info(ALIEXPRESS_OAUTH_HINT, { autoClose: 8000 });
+
+      watchOAuthPopup(popup, () => {
+        setAliConnecting(false);
+        dispatch(fetchAliExpressStatus());
+      });
+    } catch (err) {
+      setAliConnecting(false);
+      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
+    }
+  };
+
+  // AliExpress browse — fires when marketplace is active and filters change
   useEffect(() => {
     if (activePage !== "marketplace") return;
+    if (!aliCredentialsConfigured) return;
+
     if (aliSearchTimer.current) clearTimeout(aliSearchTimer.current);
 
     aliSearchTimer.current = setTimeout(() => {
       const categoryId = ALIEXPRESS_CATEGORY_MAP[activeCategory];
 
-      let keywords = keywordSearch.trim();
-      if (activeSubfilter) keywords = `${activeSubfilter} ${keywords}`.trim();
-      if (!keywords && activeCategory && activeCategory !== "All Categories") {
-        keywords = activeCategory;
-      }
-      if (!keywords) keywords = "trending";
+      let sort = ALIEXPRESS_SORT_MAP[sortBy] ?? "volumeDesc";
+      if (selectedPill === "Best Sellers") sort = "volumeDesc";
+      if (selectedPill === "Fast Shipping") sort = "priceAsc";
 
-      let sort = ALIEXPRESS_SORT_MAP[sortBy] ?? "";
-      if (selectedPill === "Best Sellers") sort = "popular";
-      if (selectedPill === "Fast Shipping") sort = "price";
-
-      const params = { q: keywords, sort, limit: 20, ships_to: shipsTo };
+      const params = {
+        sort,
+        limit: 20,
+        ships_to: shipsTo,
+        currency,
+      };
 
       if (categoryId) params.category_id = categoryId;
 
       if (priceRange !== "Select Price Range") {
         const parts = priceRange.replace(/\$/g, "").split(" - ");
         if (parts[0]) params.price_min = parseFloat(parts[0]);
-        if (parts[1]) params.price_max = parseFloat(parts[1]);
+        if (parts[1] && !parts[1].includes("+")) params.price_max = parseFloat(parts[1]);
       }
 
       dispatch(searchAliExpressAction(params));
     }, 500);
 
     return () => clearTimeout(aliSearchTimer.current);
-  }, [activePage, dispatch, keywordSearch, shipsTo, priceRange, sortBy, activeCategory, activeSubfilter, selectedPill]);
+  }, [
+    activePage,
+    dispatch,
+    shipsTo,
+    priceRange,
+    sortBy,
+    activeCategory,
+    activeSubfilter,
+    selectedPill,
+    currency,
+    aliCredentialsConfigured,
+    aliConnected,
+  ]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
@@ -768,8 +929,22 @@ const MarketplaceDashboard = () => {
   const hasNotifications = headerNotifications.length > 0;
   const previewNotifications = headerNotifications.slice(0, NOTIFICATION_PREVIEW_LIMIT);
   const hasMoreNotifications = headerNotifications.length > NOTIFICATION_PREVIEW_LIMIT;
-  const activeSidebarStore = stores.find((store) => store.id === sidebarStoreId) || stores[0];
-  const publishStore = stores.find((store) => store.id === "store-nrf-enterprise") || activeSidebarStore;
+  const activeSidebarStore = useMemo(() => {
+    if (stores.length === 0) {
+      return {
+        id: 'no-store',
+        name: 'connect-ebay',
+        sidebarName: 'Connect eBay',
+        initials: 'EB',
+        country: '—',
+        marketplace: 'eBay',
+      };
+    }
+
+    return stores.find((store) => store.id === sidebarStoreId) ?? stores[0];
+  }, [stores, sidebarStoreId]);
+
+  const publishStore = activeSidebarStore;
   const filteredStores = useMemo(() => {
     const query = storeSwitcherSearch.trim().toLowerCase();
 
@@ -1071,17 +1246,14 @@ const MarketplaceDashboard = () => {
       return;
     }
 
-    setStores((current) =>
-      current.map((store) =>
-        store.id === storeId
-          ? {
-              ...store,
-              name: nextName,
-              sidebarName: store.id === sidebarStoreId ? nextName : store.sidebarName,
-            }
-          : store,
-      ),
-    );
+    setStoreOverrides((current) => ({
+      ...current,
+      [storeId]: {
+        ...current[storeId],
+        name: nextName,
+        sidebarName: storeId === sidebarStoreId ? nextName : current[storeId]?.sidebarName,
+      },
+    }));
     setRenamingStoreId("");
     setStoreRenameValue("");
   };
@@ -1101,20 +1273,16 @@ const MarketplaceDashboard = () => {
     }
 
     if (actionId === "delete") {
-      if (stores.length === 1) {
-        setStoreSwitcherMenuId("");
-        return;
+      const connectionId = parseEbayConnectionId(storeId);
+      if (connectionId && window.confirm('Disconnect this eBay account from Auto DS?')) {
+        dispatch(disconnectEbayAction(connectionId));
       }
+      setStoreSwitcherMenuId("");
+      return;
+    }
 
-      setStores((current) => current.filter((store) => store.id !== storeId));
-      setSelectedStoreIds((current) => current.filter((id) => id !== storeId));
-      setPendingSelectedStoreIds((current) => current.filter((id) => id !== storeId));
-      if (sidebarStoreId === storeId) {
-        const nextStore = stores.find((store) => store.id !== storeId);
-        if (nextStore) {
-          setSidebarStoreId(nextStore.id);
-        }
-      }
+    if (actionId === "copy-token" || actionId === "renew-token" || actionId === "resync" || actionId === "convert") {
+      toast.info('This action is not available yet.');
     }
 
     setStoreSwitcherMenuId("");
@@ -1828,6 +1996,27 @@ const MarketplaceDashboard = () => {
                 </div>
 
                 <div className="store-switcher-modal__list">
+                  {ebayConnectionsLoading && stores.length === 0 ? (
+                    <div className="store-switcher-modal__empty" style={{ padding: '24px 16px', textAlign: 'center', color: '#6b7280' }}>
+                      <LuLoader className="spin-icon" style={{ margin: '0 auto 8px', display: 'block' }} />
+                      Loading eBay accounts…
+                    </div>
+                  ) : null}
+
+                  {!ebayConnectionsLoading && filteredStores.length === 0 ? (
+                    <div className="store-switcher-modal__empty" style={{ padding: '24px 16px', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 12px', color: '#6b7280' }}>No eBay accounts connected yet.</p>
+                      <button
+                        type="button"
+                        className="store-switcher-modal__update-btn"
+                        onClick={connectEbay}
+                        disabled={ebayConnecting}
+                      >
+                        {ebayConnecting ? 'Opening eBay…' : 'Connect eBay Account'}
+                      </button>
+                    </div>
+                  ) : null}
+
                   {filteredStores.map((store) => {
                     const isSelected = pendingSelectedStoreIds.includes(store.id);
                     const isRenaming = renamingStoreId === store.id;
@@ -1868,8 +2057,11 @@ const MarketplaceDashboard = () => {
                             <>
                               <div className="store-switcher-modal__title-row">
                                 <strong>{store.name}</strong>
-                                <button type="button" aria-label={`Edit ${store.name}`} onClick={() => beginStoreRename(store.id)}>
-                                  <LuExternalLink />
+                                {store.isPrimary ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: '#065f46', marginLeft: 6 }}>PRIMARY</span>
+                                ) : null}
+                                <button type="button" aria-label={`Rename ${store.name}`} onClick={() => beginStoreRename(store.id)}>
+                                  <LuPencil />
                                 </button>
                                 <span>{store.country}</span>
                               </div>
@@ -1928,9 +2120,14 @@ const MarketplaceDashboard = () => {
                 </div>
 
                 <div className="store-switcher-modal__footer">
-                  <button type="button" className="store-switcher-modal__add-btn">
-                    <LuPlus />
-                    <span>Add Store</span>
+                  <button
+                    type="button"
+                    className="store-switcher-modal__add-btn"
+                    onClick={connectEbay}
+                    disabled={ebayConnecting}
+                  >
+                    {ebayConnecting ? <LuLoader className="spin-icon" /> : <LuPlus />}
+                    <span>{ebayConnecting ? 'Opening eBay…' : 'Add Store'}</span>
                   </button>
 
                   <button
@@ -2471,18 +2668,32 @@ const MarketplaceDashboard = () => {
                       <LuLoader style={{ animation: "spin 1s linear infinite", fontSize: 28 }} />
                       <p>Searching AliExpress…</p>
                     </div>
+                  ) : aliCredentialsMissing || !aliCredentialsConfigured ? (
+                    <div className="marketplace-products__empty">
+                      <LuStore style={{ fontSize: 40, color: "#f97316" }} />
+                      <p style={{ fontWeight: 600, fontSize: 16 }}>AliExpress API not configured</p>
+                      <p style={{ color: "#6b7280", marginTop: 4, maxWidth: 420, textAlign: "center" }}>
+                        Add ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET to the backend .env file, then restart the API server.
+                      </p>
+                    </div>
                   ) : aliRequiresAuth ? (
                     <div className="marketplace-products__empty">
                       <LuStore style={{ fontSize: 40, color: "#f97316" }} />
                       <p style={{ fontWeight: 600, fontSize: 16 }}>Connect your AliExpress account</p>
-                      <p style={{ color: "#6b7280", marginTop: 4 }}>
-                        Link your AliExpress DS account to browse and import products.
+                      <p style={{ color: "#6b7280", marginTop: 4, maxWidth: 440, textAlign: "center" }}>
+                        Join the{" "}
+                        <a href="https://ds.aliexpress.com" target="_blank" rel="noreferrer">
+                          AliExpress Dropshipping Center
+                        </a>
+                        , then authorize your account to browse supplier products.
                       </p>
                       <button
+                        type="button"
                         className="btn btn-primary mt-3"
-                        onClick={() => navigate("/settings?tab=store")}
+                        onClick={connectAliExpress}
+                        disabled={aliConnecting}
                       >
-                        Go to Settings
+                        {aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}
                       </button>
                     </div>
                   ) : aliError ? (

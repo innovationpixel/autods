@@ -6,7 +6,13 @@ export const getEbayStatus = () =>
 
 // Get eBay OAuth authorization URL
 export const getEbayAuthUrl = () =>
-    axiosInstance.get('/ebay/auth-url');
+    axiosInstance.get('/ebay/auth-url', {
+        params: { return_origin: window.location.origin },
+    });
+
+/** Finish OAuth when eBay shows its success page instead of redirecting to our callback. */
+export const completeEbayOAuth = (payload) =>
+    axiosInstance.post('/ebay/complete-oauth', payload);
 
 // Disconnect a specific eBay account by connection ID
 export const disconnectEbayConnection = (id) =>

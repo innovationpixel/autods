@@ -13,12 +13,15 @@ const initialState = {
         total: 0,
         search_id: null,
         requires_auth: false,
+        credentials_missing: false,
         loading: false,
         error: null,
     },
     connection: {
         loading: false,
         connected: false,
+        credentials_configured: false,
+        needs_reconnect: false,
         ae_user_nick: null,
         ae_user_id: null,
         ae_seller_id: null,
@@ -44,6 +47,7 @@ export function AliExpressReducer(state = initialState, action) {
                     total: action.payload.total ?? 0,
                     search_id: action.payload.search_id ?? null,
                     requires_auth: false,
+                    credentials_missing: false,
                     loading: false,
                     error: null,
                 },
@@ -56,6 +60,7 @@ export function AliExpressReducer(state = initialState, action) {
                     loading: false,
                     error: action.payload.error ?? action.payload,
                     requires_auth: action.payload.requires_auth ?? false,
+                    credentials_missing: action.payload.credentials_missing ?? false,
                 },
             };
 
@@ -67,7 +72,12 @@ export function AliExpressReducer(state = initialState, action) {
         case ALI_STATUS_SUCCESS:
             return {
                 ...state,
-                connection: { ...action.payload, loading: false, error: null },
+                connection: {
+                    ...initialState.connection,
+                    ...action.payload,
+                    loading: false,
+                    error: null,
+                },
             };
         case ALI_STATUS_FAILURE:
             return {
@@ -78,6 +88,7 @@ export function AliExpressReducer(state = initialState, action) {
             return {
                 ...state,
                 connection: { ...initialState.connection },
+                marketplace: { ...initialState.marketplace },
             };
 
         default:

@@ -4,8 +4,7 @@ import { clearSession } from './AuthService';
 
 const axiosInstance = axios.create({
     baseURL: BASE_URL,
-    headers: { 'Content-Type': 'application/json' },
-    withCredentials: true,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });
 
 axiosInstance.interceptors.request.use((config) => {

@@ -4,5 +4,9 @@ export const selectAliError        = (state) => state.aliexpress.marketplace.err
 export const selectAliTotal        = (state) => state.aliexpress.marketplace.total;
 export const selectAliSearchId     = (state) => state.aliexpress.marketplace.search_id;
 export const selectAliRequiresAuth = (state) => state.aliexpress.marketplace.requires_auth;
+export const selectAliCredentialsMissing = (state) => state.aliexpress.marketplace.credentials_missing;
 
 export const selectAliConnection = (state) => state.aliexpress.connection;
+export const selectAliConnected = (state) => Boolean(state.aliexpress.connection.connected);
+export const selectAliCredentialsConfigured = (state) =>
+    state.aliexpress.connection.credentials_configured !== false;

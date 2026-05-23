@@ -7006,6 +7006,10 @@
   align-items: start;
 }
 
+.marketplace-settings__workspace--no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .marketplace-settings__sidebar {
   display: grid;
   gap: 12px;

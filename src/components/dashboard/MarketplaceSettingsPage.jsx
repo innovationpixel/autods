@@ -5,7 +5,6 @@ import {
   LuBadgeCheck,
   LuChevronDown,
   LuCopy,
-  LuEllipsisVertical,
   LuLink,
   LuUnplug,
   LuLoader,
@@ -18,14 +17,17 @@ import {
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
 import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/actions/AliExpressActions";
 import { updateProfileAction } from "../../store/actions/AuthActions";
-import { getEbayAuthUrl } from "../../services/EbayService";
+import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
+import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
 import { getAliExpressAuthUrl } from "../../services/AliExpressService";
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
 import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
+import { openOAuthPopup, openAliExpressOAuth, watchOAuthPopup, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT } from "../../utils/oauthBridge";
 
 const settingsPrimaryTabs = [
+  "Store Settings",
   "Supplier Settings",
   "Automations",
   "Templates",
@@ -35,7 +37,6 @@ const settingsPrimaryTabs = [
   "Users",
   "Buyer Accounts",
   "Notifications",
-  "Store Settings",
 ];
 
 const settingsInnerTabs = ["Lister", "Pricing", "Orders", "General"];
@@ -443,16 +444,20 @@ export default function MarketplaceSettingsPage() {
   const initialTab = useMemo(() => {
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "store") return "Store Settings";
-    return "Supplier Settings";
+    if (tab === "supplier") return "Supplier Settings";
+    return "Store Settings";
   }, [search]);
 
   const [activePrimaryTab, setActivePrimaryTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    if (tab === "store") {
+      setActivePrimaryTab("Store Settings");
+    }
+  }, [search]);
   const [activeInnerTab, setActiveInnerTab] = useState("Lister");
   const primaryEbayConnection = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0] ?? null;
-  const storeOptions = ebayConnections.length > 0
-    ? ebayConnections.map((c) => c.ebay_username ?? `eBay Account ${c.id}`)
-    : ["No store connected"];
-  const selectedStore = storeOptions[0];
   const [suppliers, setSuppliers] = useState(createInitialSuppliers);
   const [activeSupplierId, setActiveSupplierId] = useState(supplierTemplates[0].id);
   const [itemSpecificDraft, setItemSpecificDraft] = useState({ name: "", description: "" });
@@ -461,6 +466,8 @@ export default function MarketplaceSettingsPage() {
   const [messageDraft, setMessageDraft] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
   const [ebayConnecting, setEbayConnecting] = useState(false);
+  const [ebayCompleting, setEbayCompleting] = useState(false);
+  const [ebayPasteUrl, setEbayPasteUrl] = useState("");
   const [aliConnecting, setAliConnecting] = useState(false);
   const popupRef = useRef(null);
 
@@ -489,64 +496,68 @@ export default function MarketplaceSettingsPage() {
     dispatch(fetchAliExpressStatus());
   }, [dispatch]);
 
-  // Listen for OAuth postMessage from the /oauth/callback popup
   useEffect(() => {
-    const handleOAuthMessage = (event) => {
-      if (event.origin !== window.location.origin) return;
-      const { type, platform, status, reason } = event.data ?? {};
-      if (type !== 'OAUTH_CALLBACK') return;
+    const params = new URLSearchParams(search);
+    const ebay = params.get("ebay");
+    const aliexpress = params.get("aliexpress");
+    const reason = params.get("reason");
 
-      if (platform === 'ebay') {
-        setEbayConnecting(false);
-        if (status === 'connected') {
-          toast.success('eBay account connected successfully!');
-          dispatch(fetchEbayStatus());
-        } else {
-          toast.error(`eBay connection failed: ${reason ?? 'Unknown error'}`);
-        }
-      }
+    if (ebay === "connected") {
+      dispatch(fetchEbayStatus());
+    } else if (ebay === "error") {
+      toast.error(`eBay connection failed: ${reason ?? "Unknown error"}`);
+    }
 
-      if (platform === 'aliexpress') {
-        setAliConnecting(false);
-        if (status === 'connected') {
-          toast.success('AliExpress account connected successfully!');
-          dispatch(fetchAliExpressStatus());
-        } else {
-          toast.error(`AliExpress connection failed: ${reason ?? 'Unknown error'}`);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleOAuthMessage);
-    return () => window.removeEventListener('message', handleOAuthMessage);
-  }, [dispatch]);
-
-  const openOAuthPopup = (url, name) => {
-    const width  = 620;
-    const height = 720;
-    const left   = Math.round(window.screenX + (window.outerWidth  - width)  / 2);
-    const top    = Math.round(window.screenY + (window.outerHeight - height) / 2);
-    return window.open(url, name, `width=${width},height=${height},left=${left},top=${top},toolbar=0,scrollbars=1`);
-  };
+    if (aliexpress === "connected") {
+      dispatch(fetchAliExpressStatus());
+    } else if (aliexpress === "error") {
+      toast.error(`AliExpress connection failed: ${reason ?? "Unknown error"}`);
+    }
+  }, [search, dispatch]);
 
   const connectEbay = async () => {
     try {
       setEbayConnecting(true);
-      const res    = await getEbayAuthUrl();
-      const popup  = openOAuthPopup(res.data.url, 'ebay_oauth');
+      markOAuthReturnOrigin();
+      const res = await getEbayAuthUrl();
+      const popup = openOAuthPopup(res.data.url, "ebay_oauth");
       popupRef.current = popup;
 
-      // Fallback: if popup closes without sending postMessage (e.g. user closes manually)
-      const poll = setInterval(() => {
-        if (!popup || popup.closed) {
-          clearInterval(poll);
-          setEbayConnecting(false);
-          dispatch(fetchEbayStatus());
-        }
-      }, 800);
+      toast.info(
+        "After eBay login, you should return to Auto DS automatically. If you only see eBay’s “Authorization successfully completed” page, copy that page’s URL and use the box below.",
+        { autoClose: 10000 },
+      );
+
+      watchOAuthPopup(popup, () => {
+        setEbayConnecting(false);
+        dispatch(fetchEbayStatus());
+      });
     } catch (err) {
       setEbayConnecting(false);
-      toast.error(err.response?.data?.error ?? 'Failed to start eBay authorization.');
+      toast.error(err.response?.data?.error ?? "Failed to start eBay authorization.");
+    }
+  };
+
+  const finishEbayFromPastedUrl = async () => {
+    const parsed = parseEbayOAuthUrl(ebayPasteUrl);
+    if (!parsed || parsed.error) {
+      toast.error(
+        parsed?.error
+          ?? "Paste the full URL from the eBay success tab (https://auth2.ebay.com/oauth2/ThirdPartyAuthSucessFailure?...).",
+      );
+      return;
+    }
+
+    setEbayCompleting(true);
+    try {
+      await completeEbayOAuth({ callback_url: ebayPasteUrl.trim() });
+      setEbayPasteUrl("");
+      toast.success("eBay account connected successfully!");
+      dispatch(fetchEbayStatus());
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to complete eBay connection.");
+    } finally {
+      setEbayCompleting(false);
     }
   };
 
@@ -560,20 +571,26 @@ export default function MarketplaceSettingsPage() {
   const connectAliExpress = async () => {
     try {
       setAliConnecting(true);
-      const res   = await getAliExpressAuthUrl();
-      const popup = openOAuthPopup(res.data.url, 'aliexpress_oauth');
+      markOAuthReturnOrigin();
+      const res = await getAliExpressAuthUrl();
+      const popup = openAliExpressOAuth(res.data.url);
       popupRef.current = popup;
 
-      const poll = setInterval(() => {
-        if (!popup || popup.closed) {
-          clearInterval(poll);
-          setAliConnecting(false);
-          dispatch(fetchAliExpressStatus());
-        }
-      }, 800);
+      if (!popup) {
+        setAliConnecting(false);
+        toast.error("Your browser blocked the AliExpress window. Allow popups for this site and try again.");
+        return;
+      }
+
+      toast.info(ALIEXPRESS_OAUTH_HINT, { autoClose: 8000 });
+
+      watchOAuthPopup(popup, () => {
+        setAliConnecting(false);
+        dispatch(fetchAliExpressStatus());
+      });
     } catch (err) {
       setAliConnecting(false);
-      toast.error(err.response?.data?.error ?? 'Failed to start AliExpress authorization.');
+      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
     }
   };
 
@@ -624,9 +641,47 @@ export default function MarketplaceSettingsPage() {
           <span>Checking connection status…</span>
         </div>
       ) : ebayConnections.length === 0 ? (
-        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
-          <LuUnplug />
-          <span>No eBay accounts connected. Click <em>Add eBay Account</em> to get started.</span>
+        <div style={{ padding: "20px 0" }}>
+          <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected">
+            <LuUnplug />
+            <span>No eBay accounts connected. Click <em>Add eBay Account</em> to get started.</span>
+          </div>
+
+          <details
+            style={{
+              marginTop: 16,
+              padding: "14px 16px",
+              borderRadius: 8,
+              border: "1px solid #fde68a",
+              background: "#fffbeb",
+              fontSize: 13,
+              color: "#78350f",
+            }}
+          >
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+              Stuck on eBay “Authorization successfully completed”?
+            </summary>
+            <p style={{ margin: "10px 0 8px", lineHeight: 1.5 }}>
+              eBay did not redirect to Auto DS. Copy the <strong>full address bar URL</strong> from that eBay tab and paste it here, then click Complete connection.
+            </p>
+            <input
+              className="marketplace-settings__control"
+              type="text"
+              value={ebayPasteUrl}
+              onChange={(e) => setEbayPasteUrl(e.target.value)}
+              placeholder="https://auth2.ebay.com/oauth2/ThirdPartyAuthSucessFailure?..."
+              style={{ width: "100%", marginBottom: 8 }}
+            />
+            <button
+              type="button"
+              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+              onClick={finishEbayFromPastedUrl}
+              disabled={ebayCompleting || !ebayPasteUrl.trim()}
+            >
+              {ebayCompleting ? <LuLoader className="spin-icon" /> : <LuLink />}
+              <span>{ebayCompleting ? "Connecting…" : "Complete connection"}</span>
+            </button>
+          </details>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
@@ -688,6 +743,17 @@ export default function MarketplaceSettingsPage() {
       )}
 
       {/* ── AliExpress section ───────────────────────────────────────────────── */}
+      {!aliConnection.credentials_configured && !aliConnection.loading && (
+        <div
+          className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected"
+          style={{ marginTop: 28, padding: "14px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca" }}
+        >
+          <span style={{ color: "#991b1b" }}>
+            Server AliExpress API keys are missing. Set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET in autods-backend/.env, then restart Laravel.
+          </span>
+        </div>
+      )}
+
       <div className="marketplace-settings__store-settings-header" style={{ marginTop: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -748,7 +814,20 @@ export default function MarketplaceSettingsPage() {
       ) : (
         <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
           <LuUnplug />
-          <span>Not connected — click <em>Connect AliExpress</em> above to enable supplier access.</span>
+          <span>
+            {aliConnection.needs_reconnect
+              ? "Authorization expired — click Connect AliExpress to sign in again."
+              : (
+                <>
+                  Not connected — join the{" "}
+                  <a href="https://ds.aliexpress.com" target="_blank" rel="noreferrer">Dropshipping Center</a>
+                  , then click <em>Connect AliExpress</em>.
+                </>
+              )}
+          </span>
+          <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", maxWidth: 520 }}>
+            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a new browser tab.
+          </p>
         </div>
       )}
     </div>
@@ -793,24 +872,6 @@ export default function MarketplaceSettingsPage() {
         },
       },
     }));
-  };
-
-  const addSupplier = () => {
-    const nextTemplate = supplierTemplates.find(
-      (template) => !suppliers.some((supplier) => supplier.id === template.id),
-    );
-
-    const fallbackIndex = suppliers.length + 1;
-    const newSupplier = nextTemplate
-      ? createSupplier(nextTemplate)
-      : createSupplier({
-          id: `custom-supplier-${fallbackIndex}`,
-          label: `Supplier ${fallbackIndex}`,
-          badge: "new",
-        });
-
-    setSuppliers((currentSuppliers) => [...currentSuppliers, newSupplier]);
-    setActiveSupplierId(newSupplier.id);
   };
 
   const rotateZipcode = () => {
@@ -1779,48 +1840,7 @@ export default function MarketplaceSettingsPage() {
       </nav>
 
       {activePrimaryTab === "Supplier Settings" ? (
-        <div className="marketplace-settings__workspace">
-          <aside className="marketplace-settings__sidebar">
-            <SettingsField label="Select Store" className="marketplace-settings__sidebar-field">
-              <SettingsSelect
-                value={selectedStore}
-                options={storeOptions}
-                onChange={() => {}}
-              />
-            </SettingsField>
-
-            <div className="marketplace-settings__supplier-panel">
-              <div className="marketplace-settings__supplier-label">Supplier</div>
-
-              <div className="marketplace-settings__supplier-list">
-                {suppliers.map((supplier) => (
-                  <div
-                    className={`marketplace-settings__supplier-item ${activeSupplierId === supplier.id ? "marketplace-settings__supplier-item--active" : ""}`}
-                    key={supplier.id}
-                  >
-                    <button
-                      type="button"
-                      className="marketplace-settings__supplier-main"
-                      onClick={() => setActiveSupplierId(supplier.id)}
-                    >
-                      <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
-                      <span>{supplier.label}</span>
-                    </button>
-
-                    <button type="button" className="marketplace-settings__supplier-menu" aria-label={`More options for ${supplier.label}`}>
-                      <LuEllipsisVertical />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button type="button" className="marketplace-settings__add-supplier" onClick={addSupplier}>
-                <LuPlus />
-                <span>Add Supplier</span>
-              </button>
-            </div>
-          </aside>
-
+        <div className="marketplace-settings__workspace marketplace-settings__workspace--no-sidebar">
           <div className="marketplace-settings__panel card-wrapper">
             <div className="marketplace-settings__inner-tabs" role="tablist" aria-label="Supplier settings tabs">
               {settingsInnerTabs.map((tab) => (
