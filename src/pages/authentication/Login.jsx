@@ -94,7 +94,7 @@ function Login(props) {
                                     >
                                         Sign In
                                     </button>
-                                    <button
+                                    {/* <button
                                         type="button"
                                         style={{
                                             flex: 1, padding: '10px 0', border: 'none', background: 'none',
@@ -105,7 +105,7 @@ function Login(props) {
                                         onClick={() => setTab('register')}
                                     >
                                         Create Account
-                                    </button>
+                                    </button> */}
                                 </div>
 
                                 {props.errorMessage && (
@@ -120,7 +120,7 @@ function Login(props) {
                                 )}
 
                                 {/* ── Login form ─────────────────────────────────── */}
-                                {tab === 'login' && (
+                                {/* {tab === 'login' && (
                                     <form onSubmit={onLogin} className="form-validate">
                                         <h3 className="text-center mb-4 text-black">Sign in to your account</h3>
                                         <div className="form-group mb-3">
@@ -170,10 +170,60 @@ function Login(props) {
                                             </button>
                                         </p>
                                     </form>
-                                )}
+                                )} */}
+
+                                <form onSubmit={onLogin} className="form-validate">
+                                        <h3 className="text-center mb-4 text-black">Sign in to your account</h3>
+                                        <div className="form-group mb-3">
+                                            <label className="mb-1 form-label required">Email</label>
+                                            <input
+                                                type="email"
+                                                className="form-control"
+                                                value={loginEmail}
+                                                onChange={(e) => setLoginEmail(e.target.value)}
+                                                placeholder="Enter your email address"
+                                            />
+                                            {loginErrors.email && <div className="text-danger fs-12">{loginErrors.email}</div>}
+                                        </div>
+                                        <div className="form-group mb-3">
+                                            <label className="mb-1 form-label required">Password</label>
+                                            <div className="position-relative">
+                                                <input
+                                                    type={showLoginPw ? 'text' : 'password'}
+                                                    className="form-control"
+                                                    value={loginPassword}
+                                                    onChange={(e) => setLoginPassword(e.target.value)}
+                                                    placeholder="Enter your password"
+                                                />
+                                                {loginErrors.password && <div className="text-danger fs-12">{loginErrors.password}</div>}
+                                                <span
+                                                    className={`show-pass eye ${showLoginPw ? 'active' : ''}`}
+                                                    onClick={() => setShowLoginPw((v) => !v)}
+                                                >
+                                                    <i className="fa fa-eye-slash" />
+                                                    <i className="fa fa-eye" />
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="text-center form-group mb-3">
+                                            <button
+                                                type="submit"
+                                                className="btn btn-primary btn-block"
+                                                disabled={props.showLoading}
+                                            >
+                                                {props.showLoading ? 'Signing in…' : 'Sign In'}
+                                            </button>
+                                        </div>
+                                        <p className="text-center" style={{ fontSize: 13, color: '#6b7280' }}>
+                                            Don't have an account?{' '}
+                                            <button type="button" style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontWeight: 600 }} onClick={() => setTab('register')}>
+                                                Create one
+                                            </button>
+                                        </p>
+                                    </form>
 
                                 {/* ── Register form ──────────────────────────────── */}
-                                {tab === 'register' && (
+                                {/* {tab === 'register' && (
                                     <form onSubmit={onRegister} className="form-validate">
                                         <h3 className="text-center mb-4 text-black">Create your account</h3>
                                         <div className="form-group mb-3">
@@ -245,7 +295,7 @@ function Login(props) {
                                             </button>
                                         </p>
                                     </form>
-                                )}
+                                )} */}
 
                             </div>
                         </div>
