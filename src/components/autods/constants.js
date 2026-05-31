@@ -1,4 +1,3 @@
-import { FaTiktok } from "react-icons/fa6";
 import {
   LuBadgeCheck,
   LuBell,
@@ -12,12 +11,10 @@ import {
   LuDribbble,
   LuExternalLink,
   LuFilePenLine,
-  LuGauge,
   LuGamepad2,
   LuHeadphones,
   LuHouse,
   LuInbox,
-  LuMegaphone,
   LuMenu,
   LuMessageCircleMore,
   LuPackage2,
@@ -43,34 +40,6 @@ import {
   LuX,
   LuZap,
 } from "react-icons/lu";
-
-export const sidebarGroups = [
-  [
-    {
-      label: "Marketplace",
-      icon: LuStore,
-      active: true,
-      children: [
-        { label: "Hand-Picked Products", icon: LuBadgeCheck },
-        { label: "Ads Spy", icon: LuMegaphone },
-        { label: "Trending Products", icon: LuChartLine },
-        { label: "TikTok Analytics", icon: FaTiktok, badge: "NEW" },
-      ],
-    },
-    { label: "Print On Demand", icon: LuShirt },
-    { label: "Order Processing", icon: LuClipboardList },
-    { label: "Calculations", icon: LuChartLine },
-  ],
-  [
-    { label: "Dashboard", icon: LuGauge, marker: "#f6c6c4" },
-    { label: "Orders", icon: LuClipboardList },
-    { label: "Sourcing Request", icon: LuPackageSearch, marker: "#f1b45c" },
-    { label: "Products", icon: LuPackage2, marker: "#9ad2c0" },
-    { label: "Drafts", icon: LuFilePenLine },
-    { label: "Customer Support", icon: LuHeadphones },
-    { label: "Settings", icon: LuSettings2 },
-  ],
-];
 
 export const filterPills = [
   { label: "Best Sellers", icon: LuMenu },
@@ -150,26 +119,6 @@ export const multipleProductsTabs = [
   { id: "urls", label: "URL's or ID's" },
   { id: "csv", label: "Upload CSV" },
   { id: "finder", label: "AutoDS Finder" },
-];
-
-export const orderProcessingTabs = [
-  { id: "order-processing", label: "Order Processing" },
-  { id: "calculations", label: "Calculations" },
-];
-
-export const marketplacePages = [
-  "dashboard",
-  "marketplace",
-  "print-on-demand",
-  "order-processing",
-  "calculations",
-  "orders",
-  "products",
-  "drafts",
-  "customer-support",
-  "support-center",
-  "wallet",
-  "settings",
 ];
 
 export const finderPlans = [

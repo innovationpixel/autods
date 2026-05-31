@@ -64,7 +64,8 @@ import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
-import { sidebarGroups, filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT, marketplacePages } from '../autods/constants';
+import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT } from '../autods/constants';
+import { sidebarGroups, marketplacePages } from '../autods/menu';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
@@ -1468,17 +1469,7 @@ const MarketplaceDashboard = () => {
               {group.map((item) => {
                 const navItem = {
                   ...item,
-                  active:
-                    (activePage === "marketplace" && item.label === "Marketplace") ||
-                    (activePage === "print-on-demand" && item.label === "Print On Demand") ||
-                    (activePage === "order-processing" && item.label === "Order Processing") ||
-                    (activePage === "calculations" && item.label === "Calculations") ||
-                    (activePage === "dashboard" && item.label === "Dashboard") ||
-                    (activePage === "orders" && item.label === "Orders") ||
-                    (activePage === "products" && item.label === "Products") ||
-                    (activePage === "drafts" && item.label === "Drafts") ||
-                    (activePage === "customer-support" && item.label === "Customer Support") ||
-                    (activePage === "settings" && item.label === "Settings"),
+                  active: item.page ? activePage === item.page : false,
                 };
 
                 return (
@@ -1487,45 +1478,24 @@ const MarketplaceDashboard = () => {
                     key={item.label}
                     isOpen={Boolean(openMenus[item.label])}
                     onSelect={(selectedItem) => {
-                      if (selectedItem.label === "Marketplace") {
-                        openMarketplacePage();
+                      if (!selectedItem.page) {
+                        return;
                       }
 
-                      if (selectedItem.label === "Print On Demand") {
-                        openPrintOnDemandPage();
-                      }
+                      const pageHandlers = {
+                        marketplace: openMarketplacePage,
+                        "print-on-demand": openPrintOnDemandPage,
+                        "order-processing": openOrderProcessingPage,
+                        calculations: openCalculationsPage,
+                        dashboard: openDashboardPage,
+                        orders: openOrdersPage,
+                        products: openProductsPage,
+                        drafts: openDraftsPage,
+                        "customer-support": openCustomerSupportPage,
+                        settings: openSettingsPage,
+                      };
 
-                      if (selectedItem.label === "Order Processing") {
-                        openOrderProcessingPage();
-                      }
-
-                      if (selectedItem.label === "Calculations") {
-                        openCalculationsPage();
-                      }
-
-                      if (selectedItem.label === "Dashboard") {
-                        openDashboardPage();
-                      }
-
-                      if (selectedItem.label === "Orders") {
-                        openOrdersPage();
-                      }
-
-                      if (selectedItem.label === "Products") {
-                        openProductsPage();
-                      }
-
-                      if (selectedItem.label === "Drafts") {
-                        openDraftsPage();
-                      }
-
-                      if (selectedItem.label === "Customer Support") {
-                        openCustomerSupportPage();
-                      }
-
-                      if (selectedItem.label === "Settings") {
-                        openSettingsPage();
-                      }
+                      pageHandlers[selectedItem.page]?.();
                     }}
                     onToggle={() =>
                       setOpenMenus((current) => ({
