@@ -65,6 +65,8 @@ const Markup = () => {
                     <Route path="/" element={<Home />} />
                     <Route path="/marketplace" element={<Home />} />
                     <Route path="/print-on-demand" element={<Home />} />
+                    <Route path="/order-processing" element={<Home />} />
+                    <Route path="/calculations" element={<Home />} />
                     <Route path="/orders" element={<Home />} />
                     <Route path="/products" element={<Home />} />
                     <Route path="/drafts" element={<Home />} />
@@ -120,7 +122,11 @@ const Markup = () => {
                         <Route path="/error-503" element={<Error503 />} />
                         <Route path="/empty-page" element={<EmptyPage />} />
                     </Route>
+
+                    <Route path="*" element={<Home />} />
                 </Route>
+
+                <Route path="*" element={<Error404 />} />
             </Routes>
             <ScrollToTop />
         </>

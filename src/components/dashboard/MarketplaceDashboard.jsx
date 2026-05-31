@@ -64,7 +64,7 @@ import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
-import { sidebarGroups, filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT } from '../autods/constants';
+import { sidebarGroups, filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT, marketplacePages } from '../autods/constants';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
@@ -77,6 +77,9 @@ import ProductsContent from '../autods/pages/ProductsContent';
 import DraftsContent from '../autods/pages/DraftsContent';
 import HelpCenterContent from '../autods/pages/HelpCenterContent';
 import WalletContent from '../autods/pages/WalletContent';
+import OrderProcessingContent from '../autods/pages/OrderProcessingContent';
+import CalculationsContent from '../autods/pages/CalculationsContent';
+import NotFoundContent from '../autods/pages/NotFoundContent';
 import { fetchEbayStatus, disconnectEbayAction } from '../../store/actions/EbayActions';
 import { selectEbayConnections, selectEbayConnectionsLoading } from '../../store/selectors/EbaySelectors';
 import { getEbayAuthUrl } from '../../services/EbayService';
@@ -624,6 +627,7 @@ const MarketplaceDashboard = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activePage = pathname === "/" ? "dashboard" : pathname.slice(1);
+  const isUnknownPage = !marketplacePages.includes(activePage);
   const setActivePage = (page) => navigate(page === "dashboard" ? "/" : `/${page}`);
   const [searchAnything, setSearchAnything] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -1133,6 +1137,16 @@ const MarketplaceDashboard = () => {
     setKeywordSearch("");
   };
 
+  const openOrderProcessingPage = () => {
+    setActivePage("order-processing");
+    setSearchAnything("");
+  };
+
+  const openCalculationsPage = () => {
+    setActivePage("calculations");
+    setSearchAnything("");
+  };
+
   const openDashboardPage = () => {
     setActivePage("dashboard");
     setSearchAnything("");
@@ -1327,10 +1341,15 @@ const MarketplaceDashboard = () => {
         ? !multipleProductsCsvFile
         : finderTotalCredits === 0;
 
-  const pageTitle =
-    activePage === "print-on-demand"
+  const pageTitle = isUnknownPage
+    ? "Page Not Found"
+    : activePage === "print-on-demand"
       ? "Print On Demand"
-      : activePage === "dashboard"
+      : activePage === "order-processing"
+        ? "Order Processing"
+        : activePage === "calculations"
+          ? "Calculations"
+          : activePage === "dashboard"
         ? "Dashboard"
         : activePage === "orders"
           ? `Orders (${initialOrders.length})`
@@ -1452,6 +1471,8 @@ const MarketplaceDashboard = () => {
                   active:
                     (activePage === "marketplace" && item.label === "Marketplace") ||
                     (activePage === "print-on-demand" && item.label === "Print On Demand") ||
+                    (activePage === "order-processing" && item.label === "Order Processing") ||
+                    (activePage === "calculations" && item.label === "Calculations") ||
                     (activePage === "dashboard" && item.label === "Dashboard") ||
                     (activePage === "orders" && item.label === "Orders") ||
                     (activePage === "products" && item.label === "Products") ||
@@ -1472,6 +1493,14 @@ const MarketplaceDashboard = () => {
 
                       if (selectedItem.label === "Print On Demand") {
                         openPrintOnDemandPage();
+                      }
+
+                      if (selectedItem.label === "Order Processing") {
+                        openOrderProcessingPage();
+                      }
+
+                      if (selectedItem.label === "Calculations") {
+                        openCalculationsPage();
                       }
 
                       if (selectedItem.label === "Dashboard") {
@@ -2501,12 +2530,18 @@ const MarketplaceDashboard = () => {
           ) : null}
 
           <main className="dashboard-container marketplace-content-wrapper">
-            {activePage === "print-on-demand" ? (
+            {isUnknownPage ? (
+              <NotFoundContent />
+            ) : activePage === "print-on-demand" ? (
               <PrintOnDemandContent
                 activeCategory={activePodCategory}
                 onCategoryChange={setActivePodCategory}
                 products={filteredPodProducts}
               />
+            ) : activePage === "order-processing" ? (
+              <OrderProcessingContent />
+            ) : activePage === "calculations" ? (
+              <CalculationsContent searchQuery={searchAnything} />
             ) : activePage === "dashboard" ? (
               <DashboardContent searchQuery={searchAnything} />
             ) : activePage === "orders" ? (

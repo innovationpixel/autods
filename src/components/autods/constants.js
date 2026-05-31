@@ -58,6 +58,8 @@ export const sidebarGroups = [
       ],
     },
     { label: "Print On Demand", icon: LuShirt },
+    { label: "Order Processing", icon: LuClipboardList },
+    { label: "Calculations", icon: LuChartLine },
   ],
   [
     { label: "Dashboard", icon: LuGauge, marker: "#f6c6c4" },
@@ -148,6 +150,26 @@ export const multipleProductsTabs = [
   { id: "urls", label: "URL's or ID's" },
   { id: "csv", label: "Upload CSV" },
   { id: "finder", label: "AutoDS Finder" },
+];
+
+export const orderProcessingTabs = [
+  { id: "order-processing", label: "Order Processing" },
+  { id: "calculations", label: "Calculations" },
+];
+
+export const marketplacePages = [
+  "dashboard",
+  "marketplace",
+  "print-on-demand",
+  "order-processing",
+  "calculations",
+  "orders",
+  "products",
+  "drafts",
+  "customer-support",
+  "support-center",
+  "wallet",
+  "settings",
 ];
 
 export const finderPlans = [
@@ -568,6 +590,29 @@ export const whatsNewItems = [
 ];
 
 export const loadBalanceAmounts = [15, 50, 100, 200, 500, 1000];
+
+export const orderProcessingFundAmounts = [15, 50, 200, 500, 1000];
+
+export const orderProcessingBalanceDefaults = {
+  deposits: 1500,
+  spend: 820,
+  pending: 240,
+};
+
+export const orderProcessingPaymentMethods = [
+  {
+    id: "credit-card",
+    label: "Credit Card",
+    last4: "4242",
+    feeNote: "Credit cards charge a non-refundable 5% processing fee on each deposit.",
+  },
+  {
+    id: "paypal",
+    label: "PayPal",
+    last4: null,
+    feeNote: "PayPal charges a 2.9% + $0.30 processing fee on each deposit.",
+  },
+];
 
 export const aiCreditPackages = [
   { id: "1000", credits: "1000 Credits", price: "$0.20/10 credits" },
