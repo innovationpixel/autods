@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "../../../utils/toast";
+import { getOrders, syncOrders, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuBox,
@@ -14,6 +16,7 @@ import {
   LuMenu,
   LuPencil,
   LuPlay,
+  LuRefreshCcw,
   LuSlidersHorizontal,
   LuTruck,
   LuX,
@@ -21,10 +24,33 @@ import {
 } from "react-icons/lu";
 import CompactDateRange from "../CompactDateRange";
 import { formatDisplayDate } from "../helpers";
-import { initialOrders, orderStatusOptions } from "../constants";
+import { orderStatusOptions } from "../constants";
+
+function mapApiOrder(order) {
+  return {
+    id: String(order.id),
+    title: order.item_title,
+    color: "—",
+    buyer: order.buyer_name ?? "—",
+    itemBuy: order.item_buy_id ?? "—",
+    itemSell: order.item_sell_id ?? "—",
+    orderSellId: order.ebay_order_id,
+    orderBuyId: order.item_buy_id ?? "—",
+    date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
+    status: order.status,
+    sellPrice: order.sell_price,
+    buyPrice: order.buy_price,
+    profit: order.profit,
+    store: order.store_name ?? "—",
+    trackingNumber: order.tracking_number ?? "—",
+    estimatedArrival: order.estimated_arrival ?? "—",
+  };
+}
 
 function OrdersContent({ searchQuery }) {
-  const [orders, setOrders] = useState(initialOrders);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(true);
   const [showTutorialNote, setShowTutorialNote] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
@@ -43,6 +69,44 @@ function OrdersContent({ searchQuery }) {
   const [openActionsId, setOpenActionsId] = useState("");
   const [openDetailsId, setOpenDetailsId] = useState("");
   const tableScrollRef = useRef(null);
+
+  const loadOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const res = await getOrders({
+        q: searchQuery,
+        status: statusFilter,
+        buyer: buyerFilter,
+        from_date: fromDate,
+        to_date: toDate,
+        hide_canceled: showOnlyActive ? 1 : 0,
+        limit: 500,
+      });
+      const rows = (res.data?.data ?? []).map(mapApiOrder);
+      setOrders(rows);
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to load orders.");
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive]);
+
+  const handleSyncOrders = async () => {
+    setSyncing(true);
+    try {
+      const res = await syncOrders();
+      toast.success(res.data?.message ?? "Orders synced.");
+      await loadOrders();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Order sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const handleDocumentClick = () => {
@@ -147,12 +211,17 @@ function OrdersContent({ searchQuery }) {
     );
   };
 
-  const updateOrderStatus = (orderId, nextStatus) => {
-    setOrders((current) =>
-      current.map((order) => (order.id === orderId ? { ...order, status: nextStatus } : order)),
-    );
-    setOpenStatusId("");
-    setOrdersNotice(`Order ${orderId.replace("order-", "#")} moved to ${nextStatus}.`);
+  const updateOrderStatus = async (orderId, nextStatus) => {
+    try {
+      await updateOrderStatusApi(Number(orderId), nextStatus);
+      setOrders((current) =>
+        current.map((order) => (order.id === orderId ? { ...order, status: nextStatus } : order)),
+      );
+      setOpenStatusId("");
+      setOrdersNotice(`Order #${orderId} moved to ${nextStatus}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to update status.");
+    }
   };
 
   const scrollTable = (position) => {
@@ -248,6 +317,10 @@ function OrdersContent({ searchQuery }) {
         </div>
 
         <div className="orders-toolbar__actions">
+          <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={handleSyncOrders} disabled={syncing}>
+            <LuRefreshCcw />
+            <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
+          </button>
           <button type="button" className="orders-tour-btn" onClick={() => setShowWelcomeModal(true)}>
             <LuPlay />
             <span>Take Orders Demo Tour</span>

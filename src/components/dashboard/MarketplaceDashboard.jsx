@@ -64,7 +64,7 @@ import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
-import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, DRAFT_UPLOAD_COUNT } from '../autods/constants';
+import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
@@ -81,8 +81,8 @@ import WalletContent from '../autods/pages/WalletContent';
 import OrderProcessingContent from '../autods/pages/OrderProcessingContent';
 import CalculationsContent from '../autods/pages/CalculationsContent';
 import NotFoundContent from '../autods/pages/NotFoundContent';
-import { fetchEbayStatus, disconnectEbayAction } from '../../store/actions/EbayActions';
-import { selectEbayConnections, selectEbayConnectionsLoading } from '../../store/selectors/EbaySelectors';
+import { fetchEbayStatus, disconnectEbayAction, fetchEbayDrafts, fetchEbayListings } from '../../store/actions/EbayActions';
+import { selectEbayConnections, selectEbayConnectionsLoading, selectEbayListingsMeta, selectEbayDraftsMeta } from '../../store/selectors/EbaySelectors';
 import { getEbayAuthUrl } from '../../services/EbayService';
 import {
   mapEbayConnectionToStore,
@@ -107,6 +107,9 @@ import {
   selectAliCredentialsConfigured,
 } from '../../store/selectors/AliExpressSelectors';
 import { getAliExpressAuthUrl } from '../../services/AliExpressService';
+import { importProduct, importProductsBulk, getImportBatch } from '../../services/ProductService';
+import PlansPage from '../autods/pages/PlansPage';
+import AdminPlansPage from '../autods/pages/AdminPlansPage';
 import { toast } from '../../utils/toast';
 const catalogSections = [
   {
@@ -622,6 +625,8 @@ const MarketplaceDashboard = () => {
   const aliCredentialsConfigured = useSelector(selectAliCredentialsConfigured);
   const ebayConnections = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
+  const listingsMeta = useSelector(selectEbayListingsMeta);
+  const draftsMeta = useSelector(selectEbayDraftsMeta);
   const [aliConnecting, setAliConnecting] = useState(false);
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [storeOverrides, setStoreOverrides] = useState({});
@@ -650,6 +655,10 @@ const MarketplaceDashboard = () => {
   const [multipleProductsTab, setMultipleProductsTab] = useState("urls");
   const [multipleProductsUrls, setMultipleProductsUrls] = useState("");
   const [multipleProductsCsvFile, setMultipleProductsCsvFile] = useState("");
+  const [csvFileObject, setCsvFileObject] = useState(null);
+  const [importSubmitting, setImportSubmitting] = useState(false);
+  const [importBatchProgress, setImportBatchProgress] = useState(null);
+  const csvFileInputRef = useRef(null);
   const [finderSelections, setFinderSelections] = useState({
     basic: 0,
     popular: 0,
@@ -949,7 +958,7 @@ const MarketplaceDashboard = () => {
     return stores.find((store) => store.id === sidebarStoreId) ?? stores[0];
   }, [stores, sidebarStoreId]);
 
-  const publishStore = activeSidebarStore;
+
   const filteredStores = useMemo(() => {
     const query = storeSwitcherSearch.trim().toLowerCase();
 
@@ -1203,6 +1212,7 @@ const MarketplaceDashboard = () => {
   const openAddProductModal = (mode = "single") => {
     setAddProductsMenuOpen(false);
     setAddProductModalMode(mode);
+    setImportBatchProgress(null);
     if (mode === "single") {
       setAddProductUrl("");
     }
@@ -1210,6 +1220,7 @@ const MarketplaceDashboard = () => {
       setMultipleProductsTab("urls");
       setMultipleProductsUrls("");
       setMultipleProductsCsvFile("");
+      setCsvFileObject(null);
       setFinderSelections({
         basic: 0,
         popular: 0,
@@ -1218,6 +1229,134 @@ const MarketplaceDashboard = () => {
     }
     setAddProductModalOpen(true);
   };
+
+  const getSelectedConnectionIds = () =>
+    selectedStoreIds
+      .map((storeId) => parseEbayConnectionId(storeId))
+      .filter(Boolean);
+
+  const validateImportPrerequisites = () => {
+    if (!aliConnected) {
+      toast.error("Connect your AliExpress account in Settings first.");
+      return false;
+    }
+    const connectionIds = getSelectedConnectionIds();
+    if (!connectionIds.length) {
+      toast.error("Select at least one eBay store.");
+      return false;
+    }
+    return connectionIds;
+  };
+
+  const refreshProductData = () => {
+    dispatch(fetchEbayDrafts());
+    dispatch(fetchEbayListings());
+  };
+
+  const pollImportBatch = (batchId) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await getImportBatch(batchId);
+        const batch = res.data;
+        setImportBatchProgress(batch);
+        if (batch.status === "completed" || batch.status === "failed") {
+          clearInterval(interval);
+          setImportSubmitting(false);
+          refreshProductData();
+          toast.success(`Import finished: ${batch.completed} succeeded, ${batch.failed} failed.`);
+        }
+      } catch {
+        clearInterval(interval);
+        setImportSubmitting(false);
+      }
+    }, 1500);
+  };
+
+  const handleSingleImport = async (action) => {
+    const connectionIds = validateImportPrerequisites();
+    if (!connectionIds) return;
+    if (!addProductUrl.trim()) {
+      toast.warn("Enter an AliExpress URL or product ID.");
+      return;
+    }
+
+    setImportSubmitting(true);
+    try {
+      const res = await importProduct({
+        url_or_id: addProductUrl.trim(),
+        connection_ids: connectionIds,
+        action,
+        warehouse: "CN",
+      });
+      toast.success(res.data?.message ?? "Product imported.");
+      setAddProductModalOpen(false);
+      refreshProductData();
+      if (action === "publish") {
+        navigate("/products");
+      } else {
+        navigate("/drafts");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Import failed.");
+    } finally {
+      setImportSubmitting(false);
+    }
+  };
+
+  const handleBulkImport = async () => {
+    const connectionIds = validateImportPrerequisites();
+    if (!connectionIds) return;
+
+    setImportSubmitting(true);
+    try {
+      let res;
+      if (multipleProductsTab === "csv" && csvFileObject) {
+        const formData = new FormData();
+        formData.append("csv_file", csvFileObject);
+        connectionIds.forEach((id) => formData.append("connection_ids[]", id));
+        formData.append("action", "draft");
+        formData.append("warehouse", "CN");
+        res = await importProductsBulk(formData);
+      } else if (multipleProductsTab === "urls") {
+        const urls = multipleProductsUrls.split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
+        res = await importProductsBulk({
+          urls,
+          connection_ids: connectionIds,
+          action: "draft",
+          warehouse: "CN",
+        });
+      } else {
+        toast.warn("Finder import is not available yet.");
+        setImportSubmitting(false);
+        return;
+      }
+
+      const batchId = res.data?.batch_id;
+      if (batchId) {
+        setImportBatchProgress({ total: res.data.total, completed: 0, failed: 0, status: "processing" });
+        pollImportBatch(batchId);
+        toast.info("Bulk import started.");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Bulk import failed.");
+      setImportSubmitting(false);
+    }
+  };
+
+  const toggleModalStoreSelection = (storeId) => {
+    setSelectedStoreIds((current) =>
+      current.includes(storeId)
+        ? current.filter((id) => id !== storeId)
+        : [...current, storeId],
+    );
+  };
+
+  const selectedStoreLabel =
+    selectedStoreIds.length === 0
+      ? "No store selected"
+      : selectedStoreIds.length === 1
+        ? stores.find((s) => s.id === selectedStoreIds[0])?.sidebarName ?? "1 store"
+        : `${selectedStoreIds.length} stores`;
 
   const openStoreSwitcherModal = () => {
     setStoreSwitcherOpen(true);
@@ -1336,11 +1475,12 @@ const MarketplaceDashboard = () => {
   };
 
   const multipleProductsActionDisabled =
-    multipleProductsTab === "urls"
+    importSubmitting ||
+    (multipleProductsTab === "urls"
       ? !multipleProductsUrls.trim()
       : multipleProductsTab === "csv"
-        ? !multipleProductsCsvFile
-        : finderTotalCredits === 0;
+        ? !csvFileObject
+        : finderTotalCredits === 0);
 
   const pageTitle = isUnknownPage
     ? "Page Not Found"
@@ -1353,11 +1493,15 @@ const MarketplaceDashboard = () => {
           : activePage === "dashboard"
         ? "Dashboard"
         : activePage === "orders"
-          ? `Orders (${initialOrders.length})`
+          ? `Orders`
           : activePage === "products"
-            ? `Products (${initialProducts.length})`
+            ? `Products (${listingsMeta?.total ?? 0})`
             : activePage === "drafts"
-              ? `Upload (${DRAFT_UPLOAD_COUNT})`
+              ? `Upload (${draftsMeta?.total ?? 0})`
+              : activePage === "plans"
+                ? "Plans"
+                : activePage === "admin/plans"
+                  ? "Manage Plans"
               : activePage === "customer-support"
                 ? "Customer Support"
                 : activePage === "support-center"
@@ -2174,12 +2318,26 @@ const MarketplaceDashboard = () => {
                     <h2>{addProductModalMode === "multiple" ? "Add Products" : "Add Product"}</h2>
                     <div className="add-product-modal__publish-row">
                       <span>
-                        Publish to: <strong>{publishStore.name}</strong>
+                        Publish to: <strong>{selectedStoreLabel}</strong>
                       </span>
                       <button type="button" aria-label="Edit publish store" onClick={openStoreSwitcherModal}>
                         <LuPencil />
                       </button>
                     </div>
+                        {stores.length > 0 ? (
+                      <div className="add-product-modal__store-list" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                        {stores.map((store) => (
+                          <label key={store.id} className="add-product-modal__store-option">
+                            <input
+                              type="checkbox"
+                              checked={selectedStoreIds.includes(store.id)}
+                              onChange={() => toggleModalStoreSelection(store.id)}
+                            />
+                            <span>{store.sidebarName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -2221,10 +2379,21 @@ const MarketplaceDashboard = () => {
 
                     {multipleProductsTab === "csv" ? (
                       <div className="add-products-modal__panel add-products-modal__panel--csv">
+                        <input
+                          ref={csvFileInputRef}
+                          type="file"
+                          accept=".csv,text/csv"
+                          hidden
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            setCsvFileObject(file ?? null);
+                            setMultipleProductsCsvFile(file?.name ?? "");
+                          }}
+                        />
                         <button
                           type="button"
                           className="add-products-modal__dropzone"
-                          onClick={() => setMultipleProductsCsvFile("products-upload.csv")}
+                          onClick={() => csvFileInputRef.current?.click()}
                         >
                           <span className="add-products-modal__dropzone-icon">
                             <LuUpload />
@@ -2315,11 +2484,20 @@ const MarketplaceDashboard = () => {
 
                       <div className="add-products-modal__footer-row">
                         <span className="add-products-modal__credits">
-                          {multipleProductsTab === "finder" ? `Total cost: ${finderTotalCredits} credits` : ""}
+                          {importBatchProgress
+                            ? `Progress: ${importBatchProgress.completed + importBatchProgress.failed}/${importBatchProgress.total}`
+                            : multipleProductsTab === "finder"
+                              ? `Total cost: ${finderTotalCredits} credits`
+                              : ""}
                         </span>
                         <div className="add-products-modal__submit-wrap">
-                          <button type="button" className="add-products-modal__submit-main" disabled={multipleProductsActionDisabled}>
-                            Add As draft
+                          <button
+                            type="button"
+                            className="add-products-modal__submit-main"
+                            disabled={multipleProductsActionDisabled}
+                            onClick={handleBulkImport}
+                          >
+                            {importSubmitting ? "Importing…" : "Add As draft"}
                           </button>
                           <button type="button" className="add-products-modal__submit-toggle" disabled={multipleProductsActionDisabled} aria-label="More add product actions">
                             <LuChevronDown />
@@ -2363,11 +2541,19 @@ const MarketplaceDashboard = () => {
                     </div>
 
                     <div className="add-product-modal__actions">
-                      <button type="button" disabled={!addProductUrl.trim()}>
-                        Publish to Store
+                      <button
+                        type="button"
+                        disabled={!addProductUrl.trim() || importSubmitting}
+                        onClick={() => handleSingleImport("publish")}
+                      >
+                        {importSubmitting ? "Working…" : "Publish to Store"}
                       </button>
-                      <button type="button" disabled={!addProductUrl.trim()}>
-                        Add as Draft (Simple page)
+                      <button
+                        type="button"
+                        disabled={!addProductUrl.trim() || importSubmitting}
+                        onClick={() => handleSingleImport("draft")}
+                      >
+                        {importSubmitting ? "Working…" : "Add as Draft (Simple page)"}
                       </button>
                     </div>
                   </>
@@ -2528,6 +2714,10 @@ const MarketplaceDashboard = () => {
               <WalletContent />
             ) : activePage === "settings" ? (
               <MarketplaceSettingsPage />
+            ) : activePage === "plans" ? (
+              <PlansPage />
+            ) : activePage === "admin/plans" ? (
+              <AdminPlansPage />
             ) : (
               <>
                 <section className="marketplace-search-panel card-wrapper">

@@ -52,4 +52,6 @@ export const marketplacePages = [
     .filter(Boolean),
   "support-center",
   "wallet",
+  "plans",
+  "admin/plans",
 ];

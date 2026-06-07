@@ -24,13 +24,22 @@ import {
   selectEbayDrafts,
   selectEbayDraftsLoading,
   selectEbayDraftsError,
+  selectEbayDraftsMeta,
 } from "../../../store/selectors/EbaySelectors";
 import { fetchEbayDrafts } from "../../../store/actions/EbayActions";
+import {
+  publishProduct,
+  retryProductImport,
+  updateProduct,
+  deleteProduct,
+  bulkDeleteProducts,
+} from "../../../services/ProductService";
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
   const connected = useSelector(selectEbayConnected);
   const drafts    = useSelector(selectEbayDrafts);
+  const meta      = useSelector(selectEbayDraftsMeta);
   const loading   = useSelector(selectEbayDraftsLoading);
   const error     = useSelector(selectEbayDraftsError);
 
@@ -41,14 +50,24 @@ function DraftsContent({ searchQuery }) {
   const [expandedIds, setExpandedIds]     = useState([]);
   const [retryingIds, setRetryingIds]     = useState([]);
   const [openMenuId, setOpenMenuId]       = useState("");
+  const [editForms, setEditForms]         = useState({});
+
+  const loadDrafts = () => {
+    const params = { q: searchQuery };
+    if (activeTab === "scheduled") params.tab = "scheduled";
+    if (activeTab === "failed") params.tab = "failed";
+    dispatch(fetchEbayDrafts(params));
+  };
 
   useEffect(() => {
     if (connected) {
-      dispatch(fetchEbayDrafts({ q: searchQuery }));
+      loadDrafts();
     }
-  }, [dispatch, connected, searchQuery]);
+  }, [dispatch, connected, searchQuery, activeTab]);
 
-  const visibleDrafts = activeTab !== "drafts" ? [] : drafts;
+  const visibleDrafts = drafts;
+  const scheduledCount = activeTab === "scheduled" ? (meta?.total ?? drafts.length) : 0;
+  const failedCount = drafts.filter((d) => d.import_status === "failed").length;
 
   const allVisibleSelected = visibleDrafts.length > 0 && visibleDrafts.every((item) => selectedIds.includes(item.id));
   const allExpanded = visibleDrafts.length > 0 && visibleDrafts.every((item) => expandedIds.includes(item.id));
@@ -73,27 +92,96 @@ function DraftsContent({ searchQuery }) {
     setExpandedIds(allExpanded ? [] : visibleDrafts.map((item) => item.id));
   };
 
-  const runBulkAction = (action) => {
+  const getEditForm = (item) => ({
+    title: item.title,
+    price: item.price,
+    quantity: item.quantity,
+    ...editForms[item.id],
+  });
+
+  const setEditField = (id, field, value, item) => {
+    setEditForms((cur) => ({
+      ...cur,
+      [id]: { ...getEditForm(item), [field]: value },
+    }));
+  };
+
+  const saveDraft = async (item) => {
+    const form = getEditForm(item);
+    try {
+      await updateProduct(item.id, form);
+      toast.success("Draft saved.");
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to save draft.");
+    }
+  };
+
+  const runBulkAction = async (action) => {
     if (!selectedIds.length) { toast.warn("Select at least one draft."); return; }
-    const labels = {
-      edit: "Bulk edit opened",
-      import: "Import all started",
-      rewrite: "Bulk AI rewrite queued",
-      schedule: "Schedule listings opened",
-      remove: `${selectedIds.length} draft${selectedIds.length === 1 ? "" : "s"} removed.`,
-    };
-    toast.info(labels[action] ?? "Action applied.");
-    if (action === "remove") setSelectedIds([]);
+
+    if (action === "remove") {
+      try {
+        await bulkDeleteProducts(selectedIds);
+        toast.success(`${selectedIds.length} draft(s) removed.`);
+        setSelectedIds([]);
+        loadDrafts();
+      } catch (err) {
+        toast.error(err.response?.data?.error ?? "Bulk delete failed.");
+      }
+      return;
+    }
+
+    if (action === "import") {
+      for (const id of selectedIds) {
+        try {
+          await publishProduct(id);
+        } catch {
+          // continue
+        }
+      }
+      toast.success("Publish queued for selected drafts.");
+      loadDrafts();
+      return;
+    }
+
+    toast.info(action === "edit" ? "Bulk edit opened" : "Action applied.");
   };
 
-  const retryDraft = (id) => {
+  const retryDraft = async (id) => {
     setRetryingIds((cur) => [...new Set([...cur, id])]);
-    toast.info("Draft retry queued.");
+    try {
+      await retryProductImport(id);
+      toast.success("Draft retry completed.");
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Retry failed.");
+    } finally {
+      setRetryingIds((cur) => cur.filter((x) => x !== id));
+    }
   };
 
-  const handleDraftMenu = (id, action) => {
+  const publishDraft = async (id) => {
+    try {
+      await publishProduct(id);
+      toast.success("Published to eBay.");
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Publish failed.");
+    }
+  };
+
+  const handleDraftMenu = async (id, action) => {
+    if (action === "delete") {
+      try {
+        await deleteProduct(id);
+        toast.success("Draft deleted.");
+        loadDrafts();
+      } catch (err) {
+        toast.error(err.response?.data?.error ?? "Delete failed.");
+      }
+    }
     if (action === "schedule") toast.info("Schedule Listing panel opened.");
-    if (action === "delete") toast.info("Draft deleted from the upload list.");
     if (action === "viral") toast.info("Go Viral with TikTok Ads is ready for this draft.");
     setOpenMenuId("");
   };
@@ -110,15 +198,19 @@ function DraftsContent({ searchQuery }) {
     );
   }
 
-  const emptyMessage = activeTab === "scheduled" ? "No scheduled uploads yet." : activeTab === "recurring" ? "No recurring uploads yet." : "No draft listings found on your eBay account.";
+  const emptyMessage = activeTab === "scheduled"
+    ? "No scheduled uploads yet."
+    : activeTab === "failed"
+      ? "No failed uploads."
+      : "No draft listings found. Import products from Add Products.";
 
   return (
     <section className="drafts-page-content">
       <nav className="drafts-tabs" aria-label="Upload sections">
         {[
-          ["drafts", `Drafts (${drafts.length})`],
-          ["scheduled", "Scheduled (0)"],
-          ["recurring", "Recurring (0)"],
+          ["drafts", `Drafts (${meta?.total ?? drafts.length})`],
+          ["scheduled", `Scheduled (${scheduledCount})`],
+          ["failed", `Failed (${failedCount})`],
         ].map(([key, label]) => (
           <button key={key} type="button" className={`drafts-tab ${activeTab === key ? "drafts-tab--active" : ""}`} onClick={() => setActiveTab(key)}>
             {label}
@@ -130,7 +222,7 @@ function DraftsContent({ searchQuery }) {
         <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((c) => !c)}>
           <LuSlidersHorizontal /><span>Add Filter</span>
         </button>
-        <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => { dispatch(fetchEbayDrafts()); toast.success("Draft listings refreshed from eBay."); }}>
+        <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => { loadDrafts(); toast.success("Draft listings refreshed."); }}>
           <LuRefreshCcw /><span>Refresh</span>
         </button>
         <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => setShowTutorialNote((c) => !c)}>
@@ -141,19 +233,7 @@ function DraftsContent({ searchQuery }) {
       {showTutorialNote ? (
         <div className="orders-inline-note">
           <LuPlay />
-          <span>Drafts are eBay listings that haven't been published yet. Review, edit and retry failed uploads.</span>
-        </div>
-      ) : null}
-
-      {showFilters ? (
-        <div className="drafts-filter-panel card-wrapper">
-          <label className="orders-filter-panel__field">
-            <span>Status</span>
-            <div className="orders-filter-panel__select">
-              <select defaultValue="Draft"><option>Draft</option><option>Failed</option><option>Ready</option></select>
-              <LuChevronDown />
-            </div>
-          </label>
+          <span>Import AliExpress products as drafts, review details, then publish to your eBay stores.</span>
         </div>
       ) : null}
 
@@ -172,7 +252,7 @@ function DraftsContent({ searchQuery }) {
           <div className={`drafts-bulk-actions ${selectedIds.length ? "" : "drafts-bulk-actions--disabled"}`}>
             <button type="button" onClick={() => runBulkAction("edit")}><LuPencil /><span>Bulk Edit</span></button>
             <button type="button" onClick={() => runBulkAction("remove")}><LuTrash2 /><span>Remove from list</span></button>
-            <button type="button" onClick={() => runBulkAction("import")}><LuPlus /><span>Import All</span></button>
+            <button type="button" onClick={() => runBulkAction("import")}><LuPlus /><span>Publish All</span></button>
             <button type="button" onClick={() => runBulkAction("rewrite")}><LuSparkles /><span>Bulk AI Rewrite</span></button>
             <button type="button" onClick={() => runBulkAction("schedule")}><LuClock3 /><span>Schedule Listings</span></button>
           </div>
@@ -188,13 +268,15 @@ function DraftsContent({ searchQuery }) {
         {loading ? (
           <div className="drafts-empty">
             <LuLoader style={{ animation: "spin 1s linear infinite" }} />
-            <span>Loading drafts from eBay…</span>
+            <span>Loading drafts…</span>
           </div>
         ) : visibleDrafts.length ? (
           visibleDrafts.map((item, index) => {
             const isSelected = selectedIds.includes(item.id);
             const isExpanded = expandedIds.includes(item.id);
             const isRetrying = retryingIds.includes(item.id);
+            const form = getEditForm(item);
+            const hasError = item.import_status === "failed";
 
             return (
               <div className="drafts-entry" key={item.id}>
@@ -218,27 +300,38 @@ function DraftsContent({ searchQuery }) {
 
                   <div className="drafts-row__body">
                     <h3>
-                      <span className="drafts-row__error">!</span>
+                      {hasError ? <span className="drafts-row__error">!</span> : null}
                       <span>{item.title}</span>
                     </h3>
                     <div className="drafts-row__meta">
-                      <span>Status:</span>
-                      <span>{item.status}</span>
+                      <span>Status: {item.import_status ?? item.status}</span>
                       <i aria-hidden="true" />
-                      <span>SKU: {item.sku ?? "—"}</span>
+                      <span>Buy: ${Number(item.buy_price ?? 0).toFixed(2)}</span>
+                      <i aria-hidden="true" />
+                      <span>Profit: ${Number(item.profit ?? 0).toFixed(2)}</span>
                       <i aria-hidden="true" />
                       <span>Price: ${Number(item.price ?? 0).toFixed(2)}</span>
+                      {item.source_product_id ? (
+                        <>
+                          <i aria-hidden="true" />
+                          <span>AE: {item.source_product_id}</span>
+                        </>
+                      ) : null}
                     </div>
+                    {item.import_error ? (
+                      <div className="drafts-row__meta" style={{ color: "#991b1b" }}>{item.import_error}</div>
+                    ) : null}
                   </div>
 
                   <div className="drafts-row__actions">
-                    {item.listing_url ? (
-                      <a href={item.listing_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View on eBay">
+                    {item.source_url ? (
+                      <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View source">
                         <LuExternalLink />
                       </a>
-                    ) : (
-                      <button type="button" className="orders-row-actions__icon" aria-label="No link"><LuExternalLink /></button>
-                    )}
+                    ) : null}
+                    <button type="button" className="drafts-retry-btn" onClick={() => publishDraft(item.id)}>
+                      <LuCheck /><span>Publish</span>
+                    </button>
                     <div className="drafts-row__menu-wrap">
                       <button type="button" className="orders-row-actions__icon" aria-label="Open draft menu" onClick={() => setOpenMenuId((c) => c === item.id ? "" : item.id)}>
                         <LuEllipsisVertical />
@@ -247,7 +340,6 @@ function DraftsContent({ searchQuery }) {
                         <div className="drafts-row__menu">
                           <button type="button" onClick={() => handleDraftMenu(item.id, "schedule")}><LuClock3 /><span>Schedule Listing</span></button>
                           <button type="button" onClick={() => handleDraftMenu(item.id, "delete")}><LuTrash2 /><span>Delete Draft</span></button>
-                          <button type="button" onClick={() => handleDraftMenu(item.id, "viral")}><LuSparkles /><span>Go Viral with TikTok Ads</span></button>
                         </div>
                       ) : null}
                     </div>
@@ -267,27 +359,25 @@ function DraftsContent({ searchQuery }) {
                             <div>
                               <h4>{item.title}</h4>
                               <div className="drafts-row__meta">
-                                <span>SKU: {item.sku ?? "—"}</span>
+                                <span>Warehouse: {item.warehouse_country ?? "CN"}</span>
                                 <i aria-hidden="true" />
-                                <span>Category: {item.category_name ?? "—"}</span>
-                                <i aria-hidden="true" />
-                                <span>Price: ${Number(item.price ?? 0).toFixed(2)}</span>
+                                <span>Source: {item.source_platform ?? "aliexpress"}</span>
                               </div>
                             </div>
                           </div>
                           <div className="draft-editor__actions">
-                            <button type="button" className="draft-editor__save"><LuCheck /><span>Save</span></button>
-                            <button type="button" className="draft-editor__retry"><LuRefreshCcw /><span>Save & Retry</span></button>
+                            <button type="button" className="draft-editor__save" onClick={() => saveDraft(item)}><LuCheck /><span>Save</span></button>
+                            <button type="button" className="draft-editor__retry" onClick={() => { saveDraft(item).then(() => retryDraft(item.id)); }}><LuRefreshCcw /><span>Save & Retry</span></button>
                           </div>
                         </div>
                         <div className="draft-editor__panel" style={{ padding: "20px 24px" }}>
                           <div className="draft-editor__grid">
-                            <label><span>Title</span><input type="text" className="marketplace-settings__control" defaultValue={item.title} /></label>
-                            <label><span>Price</span><input type="number" className="marketplace-settings__control" defaultValue={item.price} /></label>
+                            <label><span>Title</span><input type="text" className="marketplace-settings__control" value={form.title} onChange={(e) => setEditField(item.id, "title", e.target.value, item)} /></label>
+                            <label><span>Price</span><input type="number" className="marketplace-settings__control" value={form.price} onChange={(e) => setEditField(item.id, "price", e.target.value, item)} /></label>
                           </div>
                           <div className="draft-editor__grid">
-                            <label><span>Quantity</span><input type="number" className="marketplace-settings__control" defaultValue={item.quantity} /></label>
-                            <label><span>Condition</span><input type="text" className="marketplace-settings__control" defaultValue={item.condition ?? "New"} /></label>
+                            <label><span>Quantity</span><input type="number" className="marketplace-settings__control" value={form.quantity} onChange={(e) => setEditField(item.id, "quantity", e.target.value, item)} /></label>
+                            <label><span>Condition</span><input type="text" className="marketplace-settings__control" defaultValue={item.condition ?? "New"} readOnly /></label>
                           </div>
                         </div>
                       </div>

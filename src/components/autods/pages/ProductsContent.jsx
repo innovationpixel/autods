@@ -31,6 +31,7 @@ import {
   fetchEbayListings,
   syncEbayListingsAction,
 } from "../../../store/actions/EbayActions";
+import { bulkDeleteProducts, deleteProduct } from "../../../services/ProductService";
 
 function ProductsContent({ searchQuery }) {
   const dispatch = useDispatch();
@@ -82,14 +83,24 @@ function ProductsContent({ searchQuery }) {
     setSelectedIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
-  const applyBulkAction = (action) => {
+  const applyBulkAction = async (action) => {
     if (!selectedIds.length) {
       toast.warn("Select at least one product to use bulk actions.");
       return;
     }
+    if (action === "delete") {
+      try {
+        await bulkDeleteProducts(selectedIds);
+        toast.success(`${selectedIds.length} products deleted.`);
+        setSelectedIds([]);
+        dispatch(fetchEbayListings({ page: currentPage, limit: pageSize, status: filterStatus === "All" ? "" : filterStatus.toLowerCase(), q: searchQuery }));
+      } catch (err) {
+        toast.error(err.response?.data?.error ?? "Bulk delete failed.");
+      }
+      return;
+    }
     const labels = {
       relist: `${selectedIds.length} products marked for relist.`,
-      delete: `${selectedIds.length} products deleted.`,
       rewrite: `${selectedIds.length} product titles queued for AI rewrite.`,
       edit: `${selectedIds.length} products opened for bulk edit.`,
     };
@@ -315,8 +326,17 @@ function ProductsContent({ searchQuery }) {
 
                         {openMenuId === item.id ? (
                           <div className="products-actions-menu">
-                            <button type="button">
-                              <LuPencil /><span>Edit Product</span>
+                            <button type="button" onClick={async () => {
+                              try {
+                                await deleteProduct(item.id);
+                                toast.success("Product deleted.");
+                                dispatch(fetchEbayListings({ page: currentPage, limit: pageSize, status: filterStatus === "All" ? "" : filterStatus.toLowerCase(), q: searchQuery }));
+                              } catch (err) {
+                                toast.error(err.response?.data?.error ?? "Delete failed.");
+                              }
+                              setOpenMenuId("");
+                            }}>
+                              <LuPencil /><span>Delete Product</span>
                             </button>
                             <button type="button">
                               <LuStore /><span>Sync To Store</span>
@@ -341,10 +361,23 @@ function ProductsContent({ searchQuery }) {
                           <span className="orders-paired-values__platform">ebay</span>
                           <strong>${Number(item.price ?? 0).toFixed(2)}</strong>
                         </div>
+                        {item.buy_price != null ? (
+                          <div>
+                            <span className="orders-paired-values__type">BUY</span>
+                            <span className="orders-paired-values__platform">{item.source_platform ?? "ae"}</span>
+                            <strong>${Number(item.buy_price).toFixed(2)}</strong>
+                          </div>
+                        ) : null}
+                        {item.profit != null ? (
+                          <div>
+                            <span className="orders-paired-values__type">PROFIT</span>
+                            <strong>${Number(item.profit).toFixed(2)}</strong>
+                          </div>
+                        ) : null}
                       </div>
                     </td>
 
-                    <td>{item.ebay_item_id ?? "—"}</td>
+                    <td>{item.ebay_item_id ?? item.source_product_id ?? "—"}</td>
                     <td>{item.quantity_sold ?? 0}</td>
                     <td>{item.views ?? 0}</td>
                     <td>{item.watchers ?? 0}</td>

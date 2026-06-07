@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   LuBadgeCheck,
   LuChevronDown,
@@ -25,6 +25,16 @@ import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 import { openOAuthPopup, openAliExpressOAuth, watchOAuthPopup, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT } from "../../utils/oauthBridge";
+import { getAccountSettings, updateAccountSettings } from "../../services/SettingsService";
+import {
+  createStripeSetupIntent,
+  deletePaymentMethod,
+  getPaymentHistory,
+  getPaymentMethods,
+  savePayPalPaymentMethod,
+  saveStripePaymentMethod,
+} from "../../services/BillingService";
+import { getCurrentPlan } from "../../services/PlanService";
 
 const settingsPrimaryTabs = [
   "Store Settings",
@@ -434,6 +444,7 @@ function buildPricingSummary(pricing) {
 
 export default function MarketplaceSettingsPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { search } = useLocation();
   const ebayConnections        = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
@@ -469,6 +480,10 @@ export default function MarketplaceSettingsPage() {
   const [ebayCompleting, setEbayCompleting] = useState(false);
   const [ebayPasteUrl, setEbayPasteUrl] = useState("");
   const [aliConnecting, setAliConnecting] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentHistory, setPaymentHistory] = useState([]);
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [paypalEmail, setPaypalEmail] = useState("");
   const popupRef = useRef(null);
 
   useEffect(() => {
@@ -494,6 +509,19 @@ export default function MarketplaceSettingsPage() {
   useEffect(() => {
     dispatch(fetchEbayStatus());
     dispatch(fetchAliExpressStatus());
+
+    getAccountSettings()
+      .then((res) => {
+        const remote = res.data?.settings ?? {};
+        if (remote.suppliers?.length) {
+          setSuppliers(remote.suppliers);
+        }
+      })
+      .catch(() => {});
+
+    getPaymentMethods().then((res) => setPaymentMethods(res.data?.payment_methods ?? [])).catch(() => {});
+    getPaymentHistory().then((res) => setPaymentHistory(res.data?.data ?? [])).catch(() => {});
+    getCurrentPlan().then((res) => setCurrentSubscription(res.data)).catch(() => {});
   }, [dispatch]);
 
   useEffect(() => {
@@ -826,7 +854,7 @@ export default function MarketplaceSettingsPage() {
               )}
           </span>
           <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", maxWidth: 520 }}>
-            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a new browser tab.
+            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a popup window.
           </p>
         </div>
       )}
@@ -1000,8 +1028,79 @@ export default function MarketplaceSettingsPage() {
     }));
   };
 
-  const saveCurrentTab = () => {
-    setSaveNotice(`${activeInnerTab} settings saved for ${activeSupplier.label}.`);
+  const saveCurrentTab = async () => {
+    try {
+      await updateAccountSettings({
+        lister: {
+          default_quantity: Number(currentSettings.lister.defaultQuantity) || 1,
+          country: currentSettings.lister.itemCountry,
+          zipcode: currentSettings.lister.zipcode,
+          shipping_method: currentSettings.lister.shippingMethod,
+          template: currentSettings.lister.defaultTemplate,
+        },
+        pricing: {
+          product_cost_percent: 0,
+          fees_percent: parseNumericValue(currentSettings.pricing.feesPercent),
+          fixed_fees: parseNumericValue(currentSettings.pricing.fixedFeeAmount),
+          profit_percent: parseNumericValue(currentSettings.pricing.additionalProfitPercent),
+        },
+        orders: {
+          auto_deliver: currentSettings.orders.autoDeliver,
+          shipped_status: currentSettings.orders.shippedStatus,
+        },
+        general: {
+          weight_unit: currentSettings.general.defaultWeightUnit,
+          min_product_quantity: Number(currentSettings.general.minimumProductQuantity) || 1,
+          max_shipping_days: Number(currentSettings.general.maximumShippingDays) || 30,
+        },
+        suppliers,
+      });
+      setSaveNotice(`${activeInnerTab} settings saved for ${activeSupplier.label}.`);
+      toast.success("Settings saved.");
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to save settings.");
+    }
+  };
+
+  const addStripePaymentMethod = async () => {
+    try {
+      const res = await createStripeSetupIntent();
+      const paymentMethodId = window.prompt(
+        "Enter Stripe payment method ID from SetupIntent (use Stripe.js in production):",
+      );
+      if (!paymentMethodId) return;
+      await saveStripePaymentMethod(paymentMethodId);
+      const methods = await getPaymentMethods();
+      setPaymentMethods(methods.data?.payment_methods ?? []);
+      toast.success("Card saved.");
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to add card.");
+    }
+  };
+
+  const addPayPalPaymentMethod = async () => {
+    if (!paypalEmail.trim()) {
+      toast.warn("Enter your PayPal email.");
+      return;
+    }
+    try {
+      await savePayPalPaymentMethod(paypalEmail.trim());
+      const methods = await getPaymentMethods();
+      setPaymentMethods(methods.data?.payment_methods ?? []);
+      toast.success("PayPal account saved.");
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to save PayPal.");
+    }
+  };
+
+  const removePaymentMethod = async (id) => {
+    try {
+      await deletePaymentMethod(id);
+      setPaymentMethods((cur) => cur.filter((m) => m.id !== id));
+      toast.success("Payment method removed.");
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to remove payment method.");
+    }
   };
 
 
@@ -1597,7 +1696,11 @@ export default function MarketplaceSettingsPage() {
                   <button
                     type="button"
                     className={plan.current ? "marketplace-settings__plan-btn marketplace-settings__plan-btn--outline" : "marketplace-settings__plan-btn"}
-                    onClick={plan.id === "ebay-plan" ? connectEbay : undefined}
+                    onClick={
+                      plan.id === "ebay-plan"
+                        ? connectEbay
+                        : () => navigate("/plans")
+                    }
                     disabled={plan.id === "ebay-plan" && ebayConnecting}
                   >
                     {plan.id === "ebay-plan" && ebayConnecting ? "Opening eBay…" : plan.primaryAction}
@@ -1778,15 +1881,56 @@ export default function MarketplaceSettingsPage() {
 
       <div className="marketplace-settings__billing-section">
         <h3>Payment Method</h3>
-        <div className="marketplace-settings__billing-card">
-          <div>
-            <strong>No Payment Method Found</strong>
-            <span>Start adding cards for all stores.</span>
+        {paymentMethods.length ? (
+          paymentMethods.map((method) => (
+            <div className="marketplace-settings__billing-card" key={method.id}>
+              <div>
+                <strong>{method.brand ?? method.provider} {method.last4 ? `•••• ${method.last4}` : ""}</strong>
+                <span>{method.is_default ? "Default payment method" : method.provider_method_id}</span>
+              </div>
+              <button type="button" className="marketplace-settings__billing-card-btn" onClick={() => removePaymentMethod(method.id)}>
+                Remove
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="marketplace-settings__billing-card">
+            <div>
+              <strong>No Payment Method Found</strong>
+              <span>Add a card or PayPal account for plan purchases.</span>
+            </div>
           </div>
-          <button type="button" className="marketplace-settings__billing-card-btn">
-            Add
+        )}
+        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
+          <button type="button" className="marketplace-settings__billing-card-btn" onClick={addStripePaymentMethod}>
+            Add Card (Stripe)
           </button>
+          <div>
+            <input
+              className="marketplace-settings__control"
+              type="email"
+              placeholder="PayPal email"
+              value={paypalEmail}
+              onChange={(e) => setPaypalEmail(e.target.value)}
+            />
+            <button type="button" className="marketplace-settings__billing-card-btn" onClick={addPayPalPaymentMethod} style={{ marginTop: 8 }}>
+              Add PayPal
+            </button>
+          </div>
         </div>
+        {currentSubscription?.current_plan ? (
+          <p style={{ marginTop: 12 }}>
+            Active plan: <strong>{currentSubscription.current_plan.title}</strong>
+            {" "}
+            <button type="button" className="marketplace-settings__plan-link" onClick={() => navigate("/plans")}>
+              Upgrade
+            </button>
+          </p>
+        ) : (
+          <button type="button" className="marketplace-settings__plan-link" onClick={() => navigate("/plans")} style={{ marginTop: 12 }}>
+            View plans &amp; upgrade
+          </button>
+        )}
       </div>
 
       <div className="marketplace-settings__billing-section">
@@ -1800,9 +1944,20 @@ export default function MarketplaceSettingsPage() {
             <span>Type</span>
             <span>Total</span>
           </div>
-          <div style={{ padding: "20px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
-            No payment history yet.
-          </div>
+          {paymentHistory.length ? (
+            paymentHistory.map((tx) => (
+              <div className="marketplace-settings__billing-history-row" key={tx.id}>
+                <span>{tx.created_at ? new Date(tx.created_at).toLocaleDateString() : "—"}</span>
+                <span>{tx.provider_payment_id ?? tx.id}</span>
+                <span>{tx.provider}</span>
+                <span>${Number(tx.amount).toFixed(2)} {tx.currency}</span>
+              </div>
+            ))
+          ) : (
+            <div style={{ padding: "20px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
+              No payment history yet.
+            </div>
+          )}
         </div>
       </div>
     </section>

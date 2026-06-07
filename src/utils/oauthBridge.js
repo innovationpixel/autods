@@ -57,19 +57,12 @@ export const ALIEXPRESS_OAUTH_HINT =
     'Check “I agree to the Authorization Terms”, scroll down if needed, then click Sign in / Authorize.';
 
 /**
- * AliExpress consent pages are tall; small popups often hide Sign in / Authorize below the fold.
- * Prefer a full browser tab (per AliExpress docs), then a large resizable window as fallback.
+ * AliExpress consent pages are tall; use a large centered popup (same as eBay flow).
  */
 export function openAliExpressOAuth(url) {
-    let win = window.open(url, '_blank', 'noopener,noreferrer');
-
-    if (!win) {
-        const width = Math.min(1100, Math.max(900, window.screen.availWidth - 48));
-        const height = Math.min(920, Math.max(820, window.screen.availHeight - 80));
-        win = openCenteredWindow(url, 'aliexpress_oauth', width, height);
-    }
-
-    return win;
+    const width = Math.min(1100, Math.max(900, window.screen.availWidth - 48));
+    const height = Math.min(920, Math.max(820, window.screen.availHeight - 80));
+    return openCenteredWindow(url, 'aliexpress_oauth', width, height);
 }
 
 /**

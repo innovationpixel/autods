@@ -19,6 +19,7 @@ export const selectEbayListingsLoading = (state) => state.ebay.listings.loading;
 export const selectEbayListingsError   = (state) => state.ebay.listings.error;
 
 export const selectEbayDrafts        = (state) => state.ebay.drafts.data;
+export const selectEbayDraftsMeta    = (state) => state.ebay.drafts.meta;
 export const selectEbayDraftsLoading = (state) => state.ebay.drafts.loading;
 export const selectEbayDraftsError   = (state) => state.ebay.drafts.error;
 
