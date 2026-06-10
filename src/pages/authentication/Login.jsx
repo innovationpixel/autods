@@ -1,315 +1,262 @@
-import React, { useEffect, useState } from 'react';
-import { connect, useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { loadingToggleAction, loginAction, signupAction } from '../../store/actions/AuthActions';
-import { getStoredToken } from '../../services/AuthService';
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  LuCircleAlert,
+  LuArrowRight,
+  LuCheck,
+  LuEye,
+  LuEyeOff,
+  LuLoader,
+  LuLock,
+  LuMail,
+  LuPackage,
+  LuRefreshCcw,
+  LuSparkles,
+  LuStore,
+} from "react-icons/lu";
+import {
+  clearAuthErrorsAction,
+  loginAction,
+} from "../../store/actions/AuthActions";
+import { getStoredToken } from "../../services/AuthService";
+import { isValidEmail } from "../../utils/apiErrors";
+import logo from "../../assets/images/logo-full.png";
+import "../../assets/css/auth-page.css";
 
-import logo from '../../assets/images/logo-full.png';
-import logo2 from '../../assets/images/logo-full-white.png';
-import pic1 from '../../assets/images/pic1.svg';
+const featureItems = [
+  { icon: LuStore, text: "Connect eBay & AliExpress in minutes" },
+  { icon: LuPackage, text: "Import products and publish listings automatically" },
+  { icon: LuRefreshCcw, text: "Sync orders, pricing, and inventory in one place" },
+];
 
-function Login(props) {
-    const [tab, setTab] = useState('login');
+function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [clientErrors, setClientErrors] = useState({});
+  const [dismissedApiFields, setDismissedApiFields] = useState([]);
 
-    // Login fields
-    const [loginEmail, setLoginEmail] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-    const [showLoginPw, setShowLoginPw] = useState(false);
-    const [loginErrors, setLoginErrors] = useState({});
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-    // Register fields
-    const [regName, setRegName] = useState('');
-    const [regEmail, setRegEmail] = useState('');
-    const [regPassword, setRegPassword] = useState('');
-    const [regConfirm, setRegConfirm] = useState('');
-    const [showRegPw, setShowRegPw] = useState(false);
-    const [regErrors, setRegErrors] = useState({});
+  const errorMessage = useSelector((state) => state.auth.errorMessage);
+  const apiFieldErrors = useSelector((state) => state.auth.fieldErrors);
+  const showLoading = useSelector((state) => state.auth.showLoading);
 
-    const dispatch = useDispatch();
-    const navigate = useNavigate();
+  useEffect(() => {
+    if (getStoredToken()) {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
 
-    useEffect(() => {
-        if (getStoredToken()) {
-            navigate('/', { replace: true });
-        }
-    }, [navigate]);
+  const visibleApiFieldErrors = useMemo(() => {
+    const next = { ...apiFieldErrors };
+    dismissedApiFields.forEach((field) => {
+      delete next[field];
+    });
+    return next;
+  }, [apiFieldErrors, dismissedApiFields]);
 
-    function onLogin(e) {
-        e.preventDefault();
-        const errs = {};
-        if (!loginEmail)    errs.email    = 'Email is required';
-        if (!loginPassword) errs.password = 'Password is required';
-        setLoginErrors(errs);
-        if (Object.keys(errs).length) return;
+  const fieldErrors = useMemo(() => ({
+    ...visibleApiFieldErrors,
+    ...clientErrors,
+  }), [visibleApiFieldErrors, clientErrors]);
 
-        dispatch(loadingToggleAction(true));
-        dispatch(loginAction(loginEmail, loginPassword, navigate));
+  const apiErrorList = useMemo(
+    () => Object.entries(visibleApiFieldErrors).map(([field, message]) => ({ field, message })),
+    [visibleApiFieldErrors],
+  );
+
+  const clearFieldError = (field) => {
+    setClientErrors((current) => {
+      if (!current[field]) return current;
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    if (apiFieldErrors[field]) {
+      setDismissedApiFields((current) => [...new Set([...current, field])]);
+    }
+  };
+
+  const validateForm = () => {
+    const errors = {};
+
+    if (!email.trim()) {
+      errors.email = "Email is required.";
+    } else if (!isValidEmail(email)) {
+      errors.email = "Enter a valid email address.";
     }
 
-    function onRegister(e) {
-        e.preventDefault();
-        const errs = {};
-        if (!regName)                              errs.name     = 'Name is required';
-        if (!regEmail)                             errs.email    = 'Email is required';
-        if (!regPassword)                          errs.password = 'Password is required';
-        else if (regPassword.length < 8)           errs.password = 'Password must be at least 8 characters';
-        if (regPassword !== regConfirm)            errs.confirm  = 'Passwords do not match';
-        setRegErrors(errs);
-        if (Object.keys(errs).length) return;
-
-        dispatch(signupAction(regName, regEmail, regPassword, regConfirm, navigate));
+    if (!password) {
+      errors.password = "Password is required.";
     }
 
-    return (
-        <div className="authincation d-flex flex-column flex-lg-row flex-column-fluid">
-            <div className="login-aside text-center d-none d-sm-flex flex-column flex-row-auto">
-                <div className="d-flex flex-column-auto flex-column pt-lg-40 pt-15">
-                    <div className="text-center mb-4 pt-5">
-                        <Link to="/"><img src={logo} className="dark-login" alt="" /></Link>
-                        <Link to="/"><img src={logo2} className="light-login" alt="" /></Link>
-                    </div>
-                    <h3 className="mb-2">{tab === 'login' ? 'Welcome back!' : 'Get started today!'}</h3>
-                    <p>Automate your dropshipping business <br />with eBay &amp; AliExpress integration</p>
-                </div>
-                <div className="aside-image" style={{ backgroundImage: `url(${pic1})` }}></div>
-            </div>
+    setClientErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-            <div className="container flex-row-fluid d-flex flex-column justify-content-center position-relative overflow-hidden p-7 mx-auto">
-                <div className="d-flex justify-content-center h-100 align-items-center">
-                    <div className="authincation-content style-2">
-                        <div className="row no-gutters">
-                            <div className="col-xl-12 tab-content">
+  const onSubmit = (event) => {
+    event.preventDefault();
+    dispatch(clearAuthErrorsAction());
+    setClientErrors({});
+    setDismissedApiFields([]);
 
-                                {/* Tab switcher */}
-                                <div className="d-flex mb-4" style={{ borderBottom: '2px solid #e5e7eb' }}>
-                                    <button
-                                        type="button"
-                                        style={{
-                                            flex: 1, padding: '10px 0', border: 'none', background: 'none',
-                                            fontWeight: 600, fontSize: 15, cursor: 'pointer',
-                                            borderBottom: tab === 'login' ? '2px solid #6366f1' : '2px solid transparent',
-                                            color: tab === 'login' ? '#6366f1' : '#6b7280',
-                                        }}
-                                        onClick={() => setTab('login')}
-                                    >
-                                        Sign In
-                                    </button>
-                                    {/* <button
-                                        type="button"
-                                        style={{
-                                            flex: 1, padding: '10px 0', border: 'none', background: 'none',
-                                            fontWeight: 600, fontSize: 15, cursor: 'pointer',
-                                            borderBottom: tab === 'register' ? '2px solid #6366f1' : '2px solid transparent',
-                                            color: tab === 'register' ? '#6366f1' : '#6b7280',
-                                        }}
-                                        onClick={() => setTab('register')}
-                                    >
-                                        Create Account
-                                    </button> */}
-                                </div>
+    if (!validateForm()) {
+      return;
+    }
 
-                                {props.errorMessage && (
-                                    <div className="bg-red-300 text-red-900 border border-red-900 p-1 my-2">
-                                        {props.errorMessage}
-                                    </div>
-                                )}
-                                {props.successMessage && (
-                                    <div className="bg-green-300 text-green-900 border border-green-900 p-1 my-2">
-                                        {props.successMessage}
-                                    </div>
-                                )}
+    dispatch(loginAction(email.trim(), password, navigate));
+  };
 
-                                {/* ── Login form ─────────────────────────────────── */}
-                                {/* {tab === 'login' && (
-                                    <form onSubmit={onLogin} className="form-validate">
-                                        <h3 className="text-center mb-4 text-black">Sign in to your account</h3>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Email</label>
-                                            <input
-                                                type="email"
-                                                className="form-control"
-                                                value={loginEmail}
-                                                onChange={(e) => setLoginEmail(e.target.value)}
-                                                placeholder="Enter your email address"
-                                            />
-                                            {loginErrors.email && <div className="text-danger fs-12">{loginErrors.email}</div>}
-                                        </div>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Password</label>
-                                            <div className="position-relative">
-                                                <input
-                                                    type={showLoginPw ? 'text' : 'password'}
-                                                    className="form-control"
-                                                    value={loginPassword}
-                                                    onChange={(e) => setLoginPassword(e.target.value)}
-                                                    placeholder="Enter your password"
-                                                />
-                                                {loginErrors.password && <div className="text-danger fs-12">{loginErrors.password}</div>}
-                                                <span
-                                                    className={`show-pass eye ${showLoginPw ? 'active' : ''}`}
-                                                    onClick={() => setShowLoginPw((v) => !v)}
-                                                >
-                                                    <i className="fa fa-eye-slash" />
-                                                    <i className="fa fa-eye" />
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="text-center form-group mb-3">
-                                            <button
-                                                type="submit"
-                                                className="btn btn-primary btn-block"
-                                                disabled={props.showLoading}
-                                            >
-                                                {props.showLoading ? 'Signing in…' : 'Sign In'}
-                                            </button>
-                                        </div>
-                                        <p className="text-center" style={{ fontSize: 13, color: '#6b7280' }}>
-                                            Don't have an account?{' '}
-                                            <button type="button" style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontWeight: 600 }} onClick={() => setTab('register')}>
-                                                Create one
-                                            </button>
-                                        </p>
-                                    </form>
-                                )} */}
+  const getFieldError = (field) => fieldErrors[field] ?? "";
 
-                                <form onSubmit={onLogin} className="form-validate">
-                                        <h3 className="text-center mb-4 text-black">Sign in to your account</h3>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Email</label>
-                                            <input
-                                                type="email"
-                                                className="form-control"
-                                                value={loginEmail}
-                                                onChange={(e) => setLoginEmail(e.target.value)}
-                                                placeholder="Enter your email address"
-                                            />
-                                            {loginErrors.email && <div className="text-danger fs-12">{loginErrors.email}</div>}
-                                        </div>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Password</label>
-                                            <div className="position-relative">
-                                                <input
-                                                    type={showLoginPw ? 'text' : 'password'}
-                                                    className="form-control"
-                                                    value={loginPassword}
-                                                    onChange={(e) => setLoginPassword(e.target.value)}
-                                                    placeholder="Enter your password"
-                                                />
-                                                {loginErrors.password && <div className="text-danger fs-12">{loginErrors.password}</div>}
-                                                <span
-                                                    className={`show-pass eye ${showLoginPw ? 'active' : ''}`}
-                                                    onClick={() => setShowLoginPw((v) => !v)}
-                                                >
-                                                    <i className="fa fa-eye-slash" />
-                                                    <i className="fa fa-eye" />
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="text-center form-group mb-3">
-                                            <button
-                                                type="submit"
-                                                className="btn btn-primary btn-block"
-                                                disabled={props.showLoading}
-                                            >
-                                                {props.showLoading ? 'Signing in…' : 'Sign In'}
-                                            </button>
-                                        </div>
-                                        <p className="text-center" style={{ fontSize: 13, color: '#6b7280' }}>
-                                            Don't have an account?{' '}
-                                            <button type="button" style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontWeight: 600 }} onClick={() => setTab('register')}>
-                                                Create one
-                                            </button>
-                                        </p>
-                                    </form>
+  return (
+    <div className="auth-page">
+      <aside className="auth-page__brand">
+        <div className="auth-page__brand-inner">
+          <Link to="/" className="auth-page__logo">
+            <img src={logo} alt="Auto DS" />
+          </Link>
 
-                                {/* ── Register form ──────────────────────────────── */}
-                                {/* {tab === 'register' && (
-                                    <form onSubmit={onRegister} className="form-validate">
-                                        <h3 className="text-center mb-4 text-black">Create your account</h3>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Full Name</label>
-                                            <input
-                                                type="text"
-                                                className="form-control"
-                                                value={regName}
-                                                onChange={(e) => setRegName(e.target.value)}
-                                                placeholder="Enter your full name"
-                                            />
-                                            {regErrors.name && <div className="text-danger fs-12">{regErrors.name}</div>}
-                                        </div>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Email</label>
-                                            <input
-                                                type="email"
-                                                className="form-control"
-                                                value={regEmail}
-                                                onChange={(e) => setRegEmail(e.target.value)}
-                                                placeholder="Enter your email address"
-                                            />
-                                            {regErrors.email && <div className="text-danger fs-12">{regErrors.email}</div>}
-                                        </div>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Password</label>
-                                            <div className="position-relative">
-                                                <input
-                                                    type={showRegPw ? 'text' : 'password'}
-                                                    className="form-control"
-                                                    value={regPassword}
-                                                    onChange={(e) => setRegPassword(e.target.value)}
-                                                    placeholder="At least 8 characters"
-                                                />
-                                                <span
-                                                    className={`show-pass eye ${showRegPw ? 'active' : ''}`}
-                                                    onClick={() => setShowRegPw((v) => !v)}
-                                                >
-                                                    <i className="fa fa-eye-slash" />
-                                                    <i className="fa fa-eye" />
-                                                </span>
-                                            </div>
-                                            {regErrors.password && <div className="text-danger fs-12">{regErrors.password}</div>}
-                                        </div>
-                                        <div className="form-group mb-3">
-                                            <label className="mb-1 form-label required">Confirm Password</label>
-                                            <input
-                                                type="password"
-                                                className="form-control"
-                                                value={regConfirm}
-                                                onChange={(e) => setRegConfirm(e.target.value)}
-                                                placeholder="Re-enter your password"
-                                            />
-                                            {regErrors.confirm && <div className="text-danger fs-12">{regErrors.confirm}</div>}
-                                        </div>
-                                        <div className="text-center form-group mb-3">
-                                            <button
-                                                type="submit"
-                                                className="btn btn-primary btn-block"
-                                                disabled={props.showLoading}
-                                            >
-                                                {props.showLoading ? 'Creating account…' : 'Create Account'}
-                                            </button>
-                                        </div>
-                                        <p className="text-center" style={{ fontSize: 13, color: '#6b7280' }}>
-                                            Already have an account?{' '}
-                                            <button type="button" style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontWeight: 600 }} onClick={() => setTab('login')}>
-                                                Sign in
-                                            </button>
-                                        </p>
-                                    </form>
-                                )} */}
+          <div className="auth-page__brand-copy">
+            <span className="auth-page__eyebrow">
+              <LuSparkles />
+              Dropshipping automation
+            </span>
+            <h1>Run your store smarter, not harder</h1>
+            <p>
+              Auto DS connects your suppliers and marketplaces so you can import,
+              list, and fulfill orders from a single dashboard.
+            </p>
+          </div>
 
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+          <ul className="auth-page__features">
+            {featureItems.map(({ icon: Icon, text }) => (
+              <li key={text}>
+                <span className="auth-page__feature-icon"><Icon /></span>
+                <span>{text}</span>
+              </li>
+            ))}
+          </ul>
         </div>
-    );
+
+        <div className="auth-page__brand-glow" aria-hidden="true" />
+      </aside>
+
+      <main className="auth-page__main">
+        <div className="auth-page__card">
+          <div className="auth-page__card-head">
+            <h2>Sign in to your account</h2>
+            <p>Welcome back. Enter your credentials to continue.</p>
+          </div>
+
+          {(errorMessage || apiErrorList.length > 0) ? (
+            <div className="auth-page__alert auth-page__alert--error" role="alert">
+              <LuCircleAlert />
+              <div>
+                <strong>{errorMessage || "Please fix the following:"}</strong>
+                {apiErrorList.length > 0 ? (
+                  <ul className="auth-page__alert-list">
+                    {apiErrorList.map(({ field, message }) => (
+                      <li key={field}>{message}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          <form className="auth-page__form" onSubmit={onSubmit} noValidate>
+            <label className={`auth-page__field ${getFieldError("email") ? "auth-page__field--error" : ""}`}>
+              <span>Email address</span>
+              <div className="auth-page__input-wrap">
+                <LuMail />
+                <input
+                  type="email"
+                  name="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    clearFieldError("email");
+                  }}
+                  placeholder="you@company.com"
+                  aria-invalid={Boolean(getFieldError("email"))}
+                  aria-describedby={getFieldError("email") ? "login-email-error" : undefined}
+                />
+              </div>
+              {getFieldError("email") ? (
+                <span className="auth-page__field-error" id="login-email-error">{getFieldError("email")}</span>
+              ) : null}
+            </label>
+
+            <label className={`auth-page__field ${getFieldError("password") ? "auth-page__field--error" : ""}`}>
+              <span>Password</span>
+              <div className="auth-page__input-wrap">
+                <LuLock />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    clearFieldError("password");
+                  }}
+                  placeholder="Enter your password"
+                  aria-invalid={Boolean(getFieldError("password"))}
+                  aria-describedby={getFieldError("password") ? "login-password-error" : undefined}
+                />
+                <button
+                  type="button"
+                  className="auth-page__toggle-password"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <LuEyeOff /> : <LuEye />}
+                </button>
+              </div>
+              {getFieldError("password") ? (
+                <span className="auth-page__field-error" id="login-password-error">{getFieldError("password")}</span>
+              ) : null}
+            </label>
+
+            <button
+              type="submit"
+              className="auth-page__submit"
+              disabled={showLoading}
+            >
+              {showLoading ? (
+                <>
+                  <LuLoader className="spin-icon" />
+                  <span>Signing in…</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <LuArrowRight />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="auth-page__card-foot">
+            <p>
+              Don&apos;t have an account?{" "}
+              <Link to="/user/register">Create one</Link>
+            </p>
+          </div>
+
+          <div className="auth-page__trust">
+            <span><LuCheck /> Secure sign-in</span>
+            <span><LuCheck /> Encrypted credentials</span>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
 
-const mapStateToProps = (state) => ({
-    errorMessage: state.auth.errorMessage,
-    successMessage: state.auth.successMessage,
-    showLoading: state.auth.showLoading,
-});
-
-export default connect(mapStateToProps)(Login);
+export default Login;

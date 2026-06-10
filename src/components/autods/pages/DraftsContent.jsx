@@ -12,7 +12,6 @@ import {
   LuLink,
   LuLoader,
   LuPencil,
-  LuPlay,
   LuPlus,
   LuRefreshCcw,
   LuSlidersHorizontal,
@@ -34,6 +33,7 @@ import {
   deleteProduct,
   bulkDeleteProducts,
 } from "../../../services/ProductService";
+import { getListingImageUrl } from "../helpers";
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
@@ -45,7 +45,6 @@ function DraftsContent({ searchQuery }) {
 
   const [activeTab, setActiveTab]         = useState("drafts");
   const [showFilters, setShowFilters]     = useState(false);
-  const [showTutorialNote, setShowTutorialNote] = useState(false);
   const [selectedIds, setSelectedIds]     = useState([]);
   const [expandedIds, setExpandedIds]     = useState([]);
   const [retryingIds, setRetryingIds]     = useState([]);
@@ -225,17 +224,7 @@ function DraftsContent({ searchQuery }) {
         <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => { loadDrafts(); toast.success("Draft listings refreshed."); }}>
           <LuRefreshCcw /><span>Refresh</span>
         </button>
-        <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => setShowTutorialNote((c) => !c)}>
-          <LuPlay /><span>Watch Tutorial</span>
-        </button>
       </div>
-
-      {showTutorialNote ? (
-        <div className="orders-inline-note">
-          <LuPlay />
-          <span>Import AliExpress products as drafts, review details, then publish to your eBay stores.</span>
-        </div>
-      ) : null}
 
       {error ? (
         <div className="orders-inline-note" style={{ color: "#991b1b", background: "#fee2e2" }}>
@@ -277,6 +266,7 @@ function DraftsContent({ searchQuery }) {
             const isRetrying = retryingIds.includes(item.id);
             const form = getEditForm(item);
             const hasError = item.import_status === "failed";
+            const imageUrl = getListingImageUrl(item);
 
             return (
               <div className="drafts-entry" key={item.id}>
@@ -295,7 +285,7 @@ function DraftsContent({ searchQuery }) {
                   </button>
 
                   <div className="drafts-row__thumb">
-                    {item.image_url ? <img src={item.image_url} alt={item.title} /> : <div style={{ width: 48, height: 48, background: "#f0f0f0", borderRadius: 6 }} />}
+                    {imageUrl ? <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" /> : <div style={{ width: 48, height: 48, background: "#f0f0f0", borderRadius: 6 }} />}
                   </div>
 
                   <div className="drafts-row__body">
@@ -355,7 +345,7 @@ function DraftsContent({ searchQuery }) {
                       <div className="draft-editor__main">
                         <div className="draft-editor__header">
                           <div className="draft-editor__heading">
-                            {item.image_url ? <img src={item.image_url} alt={item.title} style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : null}
+                            {imageUrl ? <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : null}
                             <div>
                               <h4>{item.title}</h4>
                               <div className="drafts-row__meta">

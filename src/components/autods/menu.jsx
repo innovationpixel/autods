@@ -1,4 +1,3 @@
-import { FaTiktok } from "react-icons/fa6";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -6,7 +5,6 @@ import {
   LuFilePenLine,
   LuGauge,
   LuHeadphones,
-  LuMegaphone,
   LuPackage2,
   LuPackageSearch,
   LuSettings2,
@@ -17,6 +15,7 @@ import {
 /** Marketplace dashboard sidebar — edit groups and items here. */
 export const sidebarGroups = [
   [
+    { label: "Dashboard", page: "dashboard", icon: LuGauge, marker: "#f6c6c4" },
     {
       label: "Marketplace",
       page: "marketplace",
@@ -24,9 +23,7 @@ export const sidebarGroups = [
       active: true,
       children: [
         { label: "Hand-Picked Products", icon: LuBadgeCheck },
-        { label: "Ads Spy", icon: LuMegaphone },
         { label: "Trending Products", icon: LuChartLine },
-        { label: "TikTok Analytics", icon: FaTiktok, badge: "NEW" },
       ],
     },
     { label: "Print On Demand", page: "print-on-demand", icon: LuShirt },
@@ -34,9 +31,8 @@ export const sidebarGroups = [
     { label: "Calculations", page: "calculations", icon: LuChartLine },
   ],
   [
-    { label: "Dashboard", page: "dashboard", icon: LuGauge, marker: "#f6c6c4" },
     { label: "Orders", page: "orders", icon: LuClipboardList },
-    { label: "Sourcing Request", icon: LuPackageSearch, marker: "#f1b45c" },
+    { label: "Sourcing Request", page: "sourcing-request", icon: LuPackageSearch, marker: "#f1b45c" },
     { label: "Products", page: "products", icon: LuPackage2, marker: "#9ad2c0" },
     { label: "Drafts", page: "drafts", icon: LuFilePenLine },
     { label: "Customer Support", page: "customer-support", icon: LuHeadphones },

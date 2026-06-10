@@ -1,15 +1,21 @@
-import { useEffect, useState } from "react";
-import { LuChevronLeft, LuChevronRight, LuPlus, LuStore } from "react-icons/lu";
+import { useEffect, useMemo, useState } from "react";
+import { LuChevronLeft, LuChevronRight, LuImage, LuPlus } from "react-icons/lu";
+import { getMarketplaceProductImages } from "./helpers";
 
 function ProductCard({ item }) {
-  const gallery = item.gallery?.length ? item.gallery : [item.image];
+  const gallery = useMemo(() => getMarketplaceProductImages(item), [item]);
   const [activeImage, setActiveImage] = useState(0);
+  const [failedUrls, setFailedUrls] = useState({});
 
   useEffect(() => {
     setActiveImage(0);
+    setFailedUrls({});
   }, [item.id]);
 
   const showGalleryNav = gallery.length > 1;
+  const displayUrl = gallery[activeImage] && !failedUrls[gallery[activeImage]]
+    ? gallery[activeImage]
+    : null;
 
   const changeImage = (direction) => {
     setActiveImage((current) => {
@@ -27,11 +33,33 @@ function ProductCard({ item }) {
     });
   };
 
+  const handleImageError = () => {
+    const url = gallery[activeImage];
+    if (!url) {
+      return;
+    }
+
+    setFailedUrls((current) => ({ ...current, [url]: true }));
+  };
+
   return (
     <article className={`product-card marketplace-product-card ${showGalleryNav ? "marketplace-product-card--gallery" : ""}`}>
       <div className="marketplace-product-card__media">
         <div className="marketplace-product-card__image-wrap">
-          <img className="marketplace-product-card__image" src={gallery[activeImage]} alt={item.title} />
+          {displayUrl ? (
+            <img
+              className="marketplace-product-card__image"
+              src={displayUrl}
+              alt={item.title}
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="marketplace-product-card__image-placeholder" aria-hidden="true">
+              <LuImage />
+            </div>
+          )}
         </div>
 
         {showGalleryNav ? (
@@ -69,11 +97,6 @@ function ProductCard({ item }) {
         <button type="button" className="marketplace-product-card__action-btn">
           <LuPlus />
           <span>Import as Draft &amp; Edit Manually</span>
-        </button>
-        <button type="button" className="marketplace-product-card__action-btn marketplace-product-card__action-btn--store">
-          <LuStore />
-          <span>Build a Shopify Store</span>
-          <span className="marketplace-product-card__action-badge">NEW</span>
         </button>
       </div>
     </article>

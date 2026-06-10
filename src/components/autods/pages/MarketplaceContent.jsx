@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { LuChevronDown, LuLoader, LuSearch, LuSlidersHorizontal, LuSparkles } from "react-icons/lu";
+import { LuChevronDown, LuLoader, LuSearch, LuSlidersHorizontal } from "react-icons/lu";
 import CarouselSection from "../CarouselSection";
 import ProductCard from "../ProductCard";
 import SelectField from "../SelectField";
@@ -99,11 +99,6 @@ function MarketplaceContent({
 
           <button type="button" className="button-base button-primary marketplace-search-panel__submit">
             Search
-          </button>
-
-          <button type="button" className="marketplace-search-panel__ugc-btn">
-            <LuSparkles />
-            <span>Generate Sales Ready UGC Ads</span>
           </button>
         </div>
 

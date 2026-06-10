@@ -1,188 +1,34 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuCalendar,
   LuChevronLeft,
   LuChevronRight,
   LuFilter,
+  LuInbox,
+  LuLoader,
   LuRefreshCcw,
   LuStar,
 } from "react-icons/lu";
+import { toast } from "../../utils/toast";
+import { buildPaginationItems } from "../autods/helpers";
+import {
+  getSupportConversations,
+  syncSupportConversations,
+  updateSupportConversation,
+} from "../../services/SupportService";
 import "../../assets/css/customer-support.css";
-
-const conversations = [
-  {
-    id: 1,
-    message: "Further verification needed – stakeholder details",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "7 hours",
-    unread: true,
-  },
-  {
-    id: 2,
-    message: "Further verification needed – stakeholder details",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "9 hours",
-    unread: true,
-  },
-  {
-    id: 3,
-    message:
-      "Okay, we will verify with our warehouse and proceed with issuing a refund for the returned product.",
-    buyer: "juvazque309",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 4,
-    message:
-      "Okay dear customer, in this case we will issue a partial refund. Please place your order again, and we will help.",
-    buyer: "scientifical",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 5,
-    message: "Okay, we will check with our warehouse and issue a refund for the returned product.",
-    buyer: "yi-537969",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 6,
-    message: "The product is the same. Please check again.",
-    buyer: "dagar1064",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 7,
-    message: "Your order has been updated. Kindly check your order status for the latest details.",
-    buyer: "oldp4948",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 8,
-    message: "Your order has been updated. Kindly check your order status for the latest details.",
-    buyer: "p.mr34",
-    type: "Pre Sale Conversation",
-    time: "12 hours",
-    unread: true,
-  },
-  {
-    id: 9,
-    message:
-      "We're sorry, but we cannot cancel your order as it is already in process. Thank you for your understanding.",
-    buyer: "coly-2919",
-    type: "Pre Sale Conversation",
-    time: "13 hours",
-    unread: true,
-  },
-  {
-    id: 10,
-    message: "Please see the description and images of the product.",
-    buyer: "briabr5nicssl",
-    type: "Pre Sale Conversation",
-    time: "13 hours",
-    unread: true,
-  },
-  {
-    id: 11,
-    message: "A buyer wants to cancel an order",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "16 hours",
-    unread: true,
-  },
-  {
-    id: 12,
-    message: "The offer you received has been retracted",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "19 hours",
-    unread: true,
-  },
-  {
-    id: 13,
-    message: "You have a new offer: $5.00 for NEW Gel Nano Silicon... (389414777845)",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "19 hours",
-    unread: true,
-    messageIcon: "calendar",
-  },
-  {
-    id: 14,
-    message: "Action required: update business stakeholder details",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "a day",
-    unread: true,
-  },
-  {
-    id: 15,
-    message: "Action required: verify your business details",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "a day",
-    unread: true,
-  },
-  {
-    id: 16,
-    message: "Return 5317732326: You have a message",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "a day",
-    unread: true,
-  },
-  {
-    id: 17,
-    message: "We removed some of your listings: Single-use plastic products policy",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "a day",
-    unread: true,
-  },
-  {
-    id: 18,
-    message: "We hid some of your listings: Offering to buy or sell outside of eBay policy",
-    buyer: "eBay",
-    type: "System Conversation",
-    time: "a day",
-    unread: true,
-  },
-  {
-    id: 19,
-    message:
-      "Dear Customer, Please send us a picture of the item you received so we can check and assist you further.",
-    buyer: "x3steego",
-    type: "Pre Sale Conversation",
-    time: "2 days",
-    unread: false,
-  },
-  {
-    id: 20,
-    message:
-      "Dear Customer, Your order is currently in process. The tracking information will be updated to your order soon.",
-    buyer: "kwikserv",
-    type: "Pre Sale Conversation",
-    time: "2 days",
-    unread: false,
-  },
-];
 
 const sortableColumns = {
   status: "status",
   type: "type",
   time: "time",
 };
+
+const typeFilterOptions = [
+  "All",
+  "System Conversation",
+  "Pre Sale Conversation",
+];
 
 function SortHeader({ children, column, sort, onSort }) {
   const active = sort.key === column;
@@ -203,39 +49,51 @@ function SortHeader({ children, column, sort, onSort }) {
 }
 
 function CustomerSupportContent({ searchQuery = "" }) {
-  const [sort, setSort] = useState({ key: "", direction: "asc" });
+  const [rows, setRows] = useState([]);
+  const [meta, setMeta] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [sort, setSort] = useState({ key: "time", direction: "desc" });
   const [selectedRows, setSelectedRows] = useState([]);
-  const [favoriteRows, setFavoriteRows] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("All");
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const rows = conversations
-      .filter((row) => {
-        if (!query) {
-          return true;
-        }
-
-        return [row.message, row.buyer, row.type, row.time, "New", "nrf_enterprise_inc-llc-au"]
-          .join(" ")
-          .toLowerCase()
-          .includes(query);
-      })
-      .map((row) => ({ ...row, status: "New", store: "nrf_enterprise_inc-llc-au" }));
-
-    if (!sort.key) {
-      return rows;
+  const loadConversations = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getSupportConversations({
+        q: searchQuery,
+        type: typeFilter,
+        unread: unreadOnly ? "1" : "",
+        page: currentPage,
+        limit: pageSize,
+        sort: sort.key,
+        direction: sort.direction,
+      });
+      setRows(res.data?.data ?? []);
+      setMeta(res.data?.meta ?? {});
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to load conversations.");
+    } finally {
+      setLoading(false);
     }
+  }, [searchQuery, typeFilter, unreadOnly, currentPage, pageSize, sort.key, sort.direction]);
 
-    return [...rows].sort((a, b) => {
-      const left = String(a[sort.key]).toLowerCase();
-      const right = String(b[sort.key]).toLowerCase();
-      const result = left.localeCompare(right, undefined, { numeric: true });
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
 
-      return sort.direction === "asc" ? result : -result;
-    });
-  }, [searchQuery, sort]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, typeFilter, unreadOnly, pageSize]);
 
-  const allSelected = selectedRows.length === filteredRows.length && filteredRows.length > 0;
+  const totalPages = meta?.last_page ?? 1;
+  const totalCount = meta?.total ?? rows.length;
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+  const allSelected = selectedRows.length === rows.length && rows.length > 0;
 
   const toggleSort = (column) => {
     setSort((current) => {
@@ -247,40 +105,114 @@ function CustomerSupportContent({ searchQuery = "" }) {
     });
   };
 
+  const handleRefresh = async () => {
+    setSyncing(true);
+    try {
+      const res = await syncSupportConversations();
+      toast.success(res.data?.message ?? "Conversations synced.");
+      await loadConversations();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to sync conversations.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const toggleFavorite = async (row) => {
+    try {
+      const res = await updateSupportConversation(row.id, {
+        is_favorite: !row.is_favorite,
+      });
+      const updated = res.data?.conversation;
+      setRows((current) =>
+        current.map((item) => (item.id === row.id ? { ...item, ...updated } : item)),
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to update favorite.");
+    }
+  };
+
+  const markAsRead = async (row) => {
+    if (!row.unread) {
+      return;
+    }
+
+    try {
+      const res = await updateSupportConversation(row.id, { is_unread: false });
+      const updated = res.data?.conversation;
+      setRows((current) =>
+        current.map((item) => (item.id === row.id ? { ...item, ...updated } : item)),
+      );
+    } catch {
+      // Non-blocking — row still displays if mark-read fails.
+    }
+  };
+
   const toggleAllRows = () => {
-    setSelectedRows(allSelected ? [] : filteredRows.map((row) => row.id));
+    setSelectedRows(allSelected ? [] : rows.map((row) => row.id));
   };
 
   const toggleRow = (id) => {
     setSelectedRows((current) =>
-      current.includes(id) ? current.filter((rowId) => rowId !== id) : [...current, id]
+      current.includes(id) ? current.filter((rowId) => rowId !== id) : [...current, id],
     );
   };
 
-  const toggleFavorite = (id) => {
-    setFavoriteRows((current) =>
-      current.includes(id) ? current.filter((rowId) => rowId !== id) : [...current, id]
-    );
-  };
+  const emptyMessage = useMemo(() => {
+    if (searchQuery || typeFilter !== "All" || unreadOnly) {
+      return "No conversations match your filters.";
+    }
+    return "No conversations yet. Click Refresh to sync messages from eBay.";
+  }, [searchQuery, typeFilter, unreadOnly]);
 
   return (
     <div className="customer-support-content">
       <section className="support-toolbar" aria-label="Conversation controls">
         <div className="support-toolbar__left">
-          <button type="button" className="support-view-btn">
-            My Views
+          <button
+            type="button"
+            className={`support-view-btn ${unreadOnly ? "support-view-btn--active" : ""}`}
+            onClick={() => setUnreadOnly((current) => !current)}
+          >
+            {unreadOnly ? "Unread only" : "All conversations"}
           </button>
-          <button type="button" className="support-filter-btn">
+          <button
+            type="button"
+            className={`support-filter-btn ${showFilters ? "support-filter-btn--active" : ""}`}
+            onClick={() => setShowFilters((current) => !current)}
+          >
             <LuFilter aria-hidden="true" />
             <span>Add Filter</span>
           </button>
         </div>
 
-        <button type="button" className="support-refresh-btn">
-          <LuRefreshCcw aria-hidden="true" />
-          <span>Refresh</span>
+        <button
+          type="button"
+          className="support-refresh-btn"
+          onClick={handleRefresh}
+          disabled={syncing || loading}
+        >
+          {syncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw aria-hidden="true" />}
+          <span>{syncing ? "Syncing…" : "Refresh"}</span>
         </button>
       </section>
+
+      {showFilters ? (
+        <div className="support-filters" style={{ display: "flex", gap: 12, padding: "0 0 12px", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <span>Type</span>
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              aria-label="Filter by conversation type"
+            >
+              {typeFilterOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
 
       <main className="support-table-shell">
         <div className="support-table-scroll">
@@ -304,6 +236,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
                     aria-label="Select all conversations"
                     checked={allSelected}
                     onChange={toggleAllRows}
+                    disabled={!rows.length}
                   />
                 </th>
                 <th aria-label="Favorite" />
@@ -328,57 +261,81 @@ function CustomerSupportContent({ searchQuery = "" }) {
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row) => {
-                const isSelected = selectedRows.includes(row.id);
-                const isFavorite = favoriteRows.includes(row.id);
+              {loading ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "32px 16px" }}>
+                    <LuLoader className="spin-icon" style={{ marginRight: 8 }} />
+                    Loading conversations…
+                  </td>
+                </tr>
+              ) : rows.length ? (
+                rows.map((row) => {
+                  const isSelected = selectedRows.includes(row.id);
+                  const isFavorite = row.is_favorite;
 
-                return (
-                  <tr key={row.id} className={isSelected ? "support-table__row support-table__row--selected" : "support-table__row"}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        className="support-checkbox"
-                        aria-label={`Select conversation ${row.id}`}
-                        checked={isSelected}
-                        onChange={() => toggleRow(row.id)}
-                      />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className={`support-star ${isFavorite ? "support-star--active" : ""}`}
-                        aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-                        aria-pressed={isFavorite}
-                        onClick={() => toggleFavorite(row.id)}
-                      >
-                        <LuStar />
-                      </button>
-                    </td>
-                    <td>
-                      <div className="support-message">
-                        <span className="support-message__dot" aria-hidden="true" />
-                        {row.messageIcon === "calendar" ? (
-                          <span className="support-message__mini-icon" aria-hidden="true">
-                            <LuCalendar />
+                  return (
+                    <tr
+                      key={row.id}
+                      className={isSelected ? "support-table__row support-table__row--selected" : "support-table__row"}
+                      onClick={() => markAsRead(row)}
+                    >
+                      <td>
+                        <input
+                          type="checkbox"
+                          className="support-checkbox"
+                          aria-label={`Select conversation ${row.id}`}
+                          checked={isSelected}
+                          onChange={() => toggleRow(row.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`support-star ${isFavorite ? "support-star--active" : ""}`}
+                          aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          aria-pressed={isFavorite}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(row);
+                          }}
+                        >
+                          <LuStar />
+                        </button>
+                      </td>
+                      <td>
+                        <div className="support-message">
+                          {row.unread ? <span className="support-message__dot" aria-hidden="true" /> : null}
+                          {row.message_icon === "calendar" ? (
+                            <span className="support-message__mini-icon" aria-hidden="true">
+                              <LuCalendar />
+                            </span>
+                          ) : null}
+                          <span className={`support-message__text ${row.unread ? "support-message__text--unread" : ""}`}>
+                            {row.message}
                           </span>
-                        ) : null}
-                        <span className={`support-message__text ${row.unread ? "support-message__text--unread" : ""}`}>
-                          {row.message}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="support-table__buyer">{row.buyer}</td>
-                    <td>
-                      <span className="support-status-badge">New</span>
-                    </td>
-                    <td>
-                      <span className="support-type-badge">{row.type}</span>
-                    </td>
-                    <td className="support-table__time">{row.time}</td>
-                    <td className="support-table__store">nrf_enterprise_inc-llc-au</td>
-                  </tr>
-                );
-              })}
+                        </div>
+                      </td>
+                      <td className="support-table__buyer">{row.buyer}</td>
+                      <td>
+                        <span className="support-status-badge">{row.status}</span>
+                      </td>
+                      <td>
+                        <span className="support-type-badge">{row.type}</span>
+                      </td>
+                      <td className="support-table__time">{row.time}</td>
+                      <td className="support-table__store">{row.store ?? "—"}</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 16px", color: "#8b8a93" }}>
+                    <LuInbox style={{ display: "block", margin: "0 auto 8px", fontSize: 28 }} />
+                    {emptyMessage}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -386,20 +343,37 @@ function CustomerSupportContent({ searchQuery = "" }) {
 
       <footer className="support-footer">
         <nav className="support-pagination" aria-label="Conversation pages">
-          <button type="button" className="support-pagination__arrow" aria-label="Previous page">
+          <button
+            type="button"
+            className="support-pagination__arrow"
+            aria-label="Previous page"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          >
             <LuChevronLeft />
           </button>
-          {[1, 2, 3, 4].map((page) => (
-            <button
-              type="button"
-              key={page}
-              className={`support-pagination__page ${page === 1 ? "support-pagination__page--active" : ""}`}
-              aria-current={page === 1 ? "page" : undefined}
-            >
-              {page}
-            </button>
-          ))}
-          <button type="button" className="support-pagination__arrow" aria-label="Next page">
+          {paginationItems.map((item, index) =>
+            item === "..." ? (
+              <span key={`ellipsis-${index}`} className="support-pagination__page">…</span>
+            ) : (
+              <button
+                type="button"
+                key={item}
+                className={`support-pagination__page ${item === currentPage ? "support-pagination__page--active" : ""}`}
+                aria-current={item === currentPage ? "page" : undefined}
+                onClick={() => setCurrentPage(item)}
+              >
+                {item}
+              </button>
+            ),
+          )}
+          <button
+            type="button"
+            className="support-pagination__arrow"
+            aria-label="Next page"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          >
             <LuChevronRight />
           </button>
         </nav>
@@ -407,13 +381,17 @@ function CustomerSupportContent({ searchQuery = "" }) {
         <div className="support-footer__meta">
           <label>
             <span>Show</span>
-            <select defaultValue="20" aria-label="Conversations per page">
-              <option value="20">20</option>
-              <option value="40">40</option>
-              <option value="60">60</option>
+            <select
+              value={pageSize}
+              aria-label="Conversations per page"
+              onChange={(e) => setPageSize(Number(e.target.value))}
+            >
+              <option value={20}>20</option>
+              <option value={40}>40</option>
+              <option value={60}>60</option>
             </select>
           </label>
-          <span>Conversations out of 72</span>
+          <span>Conversations out of {totalCount}</span>
         </div>
       </footer>
     </div>

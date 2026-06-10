@@ -10,14 +10,23 @@ import {
     getMe,
 } from '../../services/AuthService';
 import { toast } from '../../utils/toast';
+import { parseApiErrors } from '../../utils/apiErrors';
 
 export const LOGIN_CONFIRMED_ACTION  = '[login action] confirmed login';
 export const LOGIN_FAILED_ACTION     = '[login action] failed login';
+export const CLEAR_AUTH_ERRORS_ACTION = '[login action] clear auth errors';
 export const LOGOUT_ACTION           = '[Logout action] logout action';
 export const LOADING_TOGGLE_ACTION   = '[Loading action] toggle loading';
 
+export function clearAuthErrorsAction() {
+    return { type: CLEAR_AUTH_ERRORS_ACTION };
+}
+
 export function loginAction(email, password, navigate) {
     return (dispatch) => {
+        dispatch(loadingToggleAction(true));
+        dispatch(clearAuthErrorsAction());
+
         login(email, password)
             .then((response) => {
                 saveSession(response.data);
@@ -26,11 +35,11 @@ export function loginAction(email, password, navigate) {
                 navigate('/');
             })
             .catch((error) => {
-                const message =
-                    error.response?.data?.message || 'Login failed. Please try again.';
-                dispatch(loginFailedAction(message));
+                const { message, fieldErrors } = parseApiErrors(error);
+                dispatch(loginFailedAction({ message, fieldErrors }));
                 toast.error(message);
-            });
+            })
+            .finally(() => dispatch(loadingToggleAction(false)));
     };
 }
 
@@ -71,10 +80,11 @@ export function checkAutoLogin(dispatch, navigate) {
             }
         })
         .catch(() => {
-            // Token is invalid / expired — clear session and redirect to login
             clearSession();
             dispatch({ type: LOGOUT_ACTION });
-            navigate('/user/login');
+            if (!window.location.pathname.startsWith('/user/login')) {
+                navigate('/user/login');
+            }
         });
 
     if (window.location.pathname === '/user/login') {
@@ -93,11 +103,8 @@ export function signupAction(name, email, password, passwordConfirmation, naviga
                 navigate('/');
             })
             .catch((error) => {
-                const message =
-                    error.response?.data?.message ||
-                    Object.values(error.response?.data?.errors ?? {})[0]?.[0] ||
-                    'Registration failed. Please try again.';
-                dispatch(loginFailedAction(message));
+                const { message, fieldErrors } = parseApiErrors(error);
+                dispatch(loginFailedAction({ message, fieldErrors }));
                 toast.error(message);
             })
             .finally(() => dispatch(loadingToggleAction(false)));
@@ -130,10 +137,10 @@ export function loginConfirmedAction(data) {
     };
 }
 
-export function loginFailedAction(message) {
+export function loginFailedAction(payload) {
     return {
         type: LOGIN_FAILED_ACTION,
-        payload: message,
+        payload,
     };
 }
 

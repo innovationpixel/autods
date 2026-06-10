@@ -12,13 +12,11 @@ import {
   LuLoader,
   LuMenu,
   LuPencil,
-  LuPlay,
   LuRefreshCcw,
   LuSlidersHorizontal,
-  LuSparkles,
   LuStore,
 } from "react-icons/lu";
-import { buildPaginationItems, formatDisplayDate } from "../helpers";
+import { buildPaginationItems, formatDisplayDate, getListingImageUrl } from "../helpers";
 import {
   selectEbayConnected,
   selectEbayListings,
@@ -43,7 +41,6 @@ function ProductsContent({ searchQuery }) {
   const syncing    = useSelector(selectEbaySyncing);
 
   const [showFilters, setShowFilters]         = useState(false);
-  const [showTutorialNote, setShowTutorialNote] = useState(false);
   const [historyVisible, setHistoryVisible]   = useState(false);
   const [pageSize, setPageSize]               = useState(20);
   const [currentPage, setCurrentPage]         = useState(1);
@@ -166,23 +163,8 @@ function ProductsContent({ searchQuery }) {
             {syncing ? <LuLoader style={{ animation: "spin 1s linear infinite" }} /> : <LuRefreshCcw />}
             <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
           </button>
-          <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => setShowTutorialNote((c) => !c)}>
-            <LuPlay />
-            <span>Watch Tutorial</span>
-          </button>
-          <button type="button" className="marketplace-search-panel__ugc-btn products-toolbar__ugc-btn" onClick={() => toast.info("UGC generation queue started.")}>
-            <LuSparkles />
-            <span>Generate Sales Ready UGC Ads</span>
-          </button>
         </div>
       </div>
-
-      {showTutorialNote ? (
-        <div className="orders-inline-note">
-          <LuPlay />
-          <span>Products tutorial: manage your live eBay listings, sync from eBay, and use bulk actions.</span>
-        </div>
-      ) : null}
 
       {showFilters ? (
         <div className="products-filter-panel card-wrapper">
@@ -282,7 +264,10 @@ function ProductsContent({ searchQuery }) {
                   </td>
                 </tr>
               ) : listings.length ? (
-                listings.map((item) => (
+                listings.map((item) => {
+                  const imageUrl = getListingImageUrl(item);
+
+                  return (
                   <tr className="products-table__row" key={item.id}>
                     <td className="products-table__checkbox-col">
                       <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} />
@@ -290,9 +275,9 @@ function ProductsContent({ searchQuery }) {
 
                     <td>
                       <div className="products-item">
-                        {item.image_url ? (
+                        {imageUrl ? (
                           <div className="products-item__thumb">
-                            <img src={item.image_url} alt={item.title} />
+                            <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" />
                           </div>
                         ) : null}
                         <div className="products-item__copy">
@@ -383,7 +368,8 @@ function ProductsContent({ searchQuery }) {
                     <td>{item.watchers ?? 0}</td>
                     <td>{item.days_left != null ? `${item.days_left}d` : "—"}</td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td className="orders-table__empty" colSpan={16}>

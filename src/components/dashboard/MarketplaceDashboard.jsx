@@ -1,7 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaTiktok } from "react-icons/fa6";
 import {
   LuBadgeCheck,
   LuBell,
@@ -12,7 +11,6 @@ import {
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
-  LuChevronsLeft,
   LuClipboardList,
   LuClock3,
   LuDribbble,
@@ -26,11 +24,11 @@ import {
   LuHouse,
   LuInbox,
   LuMegaphone,
+  LuLogOut,
   LuMenu,
   LuMessageCircleMore,
   LuMoon,
   LuPackage2,
-  LuPackagePlus,
   LuPackageSearch,
   LuPawPrint,
   LuPencil,
@@ -42,7 +40,6 @@ import {
   LuShirt,
   LuShoppingCart,
   LuSlidersHorizontal,
-  LuSparkles,
   LuStore,
   LuSun,
   LuTabletSmartphone,
@@ -64,6 +61,7 @@ import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
+import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
 import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
@@ -83,12 +81,16 @@ import CalculationsContent from '../autods/pages/CalculationsContent';
 import NotFoundContent from '../autods/pages/NotFoundContent';
 import { fetchEbayStatus, disconnectEbayAction, fetchEbayDrafts, fetchEbayListings } from '../../store/actions/EbayActions';
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbayListingsMeta, selectEbayDraftsMeta } from '../../store/selectors/EbaySelectors';
+import { selectUser } from '../../store/selectors/AuthSelectors';
+import { getUserEmail, getUserFullName, getUserShortName } from '../../utils/userDisplay';
 import { getEbayAuthUrl } from '../../services/EbayService';
 import {
   mapEbayConnectionToStore,
   parseEbayConnectionId,
 } from '../../utils/ebayStore';
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
+import { logoutAction } from '../../store/actions/AuthActions';
+import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
 import {
   openOAuthPopup,
@@ -627,6 +629,10 @@ const MarketplaceDashboard = () => {
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
   const listingsMeta = useSelector(selectEbayListingsMeta);
   const draftsMeta = useSelector(selectEbayDraftsMeta);
+  const authUser = useSelector(selectUser);
+  const profileShortName = useMemo(() => getUserShortName(authUser), [authUser]);
+  const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
+  const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
   const [aliConnecting, setAliConnecting] = useState(false);
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [storeOverrides, setStoreOverrides] = useState({});
@@ -636,6 +642,7 @@ const MarketplaceDashboard = () => {
   const isUnknownPage = !marketplacePages.includes(activePage);
   const setActivePage = (page) => navigate(page === "dashboard" ? "/" : `/${page}`);
   const [searchAnything, setSearchAnything] = useState("");
+  const [accountAlert, setAccountAlert] = useState(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [addProductsMenuOpen, setAddProductsMenuOpen] = useState(false);
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
@@ -777,6 +784,17 @@ const MarketplaceDashboard = () => {
     dispatch(fetchEbayStatus());
     dispatch(fetchAliExpressStatus());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!authUser) {
+      setAccountAlert(null);
+      return;
+    }
+
+    getAccountAlert()
+      .then((res) => setAccountAlert(res.data ?? null))
+      .catch(() => setAccountAlert({ show: false }));
+  }, [authUser, pathname]);
 
   const stores = useMemo(
     () =>
@@ -1182,6 +1200,11 @@ const MarketplaceDashboard = () => {
     setSearchAnything("");
   };
 
+  const openSourcingRequestPage = () => {
+    setActivePage("sourcing-request");
+    setSearchAnything("");
+  };
+
   const openSettingsPage = () => {
     setActivePage("settings");
     setSearchAnything("");
@@ -1204,6 +1227,10 @@ const MarketplaceDashboard = () => {
 
     if (label === "AutoDS Wallet") {
       openWalletPage();
+    }
+
+    if (label === "Log out") {
+      dispatch(logoutAction(navigate));
     }
 
     setProfileMenuOpen(false);
@@ -1494,6 +1521,8 @@ const MarketplaceDashboard = () => {
         ? "Dashboard"
         : activePage === "orders"
           ? `Orders`
+          : activePage === "sourcing-request"
+            ? "Sourcing Request"
           : activePage === "products"
             ? `Products (${listingsMeta?.total ?? 0})`
             : activePage === "drafts"
@@ -1522,18 +1551,11 @@ const MarketplaceDashboard = () => {
       pageTitle
     );
 
-  const alertDays =
-    activePage === "settings"
-      ? 2
-      : activePage === "dashboard" ||
-          activePage === "orders" ||
-          activePage === "products" ||
-          activePage === "drafts" ||
-          activePage === "customer-support" ||
-          activePage === "support-center" ||
-          activePage === "wallet"
-        ? 3
-        : 4;
+  const handleAccountAlertAction = (event) => {
+    event.preventDefault();
+    const target = accountAlert?.action_path ?? "/settings?tab=billing";
+    navigate(target.startsWith("/") ? target : `/${target}`);
+  };
 
   return (
     <div className={isDarkTheme ? "marketplace-dashboard-page marketplace-dashboard-page--dark" : "marketplace-dashboard-page"}>
@@ -1633,6 +1655,7 @@ const MarketplaceDashboard = () => {
                         calculations: openCalculationsPage,
                         dashboard: openDashboardPage,
                         orders: openOrdersPage,
+                        "sourcing-request": openSourcingRequestPage,
                         products: openProductsPage,
                         drafts: openDraftsPage,
                         "customer-support": openCustomerSupportPage,
@@ -1655,27 +1678,33 @@ const MarketplaceDashboard = () => {
         </nav>
 
         <div className="marketplace-sidebar__footer">
-          <button type="button" className="marketplace-sidebar__guide-btn">
+          <button
+            type="button"
+            className="marketplace-sidebar__guide-btn marketplace-sidebar__logout-btn"
+            onClick={() => dispatch(logoutAction(navigate))}
+          >
             <span className="marketplace-sidebar__guide-copy">
-              <LuPackagePlus />
-              <span>Store Setup Guide</span>
+              <LuLogOut />
+              <span>Log out</span>
             </span>
-            <LuChevronDown />
-          </button>
-
-          <button type="button" className="marketplace-sidebar__collapse-btn" aria-label="Collapse sidebar">
-            <LuChevronsLeft />
           </button>
         </div>
       </aside>
 
       <section className="marketplace-main">
-        <div className="topbar-alert">
-          <span className="topbar-alert__icon">!</span>
-          <span>
-            Your account will be disabled in {alertDays} days. <a href="/">Change Your Payment Method</a>
-          </span>
-        </div>
+        {accountAlert?.show ? (
+          <div className={`topbar-alert topbar-alert--${accountAlert.severity === "critical" ? "critical" : "warning"}`}>
+            <span className="topbar-alert__icon">!</span>
+            <span>
+              {accountAlert.message}{" "}
+              {accountAlert.action_label ? (
+                <a href={accountAlert.action_path ?? "/settings?tab=billing"} onClick={handleAccountAlertAction}>
+                  {accountAlert.action_label}
+                </a>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
 
         <div className="marketplace-main__scroll">
           <header className="marketplace-header">
@@ -1966,7 +1995,7 @@ const MarketplaceDashboard = () => {
                     setBalanceMenuOpen(false);
                   }}
                 >
-                  <span>atif</span>
+                  <span>{profileShortName}</span>
                   <span className="marketplace-header__avatar">
                     <LuUserRound />
                   </span>
@@ -1981,8 +2010,8 @@ const MarketplaceDashboard = () => {
                           <LuUserRound />
                         </span>
                         <div>
-                          <strong>atif butt</strong>
-                          <span>roserime9900@gmail.com</span>
+                          <strong>{profileFullName}</strong>
+                          <span>{profileEmail || "—"}</span>
                         </div>
                       </div>
 
@@ -2702,6 +2731,8 @@ const MarketplaceDashboard = () => {
               <DashboardContent searchQuery={searchAnything} />
             ) : activePage === "orders" ? (
               <OrdersContent searchQuery={searchAnything} />
+            ) : activePage === "sourcing-request" ? (
+              <SourcingRequestContent searchQuery={searchAnything} />
             ) : activePage === "products" ? (
               <ProductsContent searchQuery={searchAnything} />
             ) : activePage === "drafts" ? (
@@ -2735,11 +2766,6 @@ const MarketplaceDashboard = () => {
 
                     <button type="button" className="button-base button-primary marketplace-search-panel__submit">
                       Search
-                    </button>
-
-                    <button type="button" className="marketplace-search-panel__ugc-btn">
-                      <LuSparkles />
-                      <span>Generate Sales Ready UGC Ads</span>
                     </button>
                   </div>
 
@@ -2917,8 +2943,8 @@ const MarketplaceDashboard = () => {
                               price: `$${Number(item.price ?? 0).toFixed(2)}`,
                               shipping: item.sold_count > 0 ? `${Number(item.sold_count).toLocaleString()} sold` : "Ships from China",
                               shippingDays: 10,
-                              image: item.image_url,
-                              gallery: Array.isArray(item.images) && item.images.length > 1 ? item.images : undefined,
+                              image_url: item.image_url,
+                              images: item.images,
                               shippingTag: "AliExpress",
                               listingUrl: item.listing_url,
                               marketplace: "aliexpress",

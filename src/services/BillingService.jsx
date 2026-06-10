@@ -1,5 +1,8 @@
 import axiosInstance from './AxiosInstance';
 
+export const getAccountAlert = () =>
+    axiosInstance.get('/billing/account-alert');
+
 export const getPaymentMethods = () =>
     axiosInstance.get('/billing/payment-methods');
 

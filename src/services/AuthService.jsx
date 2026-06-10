@@ -23,15 +23,21 @@ export function getMe() {
     return axiosInstance.get('/auth/me');
 }
 
+export function refreshToken() {
+    return axiosInstance.post('/auth/refresh');
+}
+
 export function updateProfile(payload) {
     return axiosInstance.put('/auth/profile', payload);
 }
 
 export function saveSession(data) {
+    const expiresIn = data.expires_in ?? null;
     const session = {
         token: data.access_token,
         user: data.user,
-        expiresIn: data.expires_in ?? null,
+        expiresIn,
+        expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : null,
         tokenType: data.token_type ?? 'Bearer',
     };
 

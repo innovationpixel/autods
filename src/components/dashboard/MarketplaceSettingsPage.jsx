@@ -13,6 +13,22 @@ import {
   LuPlus,
   LuRefreshCcw,
   LuX,
+  LuCreditCard,
+  LuShield,
+  LuUser,
+  LuReceipt,
+  LuTrash2,
+  LuCrown,
+  LuCalendar,
+  LuArrowUpRight,
+  LuWallet,
+  LuCheck,
+  LuMail,
+  LuSparkles,
+  LuStore,
+  LuPackageSearch,
+  LuZap,
+  LuExternalLink,
 } from "react-icons/lu";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
 import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/actions/AliExpressActions";
@@ -45,79 +61,125 @@ const settingsPrimaryTabs = [
   "Plans & Add-ons",
   "Account & Billing",
   "Users",
-  "Buyer Accounts",
   "Notifications",
 ];
 
 const settingsInnerTabs = ["Lister", "Pricing", "Orders", "General"];
 
+function getUserInitials(name, email) {
+  const source = (name || email || "?").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return source.slice(0, 2).toUpperCase();
+}
+
+function formatCardBrand(brand) {
+  if (!brand) return "Card";
+  return brand.charAt(0).toUpperCase() + brand.slice(1).replace(/_/g, " ");
+}
+
+function formatBillingDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatBillingDateTime(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 const staticPlanCards = [
   {
     id: "shopify-plan",
     name: "Shopify",
     logo: "shop",
-    copy: "Save time and leave your work behind using the most advanced Shopify all-in-one dropshipping app.",
-    primaryAction: "Buy plan",
+    copy: "All-in-one dropshipping automation for Shopify stores — listings, pricing, and orders.",
+    primaryAction: "Browse Plans",
+    features: ["Bulk import", "Smart pricing", "Order sync"],
   },
   {
     id: "amazon-plan",
     name: "Amazon",
     logo: "a",
-    copy: "AutoDS automates your product listings, prices, customer orders, price/stock monitoring, and more.",
-    primaryAction: "Buy plan",
+    copy: "Automate listings, stock monitoring, and fulfillment workflows on Amazon.",
+    primaryAction: "Browse Plans",
+    features: ["Listing automation", "Stock alerts", "FBA ready"],
   },
   {
     id: "facebook-plan",
     name: "Facebook",
     logo: "f",
-    copy: "Helping Facebook Marketplace dropshippers save time working on their stores with eCommerce automation.",
-    primaryAction: "Buy plan",
+    copy: "Scale Facebook Marketplace sales with automated product and order management.",
+    primaryAction: "Browse Plans",
+    features: ["Fast listing", "Auto messages", "Insights"],
   },
   {
     id: "wix-plan",
     name: "Wix",
     logo: "wix",
-    copy: "This AutoDS all-in-one dropshipping app will save you hours of work as your profits increase.",
-    primaryAction: "Buy plan",
+    copy: "Grow your Wix store with automated imports, pricing rules, and order handling.",
+    primaryAction: "Browse Plans",
+    features: ["One-click import", "Templates", "Analytics"],
   },
   {
     id: "woocommerce-plan",
     name: "WooCommerce",
     logo: "woo",
-    copy: "AutoDS automates your product listings, product editing, image optimization, customer orders, pricing, and stock monitoring.",
-    primaryAction: "Buy plan",
+    copy: "Optimize WooCommerce listings, images, pricing, and inventory from one hub.",
+    primaryAction: "Browse Plans",
+    features: ["Image tools", "Bulk edit", "Monitoring"],
   },
 ];
+
+const addOnIconMap = {
+  "finding-hub": LuPackageSearch,
+  "ai-ugc": LuSparkles,
+  "orders-processor": LuZap,
+};
 
 const settingsAddOns = [
   {
     id: "finding-hub",
     title: "Product Finding Hub",
-    copy: "Find best-sellers from our catalog of proven products along with their analytics.",
-    linkLabel: "More Info",
+    copy: "Discover proven best-sellers with sales analytics and import-ready product data.",
+    linkLabel: "Learn more",
     actionLabel: "Enable",
     footerLink: "See how it works",
+    accent: "amber",
   },
   {
     id: "ai-ugc",
     title: "AI UGC Video Ads Creator",
-    copy: "Launch TikTok, Facebook & Instagram ads in less than a minute.",
-    linkLabel: "More Info",
+    copy: "Generate TikTok, Facebook, and Instagram ad creatives in under a minute.",
+    linkLabel: "Learn more",
     actionLabel: "Enable",
-    tag: "AI NEW",
+    tag: "New",
+    accent: "violet",
   },
   {
     id: "orders-processor",
     title: "Orders Processor",
-    copy: "Automate the entire order process and save time.",
-    linkLabel: "More Info",
+    copy: "Automate fulfillment steps and reduce manual work on every customer order.",
+    linkLabel: "Learn more",
     actionLabel: "Cancel",
     footerLink: "See how it works",
     price: "$9.90/mo",
-    startedOn: "Started On: April 15, 2026",
-    tag: "Save your time",
+    startedOn: "Started Apr 15, 2026",
+    tag: "Active",
     active: true,
+    accent: "green",
   },
 ];
 
@@ -456,6 +518,7 @@ export default function MarketplaceSettingsPage() {
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "store") return "Store Settings";
     if (tab === "supplier") return "Supplier Settings";
+    if (tab === "billing") return "Account & Billing";
     return "Store Settings";
   }, [search]);
 
@@ -465,6 +528,10 @@ export default function MarketplaceSettingsPage() {
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "store") {
       setActivePrimaryTab("Store Settings");
+    } else if (tab === "supplier") {
+      setActivePrimaryTab("Supplier Settings");
+    } else if (tab === "billing") {
+      setActivePrimaryTab("Account & Billing");
     }
   }, [search]);
   const [activeInnerTab, setActiveInnerTab] = useState("Lister");
@@ -484,6 +551,8 @@ export default function MarketplaceSettingsPage() {
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [paypalEmail, setPaypalEmail] = useState("");
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [addingPayment, setAddingPayment] = useState(false);
   const popupRef = useRef(null);
 
   useEffect(() => {
@@ -1064,7 +1133,8 @@ export default function MarketplaceSettingsPage() {
 
   const addStripePaymentMethod = async () => {
     try {
-      const res = await createStripeSetupIntent();
+      setAddingPayment(true);
+      await createStripeSetupIntent();
       const paymentMethodId = window.prompt(
         "Enter Stripe payment method ID from SetupIntent (use Stripe.js in production):",
       );
@@ -1072,9 +1142,12 @@ export default function MarketplaceSettingsPage() {
       await saveStripePaymentMethod(paymentMethodId);
       const methods = await getPaymentMethods();
       setPaymentMethods(methods.data?.payment_methods ?? []);
+      setShowAddPayment(false);
       toast.success("Card saved.");
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to add card.");
+    } finally {
+      setAddingPayment(false);
     }
   };
 
@@ -1084,12 +1157,17 @@ export default function MarketplaceSettingsPage() {
       return;
     }
     try {
+      setAddingPayment(true);
       await savePayPalPaymentMethod(paypalEmail.trim());
       const methods = await getPaymentMethods();
       setPaymentMethods(methods.data?.payment_methods ?? []);
+      setPaypalEmail("");
+      setShowAddPayment(false);
       toast.success("PayPal account saved.");
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to save PayPal.");
+    } finally {
+      setAddingPayment(false);
     }
   };
 
@@ -1619,6 +1697,10 @@ export default function MarketplaceSettingsPage() {
 
   const renderPlansAddOnsTab = () => {
     const ebayConnected = ebayConnections.length > 0;
+    const activePlan = currentSubscription?.current_plan;
+    const planExpires = currentSubscription?.plan_expires_at;
+    const activeAddOnCount = settingsAddOns.filter((addOn) => addOn.active).length;
+
     const ebayCard = ebayConnected
       ? {
           id: "ebay-plan",
@@ -1626,14 +1708,14 @@ export default function MarketplaceSettingsPage() {
           logo: "ebay",
           current: true,
           summary: ebayConnections.length === 1
-            ? (primaryEbayConnection?.ebay_username ? `Connected as ${primaryEbayConnection.ebay_username}` : "Connected")
-            : `${ebayConnections.length} accounts connected`,
+            ? (primaryEbayConnection?.ebay_username ? `@${primaryEbayConnection.ebay_username}` : "Account connected")
+            : `${ebayConnections.length} accounts linked`,
           metrics: [
-            { label: "Accounts:", value: String(ebayConnections.length) },
-            { label: "Primary:", value: primaryEbayConnection?.ebay_username ?? "—" },
-            { label: "Site:", value: primaryEbayConnection?.site_id ?? "—" },
+            { label: "Accounts", value: String(ebayConnections.length) },
+            { label: "Primary store", value: primaryEbayConnection?.ebay_username ?? "—" },
+            { label: "Marketplace", value: primaryEbayConnection?.site_id ?? "eBay" },
           ],
-          secondaryAction: "Manage Accounts",
+          secondaryAction: "Manage in Store Settings",
           primaryAction: "Add Account",
         }
       : {
@@ -1641,115 +1723,233 @@ export default function MarketplaceSettingsPage() {
           name: "eBay",
           logo: "ebay",
           current: false,
-          copy: "Connect your eBay seller account to sync listings, manage products, and track performance.",
+          copy: "Connect your eBay seller account to sync listings, manage products, and track orders in real time.",
           primaryAction: "Connect eBay",
         };
 
-    const allPlans = [ebayCard, ...staticPlanCards];
+    const integrationPlans = [ebayCard, ...staticPlanCards];
 
     return (
-    <section className="marketplace-settings__full-panel card-wrapper">
-      <div className="marketplace-settings__plans-layout">
-        <div className="marketplace-settings__plans-main">
-          <div className="marketplace-settings__plans-heading">My Plans</div>
-          <div className="marketplace-settings__plans-grid">
-            {allPlans.map((plan) => (
-              <article
-                className={`marketplace-settings__plan-card ${plan.current ? "marketplace-settings__plan-card--current" : ""}`}
-                key={plan.id}
-              >
-                <div className="marketplace-settings__plan-card-top">
-                  <div>
-                    <h3>{plan.name}</h3>
-                    {plan.summary ? <span>{plan.summary}</span> : null}
-                  </div>
-                  <span className={`marketplace-settings__plan-logo marketplace-settings__plan-logo--${plan.logo}`}>{plan.logo}</span>
-                </div>
-
-                {plan.metrics ? (
-                  <div className="marketplace-settings__plan-metrics">
-                    {plan.metrics.map((metric) => (
-                      <div className="marketplace-settings__plan-metric" key={`${plan.id}-${metric.label}`}>
-                        <span>{metric.label}</span>
-                        <strong>{metric.value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="marketplace-settings__plan-copy">{plan.copy}</p>
-                )}
-
-                <div className="marketplace-settings__plan-actions">
-                  {plan.secondaryAction ? (
-                    <button
-                      type="button"
-                      className="marketplace-settings__plan-link"
-                      onClick={plan.id === "ebay-plan" && plan.secondaryAction === "Manage Accounts"
-                        ? () => setActivePrimaryTab("Store Settings")
-                        : undefined}
-                    >
-                      {plan.secondaryAction}
-                    </button>
-                  ) : (
-                    <span />
-                  )}
-                  <button
-                    type="button"
-                    className={plan.current ? "marketplace-settings__plan-btn marketplace-settings__plan-btn--outline" : "marketplace-settings__plan-btn"}
-                    onClick={
-                      plan.id === "ebay-plan"
-                        ? connectEbay
-                        : () => navigate("/plans")
-                    }
-                    disabled={plan.id === "ebay-plan" && ebayConnecting}
-                  >
-                    {plan.id === "ebay-plan" && ebayConnecting ? "Opening eBay…" : plan.primaryAction}
-                  </button>
-                </div>
-              </article>
-            ))}
+      <section className="plans-settings card-wrapper">
+        <header className="plans-settings__hero">
+          <div className="plans-settings__hero-copy">
+            <span className="plans-settings__eyebrow"><LuSparkles /> Plans &amp; Add-ons</span>
+            <h2>Subscriptions, channels &amp; power-ups</h2>
+            <p>
+              Connect marketplaces, manage your Auto DS subscription, and enable add-ons
+              that automate product research, ads, and order processing.
+            </p>
           </div>
+          {activePlan ? (
+            <div className="plans-settings__active-chip">
+              <span className="plans-settings__active-chip-icon"><LuCrown /></span>
+              <div>
+                <span className="plans-settings__active-chip-label">Current subscription</span>
+                <strong>{activePlan.title}</strong>
+                <span>{planExpires ? `Renews ${formatBillingDate(planExpires)}` : "Active plan"}</span>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="plans-settings__hero-cta" onClick={() => navigate("/plans")}>
+              <LuArrowUpRight />
+              <span>View subscription plans</span>
+            </button>
+          )}
+        </header>
+
+        <div className="plans-settings__stats">
+          <article className="plans-settings__stat">
+            <span className="plans-settings__stat-icon plans-settings__stat-icon--plan"><LuCrown /></span>
+            <div>
+              <span className="plans-settings__stat-label">Subscription</span>
+              <strong>{activePlan?.title ?? "No active plan"}</strong>
+            </div>
+          </article>
+          <article className="plans-settings__stat">
+            <span className="plans-settings__stat-icon plans-settings__stat-icon--stores"><LuStore /></span>
+            <div>
+              <span className="plans-settings__stat-label">Connected channels</span>
+              <strong>{ebayConnected ? `${ebayConnections.length} eBay` : "None connected"}</strong>
+            </div>
+          </article>
+          <article className="plans-settings__stat">
+            <span className="plans-settings__stat-icon plans-settings__stat-icon--addons"><LuZap /></span>
+            <div>
+              <span className="plans-settings__stat-label">Active add-ons</span>
+              <strong>{activeAddOnCount} enabled</strong>
+            </div>
+          </article>
+          <article className="plans-settings__stat">
+            <span className="plans-settings__stat-icon plans-settings__stat-icon--renewal"><LuCalendar /></span>
+            <div>
+              <span className="plans-settings__stat-label">Next renewal</span>
+              <strong>{planExpires ? formatBillingDate(planExpires) : "—"}</strong>
+            </div>
+          </article>
         </div>
 
-        <aside className="marketplace-settings__addons-panel">
-          <div className="marketplace-settings__plans-heading">Add-ons</div>
-          <div className="marketplace-settings__addons-list">
-            {settingsAddOns.map((addOn) => (
-              <article
-                className={`marketplace-settings__addon-card ${addOn.active ? "marketplace-settings__addon-card--active" : ""}`}
-                key={addOn.id}
-              >
-                <div className="marketplace-settings__addon-head">
-                  <span className="marketplace-settings__addon-icon" />
-                  {addOn.tag ? <span className="marketplace-settings__addon-tag">{addOn.tag}</span> : null}
-                </div>
-                <h3>{addOn.title}</h3>
-                <p>
-                  {addOn.copy} <button type="button">{addOn.linkLabel}</button>
-                </p>
-                {addOn.startedOn ? <span className="marketplace-settings__addon-meta">{addOn.startedOn}</span> : null}
-                {addOn.price ? <strong className="marketplace-settings__addon-price">{addOn.price}</strong> : null}
-                <div className="marketplace-settings__addon-actions">
-                  {addOn.footerLink ? (
-                    <button type="button" className="marketplace-settings__addon-link">
-                      {addOn.footerLink}
-                    </button>
+        <div className="plans-settings__layout">
+          <div className="plans-settings__main">
+            <div className="plans-settings__section-head">
+              <div>
+                <h3>Marketplace integrations</h3>
+                <p>Connect sales channels and unlock platform-specific automation plans.</p>
+              </div>
+              <button type="button" className="plans-settings__link-btn" onClick={() => navigate("/plans")}>
+                Compare all plans
+                <LuArrowUpRight />
+              </button>
+            </div>
+
+            <div className="plans-settings__integrations">
+              {integrationPlans.map((plan) => (
+                <article
+                  className={`plans-settings__integration ${plan.current ? "plans-settings__integration--connected" : ""}`}
+                  key={plan.id}
+                >
+                  <div className="plans-settings__integration-top">
+                    <div className="plans-settings__integration-brand">
+                      <span className={`plans-settings__brand plans-settings__brand--${plan.logo}`}>
+                        {plan.logo === "ebay" ? "eBay" : plan.logo === "shop" ? "Shop" : plan.logo.toUpperCase()}
+                      </span>
+                      <div>
+                        <h4>{plan.name}</h4>
+                        {plan.summary ? <span>{plan.summary}</span> : null}
+                      </div>
+                    </div>
+                    <span className={`plans-settings__status ${plan.current ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>
+                      {plan.current ? "Connected" : "Not connected"}
+                    </span>
+                  </div>
+
+                  {plan.metrics ? (
+                    <dl className="plans-settings__metrics">
+                      {plan.metrics.map((metric) => (
+                        <div className="plans-settings__metric" key={`${plan.id}-${metric.label}`}>
+                          <dt>{metric.label}</dt>
+                          <dd>{metric.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   ) : (
-                    <span />
+                    <>
+                      <p className="plans-settings__integration-copy">{plan.copy}</p>
+                      {plan.features ? (
+                        <ul className="plans-settings__feature-list">
+                          {plan.features.map((feature) => (
+                            <li key={`${plan.id}-${feature}`}>
+                              <LuCheck />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </>
                   )}
-                  <button
-                    type="button"
-                    className={addOn.active ? "marketplace-settings__addon-btn marketplace-settings__addon-btn--muted" : "marketplace-settings__addon-btn"}
-                  >
-                    {addOn.actionLabel}
-                  </button>
-                </div>
-              </article>
-            ))}
+
+                  <div className="plans-settings__integration-foot">
+                    {plan.secondaryAction ? (
+                      <button
+                        type="button"
+                        className="plans-settings__ghost-btn"
+                        onClick={() => setActivePrimaryTab("Store Settings")}
+                      >
+                        {plan.secondaryAction}
+                      </button>
+                    ) : (
+                      <span />
+                    )}
+                    <button
+                      type="button"
+                      className={plan.current ? "plans-settings__btn plans-settings__btn--secondary" : "plans-settings__btn plans-settings__btn--primary"}
+                      onClick={
+                        plan.id === "ebay-plan"
+                          ? connectEbay
+                          : () => navigate("/plans")
+                      }
+                      disabled={plan.id === "ebay-plan" && ebayConnecting}
+                    >
+                      {plan.id === "ebay-plan" && ebayConnecting ? "Opening eBay…" : plan.primaryAction}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
-        </aside>
-      </div>
-    </section>
+
+          <aside className="plans-settings__sidebar">
+            <div className="plans-settings__section-head">
+              <div>
+                <h3>Add-ons</h3>
+                <p>Optional tools to research products, create ads, and automate orders.</p>
+              </div>
+            </div>
+
+            <div className="plans-settings__addons">
+              {settingsAddOns.map((addOn) => {
+                const AddOnIcon = addOnIconMap[addOn.id] ?? LuZap;
+
+                return (
+                  <article
+                    className={`plans-settings__addon ${addOn.active ? "plans-settings__addon--active" : ""}`}
+                    key={addOn.id}
+                  >
+                    <div className="plans-settings__addon-head">
+                      <span className={`plans-settings__addon-icon plans-settings__addon-icon--${addOn.accent ?? "amber"}`}>
+                        <AddOnIcon />
+                      </span>
+                      {addOn.tag ? (
+                        <span className={`plans-settings__addon-tag ${addOn.active ? "plans-settings__addon-tag--active" : ""}`}>
+                          {addOn.tag}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <h4>{addOn.title}</h4>
+                    <p>
+                      {addOn.copy}{" "}
+                      <button type="button" className="plans-settings__inline-link">{addOn.linkLabel}</button>
+                    </p>
+
+                    {addOn.startedOn || addOn.price ? (
+                      <div className="plans-settings__addon-meta">
+                        {addOn.startedOn ? <span>{addOn.startedOn}</span> : null}
+                        {addOn.price ? <strong>{addOn.price}</strong> : null}
+                      </div>
+                    ) : null}
+
+                    <div className="plans-settings__addon-foot">
+                      {addOn.footerLink ? (
+                        <button type="button" className="plans-settings__inline-link">{addOn.footerLink}</button>
+                      ) : (
+                        <span />
+                      )}
+                      <button
+                        type="button"
+                        className={addOn.active ? "plans-settings__btn plans-settings__btn--muted" : "plans-settings__btn plans-settings__btn--primary"}
+                      >
+                        {addOn.actionLabel}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <article className="plans-settings__promo">
+              <span className="plans-settings__promo-icon"><LuCrown /></span>
+              <div>
+                <strong>Upgrade your subscription</strong>
+                <p>Unlock higher limits, faster sync, and priority support on paid plans.</p>
+              </div>
+              <button type="button" className="plans-settings__btn plans-settings__btn--primary" onClick={() => navigate("/plans")}>
+                Browse plans
+                <LuExternalLink />
+              </button>
+            </article>
+          </aside>
+        </div>
+      </section>
     );
   };
 
@@ -1759,6 +1959,11 @@ export default function MarketplaceSettingsPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+
+  useEffect(() => {
+    if (user?.name) setProfileName(user.name);
+    if (user?.email) setProfileEmail(user.email);
+  }, [user?.name, user?.email]);
 
   const saveProfile = async () => {
     if (newPassword && newPassword !== confirmPassword) {
@@ -1792,176 +1997,385 @@ export default function MarketplaceSettingsPage() {
     }
   };
 
-  const renderAccountBillingTab = () => (
-    <section className="marketplace-settings__full-panel marketplace-settings__billing-page card-wrapper">
-      <div className="marketplace-settings__billing-section">
-        <h3>Account Details</h3>
-        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
-          <div>
-            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
-              Full Name
-            </label>
-            <input
-              className="marketplace-settings__control"
-              type="text"
-              value={profileName}
-              onChange={(e) => setProfileName(e.target.value)}
-              placeholder="Your name"
-            />
-          </div>
-          <div>
-            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
-              Email Address
-            </label>
-            <input
-              className="marketplace-settings__control"
-              type="email"
-              value={profileEmail}
-              onChange={(e) => setProfileEmail(e.target.value)}
-              placeholder="your@email.com"
-            />
-          </div>
-        </div>
-      </div>
+  const renderAccountBillingTab = () => {
+    const activePlan = currentSubscription?.current_plan;
+    const planExpires = currentSubscription?.plan_expires_at;
+    const defaultMethod = paymentMethods.find((m) => m.is_default) ?? paymentMethods[0];
+    const totalSpent = paymentHistory.reduce(
+      (sum, tx) => sum + (tx.status === "completed" || !tx.status ? Number(tx.amount) : 0),
+      0,
+    );
+    const userInitials = getUserInitials(profileName || user?.name, profileEmail || user?.email);
+    const hasPasswordChange = Boolean(newPassword || confirmPassword || currentPassword);
 
-      <div className="marketplace-settings__billing-section">
-        <h3>Change Password</h3>
-        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
-          <div>
-            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
-              Current Password
-            </label>
-            <input
-              className="marketplace-settings__control"
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
-              autoComplete="current-password"
-            />
+    return (
+      <section className="billing-settings card-wrapper">
+        <header className="billing-settings__hero">
+          <div className="billing-settings__hero-copy">
+            <h2>Account &amp; Billing</h2>
+            <p>Manage your profile, subscription, payment methods, and billing history in one place.</p>
           </div>
-          <div>
-            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
-              New Password
-            </label>
-            <input
-              className="marketplace-settings__control"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 8 characters"
-              autoComplete="new-password"
-            />
+          <div className="billing-settings__hero-profile">
+            <span className="billing-settings__avatar" aria-hidden="true">{userInitials}</span>
+            <div>
+              <strong>{profileName || user?.name || "Your Account"}</strong>
+              <span>{profileEmail || user?.email || "—"}</span>
+            </div>
           </div>
-          <div>
-            <label className="marketplace-settings__field-label" style={{ display: "block", marginBottom: 4, fontSize: 13 }}>
-              Confirm New Password
-            </label>
-            <input
-              className="marketplace-settings__control"
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Re-enter new password"
-              autoComplete="new-password"
-            />
-          </div>
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <button
-            type="button"
-            className="marketplace-settings__save-btn"
-            onClick={saveProfile}
-            disabled={profileSaving}
-          >
-            {profileSaving ? "Saving…" : "Save Changes"}
-          </button>
-        </div>
-      </div>
+        </header>
 
-      <div className="marketplace-settings__billing-section">
-        <h3>Payment Method</h3>
-        {paymentMethods.length ? (
-          paymentMethods.map((method) => (
-            <div className="marketplace-settings__billing-card" key={method.id}>
-              <div>
-                <strong>{method.brand ?? method.provider} {method.last4 ? `•••• ${method.last4}` : ""}</strong>
-                <span>{method.is_default ? "Default payment method" : method.provider_method_id}</span>
+        <div className="billing-settings__stats">
+          <article className="billing-settings__stat">
+            <span className="billing-settings__stat-icon billing-settings__stat-icon--plan"><LuCrown /></span>
+            <div>
+              <span className="billing-settings__stat-label">Current Plan</span>
+              <strong>{activePlan?.title ?? "Free"}</strong>
+            </div>
+          </article>
+          <article className="billing-settings__stat">
+            <span className="billing-settings__stat-icon billing-settings__stat-icon--renewal"><LuCalendar /></span>
+            <div>
+              <span className="billing-settings__stat-label">Renewal</span>
+              <strong>{planExpires ? formatBillingDate(planExpires) : activePlan ? "Active" : "—"}</strong>
+            </div>
+          </article>
+          <article className="billing-settings__stat">
+            <span className="billing-settings__stat-icon billing-settings__stat-icon--wallet"><LuWallet /></span>
+            <div>
+              <span className="billing-settings__stat-label">Payment Methods</span>
+              <strong>{paymentMethods.length ? `${paymentMethods.length} saved` : "None"}</strong>
+            </div>
+          </article>
+          <article className="billing-settings__stat">
+            <span className="billing-settings__stat-icon billing-settings__stat-icon--spent"><LuReceipt /></span>
+            <div>
+              <span className="billing-settings__stat-label">Total Spent</span>
+              <strong>${totalSpent.toFixed(2)}</strong>
+            </div>
+          </article>
+        </div>
+
+        <div className="billing-settings__layout">
+          <div className="billing-settings__main">
+            <article className="billing-settings__card">
+              <div className="billing-settings__card-head">
+                <div className="billing-settings__card-title">
+                  <span className="billing-settings__card-icon"><LuUser /></span>
+                  <div>
+                    <h3>Profile Information</h3>
+                    <p>Update your name and email address used across Auto DS.</p>
+                  </div>
+                </div>
               </div>
-              <button type="button" className="marketplace-settings__billing-card-btn" onClick={() => removePaymentMethod(method.id)}>
-                Remove
+              <div className="billing-settings__fields billing-settings__fields--2">
+                <label className="billing-settings__field">
+                  <span>Full Name</span>
+                  <input
+                    className="marketplace-settings__control"
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </label>
+                <label className="billing-settings__field">
+                  <span>Email Address</span>
+                  <input
+                    className="marketplace-settings__control"
+                    type="email"
+                    value={profileEmail}
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                    placeholder="your@email.com"
+                  />
+                </label>
+              </div>
+              {!hasPasswordChange ? (
+                <div className="billing-settings__card-foot">
+                  <button
+                    type="button"
+                    className="billing-settings__btn billing-settings__btn--primary"
+                    onClick={saveProfile}
+                    disabled={profileSaving}
+                  >
+                    {profileSaving ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                    <span>{profileSaving ? "Saving…" : "Save Profile"}</span>
+                  </button>
+                </div>
+              ) : null}
+            </article>
+
+            <article className="billing-settings__card">
+              <div className="billing-settings__card-head">
+                <div className="billing-settings__card-title">
+                  <span className="billing-settings__card-icon billing-settings__card-icon--security"><LuShield /></span>
+                  <div>
+                    <h3>Security</h3>
+                    <p>Change your password to keep your account secure.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="billing-settings__fields billing-settings__fields--2">
+                <label className="billing-settings__field billing-settings__field--full">
+                  <span>Current Password</span>
+                  <input
+                    className="marketplace-settings__control"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    autoComplete="current-password"
+                  />
+                </label>
+                <label className="billing-settings__field">
+                  <span>New Password</span>
+                  <input
+                    className="marketplace-settings__control"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label className="billing-settings__field">
+                  <span>Confirm New Password</span>
+                  <input
+                    className="marketplace-settings__control"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                  />
+                </label>
+              </div>
+              {newPassword && newPassword.length < 8 ? (
+                <p className="billing-settings__hint billing-settings__hint--warn">Password must be at least 8 characters.</p>
+              ) : null}
+              {newPassword && confirmPassword && newPassword !== confirmPassword ? (
+                <p className="billing-settings__hint billing-settings__hint--warn">Passwords do not match.</p>
+              ) : null}
+              <div className="billing-settings__card-foot">
+                <button
+                  type="button"
+                  className="billing-settings__btn billing-settings__btn--primary"
+                  onClick={saveProfile}
+                  disabled={profileSaving}
+                >
+                  {profileSaving ? <LuLoader className="spin-icon" /> : <LuShield />}
+                  <span>{profileSaving ? "Saving…" : "Update Security"}</span>
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <aside className="billing-settings__sidebar">
+            <article className={`billing-settings__plan-card ${activePlan ? "billing-settings__plan-card--active" : ""}`}>
+              <div className="billing-settings__plan-card-top">
+                <span className="billing-settings__plan-badge">{activePlan ? "Active Plan" : "No Plan"}</span>
+                <LuCrown />
+              </div>
+              <h3>{activePlan?.title ?? "Start with a plan"}</h3>
+              <p>
+                {activePlan?.description
+                  ?? "Unlock bulk imports, automated pricing, order sync, and more with a subscription."}
+              </p>
+              {activePlan ? (
+                <ul className="billing-settings__plan-meta">
+                  {activePlan.price != null ? (
+                    <li>
+                      <span>Price</span>
+                      <strong>${Number(activePlan.price).toFixed(2)} {activePlan.currency ?? "USD"}</strong>
+                    </li>
+                  ) : null}
+                  {planExpires ? (
+                    <li>
+                      <span>Renews</span>
+                      <strong>{formatBillingDate(planExpires)}</strong>
+                    </li>
+                  ) : null}
+                  {defaultMethod ? (
+                    <li>
+                      <span>Billing via</span>
+                      <strong>{formatCardBrand(defaultMethod.brand ?? defaultMethod.provider)}</strong>
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
+              <div className="billing-settings__plan-actions">
+                <button type="button" className="billing-settings__btn billing-settings__btn--primary" onClick={() => navigate("/plans")}>
+                  <span>{activePlan ? "Upgrade Plan" : "View Plans"}</span>
+                  <LuArrowUpRight />
+                </button>
+              </div>
+            </article>
+
+            <article className="billing-settings__card">
+              <div className="billing-settings__card-head billing-settings__card-head--split">
+                <div className="billing-settings__card-title">
+                  <span className="billing-settings__card-icon billing-settings__card-icon--payment"><LuCreditCard /></span>
+                  <div>
+                    <h3>Payment Methods</h3>
+                    <p>Cards and PayPal accounts used for subscriptions.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="billing-settings__btn billing-settings__btn--ghost"
+                  onClick={() => setShowAddPayment((cur) => !cur)}
+                >
+                  <LuPlus />
+                  <span>{showAddPayment ? "Close" : "Add"}</span>
+                </button>
+              </div>
+
+              <div className="billing-settings__methods">
+                {paymentMethods.length ? (
+                  paymentMethods.map((method) => (
+                    <div
+                      className={`billing-settings__method ${method.is_default ? "billing-settings__method--default" : ""}`}
+                      key={method.id}
+                    >
+                      <div className="billing-settings__method-icon">
+                        {method.provider === "paypal" ? "PP" : formatCardBrand(method.brand).slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="billing-settings__method-copy">
+                        <strong>
+                          {method.provider === "paypal"
+                            ? "PayPal"
+                            : `${formatCardBrand(method.brand)}${method.last4 ? ` •••• ${method.last4}` : ""}`}
+                        </strong>
+                        <span>
+                          {method.provider === "paypal"
+                            ? method.provider_method_id
+                            : method.exp_month && method.exp_year
+                              ? `Expires ${String(method.exp_month).padStart(2, "0")}/${String(method.exp_year).slice(-2)}`
+                              : formatCardBrand(method.provider)}
+                        </span>
+                      </div>
+                      <div className="billing-settings__method-actions">
+                        {method.is_default ? <span className="billing-settings__pill">Default</span> : null}
+                        <button
+                          type="button"
+                          className="billing-settings__icon-btn"
+                          onClick={() => removePaymentMethod(method.id)}
+                          aria-label="Remove payment method"
+                        >
+                          <LuTrash2 />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="billing-settings__empty billing-settings__empty--compact">
+                    <LuCreditCard />
+                    <strong>No payment method on file</strong>
+                    <span>Add a card or PayPal account to purchase plans.</span>
+                  </div>
+                )}
+              </div>
+
+              {showAddPayment ? (
+                <div className="billing-settings__add-panel">
+                  <button
+                    type="button"
+                    className="billing-settings__add-option"
+                    onClick={addStripePaymentMethod}
+                    disabled={addingPayment}
+                  >
+                    <span className="billing-settings__add-option-icon"><LuCreditCard /></span>
+                    <div>
+                      <strong>Credit or Debit Card</strong>
+                      <span>Secure checkout via Stripe</span>
+                    </div>
+                    {addingPayment ? <LuLoader className="spin-icon" /> : <LuArrowUpRight />}
+                  </button>
+                  <div className="billing-settings__add-paypal">
+                    <label className="billing-settings__field">
+                      <span>PayPal Email</span>
+                      <div className="billing-settings__inline-input">
+                        <LuMail />
+                        <input
+                          className="marketplace-settings__control"
+                          type="email"
+                          placeholder="you@paypal.com"
+                          value={paypalEmail}
+                          onChange={(e) => setPaypalEmail(e.target.value)}
+                        />
+                      </div>
+                    </label>
+                    <button
+                      type="button"
+                      className="billing-settings__btn billing-settings__btn--secondary"
+                      onClick={addPayPalPaymentMethod}
+                      disabled={addingPayment || !paypalEmail.trim()}
+                    >
+                      {addingPayment ? <LuLoader className="spin-icon" /> : null}
+                      <span>{addingPayment ? "Saving…" : "Link PayPal"}</span>
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </article>
+          </aside>
+        </div>
+
+        <article className="billing-settings__card billing-settings__card--wide">
+          <div className="billing-settings__card-head billing-settings__card-head--split">
+            <div className="billing-settings__card-title">
+              <span className="billing-settings__card-icon billing-settings__card-icon--history"><LuReceipt /></span>
+              <div>
+                <h3>Payment History</h3>
+                <p>Recent charges and subscription payments.</p>
+              </div>
+            </div>
+            {paymentHistory.length ? (
+              <span className="billing-settings__pill billing-settings__pill--muted">{paymentHistory.length} transaction{paymentHistory.length === 1 ? "" : "s"}</span>
+            ) : null}
+          </div>
+
+          {paymentHistory.length ? (
+            <div className="billing-settings__history">
+              <div className="billing-settings__history-head">
+                <span>Date</span>
+                <span>Description</span>
+                <span>Provider</span>
+                <span>Status</span>
+                <span>Amount</span>
+              </div>
+              {paymentHistory.map((tx) => (
+                <div className="billing-settings__history-row" key={tx.id}>
+                  <span data-label="Date">{formatBillingDateTime(tx.created_at)}</span>
+                  <span data-label="Description">
+                    <strong>{tx.plan?.title ?? "Plan purchase"}</strong>
+                    <small>{tx.provider_payment_id ?? `#${tx.id}`}</small>
+                  </span>
+                  <span data-label="Provider" className="billing-settings__provider">{tx.provider ?? "—"}</span>
+                  <span data-label="Status">
+                    <span className={`billing-settings__status billing-settings__status--${(tx.status ?? "completed").toLowerCase()}`}>
+                      {tx.status ?? "completed"}
+                    </span>
+                  </span>
+                  <span data-label="Amount" className="billing-settings__amount">
+                    ${Number(tx.amount).toFixed(2)} {tx.currency ?? "USD"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="billing-settings__empty">
+              <LuReceipt />
+              <strong>No payments yet</strong>
+              <span>Your subscription charges and plan purchases will appear here.</span>
+              <button type="button" className="billing-settings__btn billing-settings__btn--secondary" onClick={() => navigate("/plans")}>
+                Browse Plans
               </button>
             </div>
-          ))
-        ) : (
-          <div className="marketplace-settings__billing-card">
-            <div>
-              <strong>No Payment Method Found</strong>
-              <span>Add a card or PayPal account for plan purchases.</span>
-            </div>
-          </div>
-        )}
-        <div className="marketplace-settings__grid marketplace-settings__grid--2" style={{ marginTop: 12 }}>
-          <button type="button" className="marketplace-settings__billing-card-btn" onClick={addStripePaymentMethod}>
-            Add Card (Stripe)
-          </button>
-          <div>
-            <input
-              className="marketplace-settings__control"
-              type="email"
-              placeholder="PayPal email"
-              value={paypalEmail}
-              onChange={(e) => setPaypalEmail(e.target.value)}
-            />
-            <button type="button" className="marketplace-settings__billing-card-btn" onClick={addPayPalPaymentMethod} style={{ marginTop: 8 }}>
-              Add PayPal
-            </button>
-          </div>
-        </div>
-        {currentSubscription?.current_plan ? (
-          <p style={{ marginTop: 12 }}>
-            Active plan: <strong>{currentSubscription.current_plan.title}</strong>
-            {" "}
-            <button type="button" className="marketplace-settings__plan-link" onClick={() => navigate("/plans")}>
-              Upgrade
-            </button>
-          </p>
-        ) : (
-          <button type="button" className="marketplace-settings__plan-link" onClick={() => navigate("/plans")} style={{ marginTop: 12 }}>
-            View plans &amp; upgrade
-          </button>
-        )}
-      </div>
-
-      <div className="marketplace-settings__billing-section">
-        <div className="marketplace-settings__billing-head">
-          <h3>Payment History</h3>
-        </div>
-        <div className="marketplace-settings__billing-history">
-          <div className="marketplace-settings__billing-history-head">
-            <span>Date</span>
-            <span>ID</span>
-            <span>Type</span>
-            <span>Total</span>
-          </div>
-          {paymentHistory.length ? (
-            paymentHistory.map((tx) => (
-              <div className="marketplace-settings__billing-history-row" key={tx.id}>
-                <span>{tx.created_at ? new Date(tx.created_at).toLocaleDateString() : "—"}</span>
-                <span>{tx.provider_payment_id ?? tx.id}</span>
-                <span>{tx.provider}</span>
-                <span>${Number(tx.amount).toFixed(2)} {tx.currency}</span>
-              </div>
-            ))
-          ) : (
-            <div style={{ padding: "20px 0", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>
-              No payment history yet.
-            </div>
           )}
-        </div>
-      </div>
-    </section>
-  );
+        </article>
+      </section>
+    );
+  };
 
   const renderInnerTab = () => {
     if (activeInnerTab === "Pricing") {

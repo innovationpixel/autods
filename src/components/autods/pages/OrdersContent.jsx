@@ -15,12 +15,10 @@ import {
   LuInbox,
   LuMenu,
   LuPencil,
-  LuPlay,
   LuRefreshCcw,
   LuSlidersHorizontal,
   LuTruck,
   LuX,
-  LuZap,
 } from "react-icons/lu";
 import CompactDateRange from "../CompactDateRange";
 import { formatDisplayDate } from "../helpers";
@@ -51,8 +49,6 @@ function OrdersContent({ searchQuery }) {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
-  const [showTutorialNote, setShowTutorialNote] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All Statuses");
@@ -60,7 +56,6 @@ function OrdersContent({ searchQuery }) {
   const [fromDate, setFromDate] = useState("2026-04-17");
   const [toDate, setToDate] = useState("2026-04-21");
   const [sortDirection, setSortDirection] = useState("desc");
-  const [credits, setCredits] = useState(5);
   const [ordersNotice, setOrdersNotice] = useState("");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -263,40 +258,6 @@ function OrdersContent({ searchQuery }) {
 
   return (
     <section className="orders-page-content">
-      {showWelcomeModal ? (
-        <div className="orders-modal">
-          <div className="orders-modal__backdrop" onClick={() => setShowWelcomeModal(false)} />
-          <div className="orders-modal__card">
-            <button
-              type="button"
-              className="orders-modal__close"
-              aria-label="Close orders modal"
-              onClick={() => setShowWelcomeModal(false)}
-            >
-              <LuX />
-            </button>
-
-            <div className="orders-modal__celebration">
-              <span className="orders-modal__check">
-                <LuCheck />
-              </span>
-            </div>
-
-            <h2>Congratulations!</h2>
-            <h3>First Order Received</h3>
-            <p>You&apos;ve just received your very first order — amazing job!</p>
-            <p>Time to grow your business — take a 1-minute tour to learn the basics.</p>
-
-            <button type="button" className="orders-modal__primary" onClick={() => setShowWelcomeModal(false)}>
-              Take a Tour
-            </button>
-            <button type="button" className="orders-modal__secondary" onClick={() => setShowWelcomeModal(false)}>
-              No, I know how to do it
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       <div className="orders-toolbar">
         <div className="orders-toolbar__left">
           <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((current) => !current)}>
@@ -321,27 +282,8 @@ function OrdersContent({ searchQuery }) {
             <LuRefreshCcw />
             <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
           </button>
-          <button type="button" className="orders-tour-btn" onClick={() => setShowWelcomeModal(true)}>
-            <LuPlay />
-            <span>Take Orders Demo Tour</span>
-          </button>
-          <button
-            type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
-            onClick={() => setShowTutorialNote((current) => !current)}
-          >
-            <LuPlay />
-            <span>Watch Tutorial</span>
-          </button>
         </div>
       </div>
-
-      {showTutorialNote ? (
-        <div className="orders-inline-note">
-          <LuPlay />
-          <span>Orders tutorial is active: use filters, status dropdowns, and row actions to manage order flow.</span>
-        </div>
-      ) : null}
 
       {ordersNotice ? (
         <div className="orders-inline-note orders-inline-note--success">
@@ -405,23 +347,6 @@ function OrdersContent({ searchQuery }) {
         </label>
 
         <div className="orders-summary-row__actions">
-          <div className="orders-credits">
-            <LuZap />
-            <span>Auto Order Credits: {credits}</span>
-            <span className="orders-credits__help">?</span>
-          </div>
-
-          <button
-            type="button"
-            className="orders-buy-btn"
-            onClick={() => {
-              setCredits((current) => current + 5);
-              setOrdersNotice("5 auto order credits added to your balance.");
-            }}
-          >
-            Buy Credits
-          </button>
-
           <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
             <LuMenu />
           </button>

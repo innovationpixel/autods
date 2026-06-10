@@ -41,6 +41,99 @@ export function formatDisplayDate(value) {
   });
 }
 
+export function normalizeImageUrl(url) {
+  if (!url || typeof url !== "string") {
+    return null;
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed.replace(/^\/+/, "")}`;
+  }
+
+  if (/^http:\/\/[^/]*alicdn\.com/i.test(trimmed)) {
+    return trimmed.replace(/^http:/i, "https:");
+  }
+
+  return trimmed;
+}
+
+export function getListingImageUrl(item) {
+  if (!item) {
+    return null;
+  }
+
+  const candidates = [
+    item.resolved_image_url,
+    item.image_url,
+    item.images?.[0]?.url,
+    typeof item.images?.[0] === "string" ? item.images[0] : null,
+    item.raw_source_data?.image_url,
+    item.raw_source_data?.images?.[0],
+  ];
+
+  for (const candidate of candidates) {
+    const url = normalizeImageUrl(typeof candidate === "object" ? candidate?.url : candidate);
+    if (url) {
+      return url;
+    }
+  }
+
+  for (const sku of item.raw_source_data?.skus ?? []) {
+    for (const prop of sku.properties ?? []) {
+      const url = normalizeImageUrl(prop.image);
+      if (url) {
+        return url;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function getMarketplaceProductImages(item) {
+  if (!item) {
+    return [];
+  }
+
+  const urls = [];
+  const seen = new Set();
+
+  const push = (candidate) => {
+    const url = normalizeImageUrl(typeof candidate === "object" ? candidate?.url : candidate);
+    if (url && !seen.has(url)) {
+      seen.add(url);
+      urls.push(url);
+    }
+  };
+
+  if (Array.isArray(item.gallery)) {
+    item.gallery.forEach(push);
+  }
+
+  if (Array.isArray(item.images)) {
+    item.images.forEach(push);
+  }
+
+  push(item.image);
+  push(item.image_url);
+
+  const listingUrl = getListingImageUrl(item);
+  if (listingUrl) {
+    push(listingUrl);
+  }
+
+  return urls;
+}
+
 export function formatCalculationAmount(value) {
   return `A$${Number(value).toFixed(2)}`;
 }

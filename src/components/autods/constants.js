@@ -24,7 +24,6 @@ import {
   LuPencil,
   LuPlus,
   LuRefreshCcw,
-  LuSearch,
   LuSettings2,
   LuShirt,
   LuShoppingCart,
@@ -66,12 +65,6 @@ export const addProductsMenuItems = [
     icon: LuBadgeCheck,
     title: "Hand-Picked Products",
     description: "Verified bestsellers to add to your store",
-  },
-  {
-    id: "autods-finder",
-    icon: LuSearch,
-    title: "AutoDS Finder",
-    description: "Use our top sellers database to import",
   },
 ];
 
@@ -448,7 +441,6 @@ export const dashboardTopProducts = [
 export const orderStatusOptions = ["Pending", "Ordered", "Shipped", "Delivered", "Canceled"];
 
 export const profileMenuItems = [
-  { label: "AutoDS Academy", icon: LuBadgeCheck },
   { label: "Support Center", icon: LuInbox },
   { label: "Refer a Friend", icon: LuUserRound, muted: true },
   { label: "AutoDS Wallet", icon: LuWalletCards, muted: true },
