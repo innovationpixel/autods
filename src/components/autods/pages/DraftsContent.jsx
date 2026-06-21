@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch, useSelector, useStore } from "react-redux";
 import { toast } from "../../../utils/toast";
 import {
   LuCheck,
-  LuChevronDown,
   LuChevronRight,
   LuClock3,
   LuEllipsisVertical,
@@ -15,11 +14,17 @@ import {
   LuPlus,
   LuRefreshCcw,
   LuSlidersHorizontal,
-  LuSparkles,
   LuTrash2,
 } from "react-icons/lu";
+import DraftEditorPanel from "../DraftEditorPanel";
+import UploadHistoryPanel from "../UploadHistoryPanel";
+import PageFilterPanel from "../PageFilterPanel";
+import ScheduleListingModal from "../ScheduleListingModal";
+import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
+import { FilterSelect } from "../FilterField";
 import {
   selectEbayConnected,
+  selectEbayConnections,
   selectEbayDrafts,
   selectEbayDraftsLoading,
   selectEbayDraftsError,
@@ -32,44 +37,83 @@ import {
   updateProduct,
   deleteProduct,
   bulkDeleteProducts,
+  scheduleProducts,
 } from "../../../services/ProductService";
-import { getListingImageUrl } from "../helpers";
+import { formatDisplayDateTime, getListingImageUrl } from "../helpers";
+import {
+  buildDraftFormState,
+  serializeDraftFormForApi,
+} from "../../../utils/draftEditorState";
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
+  const store = useStore();
   const connected = useSelector(selectEbayConnected);
-  const drafts    = useSelector(selectEbayDrafts);
-  const meta      = useSelector(selectEbayDraftsMeta);
-  const loading   = useSelector(selectEbayDraftsLoading);
-  const error     = useSelector(selectEbayDraftsError);
+  const connections = useSelector(selectEbayConnections);
+  const drafts = useSelector(selectEbayDrafts);
+  const meta = useSelector(selectEbayDraftsMeta);
+  const loading = useSelector(selectEbayDraftsLoading);
+  const error = useSelector(selectEbayDraftsError);
 
-  const [activeTab, setActiveTab]         = useState("drafts");
-  const [showFilters, setShowFilters]     = useState(false);
-  const [selectedIds, setSelectedIds]     = useState([]);
-  const [expandedIds, setExpandedIds]     = useState([]);
-  const [retryingIds, setRetryingIds]     = useState([]);
-  const [openMenuId, setOpenMenuId]       = useState("");
-  const [editForms, setEditForms]         = useState({});
+  const [activeTab, setActiveTab] = useState("drafts");
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [expandedIds, setExpandedIds] = useState([]);
+  const [editorTabs, setEditorTabs] = useState({});
+  const [retryingIds, setRetryingIds] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState("");
+  const [editForms, setEditForms] = useState({});
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterSource, setFilterSource] = useState("");
+  const [filterStore, setFilterStore] = useState("");
+  const [scheduleTargets, setScheduleTargets] = useState([]);
+  const [scheduling, setScheduling] = useState(false);
+  const [bulkEditTargets, setBulkEditTargets] = useState([]);
+  const [bulkEditing, setBulkEditing] = useState(false);
 
   const loadDrafts = () => {
     const params = { q: searchQuery };
     if (activeTab === "scheduled") params.tab = "scheduled";
     if (activeTab === "failed") params.tab = "failed";
-    dispatch(fetchEbayDrafts(params));
+    if (filterStatus) params.import_status = filterStatus;
+    if (filterStore) params.connection_id = filterStore;
+    return dispatch(fetchEbayDrafts(params));
   };
+
+  const clearDraftFilters = () => {
+    setFilterStatus("");
+    setFilterSource("");
+    setFilterStore("");
+  };
+
+  const hasDraftFilters = Boolean(filterStatus || filterSource || filterStore);
 
   useEffect(() => {
     if (connected) {
       loadDrafts();
     }
-  }, [dispatch, connected, searchQuery, activeTab]);
+  }, [dispatch, connected, searchQuery, activeTab, filterStatus, filterStore]);
 
-  const visibleDrafts = drafts;
+  useEffect(() => {
+    const closeMenu = () => setOpenMenuId("");
+    document.addEventListener("click", closeMenu);
+    return () => document.removeEventListener("click", closeMenu);
+  }, []);
+
+  const visibleDrafts = drafts.filter((item) => {
+    if (filterSource && item.source_platform !== filterSource) {
+      return false;
+    }
+    return true;
+  });
   const scheduledCount = activeTab === "scheduled" ? (meta?.total ?? drafts.length) : 0;
   const failedCount = drafts.filter((d) => d.import_status === "failed").length;
 
-  const allVisibleSelected = visibleDrafts.length > 0 && visibleDrafts.every((item) => selectedIds.includes(item.id));
-  const allExpanded = visibleDrafts.length > 0 && visibleDrafts.every((item) => expandedIds.includes(item.id));
+  const allVisibleSelected =
+    visibleDrafts.length > 0 && visibleDrafts.every((item) => selectedIds.includes(item.id));
+  const allExpanded =
+    visibleDrafts.length > 0 && visibleDrafts.every((item) => expandedIds.includes(item.id));
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
@@ -80,44 +124,102 @@ function DraftsContent({ searchQuery }) {
   };
 
   const toggleSelectOne = (id) => {
-    setSelectedIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+    setSelectedIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
   };
 
   const toggleExpanded = (id) => {
-    setExpandedIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+    const item = visibleDrafts.find((draft) => draft.id === id);
+    setExpandedIds((cur) => {
+      const opening = !cur.includes(id);
+      const next = opening ? [...cur, id] : cur.filter((x) => x !== id);
+      if (opening) {
+        const latest = visibleDrafts.find((draft) => draft.id === id) ?? item;
+        setEditForms((forms) => ({
+          ...forms,
+          [id]: forms[id] ?? buildDraftFormState(latest),
+        }));
+        if (!editorTabs[id]) {
+          setEditorTabs((tabs) => ({ ...tabs, [id]: "general" }));
+        }
+      }
+      return next;
+    });
   };
 
   const toggleExpandAll = () => {
-    setExpandedIds(allExpanded ? [] : visibleDrafts.map((item) => item.id));
+    if (allExpanded) {
+      setExpandedIds([]);
+      return;
+    }
+    const ids = visibleDrafts.map((item) => item.id);
+    setExpandedIds(ids);
+    setEditForms((forms) => {
+      const next = { ...forms };
+      visibleDrafts.forEach((item) => {
+        if (!next[item.id]) {
+          next[item.id] = buildDraftFormState(item);
+        }
+      });
+      return next;
+    });
+    setEditorTabs((tabs) => {
+      const next = { ...tabs };
+      ids.forEach((id) => {
+        if (!next[id]) next[id] = "general";
+      });
+      return next;
+    });
   };
 
-  const getEditForm = (item) => ({
-    title: item.title,
-    price: item.price,
-    quantity: item.quantity,
-    ...editForms[item.id],
-  });
+  const getEditForm = (item) => editForms[item.id] ?? buildDraftFormState(item);
 
-  const setEditField = (id, field, value, item) => {
+  const setEditForm = (id, item, nextForm) => {
     setEditForms((cur) => ({
       ...cur,
-      [id]: { ...getEditForm(item), [field]: value },
+      [id]: typeof nextForm === "function" ? nextForm(getEditForm(item)) : nextForm,
     }));
   };
 
   const saveDraft = async (item) => {
     const form = getEditForm(item);
     try {
-      await updateProduct(item.id, form);
+      const res = await updateProduct(item.id, serializeDraftFormForApi(form));
+      const savedListing = res.data?.listing;
+
+      await loadDrafts();
+
+      const sourceListing =
+        savedListing ??
+        store.getState().ebay.drafts.data.find((draft) => draft.id === item.id);
+
+      if (sourceListing) {
+        setEditForms((cur) => ({
+          ...cur,
+          [item.id]: buildDraftFormState(sourceListing),
+        }));
+      }
+
       toast.success("Draft saved.");
-      loadDrafts();
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to save draft.");
+      return false;
     }
   };
 
+  const saveDraftIfDirty = async (item) => {
+    if (!editForms[item.id]) {
+      return true;
+    }
+
+    return saveDraft(item);
+  };
+
   const runBulkAction = async (action) => {
-    if (!selectedIds.length) { toast.warn("Select at least one draft."); return; }
+    if (!selectedIds.length) {
+      toast.warn("Select at least one draft.");
+      return;
+    }
 
     if (action === "remove") {
       try {
@@ -134,6 +236,10 @@ function DraftsContent({ searchQuery }) {
     if (action === "import") {
       for (const id of selectedIds) {
         try {
+          const item = drafts.find((draft) => draft.id === id);
+          if (item) {
+            await saveDraftIfDirty(item);
+          }
           await publishProduct(id);
         } catch {
           // continue
@@ -144,7 +250,114 @@ function DraftsContent({ searchQuery }) {
       return;
     }
 
-    toast.info(action === "edit" ? "Bulk edit opened" : "Action applied.");
+    if (action === "schedule") {
+      await openScheduleModal(selectedIds);
+      return;
+    }
+
+    if (action === "edit") {
+      const items = visibleDrafts.filter((draft) => selectedIds.includes(draft.id));
+      if (!items.length) {
+        toast.warn("Select at least one draft to edit.");
+        return;
+      }
+      setBulkEditTargets(items);
+      return;
+    }
+
+    toast.info("Action applied.");
+  };
+
+  const confirmBulkEdit = async (changes) => {
+    if (!bulkEditTargets.length) {
+      return;
+    }
+
+    setBulkEditing(true);
+    let updated = 0;
+    let failed = 0;
+
+    for (const item of bulkEditTargets) {
+      try {
+        const baseForm = editForms[item.id] ?? buildDraftFormState(item);
+        const nextForm = applyBulkEditToForm(baseForm, changes);
+        await updateProduct(item.id, serializeDraftFormForApi(nextForm));
+        setEditForms((cur) => ({
+          ...cur,
+          [item.id]: nextForm,
+        }));
+        updated += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setBulkEditing(false);
+    setBulkEditTargets([]);
+    await loadDrafts();
+
+    if (updated) {
+      toast.success(`Bulk edit applied to ${updated} draft${updated === 1 ? "" : "s"}.`);
+    }
+    if (failed) {
+      toast.error(`${failed} draft${failed === 1 ? "" : "s"} could not be updated.`);
+    }
+  };
+
+  const openScheduleModal = async (ids) => {
+    const items = visibleDrafts.filter((draft) => ids.includes(draft.id));
+    if (!items.length) {
+      toast.warn("Select at least one draft to schedule.");
+      return;
+    }
+
+    for (const item of items) {
+      await saveDraftIfDirty(item);
+    }
+
+    setScheduleTargets(items);
+  };
+
+  const confirmSchedule = async (scheduledAt) => {
+    if (!scheduleTargets.length) {
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const res = await scheduleProducts({
+        ids: scheduleTargets.map((draft) => draft.id),
+        scheduled_at: scheduledAt,
+      });
+      toast.success(res.data?.message ?? "Listing(s) scheduled.");
+      setScheduleTargets([]);
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to schedule listing(s).");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const clearSchedule = async () => {
+    if (!scheduleTargets.length) {
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const res = await scheduleProducts({
+        ids: scheduleTargets.map((draft) => draft.id),
+        scheduled_at: null,
+      });
+      toast.success(res.data?.message ?? "Schedule removed.");
+      setScheduleTargets([]);
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to remove schedule.");
+    } finally {
+      setScheduling(false);
+    }
   };
 
   const retryDraft = async (id) => {
@@ -160,9 +373,12 @@ function DraftsContent({ searchQuery }) {
     }
   };
 
-  const publishDraft = async (id) => {
+  const publishDraft = async (item) => {
     try {
-      await publishProduct(id);
+      const saved = await saveDraftIfDirty(item);
+      if (!saved) return;
+
+      await publishProduct(item.id);
       toast.success("Published to eBay.");
       loadDrafts();
     } catch (err) {
@@ -180,8 +396,9 @@ function DraftsContent({ searchQuery }) {
         toast.error(err.response?.data?.error ?? "Delete failed.");
       }
     }
-    if (action === "schedule") toast.info("Schedule Listing panel opened.");
-    if (action === "viral") toast.info("Go Viral with TikTok Ads is ready for this draft.");
+    if (action === "schedule") {
+      await openScheduleModal([id]);
+    }
     setOpenMenuId("");
   };
 
@@ -191,17 +408,20 @@ function DraftsContent({ searchQuery }) {
         <div className="drafts-not-connected card-wrapper" style={{ padding: 40, textAlign: "center" }}>
           <LuLink size={32} style={{ opacity: 0.4, marginBottom: 12 }} />
           <h3>No eBay account connected</h3>
-          <p>Go to <strong>Settings → Store Settings</strong> to connect your eBay seller account.</p>
+          <p>
+            Go to <strong>Settings → Store Settings</strong> to connect your eBay seller account.
+          </p>
         </div>
       </section>
     );
   }
 
-  const emptyMessage = activeTab === "scheduled"
-    ? "No scheduled uploads yet."
-    : activeTab === "failed"
-      ? "No failed uploads."
-      : "No draft listings found. Import products from Add Products.";
+  const emptyMessage =
+    activeTab === "scheduled"
+      ? "No scheduled uploads yet."
+      : activeTab === "failed"
+        ? "No failed uploads."
+        : "No draft listings found. Import products from Add Products.";
 
   return (
     <section className="drafts-page-content">
@@ -211,20 +431,66 @@ function DraftsContent({ searchQuery }) {
           ["scheduled", `Scheduled (${scheduledCount})`],
           ["failed", `Failed (${failedCount})`],
         ].map(([key, label]) => (
-          <button key={key} type="button" className={`drafts-tab ${activeTab === key ? "drafts-tab--active" : ""}`} onClick={() => setActiveTab(key)}>
+          <button
+            key={key}
+            type="button"
+            className={`drafts-tab ${activeTab === key ? "drafts-tab--active" : ""}`}
+            onClick={() => setActiveTab(key)}
+          >
             {label}
+            {key === "scheduled" ? <span className="drafts-help">?</span> : null}
           </button>
         ))}
       </nav>
 
       <div className="drafts-toolbar">
-        <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((c) => !c)}>
-          <LuSlidersHorizontal /><span>Add Filter</span>
+        <button
+          type="button"
+          className={`orders-filter-toggle ${showFilters ? "orders-filter-toggle--active" : ""}`}
+          onClick={() => setShowFilters((c) => !c)}
+        >
+          <LuSlidersHorizontal />
+          <span>Add Filter</span>
         </button>
-        <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={() => { loadDrafts(); toast.success("Draft listings refreshed."); }}>
-          <LuRefreshCcw /><span>Refresh</span>
+        <button
+          type="button"
+          className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+          onClick={() => {
+            loadDrafts();
+            toast.success("Draft listings refreshed.");
+          }}
+        >
+          <LuRefreshCcw />
+          <span>Refresh</span>
         </button>
       </div>
+
+      {showFilters ? (
+        <PageFilterPanel layout="drafts" onClear={hasDraftFilters ? clearDraftFilters : undefined}>
+          <FilterSelect label="Status" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            <option value="ready">Ready</option>
+            <option value="failed">Failed</option>
+            <option value="queued">Queued</option>
+          </FilterSelect>
+          <FilterSelect label="Source" value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
+            <option value="">All suppliers</option>
+            <option value="aliexpress">AliExpress</option>
+            <option value="amazon">Amazon</option>
+            <option value="walmart">Walmart</option>
+            <option value="etsy">Etsy</option>
+            <option value="ebay">eBay</option>
+          </FilterSelect>
+          <FilterSelect label="Store" value={filterStore} onChange={(e) => setFilterStore(e.target.value)}>
+            <option value="">All stores</option>
+            {connections.map((conn) => (
+              <option key={conn.id} value={conn.id}>
+                {conn.ebay_username ?? `Store #${conn.id}`}
+              </option>
+            ))}
+          </FilterSelect>
+        </PageFilterPanel>
+      ) : null}
 
       {error ? (
         <div className="orders-inline-note" style={{ color: "#991b1b", background: "#fee2e2" }}>
@@ -239,24 +505,45 @@ function DraftsContent({ searchQuery }) {
             <span>{selectedIds.length} Results Selected</span>
           </label>
           <div className={`drafts-bulk-actions ${selectedIds.length ? "" : "drafts-bulk-actions--disabled"}`}>
-            <button type="button" onClick={() => runBulkAction("edit")}><LuPencil /><span>Bulk Edit</span></button>
-            <button type="button" onClick={() => runBulkAction("remove")}><LuTrash2 /><span>Remove from list</span></button>
-            <button type="button" onClick={() => runBulkAction("import")}><LuPlus /><span>Publish All</span></button>
-            <button type="button" onClick={() => runBulkAction("rewrite")}><LuSparkles /><span>Bulk AI Rewrite</span></button>
-            <button type="button" onClick={() => runBulkAction("schedule")}><LuClock3 /><span>Schedule Listings</span></button>
+            <button type="button" onClick={() => runBulkAction("edit")}>
+              <LuPencil />
+              <span>Bulk Edit</span>
+            </button>
+            <button type="button" onClick={() => runBulkAction("remove")}>
+              <LuTrash2 />
+              <span>Remove from list</span>
+            </button>
+            <button type="button" onClick={() => runBulkAction("import")}>
+              <LuPlus />
+              <span>Publish All</span>
+            </button>
+            <button type="button" onClick={() => runBulkAction("schedule")}>
+              <LuClock3 />
+              <span>Schedule Listings</span>
+            </button>
           </div>
         </div>
         <div className="drafts-selection-row__right">
-          <button type="button" onClick={() => toast.info("History panel ready.")}>View History</button>
+          <button
+            type="button"
+            className={historyVisible ? "drafts-history-btn drafts-history-btn--active" : "drafts-history-btn"}
+            onClick={() => setHistoryVisible((current) => !current)}
+          >
+            View History
+          </button>
           <span aria-hidden="true" />
-          <button type="button" onClick={toggleExpandAll}>{allExpanded ? "Collapse all" : "Expand all"}</button>
+          <button type="button" onClick={toggleExpandAll}>
+            {allExpanded ? "Collapse all" : "Expand all"}
+          </button>
         </div>
       </div>
+
+      <UploadHistoryPanel visible={historyVisible} onClose={() => setHistoryVisible(false)} />
 
       <div className="drafts-list card-wrapper">
         {loading ? (
           <div className="drafts-empty">
-            <LuLoader style={{ animation: "spin 1s linear infinite" }} />
+            <LuLoader className="spin-icon" />
             <span>Loading drafts…</span>
           </div>
         ) : visibleDrafts.length ? (
@@ -267,25 +554,38 @@ function DraftsContent({ searchQuery }) {
             const form = getEditForm(item);
             const hasError = item.import_status === "failed";
             const imageUrl = getListingImageUrl(item);
+            const statusLabel = hasError ? "Failed" : item.status === "draft" ? "Draft" : item.status ?? "Draft";
 
             return (
               <div className="drafts-entry" key={item.id}>
-                <article className={`drafts-row ${index === 0 ? "drafts-row--featured" : ""} ${isSelected ? "drafts-row--selected" : ""} ${isExpanded ? "drafts-row--expanded" : ""}`}>
+                <article
+                  className={`drafts-row ${index === 0 ? "drafts-row--featured" : ""} ${isSelected ? "drafts-row--selected" : ""} ${isExpanded ? "drafts-row--expanded" : ""}`}
+                >
                   <label className="drafts-row__check">
-                    <input type="checkbox" checked={isSelected} onChange={() => toggleSelectOne(item.id)} aria-label={`Select ${item.title}`} />
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectOne(item.id)}
+                      aria-label={`Select ${item.title}`}
+                    />
                   </label>
 
                   <button
                     type="button"
                     className={`drafts-row__expand ${isExpanded ? "drafts-row__expand--open" : ""}`}
                     onClick={() => toggleExpanded(item.id)}
-                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                    aria-label={isExpanded ? "Collapse draft" : "Expand draft"}
+                    aria-expanded={isExpanded}
                   >
                     <LuChevronRight />
                   </button>
 
                   <div className="drafts-row__thumb">
-                    {imageUrl ? <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" /> : <div style={{ width: 48, height: 48, background: "#f0f0f0", borderRadius: 6 }} />}
+                    {imageUrl ? (
+                      <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" />
+                    ) : (
+                      <div style={{ width: 46, height: 46, background: "#f0f0f0" }} />
+                    )}
                   </div>
 
                   <div className="drafts-row__body">
@@ -294,95 +594,121 @@ function DraftsContent({ searchQuery }) {
                       <span>{item.title}</span>
                     </h3>
                     <div className="drafts-row__meta">
-                      <span>Status: {item.import_status ?? item.status}</span>
-                      <i aria-hidden="true" />
-                      <span>Buy: ${Number(item.buy_price ?? 0).toFixed(2)}</span>
-                      <i aria-hidden="true" />
+                      {item.source_product_id ? <span>Buy Item Id: {item.source_product_id}</span> : null}
+                      {item.source_product_id ? <i aria-hidden="true" /> : null}
                       <span>Profit: ${Number(item.profit ?? 0).toFixed(2)}</span>
                       <i aria-hidden="true" />
                       <span>Price: ${Number(item.price ?? 0).toFixed(2)}</span>
-                      {item.source_product_id ? (
+                      <i aria-hidden="true" />
+                      <span>Status: {statusLabel}</span>
+                      {item.scheduled_at ? (
                         <>
                           <i aria-hidden="true" />
-                          <span>AE: {item.source_product_id}</span>
+                          <span className="drafts-row__scheduled">
+                            Scheduled: {formatDisplayDateTime(item.scheduled_at)}
+                          </span>
                         </>
                       ) : null}
                     </div>
-                    {item.import_error ? (
-                      <div className="drafts-row__meta" style={{ color: "#991b1b" }}>{item.import_error}</div>
+                    {hasError || item.import_error ? (
+                      <div className="drafts-row__details">
+                        <strong>!</strong>
+                        <span>
+                          {item.import_error ??
+                            "This draft could not be imported. Open the editor below and click Save & Retry."}
+                        </span>
+                      </div>
                     ) : null}
                   </div>
 
                   <div className="drafts-row__actions">
                     {item.source_url ? (
-                      <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View source">
+                      <a
+                        href={item.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="orders-row-actions__icon"
+                        aria-label="View source product"
+                      >
                         <LuExternalLink />
                       </a>
                     ) : null}
-                    <button type="button" className="drafts-retry-btn" onClick={() => publishDraft(item.id)}>
-                      <LuCheck /><span>Publish</span>
+                    <button type="button" className="drafts-retry-btn" onClick={() => publishDraft(item)}>
+                      <LuCheck />
+                      <span>Publish to Store</span>
                     </button>
-                    <div className="drafts-row__menu-wrap">
-                      <button type="button" className="orders-row-actions__icon" aria-label="Open draft menu" onClick={() => setOpenMenuId((c) => c === item.id ? "" : item.id)}>
+                    <div className="drafts-row__menu-wrap" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="orders-row-actions__icon"
+                        aria-label="Open draft menu"
+                        onClick={() => setOpenMenuId((c) => (c === item.id ? "" : item.id))}
+                      >
                         <LuEllipsisVertical />
                       </button>
                       {openMenuId === item.id ? (
                         <div className="drafts-row__menu">
-                          <button type="button" onClick={() => handleDraftMenu(item.id, "schedule")}><LuClock3 /><span>Schedule Listing</span></button>
-                          <button type="button" onClick={() => handleDraftMenu(item.id, "delete")}><LuTrash2 /><span>Delete Draft</span></button>
+                          <button type="button" onClick={() => handleDraftMenu(item.id, "schedule")}>
+                            <LuClock3 />
+                            <span>Schedule Listing</span>
+                          </button>
+                          <button type="button" onClick={() => handleDraftMenu(item.id, "delete")}>
+                            <LuTrash2 />
+                            <span>Delete Draft</span>
+                          </button>
                         </div>
                       ) : null}
                     </div>
-                    <button type="button" className={`drafts-retry-btn ${isRetrying ? "drafts-retry-btn--active" : ""}`} onClick={() => retryDraft(item.id)}>
-                      <LuRefreshCcw /><span>{isRetrying ? "Queued" : "Retry"}</span>
+                    <button
+                      type="button"
+                      className={`drafts-retry-btn ${isRetrying ? "drafts-retry-btn--active" : ""}`}
+                      onClick={() => retryDraft(item.id)}
+                    >
+                      <LuRefreshCcw />
+                      <span>{isRetrying ? "Queued" : "Retry"}</span>
                     </button>
                   </div>
                 </article>
 
                 {isExpanded ? (
-                  <div className="draft-editor">
-                    <div className="draft-editor__shell">
-                      <div className="draft-editor__main">
-                        <div className="draft-editor__header">
-                          <div className="draft-editor__heading">
-                            {imageUrl ? <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" style={{ width: 48, height: 48, objectFit: "cover", borderRadius: 6 }} /> : null}
-                            <div>
-                              <h4>{item.title}</h4>
-                              <div className="drafts-row__meta">
-                                <span>Warehouse: {item.warehouse_country ?? "CN"}</span>
-                                <i aria-hidden="true" />
-                                <span>Source: {item.source_platform ?? "aliexpress"}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="draft-editor__actions">
-                            <button type="button" className="draft-editor__save" onClick={() => saveDraft(item)}><LuCheck /><span>Save</span></button>
-                            <button type="button" className="draft-editor__retry" onClick={() => { saveDraft(item).then(() => retryDraft(item.id)); }}><LuRefreshCcw /><span>Save & Retry</span></button>
-                          </div>
-                        </div>
-                        <div className="draft-editor__panel" style={{ padding: "20px 24px" }}>
-                          <div className="draft-editor__grid">
-                            <label><span>Title</span><input type="text" className="marketplace-settings__control" value={form.title} onChange={(e) => setEditField(item.id, "title", e.target.value, item)} /></label>
-                            <label><span>Price</span><input type="number" className="marketplace-settings__control" value={form.price} onChange={(e) => setEditField(item.id, "price", e.target.value, item)} /></label>
-                          </div>
-                          <div className="draft-editor__grid">
-                            <label><span>Quantity</span><input type="number" className="marketplace-settings__control" value={form.quantity} onChange={(e) => setEditField(item.id, "quantity", e.target.value, item)} /></label>
-                            <label><span>Condition</span><input type="text" className="marketplace-settings__control" defaultValue={item.condition ?? "New"} readOnly /></label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <DraftEditorPanel
+                    item={item}
+                    form={form}
+                    activeTab={editorTabs[item.id] ?? "general"}
+                    onTabChange={(tabId) => setEditorTabs((cur) => ({ ...cur, [item.id]: tabId }))}
+                    onChange={(nextForm) => setEditForm(item.id, item, nextForm)}
+                    onSave={() => saveDraft(item)}
+                    onSaveAndRetry={() => saveDraft(item).then((saved) => saved && retryDraft(item.id))}
+                    onPublish={() => publishDraft(item)}
+                  />
                 ) : null}
               </div>
             );
           })
         ) : (
           <div className="drafts-empty">
-            <LuInbox /><span>{emptyMessage}</span>
+            <LuInbox />
+            <span>{emptyMessage}</span>
           </div>
         )}
       </div>
+
+      <ScheduleListingModal
+        open={scheduleTargets.length > 0}
+        drafts={scheduleTargets}
+        saving={scheduling}
+        onClose={() => setScheduleTargets([])}
+        onSchedule={confirmSchedule}
+        onClearSchedule={clearSchedule}
+      />
+
+      <BulkEditDraftsModal
+        open={bulkEditTargets.length > 0}
+        drafts={bulkEditTargets}
+        saving={bulkEditing}
+        onClose={() => setBulkEditTargets([])}
+        onApply={confirmBulkEdit}
+      />
     </section>
   );
 }

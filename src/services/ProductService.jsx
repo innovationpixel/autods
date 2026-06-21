@@ -15,6 +15,9 @@ export const importProductsBulk = (payload) => {
 export const getImportBatch = (id) =>
     axiosInstance.get(`/products/import/batches/${id}`);
 
+export const getImportHistory = (params = {}) =>
+    axiosInstance.get('/products/import/history', { params });
+
 export const publishProduct = (id) =>
     axiosInstance.post(`/products/${id}/publish`);
 
@@ -23,6 +26,9 @@ export const retryProductImport = (id) =>
 
 export const updateProduct = (id, data) =>
     axiosInstance.patch(`/products/${id}`, data);
+
+export const scheduleProducts = (payload) =>
+    axiosInstance.post('/products/schedule', payload);
 
 export const deleteProduct = (id) =>
     axiosInstance.delete(`/products/${id}`);

@@ -51,6 +51,8 @@ import {
   saveStripePaymentMethod,
 } from "../../services/BillingService";
 import { getCurrentPlan } from "../../services/PlanService";
+import SettingsTemplatesPanel from "../autods/settings/SettingsTemplatesPanel";
+import { allTemplates } from "../autods/settings/settingsTemplates";
 
 const settingsPrimaryTabs = [
   "Store Settings",
@@ -519,6 +521,8 @@ export default function MarketplaceSettingsPage() {
     if (tab === "store") return "Store Settings";
     if (tab === "supplier") return "Supplier Settings";
     if (tab === "billing") return "Account & Billing";
+    if (tab === "templates") return "Templates";
+    if (tab === "plans") return "Plans & Add-ons";
     return "Store Settings";
   }, [search]);
 
@@ -532,6 +536,10 @@ export default function MarketplaceSettingsPage() {
       setActivePrimaryTab("Supplier Settings");
     } else if (tab === "billing") {
       setActivePrimaryTab("Account & Billing");
+    } else if (tab === "templates") {
+      setActivePrimaryTab("Templates");
+    } else if (tab === "plans") {
+      setActivePrimaryTab("Plans & Add-ons");
     }
   }, [search]);
   const [activeInnerTab, setActiveInnerTab] = useState("Lister");
@@ -553,6 +561,7 @@ export default function MarketplaceSettingsPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
+  const [templateCatalog, setTemplateCatalog] = useState({ custom: [], default_id: "" });
   const popupRef = useRef(null);
 
   useEffect(() => {
@@ -584,6 +593,12 @@ export default function MarketplaceSettingsPage() {
         const remote = res.data?.settings ?? {};
         if (remote.suppliers?.length) {
           setSuppliers(remote.suppliers);
+        }
+        if (remote.templates) {
+          setTemplateCatalog({
+            custom: remote.templates.custom ?? [],
+            default_id: remote.templates.default_id ?? "",
+          });
         }
       })
       .catch(() => {});
@@ -697,6 +712,57 @@ export default function MarketplaceSettingsPage() {
   };
 
   const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
+
+  const templateSelectOptions = useMemo(() => {
+    const names = allTemplates(templateCatalog.custom).map((template) => template.name);
+    return ["Select default template", ...names];
+  }, [templateCatalog.custom]);
+
+  const addSupplierProfile = () => {
+    const existingIds = new Set(suppliers.map((supplier) => supplier.id));
+    const nextTemplate = supplierTemplates.find((template) => !existingIds.has(template.id));
+    if (!nextTemplate) {
+      toast.info("All supplier profiles are already added.");
+      return;
+    }
+    const next = createSupplier(nextTemplate);
+    setSuppliers((current) => [...current, next]);
+    setActiveSupplierId(next.id);
+  };
+
+  const renderSupplierSidebar = () => (
+    <aside className="marketplace-settings__sidebar">
+      <div className="marketplace-settings__sidebar-field">
+        <div className="marketplace-settings__supplier-label">Supplier Profiles</div>
+        <div className="marketplace-settings__supplier-panel">
+          <div className="marketplace-settings__supplier-list">
+            {suppliers.map((supplier) => (
+              <div
+                className={`marketplace-settings__supplier-item ${activeSupplierId === supplier.id ? "marketplace-settings__supplier-item--active" : ""}`}
+                key={supplier.id}
+              >
+                <button
+                  type="button"
+                  className="marketplace-settings__supplier-main"
+                  onClick={() => setActiveSupplierId(supplier.id)}
+                >
+                  <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
+                  <span>{supplier.label}</span>
+                </button>
+                <button type="button" className="marketplace-settings__supplier-menu" aria-label={`${supplier.label} options`}>
+                  <LuChevronDown />
+                </button>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="marketplace-settings__add-supplier" onClick={addSupplierProfile}>
+            <LuPlus />
+            <span>Add Supplier Profile</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
 
   const renderStoreSettingsTab = () => (
     <div className="marketplace-settings__store-settings card-wrapper">
@@ -1235,7 +1301,7 @@ export default function MarketplaceSettingsPage() {
           <SettingsField label="Default Template" help>
             <SettingsSelect
               value={currentSettings.lister.defaultTemplate}
-              options={templateOptions}
+              options={templateSelectOptions}
               onChange={(event) => patchSection("lister", { defaultTemplate: event.target.value })}
             />
           </SettingsField>
@@ -2409,7 +2475,8 @@ export default function MarketplaceSettingsPage() {
       </nav>
 
       {activePrimaryTab === "Supplier Settings" ? (
-        <div className="marketplace-settings__workspace marketplace-settings__workspace--no-sidebar">
+        <div className="marketplace-settings__workspace">
+          {renderSupplierSidebar()}
           <div className="marketplace-settings__panel card-wrapper">
             <div className="marketplace-settings__inner-tabs" role="tablist" aria-label="Supplier settings tabs">
               {settingsInnerTabs.map((tab) => (
@@ -2441,6 +2508,12 @@ export default function MarketplaceSettingsPage() {
         renderPlansAddOnsTab()
       ) : activePrimaryTab === "Account & Billing" ? (
         renderAccountBillingTab()
+      ) : activePrimaryTab === "Templates" ? (
+        <SettingsTemplatesPanel
+          initialCustomTemplates={templateCatalog.custom}
+          initialDefaultId={templateCatalog.default_id}
+          onTemplatesChange={setTemplateCatalog}
+        />
       ) : activePrimaryTab === "Store Settings" ? (
         renderStoreSettingsTab()
       ) : (

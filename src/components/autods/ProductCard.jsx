@@ -42,9 +42,18 @@ function ProductCard({ item }) {
     setFailedUrls((current) => ({ ...current, [url]: true }));
   };
 
+  const shippingLabel =
+    typeof item.shippingDays === "number" && !String(item.shipping).toLowerCase().includes("sold")
+      ? `Shipping time: ${item.shipping}`
+      : item.shipping;
+
   return (
     <article className={`product-card marketplace-product-card ${showGalleryNav ? "marketplace-product-card--gallery" : ""}`}>
       <div className="marketplace-product-card__media">
+        {item.shippingTag ? (
+          <span className="marketplace-product-card__tag">{item.shippingTag}</span>
+        ) : null}
+
         <div className="marketplace-product-card__image-wrap">
           {displayUrl ? (
             <img
@@ -85,12 +94,12 @@ function ProductCard({ item }) {
       </div>
 
       <div className="marketplace-product-card__body">
-        <a className="marketplace-product-card__vendor" href="/">
+        <a className="marketplace-product-card__vendor" href="/" onClick={(event) => event.preventDefault()}>
           {item.vendor}
         </a>
         <h3 className="marketplace-product-card__title">{item.title}</h3>
         <div className="marketplace-product-card__price">{item.price}</div>
-        <div className="marketplace-product-card__shipping">Shipping time: {item.shipping}</div>
+        <div className="marketplace-product-card__shipping">{shippingLabel}</div>
       </div>
 
       <div className="marketplace-product-card__actions">

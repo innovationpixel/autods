@@ -1,4 +1,22 @@
-const isLocalHost = typeof window !== 'undefined'
-    && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+/**
+ * API base URL.
+ *
+ * Dev (Vite): defaults to `/api` — proxied to Laravel (see vite.config.js), so no CORS.
+ * Override with VITE_API_URL in `.env.development` if needed.
+ *
+ * Production build: uses VITE_API_URL or the deployed API host.
+ */
+function resolveApiBaseUrl() {
+    const fromEnv = import.meta.env.VITE_API_URL;
+    if (fromEnv) {
+        return String(fromEnv).replace(/\/$/, '');
+    }
 
-export const BASE_URL = 'https://autods.youbasautopilot.com/api';
+    if (import.meta.env.DEV) {
+        return '/api';
+    }
+
+    return 'https://autods.youbasautopilot.com/api';
+}
+
+export const BASE_URL = resolveApiBaseUrl();

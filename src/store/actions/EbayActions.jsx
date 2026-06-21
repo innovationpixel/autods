@@ -19,6 +19,42 @@ import {
 
 import { toast } from '../../utils/toast';
 
+function normalizePaginatedPayload(payload) {
+    if (!payload || Array.isArray(payload)) {
+        return { data: payload ?? [], meta: {} };
+    }
+
+    if (Array.isArray(payload.data) && payload.meta) {
+        return payload;
+    }
+
+    if (!Array.isArray(payload.data)) {
+        return { data: [], meta: {} };
+    }
+
+    const {
+        data,
+        current_page,
+        last_page,
+        per_page,
+        total,
+        from,
+        to,
+    } = payload;
+
+    return {
+        data,
+        meta: {
+            current_page,
+            last_page,
+            per_page,
+            total,
+            from,
+            to,
+        },
+    };
+}
+
 // ─── Connection management ────────────────────────────────────────────────────
 
 export const fetchEbayStatus = () => (dispatch) => {
@@ -71,7 +107,7 @@ export const syncEbayListingsAction = (connectionId) => (dispatch) => {
 export const fetchEbayListings = (params = {}) => (dispatch) => {
     dispatch({ type: EBAY_LISTINGS_REQUEST });
     return getEbayListings(params)
-        .then((res) => dispatch({ type: EBAY_LISTINGS_SUCCESS, payload: res.data }))
+        .then((res) => dispatch({ type: EBAY_LISTINGS_SUCCESS, payload: normalizePaginatedPayload(res.data) }))
         .catch((err) => {
             const msg = err.response?.data?.error ?? 'Failed to load eBay listings.';
             dispatch({ type: EBAY_LISTINGS_FAILURE, payload: msg });
@@ -82,7 +118,7 @@ export const fetchEbayListings = (params = {}) => (dispatch) => {
 export const fetchEbayDrafts = (params = {}) => (dispatch) => {
     dispatch({ type: EBAY_DRAFTS_REQUEST });
     return getEbayDrafts(params)
-        .then((res) => dispatch({ type: EBAY_DRAFTS_SUCCESS, payload: res.data }))
+        .then((res) => dispatch({ type: EBAY_DRAFTS_SUCCESS, payload: normalizePaginatedPayload(res.data) }))
         .catch((err) => {
             const msg = err.response?.data?.error ?? 'Failed to load draft listings.';
             dispatch({ type: EBAY_DRAFTS_FAILURE, payload: msg });

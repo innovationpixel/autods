@@ -17,6 +17,8 @@ import {
   updateSupportConversation,
 } from "../../services/SupportService";
 import "../../assets/css/customer-support.css";
+import PageFilterPanel from "../autods/PageFilterPanel";
+import { FilterSelect } from "../autods/FilterField";
 
 const sortableColumns = {
   status: "status",
@@ -60,6 +62,10 @@ function CustomerSupportContent({ searchQuery = "" }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const clearSupportFilters = () => {
+    setTypeFilter("All");
+  };
 
   const loadConversations = useCallback(async () => {
     setLoading(true);
@@ -198,20 +204,22 @@ function CustomerSupportContent({ searchQuery = "" }) {
       </section>
 
       {showFilters ? (
-        <div className="support-filters" style={{ display: "flex", gap: 12, padding: "0 0 12px", flexWrap: "wrap" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <span>Type</span>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              aria-label="Filter by conversation type"
-            >
-              {typeFilterOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <PageFilterPanel
+          layout="auto"
+          onClear={typeFilter !== "All" ? clearSupportFilters : undefined}
+        >
+          <FilterSelect
+            label="Type"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+          >
+            {typeFilterOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FilterSelect>
+        </PageFilterPanel>
       ) : null}
 
       <main className="support-table-shell">

@@ -21,6 +21,8 @@ import {
   LuX,
 } from "react-icons/lu";
 import CompactDateRange from "../CompactDateRange";
+import PageFilterPanel from "../PageFilterPanel";
+import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import { formatDisplayDate } from "../helpers";
 import { orderStatusOptions } from "../constants";
 
@@ -191,6 +193,21 @@ function OrdersContent({ searchQuery }) {
       : null,
   ].filter(Boolean);
 
+  const clearOrderFilters = () => {
+    setShowOnlyActive(true);
+    setStatusFilter("All Statuses");
+    setBuyerFilter("");
+    setFromDate("2026-04-17");
+    setToDate("2026-04-21");
+  };
+
+  const hasOrderFilters =
+    !showOnlyActive ||
+    statusFilter !== "All Statuses" ||
+    buyerFilter.trim() ||
+    fromDate !== "2026-04-17" ||
+    toDate !== "2026-04-21";
+
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
       setSelectedIds((current) => current.filter((id) => !visibleOrders.some((order) => order.id === id)));
@@ -260,7 +277,11 @@ function OrdersContent({ searchQuery }) {
     <section className="orders-page-content">
       <div className="orders-toolbar">
         <div className="orders-toolbar__left">
-          <button type="button" className="orders-filter-toggle" onClick={() => setShowFilters((current) => !current)}>
+          <button
+            type="button"
+            className={`orders-filter-toggle ${showFilters ? "orders-filter-toggle--active" : ""}`}
+            onClick={() => setShowFilters((current) => !current)}
+          >
             <LuSlidersHorizontal />
             <span>Add Filter</span>
           </button>
@@ -296,31 +317,22 @@ function OrdersContent({ searchQuery }) {
       ) : null}
 
       {showFilters ? (
-        <div className="orders-filter-panel card-wrapper">
-          <label className="orders-filter-panel__field">
-            <span>Status</span>
-            <div className="orders-filter-panel__select">
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="All Statuses">All Statuses</option>
-                {orderStatusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <LuChevronDown />
-            </div>
-          </label>
+        <PageFilterPanel layout="orders" onClear={hasOrderFilters ? clearOrderFilters : undefined}>
+          <FilterSelect label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="All Statuses">All Statuses</option>
+            {orderStatusOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FilterSelect>
 
-          <label className="orders-filter-panel__field">
-            <span>Buyer Username</span>
-            <input
-              type="text"
-              value={buyerFilter}
-              onChange={(event) => setBuyerFilter(event.target.value)}
-              placeholder="Search buyer"
-            />
-          </label>
+          <FilterInput
+            label="Buyer username"
+            value={buyerFilter}
+            onChange={(event) => setBuyerFilter(event.target.value)}
+            placeholder="Search buyer"
+          />
 
           <CompactDateRange
             from={fromDate}
@@ -329,15 +341,12 @@ function OrdersContent({ searchQuery }) {
             onToChange={setToDate}
           />
 
-          <label className="orders-active-toggle">
-            <input
-              type="checkbox"
-              checked={showOnlyActive}
-              onChange={(event) => setShowOnlyActive(event.target.checked)}
-            />
-            <span>Show active orders only</span>
-          </label>
-        </div>
+          <FilterCheckbox
+            label="Show active orders only"
+            checked={showOnlyActive}
+            onChange={(event) => setShowOnlyActive(event.target.checked)}
+          />
+        </PageFilterPanel>
       ) : null}
 
       <div className="orders-summary-row">

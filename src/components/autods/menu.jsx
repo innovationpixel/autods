@@ -8,7 +8,6 @@ import {
   LuPackage2,
   LuPackageSearch,
   LuSettings2,
-  LuShirt,
   LuStore,
 } from "react-icons/lu";
 
@@ -26,7 +25,6 @@ export const sidebarGroups = [
         { label: "Trending Products", icon: LuChartLine },
       ],
     },
-    { label: "Print On Demand", page: "print-on-demand", icon: LuShirt },
     { label: "Order Processing", page: "order-processing", icon: LuClipboardList },
     { label: "Calculations", page: "calculations", icon: LuChartLine },
   ],

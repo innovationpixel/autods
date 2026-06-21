@@ -62,13 +62,14 @@ import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
 import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
-import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages } from '../autods/constants';
+import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, importSuppliers } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
 import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
-import ProductCard from '../autods/ProductCard';
-import CarouselSection from '../autods/CarouselSection';
+import ConnectEbayModal from '../autods/ConnectEbayModal';
+import AddProductModal from '../autods/AddProductModal';
+import MarketplaceSections from '../autods/pages/MarketplaceSections';
 import PrintOnDemandContent from '../autods/pages/PrintOnDemandContent';
 import DashboardContent from '../autods/pages/DashboardContent';
 import OrdersContent from '../autods/pages/OrdersContent';
@@ -110,6 +111,11 @@ import {
 } from '../../store/selectors/AliExpressSelectors';
 import { getAliExpressAuthUrl } from '../../services/AliExpressService';
 import { importProduct, importProductsBulk, getImportBatch } from '../../services/ProductService';
+import {
+  applyDetectedImportSupplier,
+  importSupplierHint,
+  isImportSupplierEnabled,
+} from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
 import AdminPlansPage from '../autods/pages/AdminPlansPage';
 import { toast } from '../../utils/toast';
@@ -648,6 +654,8 @@ const MarketplaceDashboard = () => {
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
   const [addProductModalMode, setAddProductModalMode] = useState("single");
   const [storeSwitcherOpen, setStoreSwitcherOpen] = useState(false);
+  const [connectEbayModalOpen, setConnectEbayModalOpen] = useState(false);
+  const [ebaySiteId, setEbaySiteId] = useState("EBAY_US");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
   const [balanceMenuOpen, setBalanceMenuOpen] = useState(false);
@@ -659,6 +667,8 @@ const MarketplaceDashboard = () => {
   const [selectedLoadAmount, setSelectedLoadAmount] = useState(15);
   const [selectedAiPackage, setSelectedAiPackage] = useState("5000");
   const [addProductUrl, setAddProductUrl] = useState("");
+  const [importSupplier, setImportSupplier] = useState("aliexpress");
+  const [importWarehouse, setImportWarehouse] = useState("CN");
   const [multipleProductsTab, setMultipleProductsTab] = useState("urls");
   const [multipleProductsUrls, setMultipleProductsUrls] = useState("");
   const [multipleProductsCsvFile, setMultipleProductsCsvFile] = useState("");
@@ -754,6 +764,7 @@ const MarketplaceDashboard = () => {
     const shouldLockScroll =
       addProductModalOpen ||
       storeSwitcherOpen ||
+      connectEbayModalOpen ||
       notificationsModalOpen ||
       loadBalanceModalOpen ||
       aiCreditsModalOpen ||
@@ -778,7 +789,7 @@ const MarketplaceDashboard = () => {
       documentElement.style.overflow = previousHtmlOverflow;
       documentElement.style.touchAction = previousHtmlTouchAction;
     };
-  }, [addProductModalOpen, aiCreditsModalOpen, loadBalanceModalOpen, notificationsModalOpen, notificationsOpen, storeSwitcherOpen]);
+  }, [addProductModalOpen, aiCreditsModalOpen, connectEbayModalOpen, loadBalanceModalOpen, notificationsModalOpen, notificationsOpen, storeSwitcherOpen]);
 
   useEffect(() => {
     dispatch(fetchEbayStatus());
@@ -875,6 +886,7 @@ const MarketplaceDashboard = () => {
 
       watchOAuthPopup(popup, () => {
         setEbayConnecting(false);
+        setConnectEbayModalOpen(false);
         dispatch(fetchEbayStatus());
       });
     } catch (err) {
@@ -929,6 +941,10 @@ const MarketplaceDashboard = () => {
         currency,
       };
 
+      if (keywordSearch.trim()) {
+        params.q = keywordSearch.trim();
+      }
+
       if (categoryId) params.category_id = categoryId;
 
       if (priceRange !== "Select Price Range") {
@@ -953,6 +969,7 @@ const MarketplaceDashboard = () => {
     currency,
     aliCredentialsConfigured,
     aliConnected,
+    keywordSearch,
   ]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
@@ -1151,6 +1168,7 @@ const MarketplaceDashboard = () => {
     setActiveSubfilter("");
     setExpandedProductsTitle("");
     setSelectedPill("");
+    setKeywordSearch("");
   };
 
   const openMarketplacePage = () => {
@@ -1263,7 +1281,11 @@ const MarketplaceDashboard = () => {
       .filter(Boolean);
 
   const validateImportPrerequisites = () => {
-    if (!aliConnected) {
+    if (!isImportSupplierEnabled(importSupplier)) {
+      toast.error(`${importSuppliers.find((s) => s.id === importSupplier)?.label ?? "This supplier"} import is not available yet.`);
+      return false;
+    }
+    if (importSupplier === "aliexpress" && !aliConnected) {
       toast.error("Connect your AliExpress account in Settings first.");
       return false;
     }
@@ -1273,6 +1295,23 @@ const MarketplaceDashboard = () => {
       return false;
     }
     return connectionIds;
+  };
+
+  const handleAddProductUrlChange = (url) => {
+    setAddProductUrl(url);
+    applyDetectedImportSupplier(url, {
+      onSupplierChange: setImportSupplier,
+      onWarehouseChange: setImportWarehouse,
+    });
+  };
+
+  const handleMultipleProductsUrlsChange = (urls) => {
+    setMultipleProductsUrls(urls);
+    const firstLine = urls.split(/[\r\n]+/).map((line) => line.trim()).find(Boolean) ?? "";
+    applyDetectedImportSupplier(firstLine, {
+      onSupplierChange: setImportSupplier,
+      onWarehouseChange: setImportWarehouse,
+    });
   };
 
   const refreshProductData = () => {
@@ -1303,7 +1342,7 @@ const MarketplaceDashboard = () => {
     const connectionIds = validateImportPrerequisites();
     if (!connectionIds) return;
     if (!addProductUrl.trim()) {
-      toast.warn("Enter an AliExpress URL or product ID.");
+      toast.warn(importSupplierHint(importSupplier));
       return;
     }
 
@@ -1313,7 +1352,8 @@ const MarketplaceDashboard = () => {
         url_or_id: addProductUrl.trim(),
         connection_ids: connectionIds,
         action,
-        warehouse: "CN",
+        warehouse: importWarehouse,
+        supplier: importSupplier,
       });
       toast.success(res.data?.message ?? "Product imported.");
       setAddProductModalOpen(false);
@@ -1342,7 +1382,8 @@ const MarketplaceDashboard = () => {
         formData.append("csv_file", csvFileObject);
         connectionIds.forEach((id) => formData.append("connection_ids[]", id));
         formData.append("action", "draft");
-        formData.append("warehouse", "CN");
+        formData.append("warehouse", importWarehouse);
+        formData.append("supplier", importSupplier);
         res = await importProductsBulk(formData);
       } else if (multipleProductsTab === "urls") {
         const urls = multipleProductsUrls.split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
@@ -1350,7 +1391,8 @@ const MarketplaceDashboard = () => {
           urls,
           connection_ids: connectionIds,
           action: "draft",
-          warehouse: "CN",
+          warehouse: importWarehouse,
+          supplier: importSupplier,
         });
       } else {
         toast.warn("Finder import is not available yet.");
@@ -1386,6 +1428,11 @@ const MarketplaceDashboard = () => {
         : `${selectedStoreIds.length} stores`;
 
   const openStoreSwitcherModal = () => {
+    if (stores.length === 0 && !ebayConnectionsLoading) {
+      setConnectEbayModalOpen(true);
+      return;
+    }
+
     setStoreSwitcherOpen(true);
     setStoreSwitcherSearch("");
     setStoreSwitcherMenuId("");
@@ -1503,11 +1550,10 @@ const MarketplaceDashboard = () => {
 
   const multipleProductsActionDisabled =
     importSubmitting ||
-    (multipleProductsTab === "urls"
-      ? !multipleProductsUrls.trim()
-      : multipleProductsTab === "csv"
-        ? !csvFileObject
-        : finderTotalCredits === 0);
+    (multipleProductsTab === "urls" ? !multipleProductsUrls.trim() : !csvFileObject);
+
+  const importSupplierEnabled =
+    importSuppliers.find((supplier) => supplier.id === importSupplier)?.enabled !== false;
 
   const pageTitle = isUnknownPage
     ? "Page Not Found"
@@ -1540,16 +1586,6 @@ const MarketplaceDashboard = () => {
                     : activePage === "settings"
                       ? "Settings"
                       : "Marketplace";
-
-  const pageTitleContent =
-    activePage === "wallet" ? (
-      <>
-        <span>AutoDS Wallet</span>
-        <span className="marketplace-header__title-addon">Powered by Payoneer</span>
-      </>
-    ) : (
-      pageTitle
-    );
 
   const handleAccountAlertAction = (event) => {
     event.preventDefault();
@@ -1718,7 +1754,7 @@ const MarketplaceDashboard = () => {
               >
                 <LuMenu />
               </button>
-              <h1 className="section-title marketplace-header__title">{pageTitleContent}</h1>
+              <h1 className="section-title marketplace-header__title">{pageTitle}</h1>
             </div>
 
             <div className="marketplace-header__search">
@@ -2315,281 +2351,47 @@ const MarketplaceDashboard = () => {
             </div>
           ) : null}
 
-          {addProductModalOpen ? (
-            <div className="add-product-modal-layer" role="presentation">
-              <button
-                type="button"
-                className="add-product-modal-layer__backdrop"
-                aria-label="Close add product modal"
-                onClick={() => setAddProductModalOpen(false)}
-              />
-              <section
-                className={addProductModalMode === "multiple" ? "add-product-modal add-product-modal--multiple" : "add-product-modal"}
-                role="dialog"
-                aria-modal="true"
-                aria-label={addProductModalMode === "multiple" ? "Add Products" : "Add Product"}
-              >
-                <button
-                  type="button"
-                  className="balance-modal__close"
-                  aria-label="Close add product modal"
-                  onClick={() => setAddProductModalOpen(false)}
-                >
-                  <LuX />
-                </button>
+          <ConnectEbayModal
+            open={connectEbayModalOpen}
+            onClose={() => setConnectEbayModalOpen(false)}
+            onConnect={connectEbay}
+            connecting={ebayConnecting}
+            siteId={ebaySiteId}
+            onSiteChange={setEbaySiteId}
+          />
 
-                <div className="add-product-modal__head">
-                  <div className="add-product-modal__title-icon" aria-hidden="true">
-                    <LuBox />
-                    <span>+</span>
-                  </div>
-                  <div className="add-product-modal__title-copy">
-                    <h2>{addProductModalMode === "multiple" ? "Add Products" : "Add Product"}</h2>
-                    <div className="add-product-modal__publish-row">
-                      <span>
-                        Publish to: <strong>{selectedStoreLabel}</strong>
-                      </span>
-                      <button type="button" aria-label="Edit publish store" onClick={openStoreSwitcherModal}>
-                        <LuPencil />
-                      </button>
-                    </div>
-                        {stores.length > 0 ? (
-                      <div className="add-product-modal__store-list" style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
-                        {stores.map((store) => (
-                          <label key={store.id} className="add-product-modal__store-option">
-                            <input
-                              type="checkbox"
-                              checked={selectedStoreIds.includes(store.id)}
-                              onChange={() => toggleModalStoreSelection(store.id)}
-                            />
-                            <span>{store.sidebarName}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {addProductModalMode === "multiple" ? (
-                  <>
-                    <div className="add-products-modal__tabs" role="tablist" aria-label="Add products methods">
-                      {multipleProductsTabs.map((tab) => (
-                        <button
-                          type="button"
-                          key={tab.id}
-                          role="tab"
-                          aria-selected={multipleProductsTab === tab.id}
-                          className={multipleProductsTab === tab.id ? "add-products-modal__tab add-products-modal__tab--active" : "add-products-modal__tab"}
-                          onClick={() => setMultipleProductsTab(tab.id)}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {multipleProductsTab === "urls" ? (
-                      <div className="add-products-modal__panel">
-                        <label className="add-product-modal__field">
-                          <span>
-                            Supplier Url or Product ID (Buy)
-                            <em> (For multiple products, click &lt;enter&gt; to separate them)</em>
-                            <button type="button" className="add-products-modal__info" aria-label="Multiple product instructions">
-                              ?
-                            </button>
-                          </span>
-                          <textarea
-                            value={multipleProductsUrls}
-                            onChange={(event) => setMultipleProductsUrls(event.target.value)}
-                            placeholder=""
-                          />
-                        </label>
-                      </div>
-                    ) : null}
-
-                    {multipleProductsTab === "csv" ? (
-                      <div className="add-products-modal__panel add-products-modal__panel--csv">
-                        <input
-                          ref={csvFileInputRef}
-                          type="file"
-                          accept=".csv,text/csv"
-                          hidden
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            setCsvFileObject(file ?? null);
-                            setMultipleProductsCsvFile(file?.name ?? "");
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="add-products-modal__dropzone"
-                          onClick={() => csvFileInputRef.current?.click()}
-                        >
-                          <span className="add-products-modal__dropzone-icon">
-                            <LuUpload />
-                          </span>
-                          <strong>{multipleProductsCsvFile ? multipleProductsCsvFile : "Drop CSV file"}</strong>
-                          <span>{multipleProductsCsvFile ? "Ready to import into your selected store." : "Or select file from your computer"}</span>
-                        </button>
-
-                        <div className="add-products-modal__csv-card">
-                          <strong>CSV format</strong>
-                          <p>
-                            The file must be a CSV file with the following fields as column titles:
-                          </p>
-                          <ul>
-                            <li>BuyId (Required)</li>
-                            <li>Title (Optional)</li>
-                            <li>Price (Optional)</li>
-                          </ul>
-                          <button type="button">Download Example File</button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {multipleProductsTab === "finder" ? (
-                      <div className="add-products-modal__panel add-products-modal__panel--finder">
-                        <div className="add-products-modal__finder-head">
-                          <strong>Let us find the perfect products for your store</strong>
-                          <span>
-                            Your Credits: 400 <button type="button">Buy more</button>
-                          </span>
-                        </div>
-
-                        <div className="add-products-modal__finder-grid">
-                          {finderPlans.map((plan) => {
-                            const PlanIcon = plan.icon;
-                            const quantity = finderSelections[plan.id] || 0;
-
-                            return (
-                              <article className="add-products-modal__finder-card" key={plan.id}>
-                                <span className="add-products-modal__finder-label">{plan.label}</span>
-                                <span className={`add-products-modal__finder-icon add-products-modal__finder-icon--${plan.id}`}>
-                                  <PlanIcon />
-                                </span>
-                                <strong>{plan.sales}</strong>
-                                <span>{plan.credits} Credits per product</span>
-
-                                <div className="add-products-modal__finder-counter">
-                                  <div>Select amount</div>
-                                  <div className="add-products-modal__finder-counter-row">
-                                    <button type="button" onClick={() => adjustFinderSelection(plan.id, -1)}>
-                                      -
-                                    </button>
-                                    <span>{quantity}</span>
-                                    <button type="button" onClick={() => adjustFinderSelection(plan.id, 1)}>
-                                      +
-                                    </button>
-                                  </div>
-                                </div>
-                              </article>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="add-products-modal__meta-footer">
-                      <div className="add-product-modal__meta-row">
-                        <span>
-                          Supplier Source:
-                          <button type="button">
-                            <span className="add-product-modal__meta-dot" />
-                            Aliexpress
-                            <LuChevronDown />
-                          </button>
-                        </span>
-                        <i />
-                        <span>
-                          Ship From Warehouse:
-                          <button type="button">
-                            China
-                            <LuChevronDown />
-                          </button>
-                        </span>
-                        <button type="button" className="add-product-modal__hint" aria-label="Warehouse info">
-                          ?
-                        </button>
-                      </div>
-
-                      <div className="add-products-modal__footer-row">
-                        <span className="add-products-modal__credits">
-                          {importBatchProgress
-                            ? `Progress: ${importBatchProgress.completed + importBatchProgress.failed}/${importBatchProgress.total}`
-                            : multipleProductsTab === "finder"
-                              ? `Total cost: ${finderTotalCredits} credits`
-                              : ""}
-                        </span>
-                        <div className="add-products-modal__submit-wrap">
-                          <button
-                            type="button"
-                            className="add-products-modal__submit-main"
-                            disabled={multipleProductsActionDisabled}
-                            onClick={handleBulkImport}
-                          >
-                            {importSubmitting ? "Importing…" : "Add As draft"}
-                          </button>
-                          <button type="button" className="add-products-modal__submit-toggle" disabled={multipleProductsActionDisabled} aria-label="More add product actions">
-                            <LuChevronDown />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <label className="add-product-modal__field">
-                      <span>Supplier Url or Product ID (Buy)</span>
-                      <input
-                        type="text"
-                        value={addProductUrl}
-                        onChange={(event) => setAddProductUrl(event.target.value)}
-                        placeholder="Enter URL or Product ID"
-                      />
-                    </label>
-
-                    <div className="add-product-modal__meta-row">
-                      <span>
-                        Supplier Source:
-                        <button type="button">
-                          <span className="add-product-modal__meta-dot" />
-                          Aliexpress
-                          <LuChevronDown />
-                        </button>
-                      </span>
-                      <i />
-                      <span>
-                        Ship From Warehouse:
-                        <button type="button">
-                          China
-                          <LuChevronDown />
-                        </button>
-                      </span>
-                      <button type="button" className="add-product-modal__hint" aria-label="Warehouse info">
-                        ?
-                      </button>
-                    </div>
-
-                    <div className="add-product-modal__actions">
-                      <button
-                        type="button"
-                        disabled={!addProductUrl.trim() || importSubmitting}
-                        onClick={() => handleSingleImport("publish")}
-                      >
-                        {importSubmitting ? "Working…" : "Publish to Store"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!addProductUrl.trim() || importSubmitting}
-                        onClick={() => handleSingleImport("draft")}
-                      >
-                        {importSubmitting ? "Working…" : "Add as Draft (Simple page)"}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </section>
-            </div>
-          ) : null}
+          <AddProductModal
+            open={addProductModalOpen}
+            mode={addProductModalMode}
+            onClose={() => setAddProductModalOpen(false)}
+            selectedStoreLabel={selectedStoreLabel}
+            onEditStores={openStoreSwitcherModal}
+            addProductUrl={addProductUrl}
+            onAddProductUrlChange={handleAddProductUrlChange}
+            multipleProductsTab={multipleProductsTab}
+            onMultipleProductsTabChange={setMultipleProductsTab}
+            multipleProductsUrls={multipleProductsUrls}
+            onMultipleProductsUrlsChange={handleMultipleProductsUrlsChange}
+            multipleProductsCsvFile={multipleProductsCsvFile}
+            csvFileObject={csvFileObject}
+            onCsvFileChange={(file) => {
+              setCsvFileObject(file);
+              setMultipleProductsCsvFile(file?.name ?? "");
+            }}
+            finderSelections={finderSelections}
+            onAdjustFinderSelection={adjustFinderSelection}
+            importSupplier={importSupplier}
+            onImportSupplierChange={setImportSupplier}
+            importWarehouse={importWarehouse}
+            onImportWarehouseChange={setImportWarehouse}
+            importSubmitting={importSubmitting}
+            importBatchProgress={importBatchProgress}
+            finderTotalCredits={finderTotalCredits}
+            multipleProductsActionDisabled={multipleProductsActionDisabled}
+            onSingleImport={handleSingleImport}
+            onBulkImport={handleBulkImport}
+            supplierEnabled={importSupplierEnabled}
+          />
 
 	          {loadBalanceModalOpen || aiCreditsModalOpen ? (
             <div className="balance-modal-layer" role="presentation">
@@ -2767,6 +2569,11 @@ const MarketplaceDashboard = () => {
                     <button type="button" className="button-base button-primary marketplace-search-panel__submit">
                       Search
                     </button>
+
+                    <button type="button" className="marketplace-search-panel__ugc-btn">
+                      <span aria-hidden="true">✦</span>
+                      <span>UGC Video Ads</span>
+                    </button>
                   </div>
 
                   <div className="marketplace-search-panel__filters">
@@ -2884,81 +2691,22 @@ const MarketplaceDashboard = () => {
                 </section>
 
                 <div className="marketplace-sections">
-                  {aliLoading ? (
-                    <div className="marketplace-products__empty">
-                      <LuLoader style={{ animation: "spin 1s linear infinite", fontSize: 28 }} />
-                      <p>Searching AliExpress…</p>
-                    </div>
-                  ) : aliCredentialsMissing || !aliCredentialsConfigured ? (
-                    <div className="marketplace-products__empty">
-                      <LuStore style={{ fontSize: 40, color: "#f97316" }} />
-                      <p style={{ fontWeight: 600, fontSize: 16 }}>AliExpress API not configured</p>
-                      <p style={{ color: "#6b7280", marginTop: 4, maxWidth: 420, textAlign: "center" }}>
-                        Add ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET to the backend .env file, then restart the API server.
-                      </p>
-                    </div>
-                  ) : aliRequiresAuth ? (
-                    <div className="marketplace-products__empty">
-                      <LuStore style={{ fontSize: 40, color: "#f97316" }} />
-                      <p style={{ fontWeight: 600, fontSize: 16 }}>Connect your AliExpress account</p>
-                      <p style={{ color: "#6b7280", marginTop: 4, maxWidth: 440, textAlign: "center" }}>
-                        Join the{" "}
-                        <a href="https://ds.aliexpress.com" target="_blank" rel="noreferrer">
-                          AliExpress Dropshipping Center
-                        </a>
-                        , then authorize your account to browse supplier products.
-                      </p>
-                      <button
-                        type="button"
-                        className="btn btn-primary mt-3"
-                        onClick={connectAliExpress}
-                        disabled={aliConnecting}
-                      >
-                        {aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}
-                      </button>
-                    </div>
-                  ) : aliError ? (
-                    <div className="marketplace-products__empty">
-                      <LuSlidersHorizontal />
-                      <p style={{ color: "#991b1b" }}>{aliError}</p>
-                    </div>
-                  ) : aliItems.length > 0 ? (
-                    <section className="marketplace-expanded-products">
-                      <div className="marketplace-expanded-products__head">
-                        <h2 className="marketplace-section__title">
-                          AliExpress&nbsp;—&nbsp;
-                          {activeCategory !== "All Categories" ? activeCategory : "Trending Products"}
-                          {keywordSearch ? ` matching "${keywordSearch}"` : ""}
-                          &nbsp;({aliItems.length} result{aliItems.length !== 1 ? "s" : ""})
-                        </h2>
-                      </div>
-                      <div className="marketplace-expanded-products__grid">
-                        {aliItems.map((item) => (
-                          <ProductCard
-                            key={item.id}
-                            item={{
-                              id: item.id,
-                              vendor: item.seller ?? "AliExpress",
-                              title: item.title,
-                              price: `$${Number(item.price ?? 0).toFixed(2)}`,
-                              shipping: item.sold_count > 0 ? `${Number(item.sold_count).toLocaleString()} sold` : "Ships from China",
-                              shippingDays: 10,
-                              image_url: item.image_url,
-                              images: item.images,
-                              shippingTag: "AliExpress",
-                              listingUrl: item.listing_url,
-                              marketplace: "aliexpress",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ) : (
-                    <div className="marketplace-products__empty">
-                      <LuSlidersHorizontal />
-                      <p>No AliExpress products found. Try adjusting your search or filters.</p>
-                    </div>
-                  )}
+                  <MarketplaceSections
+                    aliLoading={aliLoading}
+                    aliError={aliError}
+                    aliRequiresAuth={aliRequiresAuth}
+                    aliCredentialsMissing={aliCredentialsMissing}
+                    aliCredentialsConfigured={aliCredentialsConfigured}
+                    aliItems={aliItems}
+                    aliConnecting={aliConnecting}
+                    onConnectAliExpress={connectAliExpress}
+                    expandedProductsTitle={expandedProductsTitle}
+                    visibleProducts={visibleProducts}
+                    visibleSections={visibleSections}
+                    keywordSearch={keywordSearch}
+                    onSeeMore={openProductsView}
+                    onResetView={resetMarketplaceView}
+                  />
                 </div>
               </>
             )}

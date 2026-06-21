@@ -16,17 +16,17 @@ import {
   LuSearch,
   LuX,
 } from "react-icons/lu";
-import { toast } from "../../utils/toast";
-import { buildPaginationItems, normalizeImageUrl } from "../autods/helpers";
-import { selectEbayConnections } from "../../store/selectors/EbaySelectors";
+import { toast } from "../../../utils/toast";
+import { buildPaginationItems, normalizeImageUrl } from "../helpers";
+import { selectEbayConnections } from "../../../store/selectors/EbaySelectors";
 import {
   cancelSourcingRequest,
   createSourcingRequest,
   getSourcingRequests,
   linkSourcingQuote,
   refreshSourcingRequest,
-} from "../../services/SourcingService";
-import "../../assets/css/sourcing-request.css";
+} from "../../../services/SourcingService";
+import "../../../assets/css/sourcing-request.css";
 
 const statusFilters = ["All", "Processing", "Quoted", "Linked", "Cancelled"];
 

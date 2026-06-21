@@ -34,10 +34,46 @@ export function getSectionCategory(section) {
 }
 
 export function formatDisplayDate(value) {
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-US", {
+  if (!value) {
+    return "—";
+  }
+
+  const raw = String(value).trim();
+  const date = raw.includes("T") || raw.includes(" ")
+    ? new Date(raw.replace(" ", "T"))
+    : new Date(`${raw}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+  });
+}
+
+export function formatDisplayDateTime(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const raw = String(value).trim();
+  const date = raw.includes("T") || raw.includes(" ")
+    ? new Date(raw.replace(" ", "T"))
+    : new Date(`${raw}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 }
 

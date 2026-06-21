@@ -111,7 +111,30 @@ export const storeSwitcherMenuItems = [
 export const multipleProductsTabs = [
   { id: "urls", label: "URL's or ID's" },
   { id: "csv", label: "Upload CSV" },
-  { id: "finder", label: "AutoDS Finder" },
+];
+
+/** Buy-side suppliers shown in Add Product modal (AutoDS-style). */
+export const importSuppliers = [
+  { id: "aliexpress", label: "Aliexpress", color: "#e62e04", enabled: true },
+  { id: "amazon", label: "Amazon", color: "#ff9900", enabled: true },
+  { id: "walmart", label: "Walmart", color: "#0071ce", enabled: true },
+  { id: "ebay", label: "eBay", color: "#0064d2", enabled: true },
+  { id: "cj", label: "CJ Dropshipping", color: "#f97316", enabled: false },
+  { id: "banggood", label: "Banggood", color: "#ff6600", enabled: false },
+  { id: "homedepot", label: "Home Depot", color: "#f96302", enabled: false },
+  { id: "etsy", label: "Etsy", color: "#f1641e", enabled: true },
+  { id: "target", label: "Target", color: "#cc0000", enabled: false },
+  { id: "costway", label: "Costway", color: "#111827", enabled: false },
+  { id: "costco", label: "Costco", color: "#005daa", enabled: false },
+];
+
+export const importWarehouses = [
+  { id: "CN", label: "China" },
+  { id: "US", label: "United States" },
+  { id: "UK", label: "United Kingdom" },
+  { id: "DE", label: "Germany" },
+  { id: "AU", label: "Australia" },
+  { id: "FR", label: "France" },
 ];
 
 export const finderPlans = [
@@ -887,19 +910,6 @@ export const initialOrders = orderRowsSeed.map((item, index) => ({
   orderBuyId: `${item.itemBuy}-100${index + 1}`,
   orderSellId: `${item.itemSell}-100${index + 1}`,
 }));
-
-export const initialProductAlerts = [
-  {
-    id: "import-1",
-    tone: "warning",
-    message: "Import Products #153999960 (Import to Store) (197/197 finished)",
-  },
-  {
-    id: "import-2",
-    tone: "danger",
-    message: "Import Products #153999648 (Import to Store) (98/98 finished)",
-  },
-];
 
 export const productSeedItems = [
   {
