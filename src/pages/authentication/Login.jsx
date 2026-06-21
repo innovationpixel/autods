@@ -242,13 +242,6 @@ function Login() {
             </button>
           </form>
 
-          <div className="auth-page__card-foot">
-            <p>
-              Don&apos;t have an account?{" "}
-              <Link to="/user/register">Create one</Link>
-            </p>
-          </div>
-
           <div className="auth-page__trust">
             <span><LuCheck /> Secure sign-in</span>
             <span><LuCheck /> Encrypted credentials</span>
