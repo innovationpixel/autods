@@ -40,7 +40,7 @@ import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingI
 import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
-import { openOAuthPopup, openAliExpressOAuth, watchOAuthPopup, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT } from "../../utils/oauthBridge";
+import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
 import { getAccountSettings, updateAccountSettings } from "../../services/SettingsService";
 import {
   createStripeSetupIntent,
@@ -562,7 +562,7 @@ export default function MarketplaceSettingsPage() {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [templateCatalog, setTemplateCatalog] = useState({ custom: [], default_id: "" });
-  const popupRef = useRef(null);
+  const oauthTabRef = useRef(null);
 
   useEffect(() => {
     if (!saveNotice) {
@@ -632,15 +632,21 @@ export default function MarketplaceSettingsPage() {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
       const res = await getEbayAuthUrl();
-      const popup = openOAuthPopup(res.data.url, "ebay_oauth");
-      popupRef.current = popup;
+      const tab = openOAuthTab(res.data.url);
+      oauthTabRef.current = tab;
+
+      if (!tab) {
+        setEbayConnecting(false);
+        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
+        return;
+      }
 
       toast.info(
-        "After eBay login, you should return to Auto DS automatically. If you only see eBay’s “Authorization successfully completed” page, copy that page’s URL and use the box below.",
+        `${OAUTH_TAB_HINT} If eBay only shows “Authorization successfully completed”, copy that page’s URL and use the box below.`,
         { autoClose: 10000 },
       );
 
-      watchOAuthPopup(popup, () => {
+      watchOAuthTab(tab, () => {
         setEbayConnecting(false);
         dispatch(fetchEbayStatus());
       });
@@ -685,18 +691,18 @@ export default function MarketplaceSettingsPage() {
       setAliConnecting(true);
       markOAuthReturnOrigin();
       const res = await getAliExpressAuthUrl();
-      const popup = openAliExpressOAuth(res.data.url);
-      popupRef.current = popup;
+      const tab = openOAuthTab(res.data.url);
+      oauthTabRef.current = tab;
 
-      if (!popup) {
+      if (!tab) {
         setAliConnecting(false);
-        toast.error("Your browser blocked the AliExpress window. Allow popups for this site and try again.");
+        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
         return;
       }
 
-      toast.info(ALIEXPRESS_OAUTH_HINT, { autoClose: 8000 });
+      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
 
-      watchOAuthPopup(popup, () => {
+      watchOAuthTab(tab, () => {
         setAliConnecting(false);
         dispatch(fetchAliExpressStatus());
       });
@@ -989,7 +995,7 @@ export default function MarketplaceSettingsPage() {
               )}
           </span>
           <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", maxWidth: 520 }}>
-            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a popup window.
+            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a new browser tab.
           </p>
         </div>
       )}

@@ -94,11 +94,11 @@ import { logoutAction } from '../../store/actions/AuthActions';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
 import {
-  openOAuthPopup,
-  openAliExpressOAuth,
-  watchOAuthPopup,
+  openOAuthTab,
+  watchOAuthTab,
   markOAuthReturnOrigin,
   ALIEXPRESS_OAUTH_HINT,
+  OAUTH_TAB_HINT,
 } from '../../utils/oauthBridge';
 import {
   selectAliItems,
@@ -876,15 +876,17 @@ const MarketplaceDashboard = () => {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
       const res = await getEbayAuthUrl();
-      const popup = openOAuthPopup(res.data.url, 'ebay_oauth');
+      const tab = openOAuthTab(res.data.url);
 
-      if (!popup) {
+      if (!tab) {
         setEbayConnecting(false);
-        toast.error('Browser blocked the eBay window. Allow popups for this site and try again.');
+        toast.error('Your browser blocked the new tab. Allow popups for this site and try again.');
         return;
       }
 
-      watchOAuthPopup(popup, () => {
+      toast.info(OAUTH_TAB_HINT, { autoClose: 8000 });
+
+      watchOAuthTab(tab, () => {
         setEbayConnecting(false);
         setConnectEbayModalOpen(false);
         dispatch(fetchEbayStatus());
@@ -900,17 +902,17 @@ const MarketplaceDashboard = () => {
       setAliConnecting(true);
       markOAuthReturnOrigin();
       const res = await getAliExpressAuthUrl();
-      const popup = openAliExpressOAuth(res.data.url);
+      const tab = openOAuthTab(res.data.url);
 
-      if (!popup) {
+      if (!tab) {
         setAliConnecting(false);
-        toast.error("Browser blocked the AliExpress window. Allow popups for this site and try again.");
+        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
         return;
       }
 
-      toast.info(ALIEXPRESS_OAUTH_HINT, { autoClose: 8000 });
+      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
 
-      watchOAuthPopup(popup, () => {
+      watchOAuthTab(tab, () => {
         setAliConnecting(false);
         dispatch(fetchAliExpressStatus());
       });

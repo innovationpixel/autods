@@ -40,36 +40,32 @@ export function consumeOAuthResult(maxAgeMs = 120000) {
     }
 }
 
-function openCenteredWindow(url, name, width, height, features = '') {
-    const left = Math.round(window.screenX + (window.outerWidth - width) / 2);
-    const top = Math.round(window.screenY + (window.outerHeight - height) / 2);
-    const size = `width=${width},height=${height},left=${left},top=${top}`;
-
-    return window.open(url, name, `${size},toolbar=0,scrollbars=1,resizable=1${features ? `,${features}` : ''}`);
+/** Open OAuth provider in a new browser tab (not a popup). */
+export function openOAuthTab(url) {
+    return window.open(url, '_blank', 'noopener,noreferrer');
 }
 
-/** eBay and other providers — compact centered popup. */
-export function openOAuthPopup(url, name = 'oauth_popup') {
-    return openCenteredWindow(url, name, 620, 720);
+/** @deprecated Use openOAuthTab */
+export function openOAuthPopup(url) {
+    return openOAuthTab(url);
+}
+
+/** @deprecated Use openOAuthTab */
+export function openAliExpressOAuth(url) {
+    return openOAuthTab(url);
 }
 
 export const ALIEXPRESS_OAUTH_HINT =
     'Check “I agree to the Authorization Terms”, scroll down if needed, then click Sign in / Authorize.';
 
-/**
- * AliExpress consent pages are tall; use a large centered popup (same as eBay flow).
- */
-export function openAliExpressOAuth(url) {
-    const width = Math.min(1100, Math.max(900, window.screen.availWidth - 48));
-    const height = Math.min(920, Math.max(820, window.screen.availHeight - 80));
-    return openCenteredWindow(url, 'aliexpress_oauth', width, height);
-}
+export const OAUTH_TAB_HINT =
+    'Complete authorization in the new tab, then return here — this page will update automatically.';
 
 /**
- * Poll localStorage + popup closed while OAuth completes.
+ * Poll localStorage (+ optional tab closed) while OAuth completes in another tab.
  */
-export function watchOAuthPopup(popup, onComplete) {
-    const hadPopup = Boolean(popup);
+export function watchOAuthTab(tab, onComplete) {
+    const hadTab = Boolean(tab);
 
     const interval = setInterval(() => {
         const result = consumeOAuthResult();
@@ -79,13 +75,18 @@ export function watchOAuthPopup(popup, onComplete) {
             return;
         }
 
-        if (hadPopup && (!popup || popup.closed)) {
+        if (hadTab && (!tab || tab.closed)) {
             clearInterval(interval);
             onComplete(consumeOAuthResult() ?? null);
         }
     }, 400);
 
     return () => clearInterval(interval);
+}
+
+/** @deprecated Use watchOAuthTab */
+export function watchOAuthPopup(tab, onComplete) {
+    return watchOAuthTab(tab, onComplete);
 }
 
 export function isOAuthCallbackMessage(data) {

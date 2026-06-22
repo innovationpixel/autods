@@ -48,29 +48,15 @@ export default function OAuthCallback() {
             } catch {
                 // localStorage bridge handles it when same-origin
             }
-
-            try {
-                window.opener.focus();
-            } catch {
-                // ignore cross-origin focus errors
-            }
         }
 
         if (callbackStatus === 'connected') {
             setStatus('success');
-            setDetail('Account connected successfully.');
+            setDetail('Account connected successfully. You can close this tab and return to Auto DS.');
         } else {
             setStatus('error');
             setDetail(reason ? decodeURIComponent(reason) : 'Authorization was not completed.');
         }
-
-        const closeTimer = setTimeout(() => {
-            if (window.opener && !window.opener.closed) {
-                window.close();
-            }
-        }, 2500);
-
-        return () => clearTimeout(closeTimer);
     }, [returnOrigin]);
 
     return (
@@ -93,7 +79,7 @@ export default function OAuthCallback() {
                     <p style={{ fontWeight: 600, color: '#065f46', margin: 0 }}>Account connected</p>
                     <p style={{ color: '#6b7280', margin: 0, fontSize: 14 }}>{detail}</p>
                     <p style={{ color: '#9ca3af', margin: 0, fontSize: 13 }}>
-                        This window will close automatically, or use the button below.
+                        Close this tab and return to Auto DS, or use the button below.
                     </p>
                     <a
                         href={returnUrl}
