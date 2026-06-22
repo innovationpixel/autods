@@ -48,8 +48,8 @@ const Markup = () => {
             <Routes>
                 {/* Public auth routes — no layout */}
                 <Route path="/user/login" element={<Login />} />
-                <Route path="/user/register" element={<Registration />} />
-                <Route path="/user/lock-screen" element={<LockScreen />} />
+                {/* <Route path="/user/register" element={<Registration />} />
+                <Route path="/user/lock-screen" element={<LockScreen />} /> */}
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
 
                 {/* Standalone error pages — no layout */}
