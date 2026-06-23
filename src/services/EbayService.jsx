@@ -10,6 +10,10 @@ export const getEbayAuthUrl = () =>
         params: { return_origin: window.location.origin },
     });
 
+// RuName / callback setup info for eBay Developer Portal
+export const getEbayOAuthSetup = () =>
+    axiosInstance.get('/ebay/oauth-setup');
+
 /** Finish OAuth when eBay shows its success page instead of redirecting to our callback. */
 export const completeEbayOAuth = (payload) =>
     axiosInstance.post('/ebay/complete-oauth', payload);

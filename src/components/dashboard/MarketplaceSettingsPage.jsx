@@ -35,6 +35,8 @@ import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/a
 import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
+import EbayOAuthSetupBanner from "../autods/EbayOAuthSetupBanner";
+import ShipFromSetupNotice from "../autods/ShipFromSetupNotice";
 import { getAliExpressAuthUrl } from "../../services/AliExpressService";
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
 import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
@@ -194,13 +196,31 @@ const supplierTemplates = [
 ];
 
 const zipRotations = [
-  { zipcode: "2042", city: "Newtown", country: "Australia" },
-  { zipcode: "2000", city: "Sydney", country: "Australia" },
-  { zipcode: "3000", city: "Melbourne", country: "Australia" },
-  { zipcode: "4000", city: "Brisbane", country: "Australia" },
+  { zipcode: "10001", city: "New York", state: "NY", country: "US" },
+  { zipcode: "90210", city: "Beverly Hills", state: "CA", country: "US" },
+  { zipcode: "19801", city: "Wilmington", state: "DE", country: "US" },
+  { zipcode: "2042", city: "Newtown", state: "NSW", country: "AU" },
+  { zipcode: "2000", city: "Sydney", state: "NSW", country: "AU" },
 ];
 
-const countryOptions = ["Australia", "United States", "United Kingdom", "Canada"];
+const countryOptions = [
+  { value: "US", label: "United States" },
+  { value: "AU", label: "Australia" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "CA", label: "Canada" },
+];
+
+function mapStoredCountry(country) {
+  if (!country) return "US";
+  if (country.length === 2) return country.toUpperCase();
+  const names = {
+    Australia: "AU",
+    "United States": "US",
+    "United Kingdom": "GB",
+    Canada: "CA",
+  };
+  return names[country] ?? "US";
+}
 const shippingMethodOptions = [
   "Cheapest with tracking",
   "Fastest delivery",
@@ -320,9 +340,10 @@ function createInitialSupplierSettings() {
   return {
     lister: {
       defaultQuantity: "5",
-      itemCountry: "Australia",
-      zipcode: "2042",
-      city: "Newtown",
+      itemCountry: "US",
+      zipcode: "",
+      city: "",
+      state: "",
       shippingMethod: "Cheapest with tracking",
       defaultTemplate: "Select default template",
       useDynamicPolicies: false,
@@ -416,11 +437,15 @@ function SettingsSelect({ value, options, onChange }) {
   return (
     <span className="marketplace-settings__select-wrap">
       <select className="marketplace-settings__control" value={value} onChange={onChange}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
+        {options.map((option) => {
+          const optionValue = typeof option === "object" ? option.value : option;
+          const optionLabel = typeof option === "object" ? option.label : option;
+          return (
+            <option key={optionValue} value={optionValue}>
+              {optionLabel}
+            </option>
+          );
+        })}
       </select>
       <LuChevronDown />
     </span>
@@ -527,9 +552,11 @@ export default function MarketplaceSettingsPage() {
   }, [search]);
 
   const [activePrimaryTab, setActivePrimaryTab] = useState(initialTab);
+  const [activeInnerTab, setActiveInnerTab] = useState("Lister");
 
   useEffect(() => {
     const tab = new URLSearchParams(search).get("tab");
+    const inner = new URLSearchParams(search).get("inner");
     if (tab === "store") {
       setActivePrimaryTab("Store Settings");
     } else if (tab === "supplier") {
@@ -541,8 +568,11 @@ export default function MarketplaceSettingsPage() {
     } else if (tab === "plans") {
       setActivePrimaryTab("Plans & Add-ons");
     }
+    if (inner === "lister") {
+      setActivePrimaryTab("Supplier Settings");
+      setActiveInnerTab("Lister");
+    }
   }, [search]);
-  const [activeInnerTab, setActiveInnerTab] = useState("Lister");
   const primaryEbayConnection = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0] ?? null;
   const [suppliers, setSuppliers] = useState(createInitialSuppliers);
   const [activeSupplierId, setActiveSupplierId] = useState(supplierTemplates[0].id);
@@ -561,6 +591,7 @@ export default function MarketplaceSettingsPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
+  const [accountSettings, setAccountSettings] = useState(null);
   const [templateCatalog, setTemplateCatalog] = useState({ custom: [], default_id: "" });
   const oauthTabRef = useRef(null);
 
@@ -591,8 +622,29 @@ export default function MarketplaceSettingsPage() {
     getAccountSettings()
       .then((res) => {
         const remote = res.data?.settings ?? {};
+        setAccountSettings(remote);
         if (remote.suppliers?.length) {
           setSuppliers(remote.suppliers);
+        }
+        if (remote.lister) {
+          setSuppliers((prev) =>
+            prev.map((supplier) => ({
+              ...supplier,
+              settings: {
+                ...supplier.settings,
+                lister: {
+                  ...supplier.settings.lister,
+                  defaultQuantity: String(remote.lister.default_quantity ?? supplier.settings.lister.defaultQuantity),
+                  itemCountry: mapStoredCountry(remote.lister.country),
+                  zipcode: remote.lister.zipcode ?? supplier.settings.lister.zipcode,
+                  city: remote.lister.city ?? supplier.settings.lister.city,
+                  state: remote.lister.state ?? supplier.settings.lister.state ?? "",
+                  shippingMethod: remote.lister.shipping_method ?? supplier.settings.lister.shippingMethod,
+                  defaultTemplate: remote.lister.template ?? supplier.settings.lister.defaultTemplate,
+                },
+              },
+            })),
+          );
         }
         if (remote.templates) {
           setTemplateCatalog({
@@ -627,10 +679,11 @@ export default function MarketplaceSettingsPage() {
     }
   }, [search, dispatch]);
 
-  const connectEbay = async () => {
+  const startEbayOAuthFlow = async () => {
     try {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
+
       const res = await getEbayAuthUrl();
       const tab = openOAuthTab(res.data.url);
       oauthTabRef.current = tab;
@@ -652,9 +705,13 @@ export default function MarketplaceSettingsPage() {
       });
     } catch (err) {
       setEbayConnecting(false);
-      toast.error(err.response?.data?.error ?? "Failed to start eBay authorization.");
+      const details = err.response?.data?.details;
+      const message = err.response?.data?.error ?? "Failed to start eBay authorization.";
+      toast.error(details?.length ? `${message} ${details.join(" ")}` : message);
     }
   };
+
+  const connectEbay = () => startEbayOAuthFlow();
 
   const finishEbayFromPastedUrl = async () => {
     const parsed = parseEbayOAuthUrl(ebayPasteUrl);
@@ -774,6 +831,8 @@ export default function MarketplaceSettingsPage() {
     <div className="marketplace-settings__store-settings card-wrapper">
 
       {/* ── eBay section ─────────────────────────────────────────────────────── */}
+      <EbayOAuthSetupBanner onContinue={startEbayOAuthFlow} show={ebayConnections.length === 0} />
+      {ebayConnections.length > 0 ? <ShipFromSetupNotice settings={accountSettings} /> : null}
       <div className="marketplace-settings__store-settings-header">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <div>
@@ -1053,6 +1112,7 @@ export default function MarketplaceSettingsPage() {
     patchSection("lister", {
       zipcode: nextLocation.zipcode,
       city: nextLocation.city,
+      state: nextLocation.state ?? "",
       itemCountry: nextLocation.country,
     });
   };
@@ -1175,6 +1235,8 @@ export default function MarketplaceSettingsPage() {
         lister: {
           default_quantity: Number(currentSettings.lister.defaultQuantity) || 1,
           country: currentSettings.lister.itemCountry,
+          city: currentSettings.lister.city,
+          state: currentSettings.lister.state ?? "",
           zipcode: currentSettings.lister.zipcode,
           shipping_method: currentSettings.lister.shippingMethod,
           template: currentSettings.lister.defaultTemplate,
@@ -1197,6 +1259,18 @@ export default function MarketplaceSettingsPage() {
         suppliers,
       });
       setSaveNotice(`${activeInnerTab} settings saved for ${activeSupplier.label}.`);
+      setAccountSettings((prev) => ({
+        ...(prev ?? {}),
+        lister: {
+          default_quantity: Number(currentSettings.lister.defaultQuantity) || 1,
+          country: currentSettings.lister.itemCountry,
+          city: currentSettings.lister.city,
+          state: currentSettings.lister.state ?? "",
+          zipcode: currentSettings.lister.zipcode,
+          shipping_method: currentSettings.lister.shippingMethod,
+          template: currentSettings.lister.defaultTemplate,
+        },
+      }));
       toast.success("Settings saved.");
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to save settings.");
@@ -1256,8 +1330,23 @@ export default function MarketplaceSettingsPage() {
 
   const renderListerTab = () => (
     <div className="marketplace-settings__tab-panel">
+      {ebayConnections.length > 0 ? (
+        <ShipFromSetupNotice
+          settings={{
+            lister: {
+              country: currentSettings.lister.itemCountry,
+              city: currentSettings.lister.city,
+              state: currentSettings.lister.state,
+              zipcode: currentSettings.lister.zipcode,
+            },
+          }}
+        />
+      ) : null}
       <section className="marketplace-settings__section">
         <h3 className="marketplace-settings__section-title">Lister Settings</h3>
+        <p style={{ margin: "0 0 12px", color: "#6b7280", fontSize: 13 }}>
+          Ship-from address is saved per your account and sent to eBay when publishing (country must match your eBay marketplace, e.g. US zip for ebay.com).
+        </p>
         <div className="marketplace-settings__grid marketplace-settings__grid--2">
           <SettingsField label="Default Product Quantity" help className="marketplace-settings__field--full">
             <SettingsInput
@@ -1275,7 +1364,23 @@ export default function MarketplaceSettingsPage() {
             />
           </SettingsField>
 
-          <SettingsField label="Default Zipcode" required help>
+          <SettingsField label="Ship-from City" required help>
+            <SettingsInput
+              value={currentSettings.lister.city}
+              onChange={(event) => patchSection("lister", { city: event.target.value })}
+              placeholder="e.g. New York"
+            />
+          </SettingsField>
+
+          <SettingsField label="Ship-from State / Province" help>
+            <SettingsInput
+              value={currentSettings.lister.state ?? ""}
+              onChange={(event) => patchSection("lister", { state: event.target.value })}
+              placeholder={currentSettings.lister.itemCountry === "US" ? "e.g. NY" : "Optional"}
+            />
+          </SettingsField>
+
+          <SettingsField label="Ship-from Zip / Postcode" required help>
             <div className="marketplace-settings__zipcode-row">
               <SettingsInput
                 value={currentSettings.lister.zipcode}

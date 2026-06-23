@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector, useStore } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
   LuCheck,
@@ -44,10 +45,14 @@ import {
   buildDraftFormState,
   serializeDraftFormForApi,
 } from "../../../utils/draftEditorState";
+import ShipFromSetupNotice from "../ShipFromSetupNotice";
+import { getAccountSettings } from "../../../services/SettingsService";
+import { getShipFromStatus, SHIP_FROM_CLIENT_MESSAGE, SHIP_FROM_SETTINGS_PATH } from "../../../utils/ebayShipFrom";
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
   const store = useStore();
+  const navigate = useNavigate();
   const connected = useSelector(selectEbayConnected);
   const connections = useSelector(selectEbayConnections);
   const drafts = useSelector(selectEbayDrafts);
@@ -71,6 +76,30 @@ function DraftsContent({ searchQuery }) {
   const [scheduling, setScheduling] = useState(false);
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
   const [bulkEditing, setBulkEditing] = useState(false);
+  const [accountSettings, setAccountSettings] = useState(null);
+
+  const ensureShipFromReady = async () => {
+    let settings = accountSettings;
+    if (!settings) {
+      try {
+        const res = await getAccountSettings();
+        settings = res.data?.settings ?? {};
+        setAccountSettings(settings);
+      } catch {
+        toast.error("Could not load your settings. Try again.");
+        return false;
+      }
+    }
+
+    const { complete } = getShipFromStatus(settings);
+    if (!complete) {
+      toast.error(SHIP_FROM_CLIENT_MESSAGE);
+      navigate(SHIP_FROM_SETTINGS_PATH);
+      return false;
+    }
+
+    return true;
+  };
 
   const loadDrafts = () => {
     const params = { q: searchQuery };
@@ -92,6 +121,9 @@ function DraftsContent({ searchQuery }) {
   useEffect(() => {
     if (connected) {
       loadDrafts();
+      getAccountSettings()
+        .then((res) => setAccountSettings(res.data?.settings ?? {}))
+        .catch(() => {});
     }
   }, [dispatch, connected, searchQuery, activeTab, filterStatus, filterStore]);
 
@@ -234,6 +266,8 @@ function DraftsContent({ searchQuery }) {
     }
 
     if (action === "import") {
+      if (!(await ensureShipFromReady())) return;
+
       for (const id of selectedIds) {
         try {
           const item = drafts.find((draft) => draft.id === id);
@@ -374,6 +408,8 @@ function DraftsContent({ searchQuery }) {
   };
 
   const publishDraft = async (item) => {
+    if (!(await ensureShipFromReady())) return;
+
     try {
       const saved = await saveDraftIfDirty(item);
       if (!saved) return;
@@ -442,6 +478,13 @@ function DraftsContent({ searchQuery }) {
           </button>
         ))}
       </nav>
+
+      {connected ? (
+        <ShipFromSetupNotice
+          settings={accountSettings}
+          className="drafts-ship-from-notice"
+        />
+      ) : null}
 
       <div className="drafts-toolbar">
         <button

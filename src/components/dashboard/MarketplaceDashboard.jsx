@@ -93,6 +93,7 @@ import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actio
 import { logoutAction } from '../../store/actions/AuthActions';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
+import EbayOAuthSetupBanner from '../autods/EbayOAuthSetupBanner';
 import {
   openOAuthTab,
   watchOAuthTab,
@@ -871,10 +872,11 @@ const MarketplaceDashboard = () => {
 
   useOAuthHandler(oauthHandlers);
 
-  const connectEbay = async () => {
+  const startEbayOAuthFlow = async () => {
     try {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
+
       const res = await getEbayAuthUrl();
       const tab = openOAuthTab(res.data.url);
 
@@ -896,6 +898,8 @@ const MarketplaceDashboard = () => {
       toast.error(err.response?.data?.error ?? 'Failed to start eBay authorization.');
     }
   };
+
+  const connectEbay = () => startEbayOAuthFlow();
 
   const connectAliExpress = async () => {
     try {

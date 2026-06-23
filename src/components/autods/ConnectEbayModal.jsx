@@ -1,4 +1,5 @@
 import { LuChevronDown, LuLoader, LuX } from "react-icons/lu";
+import EbayOAuthSetupBanner from "./EbayOAuthSetupBanner";
 
 const EBAY_MARKETPLACES = [
   { value: "EBAY_US", label: "United States — ebay.com" },
@@ -53,6 +54,8 @@ function ConnectEbayModal({
         <p className="connect-ebay-modal__copy">
           Add your eBay seller account to import products, sync listings, and automate orders.
         </p>
+
+        <EbayOAuthSetupBanner onContinue={onConnect} />
 
         <label className="connect-ebay-modal__field">
           <span className="connect-ebay-modal__label">eBay marketplace</span>
