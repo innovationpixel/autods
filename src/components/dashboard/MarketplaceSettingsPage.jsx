@@ -37,6 +37,11 @@ import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
 import EbayOAuthSetupBanner from "../autods/EbayOAuthSetupBanner";
 import ShipFromSetupNotice from "../autods/ShipFromSetupNotice";
+import {
+  buildSupplierProfile,
+  listAvailableSupplierProfiles,
+  normalizeSuppliersFromApi,
+} from "../../utils/supplierProfiles";
 import { getAliExpressAuthUrl } from "../../services/AliExpressService";
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
 import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
@@ -187,13 +192,6 @@ const settingsAddOns = [
   },
 ];
 
-
-const supplierTemplates = [
-  { id: "ebay-au", label: "eBay AU", badge: "ebay" },
-  { id: "amazon-au", label: "Amazon AU", badge: "amz" },
-  { id: "walmart-us", label: "Walmart US", badge: "wm" },
-  { id: "etsy-uk", label: "Etsy UK", badge: "ets" },
-];
 
 const zipRotations = [
   { zipcode: "10001", city: "New York", state: "NY", country: "US" },
@@ -401,7 +399,15 @@ function createInitialSupplierSettings() {
   };
 }
 
+function createSupplierFromOption(option) {
+  return buildSupplierProfile(option.platform, option.country, createInitialSupplierSettings);
+}
+
 function createSupplier(template) {
+  if (template?.platform && template?.country) {
+    return createSupplierFromOption(template);
+  }
+
   return {
     ...template,
     settings: createInitialSupplierSettings(),
@@ -409,7 +415,7 @@ function createSupplier(template) {
 }
 
 function createInitialSuppliers() {
-  return [createSupplier(supplierTemplates[0])];
+  return [];
 }
 
 function SettingsHelpBadge() {
@@ -575,7 +581,7 @@ export default function MarketplaceSettingsPage() {
   }, [search]);
   const primaryEbayConnection = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0] ?? null;
   const [suppliers, setSuppliers] = useState(createInitialSuppliers);
-  const [activeSupplierId, setActiveSupplierId] = useState(supplierTemplates[0].id);
+  const [activeSupplierId, setActiveSupplierId] = useState("");
   const [itemSpecificDraft, setItemSpecificDraft] = useState({ name: "", description: "" });
   const [editAllItemSpecifics, setEditAllItemSpecifics] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -624,7 +630,9 @@ export default function MarketplaceSettingsPage() {
         const remote = res.data?.settings ?? {};
         setAccountSettings(remote);
         if (remote.suppliers?.length) {
-          setSuppliers(remote.suppliers);
+          const normalized = normalizeSuppliersFromApi(remote.suppliers, createInitialSupplierSettings);
+          setSuppliers(normalized);
+          setActiveSupplierId((current) => current || normalized[0]?.id || "");
         }
         if (remote.lister) {
           setSuppliers((prev) =>
@@ -782,13 +790,13 @@ export default function MarketplaceSettingsPage() {
   }, [templateCatalog.custom]);
 
   const addSupplierProfile = () => {
-    const existingIds = new Set(suppliers.map((supplier) => supplier.id));
-    const nextTemplate = supplierTemplates.find((template) => !existingIds.has(template.id));
-    if (!nextTemplate) {
-      toast.info("All supplier profiles are already added.");
+    const available = listAvailableSupplierProfiles(suppliers);
+    const nextOption = available[0];
+    if (!nextOption) {
+      toast.info("All supplier profiles for enabled marketplaces are already added.");
       return;
     }
-    const next = createSupplier(nextTemplate);
+    const next = createSupplierFromOption(nextOption);
     setSuppliers((current) => [...current, next]);
     setActiveSupplierId(next.id);
   };
@@ -799,24 +807,30 @@ export default function MarketplaceSettingsPage() {
         <div className="marketplace-settings__supplier-label">Supplier Profiles</div>
         <div className="marketplace-settings__supplier-panel">
           <div className="marketplace-settings__supplier-list">
-            {suppliers.map((supplier) => (
-              <div
-                className={`marketplace-settings__supplier-item ${activeSupplierId === supplier.id ? "marketplace-settings__supplier-item--active" : ""}`}
-                key={supplier.id}
-              >
-                <button
-                  type="button"
-                  className="marketplace-settings__supplier-main"
-                  onClick={() => setActiveSupplierId(supplier.id)}
+            {suppliers.length ? (
+              suppliers.map((supplier) => (
+                <div
+                  className={`marketplace-settings__supplier-item ${activeSupplierId === supplier.id ? "marketplace-settings__supplier-item--active" : ""}`}
+                  key={supplier.id}
                 >
-                  <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
-                  <span>{supplier.label}</span>
-                </button>
-                <button type="button" className="marketplace-settings__supplier-menu" aria-label={`${supplier.label} options`}>
-                  <LuChevronDown />
-                </button>
-              </div>
-            ))}
+                  <button
+                    type="button"
+                    className="marketplace-settings__supplier-main"
+                    onClick={() => setActiveSupplierId(supplier.id)}
+                  >
+                    <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
+                    <span>{supplier.label}</span>
+                  </button>
+                  <button type="button" className="marketplace-settings__supplier-menu" aria-label={`${supplier.label} options`}>
+                    <LuChevronDown />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p style={{ margin: 0, padding: "12px 14px", color: "#6b7280", fontSize: 13, lineHeight: 1.5 }}>
+                No supplier profiles yet. Import a product from Add Product to auto-create one (e.g. Walmart US), or click Add Supplier Profile.
+              </p>
+            )}
           </div>
           <button type="button" className="marketplace-settings__add-supplier" onClick={addSupplierProfile}>
             <LuPlus />
@@ -1230,6 +1244,11 @@ export default function MarketplaceSettingsPage() {
   };
 
   const saveCurrentTab = async () => {
+    if (!activeSupplier) {
+      toast.warn("Add or import a supplier profile first.");
+      return;
+    }
+
     try {
       await updateAccountSettings({
         lister: {

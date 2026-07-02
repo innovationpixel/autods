@@ -1,18 +1,17 @@
 import { useState } from "react";
 import {
   LuCheck,
-  LuChevronDown,
   LuImage,
   LuMapPin,
   LuPencil,
   LuPlus,
-  LuRefreshCcw,
   LuTrash2,
   LuX,
 } from "react-icons/lu";
 import { getListingImageUrl } from "./helpers";
 import { uid } from "../../utils/draftEditorState";
 import DraftDescriptionEditor from "./DraftDescriptionEditor";
+import DraftCategorySelect from "./DraftCategorySelect";
 
 const EDITOR_TABS = [
   { id: "general", label: "General" },
@@ -46,8 +45,6 @@ function DraftEditorPanel({
   onTabChange,
   onChange,
   onSave,
-  onSaveAndRetry,
-  onPublish,
 }) {
   const [editingVariantId, setEditingVariantId] = useState(null);
   const [editingSpecificId, setEditingSpecificId] = useState(null);
@@ -171,16 +168,6 @@ function DraftEditorPanel({
                 <LuCheck />
                 <span>Save</span>
               </button>
-              {onPublish ? (
-                <button type="button" className="draft-editor__save" onClick={onPublish}>
-                  <LuCheck />
-                  <span>Publish to Store</span>
-                </button>
-              ) : null}
-              <button type="button" className="draft-editor__retry" onClick={onSaveAndRetry}>
-                <LuRefreshCcw />
-                <span>Save &amp; Retry</span>
-              </button>
             </div>
           </div>
 
@@ -219,10 +206,15 @@ function DraftEditorPanel({
                 <div className="draft-editor__grid">
                   <label>
                     <span>Category</span>
-                    <div className="draft-editor__select draft-editor__select--readonly">
-                      <span>{form.categoryName || "Select category"}</span>
-                      <LuChevronDown />
-                    </div>
+                    <DraftCategorySelect
+                      listingId={item.id}
+                      categoryId={form.categoryId ?? ""}
+                      categoryName={form.categoryName ?? ""}
+                      searchSeed={form.title ?? item.title ?? ""}
+                      onChange={({ categoryId, categoryName }) =>
+                        patch({ categoryId, categoryName })
+                      }
+                    />
                   </label>
                   <label>
                     <span>Condition</span>

@@ -28,6 +28,31 @@ export function parseApiErrors(error) {
   return { message, fieldErrors };
 }
 
+export function getApiErrorMessage(error, fallback = "Something went wrong.") {
+  const data = error?.response?.data;
+
+  if (!data) {
+    return fallback;
+  }
+
+  if (typeof data.error === "string" && data.error.trim()) {
+    return data.error;
+  }
+
+  if (data.errors && typeof data.errors === "object") {
+    const firstField = Object.values(data.errors).flat().find(Boolean);
+    if (typeof firstField === "string" && firstField.trim()) {
+      return firstField;
+    }
+  }
+
+  if (typeof data.message === "string" && data.message.trim() && data.message !== "Server Error") {
+    return data.message;
+  }
+
+  return fallback;
+}
+
 export function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
 }

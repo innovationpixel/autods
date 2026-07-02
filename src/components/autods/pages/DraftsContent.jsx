@@ -3,7 +3,6 @@ import { useDispatch, useSelector, useStore } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
-  LuCheck,
   LuChevronRight,
   LuClock3,
   LuEllipsisVertical,
@@ -34,7 +33,6 @@ import {
 import { fetchEbayDrafts } from "../../../store/actions/EbayActions";
 import {
   publishProduct,
-  retryProductImport,
   updateProduct,
   deleteProduct,
   bulkDeleteProducts,
@@ -47,7 +45,12 @@ import {
 } from "../../../utils/draftEditorState";
 import ShipFromSetupNotice from "../ShipFromSetupNotice";
 import { getAccountSettings } from "../../../services/SettingsService";
-import { getShipFromStatus, SHIP_FROM_CLIENT_MESSAGE, SHIP_FROM_SETTINGS_PATH } from "../../../utils/ebayShipFrom";
+import { getApiErrorMessage } from "../../../utils/apiErrors";
+import {
+  getShipFromStatus,
+  SHIP_FROM_CLIENT_MESSAGE,
+  SHIP_FROM_SETTINGS_PATH,
+} from "../../../utils/ebayShipFrom";
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
@@ -65,7 +68,6 @@ function DraftsContent({ searchQuery }) {
   const [selectedIds, setSelectedIds] = useState([]);
   const [expandedIds, setExpandedIds] = useState([]);
   const [editorTabs, setEditorTabs] = useState({});
-  const [retryingIds, setRetryingIds] = useState([]);
   const [openMenuId, setOpenMenuId] = useState("");
   const [editForms, setEditForms] = useState({});
   const [historyVisible, setHistoryVisible] = useState(false);
@@ -234,7 +236,7 @@ function DraftsContent({ searchQuery }) {
       toast.success("Draft saved.");
       return true;
     } catch (err) {
-      toast.error(err.response?.data?.error ?? "Failed to save draft.");
+      toast.error(getApiErrorMessage(err, "Failed to save draft."));
       return false;
     }
   };
@@ -391,34 +393,6 @@ function DraftsContent({ searchQuery }) {
       toast.error(err.response?.data?.error ?? "Failed to remove schedule.");
     } finally {
       setScheduling(false);
-    }
-  };
-
-  const retryDraft = async (id) => {
-    setRetryingIds((cur) => [...new Set([...cur, id])]);
-    try {
-      await retryProductImport(id);
-      toast.success("Draft retry completed.");
-      loadDrafts();
-    } catch (err) {
-      toast.error(err.response?.data?.error ?? "Retry failed.");
-    } finally {
-      setRetryingIds((cur) => cur.filter((x) => x !== id));
-    }
-  };
-
-  const publishDraft = async (item) => {
-    if (!(await ensureShipFromReady())) return;
-
-    try {
-      const saved = await saveDraftIfDirty(item);
-      if (!saved) return;
-
-      await publishProduct(item.id);
-      toast.success("Published to eBay.");
-      loadDrafts();
-    } catch (err) {
-      toast.error(err.response?.data?.error ?? "Publish failed.");
     }
   };
 
@@ -593,7 +567,6 @@ function DraftsContent({ searchQuery }) {
           visibleDrafts.map((item, index) => {
             const isSelected = selectedIds.includes(item.id);
             const isExpanded = expandedIds.includes(item.id);
-            const isRetrying = retryingIds.includes(item.id);
             const form = getEditForm(item);
             const hasError = item.import_status === "failed";
             const imageUrl = getListingImageUrl(item);
@@ -658,7 +631,7 @@ function DraftsContent({ searchQuery }) {
                         <strong>!</strong>
                         <span>
                           {item.import_error ??
-                            "This draft could not be imported. Open the editor below and click Save & Retry."}
+                            "This draft could not be imported. Open the editor below, fix the details, and click Save."}
                         </span>
                       </div>
                     ) : null}
@@ -676,10 +649,6 @@ function DraftsContent({ searchQuery }) {
                         <LuExternalLink />
                       </a>
                     ) : null}
-                    <button type="button" className="drafts-retry-btn" onClick={() => publishDraft(item)}>
-                      <LuCheck />
-                      <span>Publish to Store</span>
-                    </button>
                     <div className="drafts-row__menu-wrap" onClick={(event) => event.stopPropagation()}>
                       <button
                         type="button"
@@ -702,14 +671,6 @@ function DraftsContent({ searchQuery }) {
                         </div>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      className={`drafts-retry-btn ${isRetrying ? "drafts-retry-btn--active" : ""}`}
-                      onClick={() => retryDraft(item.id)}
-                    >
-                      <LuRefreshCcw />
-                      <span>{isRetrying ? "Queued" : "Retry"}</span>
-                    </button>
                   </div>
                 </article>
 
@@ -721,8 +682,6 @@ function DraftsContent({ searchQuery }) {
                     onTabChange={(tabId) => setEditorTabs((cur) => ({ ...cur, [item.id]: tabId }))}
                     onChange={(nextForm) => setEditForm(item.id, item, nextForm)}
                     onSave={() => saveDraft(item)}
-                    onSaveAndRetry={() => saveDraft(item).then((saved) => saved && retryDraft(item.id))}
-                    onPublish={() => publishDraft(item)}
                   />
                 ) : null}
               </div>

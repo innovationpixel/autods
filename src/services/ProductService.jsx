@@ -25,7 +25,16 @@ export const retryProductImport = (id) =>
     axiosInstance.post(`/products/${id}/retry`);
 
 export const updateProduct = (id, data) =>
-    axiosInstance.patch(`/products/${id}`, data);
+    axiosInstance.put(`/products/${id}`, data).catch((error) => {
+        if ([404, 405].includes(error.response?.status)) {
+            return axiosInstance.post(`/products/${id}/update`, data);
+        }
+
+        throw error;
+    });
+
+export const getProductCategorySuggestions = (id, q) =>
+    axiosInstance.get(`/products/${id}/category-suggestions`, { params: { q } });
 
 export const scheduleProducts = (payload) =>
     axiosInstance.post('/products/schedule', payload);

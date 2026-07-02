@@ -1291,10 +1291,6 @@ const MarketplaceDashboard = () => {
       toast.error(`${importSuppliers.find((s) => s.id === importSupplier)?.label ?? "This supplier"} import is not available yet.`);
       return false;
     }
-    if (importSupplier === "aliexpress" && !aliConnected) {
-      toast.error("Connect your AliExpress account in Settings first.");
-      return false;
-    }
     const connectionIds = getSelectedConnectionIds();
     if (!connectionIds.length) {
       toast.error("Select at least one eBay store.");

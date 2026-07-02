@@ -1,11 +1,39 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LuMapPin } from "react-icons/lu";
 import { getShipFromStatus, SHIP_FROM_CLIENT_MESSAGE, SHIP_FROM_SETTINGS_PATH } from "../../utils/ebayShipFrom";
 
+const SHIP_FROM_SAVED_NOTICE_KEY = "autods.shipFromSavedNoticeSeen";
+
 export default function ShipFromSetupNotice({ settings, className = "" }) {
   const { complete, missing } = getShipFromStatus(settings);
+  const [showSavedNotice, setShowSavedNotice] = useState(false);
+
+  useEffect(() => {
+    if (!complete) {
+      setShowSavedNotice(false);
+      return;
+    }
+
+    if (localStorage.getItem(SHIP_FROM_SAVED_NOTICE_KEY)) {
+      return;
+    }
+
+    setShowSavedNotice(true);
+
+    const timer = window.setTimeout(() => {
+      setShowSavedNotice(false);
+      localStorage.setItem(SHIP_FROM_SAVED_NOTICE_KEY, "1");
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [complete]);
 
   if (complete) {
+    if (!showSavedNotice) {
+      return null;
+    }
+
     return (
       <div
         className={className}
