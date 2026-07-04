@@ -3,20 +3,21 @@ import { toast } from "../../../utils/toast";
 import { getOrders, syncOrders, updateOrderStatus as updateOrderStatusApi, getOrdersGoogleSheetStatus, syncOrdersGoogleSheet } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
-  LuBox,
-  LuCheck,
+  LuBolt,
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
+  LuClipboardCheck,
   LuClipboardList,
   LuClock3,
-  LuEllipsisVertical,
   LuExternalLink,
   LuFileSpreadsheet,
   LuInbox,
   LuMenu,
-  LuPencil,
+  LuPlus,
+  LuPrinter,
   LuRefreshCcw,
+  LuSend,
   LuSlidersHorizontal,
   LuTruck,
   LuX,
@@ -24,28 +25,155 @@ import {
 import CompactDateRange from "../CompactDateRange";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
+import OrderColumnManager from "../OrderColumnManager";
+import {
+  getVisibleTableMinWidth,
+  loadVisibleColumnIds,
+  orderTableColumns,
+  saveVisibleColumnIds,
+} from "../orderColumns";
 import { formatDisplayDate } from "../helpers";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
-import { orderStatusOptions } from "../constants";
+import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
+
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
+
+function formatMoney(value, currency = "USD") {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+
+  const amount = Number(value);
+  if (Number.isNaN(amount)) {
+    return String(value);
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+function joinAddress(parts) {
+  return parts.filter(Boolean).join(", ") || "—";
+}
 
 function mapApiOrder(order) {
+  const raw = order.raw_data ?? {};
+  const lineItems = raw.lineItems ?? [];
+  const firstItem = lineItems[0] ?? {};
+  const buyer = raw.buyer ?? {};
+  const pricing = raw.pricingSummary ?? {};
+  const payment = raw.paymentSummary?.payments?.[0] ?? {};
+  const fulfillment = raw.fulfillmentStartInstructions?.[0] ?? {};
+  const shipTo = fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
+  const delivery = raw.deliveryCost ?? {};
+  const variationAspects = firstItem.lineItemFulfillmentInstructions?.variations
+    ?? firstItem.variationAspects
+    ?? [];
+
+  const variationText = Array.isArray(variationAspects)
+    ? variationAspects
+        .map((aspect) => {
+          if (typeof aspect === "string") {
+            return aspect;
+          }
+          const name = aspect.name ?? aspect.localizedName ?? "";
+          const value = aspect.value ?? aspect.localizedValue ?? "";
+          return [name, value].filter(Boolean).join(": ");
+        })
+        .filter(Boolean)
+        .join(", ")
+    : "";
+
+  const totalQuantity = lineItems.reduce((sum, item) => sum + Number(item.quantity ?? 1), 0);
+  const sellPrice = order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0;
+  const buyPrice = order.buy_price;
+  const profit = order.profit ?? (buyPrice != null ? Number(sellPrice) - Number(buyPrice) : null);
+  const currency = order.currency ?? pricing.total?.currency ?? "USD";
+
+  const paymentStatus = raw.orderPaymentStatus
+    ? String(raw.orderPaymentStatus).replace(/_/g, " ")
+    : "—";
+
+  const shippingStatus = raw.orderFulfillmentStatus
+    ? String(raw.orderFulfillmentStatus).replace(/_/g, " ")
+    : "—";
+
+  const refund = raw.refundSummary ?? raw.paymentSummary?.refunds?.[0] ?? {};
+  const shippingStep = fulfillment.shippingStep ?? {};
+
   return {
     id: String(order.id),
-    title: order.item_title,
-    color: "—",
-    buyer: order.buyer_name ?? "—",
+    title: order.item_title ?? firstItem.title ?? "Order item",
+    image: firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
+    color: variationText || "—",
+    pickStatus: raw.pickStatus ?? "—",
+    itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
+    sku: firstItem.sku ?? "—",
+    variationSpecifics: variationText || "—",
+    bundleDetails: firstItem.bundleDetails ?? "—",
+    listingsTags: firstItem.listingTags ?? "—",
+    orderId: order.ebay_order_id ?? raw.orderId ?? "—",
+    detailsExtended: [
+      paymentStatus !== "—" ? `Payment: ${paymentStatus}` : null,
+      shippingStatus !== "—" ? `Shipping: ${shippingStatus}` : null,
+      delivery.shippingCost?.value ? `Shipping cost: ${formatMoney(delivery.shippingCost.value, delivery.shippingCost.currency)}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || "—",
+    orderDate: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
+    status: order.status,
+    paidDate: payment.paymentDate ? String(payment.paymentDate).slice(0, 10) : "—",
+    total: formatMoney(sellPrice, currency),
+    totalQuantity: totalQuantity || 1,
+    transactionId: firstItem.lineItemId ?? raw.salesRecordReference ?? "—",
+    refundDate: refund.refundDate ? String(refund.refundDate).slice(0, 10) : "—",
+    refundTotal: formatMoney(refund.amount?.value ?? raw.refundAmount?.value, refund.amount?.currency ?? currency),
+    cancelStatus: raw.cancelStatus?.cancelState ?? "—",
+    returnStatus: raw.returnStatus ?? raw.cancelStatus?.cancelState ?? "—",
+    inquiryStatus: raw.inquiryStatus ?? "—",
+    tags: order.tags ?? "—",
+    profit: profit != null ? formatMoney(profit, currency) : "—",
+    buyerName: shipTo.fullName ?? buyer.buyerRegistrationAddress?.fullName ?? order.buyer_name ?? "—",
+    username: buyer.username ?? order.buyer_name ?? "—",
+    buyerNotes: raw.buyerCheckoutNotes ?? "—",
+    email: order.buyer_email ?? buyer.buyerRegistrationAddress?.email ?? "—",
+    buyerAdditionalInfo: buyer.taxAddress?.postalCode ?? buyer.primaryPhone?.phoneNumber ?? "—",
+    shippingStatus,
+    shippingService: shippingStep.shippingServiceCode ?? fulfillment.shippingStep?.shippingCarrierCode ?? "—",
+    shippingPrice: formatMoney(delivery.shippingCost?.value ?? delivery.amount?.value, delivery.shippingCost?.currency ?? currency),
+    trackingNumber: order.tracking_number ?? shippingStep.shipmentTrackingNumber ?? "—",
+    carrier: shippingStep.shippingCarrierCode ?? "—",
+    shippingAddress: joinAddress([
+      shipTo.contactAddress?.addressLine1 ?? shipTo.addressLine1,
+      shipTo.contactAddress?.city ?? shipTo.city,
+      shipTo.contactAddress?.stateOrProvince ?? shipTo.stateOrProvince,
+      shipTo.contactAddress?.postalCode ?? shipTo.postalCode,
+      shipTo.contactAddress?.countryCode ?? shipTo.countryCode,
+    ]),
+    shipBy: raw.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate?.slice(0, 10) ?? "—",
+    shippingDate: raw.fulfillmentHrefs?.length ? String(raw.lastModifiedDate ?? "").slice(0, 10) || "Shipped" : "—",
+    estDeliveryDate: order.estimated_arrival ?? raw.maxEstimatedDeliveryDate?.slice(0, 10) ?? "—",
+    notes: order.internal_notes ?? "—",
+    ebaySellerNotes: order.ebay_seller_notes ?? "—",
+    invoice: "Print",
+    packingSlip: "Print",
+    feedback: order.feedback_status ?? "—",
+    record: raw.salesRecordReference ?? String(order.id ?? "—"),
+    taxRef: raw.taxReference ?? "—",
+    channel: order.store_name ? `${order.store_name} · eBay` : "eBay",
+    teammate: order.teammate ?? "—",
     itemBuy: order.item_buy_id ?? "—",
     itemSell: order.item_sell_id ?? "—",
-    orderSellId: order.ebay_order_id,
-    orderBuyId: order.item_buy_id ?? "—",
+    buyer: buyer.username ?? order.buyer_name ?? "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
-    status: order.status,
-    sellPrice: order.sell_price,
-    buyPrice: order.buy_price,
-    profit: order.profit,
-    store: order.store_name ?? "—",
-    trackingNumber: order.tracking_number ?? "—",
-    estimatedArrival: order.estimated_arrival ?? "—",
   };
 }
 
@@ -71,9 +199,26 @@ function OrdersContent({ searchQuery }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
   const [openStatusId, setOpenStatusId] = useState("");
-  const [openActionsId, setOpenActionsId] = useState("");
+  const [openRowPrintId, setOpenRowPrintId] = useState("");
+  const [openRowBoltId, setOpenRowBoltId] = useState("");
   const [openDetailsId, setOpenDetailsId] = useState("");
+  const [openBulkMenu, setOpenBulkMenu] = useState(false);
+  const [openPrintMenu, setOpenPrintMenu] = useState(false);
+  const [searchType, setSearchType] = useState("buyer_id");
+  const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleColumnIds);
   const tableScrollRef = useRef(null);
+
+  const visibleColumns = useMemo(
+    () => orderTableColumns.filter((column) => visibleColumnIds.includes(column.id)),
+    [visibleColumnIds],
+  );
+
+  const tableMinWidth = useMemo(() => getVisibleTableMinWidth(visibleColumnIds), [visibleColumnIds]);
+
+  const handleVisibleColumnsChange = (nextIds) => {
+    setVisibleColumnIds(nextIds);
+    saveVisibleColumnIds(nextIds);
+  };
 
   const loadSheetStatus = async () => {
     try {
@@ -169,7 +314,10 @@ function OrdersContent({ searchQuery }) {
   useEffect(() => {
     const handleDocumentClick = () => {
       setOpenStatusId("");
-      setOpenActionsId("");
+      setOpenRowPrintId("");
+      setOpenRowBoltId("");
+      setOpenBulkMenu(false);
+      setOpenPrintMenu(false);
     };
 
     document.addEventListener("click", handleDocumentClick);
@@ -210,6 +358,9 @@ function OrdersContent({ searchQuery }) {
         order.itemBuy,
         order.itemSell,
         order.orderSellId,
+        order.orderId,
+        order.sku,
+        order.transactionId,
       ]
         .join(" ")
         .toLowerCase()
@@ -229,6 +380,7 @@ function OrdersContent({ searchQuery }) {
   const visibleOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const allVisibleSelected =
     visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id));
+  const tableColumnCount = visibleColumns.length + 2;
 
   const activeFilterChips = [
     showOnlyActive
@@ -318,25 +470,209 @@ function OrdersContent({ searchQuery }) {
     Canceled: { icon: LuX, className: "canceled" },
   };
 
-  const handleOrderAction = (orderId, action) => {
-    if (action === "edit-order") {
-      setOrdersNotice(`Order ${orderId.replace("order-", "#")} opened for editing.`);
+  const closeRowActionMenus = () => {
+    setOpenRowPrintId("");
+    setOpenRowBoltId("");
+  };
+
+  const handleOrderAction = (orderId, action, label) => {
+    const orderLabel = orderId.startsWith("order-") ? orderId.replace("order-", "#") : `#${orderId}`;
+
+    if (action === "update-pick-status") {
+      toast.info("Update Pick Status — coming soon.");
+    } else if (action === "send-message") {
+      toast.info("Send Messages — coming soon.");
+    } else {
+      toast.info(`${label} for order ${orderLabel} — coming soon.`);
     }
 
-    if (action === "edit-product") {
-      setOrdersNotice(`Product linked to ${orderId.replace("order-", "#")} opened for editing.`);
+    closeRowActionMenus();
+  };
+
+  const toggleRowPrintMenu = (orderId) => {
+    setOpenStatusId("");
+    setOpenRowBoltId("");
+    setOpenRowPrintId((current) => (current === orderId ? "" : orderId));
+  };
+
+  const toggleRowBoltMenu = (orderId) => {
+    setOpenStatusId("");
+    setOpenRowPrintId("");
+    setOpenRowBoltId((current) => (current === orderId ? "" : orderId));
+  };
+
+  const renderRowActionMenu = (orderId, items, menuClassName = "") => (
+    <div className={`orders-actions-menu orders-actions-menu--row ${menuClassName}`.trim()} role="menu">
+      {items.map((item, index) => (
+        <button
+          type="button"
+          key={`${orderId}-${item.id}-${index}`}
+          className={item.disabled ? "orders-actions-menu__item orders-actions-menu__item--disabled" : "orders-actions-menu__item"}
+          disabled={item.disabled}
+          onClick={() => handleOrderAction(orderId, item.id, item.label)}
+        >
+          <span>{item.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const renderColumnHeader = (column) => {
+    if (column.sortable) {
+      return (
+        <button
+          type="button"
+          className="orders-sort-btn"
+          onClick={() => setSortDirection((current) => (current === "desc" ? "asc" : "desc"))}
+        >
+          <span>{column.label}</span>
+          <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
+        </button>
+      );
     }
 
-    if (action === "ticket") {
-      setOrdersNotice(`Support ticket draft created for ${orderId.replace("order-", "#")}.`);
-    }
+    return column.label;
+  };
 
-    setOpenActionsId("");
+  const renderOrderCell = (order, columnId, meta, StatusIcon) => {
+    switch (columnId) {
+      case "name":
+        return (
+          <div className="orders-product">
+            <div className="orders-product__thumb">
+              <img src={order.image} alt={order.title} />
+            </div>
+            <div className="orders-product__copy">
+              <h3>{order.title}</h3>
+              <p>{order.color}</p>
+            </div>
+          </div>
+        );
+      case "status":
+        return (
+          <div className="orders-status-wrap" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className={`orders-status-badge orders-status-badge--${meta.className}`}
+              onClick={() => {
+                closeRowActionMenus();
+                setOpenStatusId((current) => (current === order.id ? "" : order.id));
+              }}
+            >
+              <span className="orders-status-badge__left">
+                <StatusIcon />
+                <span>{order.status}</span>
+              </span>
+              <LuChevronDown />
+            </button>
+
+            {openStatusId === order.id ? (
+              <div className="orders-status-menu">
+                <button
+                  type="button"
+                  className="orders-status-menu__header"
+                  onClick={() => updateOrderStatus(order.id, "Ordered")}
+                >
+                  Send To Auto Order
+                </button>
+
+                {orderStatusOptions.map((option) => {
+                  const optionMeta = statusMeta[option];
+                  const OptionIcon = optionMeta.icon;
+
+                  return (
+                    <button
+                      type="button"
+                      className="orders-status-menu__item"
+                      key={option}
+                      onClick={() => updateOrderStatus(order.id, option)}
+                    >
+                      <OptionIcon />
+                      <span>{option}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        );
+      case "detailsExtended":
+        return (
+          <div className="orders-details">
+            <span>{order.detailsExtended}</span>
+            <button
+              type="button"
+              className="orders-details__link"
+              onClick={() => setOpenDetailsId((current) => (current === order.id ? "" : order.id))}
+            >
+              Details
+            </button>
+
+            {openDetailsId === order.id ? (
+              <div className="orders-details__popover">
+                <span className="orders-details__icon">
+                  <LuInbox />
+                </span>
+                <strong>{order.detailsExtended}</strong>
+              </div>
+            ) : null}
+          </div>
+        );
+      case "orderDate":
+      case "paidDate":
+      case "refundDate":
+      case "shipBy":
+      case "shippingDate":
+      case "estDeliveryDate":
+        return order[columnId] && order[columnId] !== "—" ? formatDisplayDate(order[columnId]) : "—";
+      case "username":
+        return <span className="orders-table__buyer">{order.username}</span>;
+      case "itemId":
+        return (
+          <div className="orders-paired-values">
+            <div>
+              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__platform">ebay</span>
+              <strong>{order.itemBuy}</strong>
+            </div>
+            <div>
+              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__platform">ebay</span>
+              <strong>{order.itemSell}</strong>
+            </div>
+          </div>
+        );
+      case "orderId":
+        return <strong>{order.orderId}</strong>;
+      case "profit":
+        return <span className="orders-table__profit">{order.profit}</span>;
+      case "invoice":
+      case "packingSlip":
+        return (
+          <button type="button" className="orders-details__link" onClick={() => toast.info(`${columnId} printing is coming soon.`)}>
+            Print
+          </button>
+        );
+      default:
+        return order[columnId] ?? "—";
+    }
+  };
+
+  const hasSelection = selectedIds.length > 0;
+  const searchTypeLabels = {
+    buyer_id: "Buyer ID:",
+    order_id: "Order ID:",
+    sku: "SKU:",
+    item_id: "Item ID:",
   };
 
   return (
     <section className="orders-page-content">
-      <div className="orders-toolbar">
+      <div className="orders-page-header">
+        <h2 className="orders-page-header__title">All Orders</h2>
+      </div>
+
+      <div className="orders-toolbar orders-toolbar--primary">
         <div className="orders-toolbar__left">
           <button
             type="button"
@@ -345,6 +681,57 @@ function OrdersContent({ searchQuery }) {
           >
             <LuSlidersHorizontal />
             <span>Add Filter</span>
+          </button>
+
+          <div className="orders-toolbar-dropdown" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="orders-toolbar-action"
+              disabled={!hasSelection}
+              onClick={() => {
+                setOpenPrintMenu(false);
+                setOpenBulkMenu((current) => !current);
+              }}
+            >
+              <LuBolt />
+              <span>Bulk Actions</span>
+              <LuChevronDown />
+            </button>
+            {openBulkMenu && hasSelection ? (
+              <div className="orders-toolbar-dropdown__menu">
+                <button type="button" onClick={() => toast.info("Mark as shipped — coming soon.")}>Mark as shipped</button>
+                <button type="button" onClick={() => toast.info("Add tracking — coming soon.")}>Add tracking</button>
+                <button type="button" onClick={() => toast.info("Send message — coming soon.")}>Send message</button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="orders-toolbar-dropdown" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="orders-toolbar-action"
+              disabled={!hasSelection}
+              onClick={() => {
+                setOpenBulkMenu(false);
+                setOpenPrintMenu((current) => !current);
+              }}
+            >
+              <LuPrinter />
+              <span>Print</span>
+              <LuChevronDown />
+            </button>
+            {openPrintMenu && hasSelection ? (
+              <div className="orders-toolbar-dropdown__menu">
+                <button type="button" onClick={() => toast.info("Invoice print — coming soon.")}>Invoice</button>
+                <button type="button" onClick={() => toast.info("Packing slip print — coming soon.")}>Packing Slip</button>
+                <button type="button" onClick={() => toast.info("Pick list print — coming soon.")}>Pick List</button>
+              </div>
+            ) : null}
+          </div>
+
+          <button type="button" className="orders-toolbar-action orders-toolbar-action--primary" disabled>
+            <LuPlus />
+            <span>Create Manual Order</span>
           </button>
 
           {activeFilterChips.length ? (
@@ -359,6 +746,24 @@ function OrdersContent({ searchQuery }) {
           ) : null}
         </div>
 
+        <div className="orders-toolbar__actions orders-toolbar__actions--search">
+          <label className="orders-search-type">
+            <select value={searchType} onChange={(event) => setSearchType(event.target.value)}>
+              <option value="buyer_id">Buyer ID:</option>
+              <option value="order_id">Order ID:</option>
+              <option value="sku">SKU:</option>
+              <option value="item_id">Item ID:</option>
+            </select>
+          </label>
+          <span className="orders-search-type__label">{searchTypeLabels[searchType]}</span>
+          <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh orders grid">
+            <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
+          </button>
+          <OrderColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
+        </div>
+      </div>
+
+      <div className="orders-toolbar orders-toolbar--secondary">
         <div className="orders-toolbar__actions">
           <button
             type="button"
@@ -460,34 +865,33 @@ function OrdersContent({ searchQuery }) {
 
       <div className="orders-table-shell">
         <div className="orders-table-scroll" ref={tableScrollRef}>
-          <table className="orders-table">
+          <table className="orders-table" style={{ minWidth: tableMinWidth }}>
             <thead>
               <tr>
                 <th className="orders-table__checkbox-col" />
-                <th>Name</th>
-                <th>
-                  <button type="button" className="orders-sort-btn" onClick={() => setSortDirection((current) => (current === "desc" ? "asc" : "desc"))}>
-                    <span>Date</span>
-                    <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
-                  </button>
-                </th>
-                <th>Order Status</th>
-                <th>Estimated Arrival</th>
-                <th className="orders-table__actions-col" />
-                <th>Sourcing Request</th>
-                <th>Tracking Number</th>
-                <th>Item ID</th>
-                <th>Buyer Username</th>
-                <th>Price</th>
-                <th>Profit</th>
-                <th>Fee/Tax</th>
-                <th>Order ID</th>
-                <th>Tags</th>
+                {visibleColumns.map((column) => (
+                  <th
+                    key={column.id}
+                    className="orders-table__col"
+                    data-column={column.id}
+                    style={{ minWidth: column.minWidth, width: column.minWidth }}
+                  >
+                    {renderColumnHeader(column)}
+                  </th>
+                ))}
+                <th className="orders-table__actions-col">Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {visibleOrders.length ? (
+              {ordersLoading ? (
+                <tr>
+                  <td className="orders-table__empty" colSpan={tableColumnCount}>
+                    <LuRefreshCcw className="spin-icon" />
+                    <span>Loading orders…</span>
+                  </td>
+                </tr>
+              ) : visibleOrders.length ? (
                 visibleOrders.map((order) => {
                   const meta = statusMeta[order.status];
                   const StatusIcon = meta.icon;
@@ -505,189 +909,78 @@ function OrdersContent({ searchQuery }) {
                         />
                       </td>
 
-                      <td>
-                        <div className="orders-product">
-                          <div className="orders-product__thumb">
-                            <img src={order.image} alt={order.title} />
-                          </div>
-                          <div className="orders-product__copy">
-                            <h3>{order.title}</h3>
-                            <p>{order.color}</p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="orders-table__date">{formatDisplayDate(order.date)}</td>
-
-                      <td className="orders-table__status-cell">
-                        <div className="orders-status-wrap" onClick={(event) => event.stopPropagation()}>
-                          <button
-                            type="button"
-                            className={`orders-status-badge orders-status-badge--${meta.className}`}
-                            onClick={() => {
-                              setOpenActionsId("");
-                              setOpenStatusId((current) => (current === order.id ? "" : order.id));
-                            }}
-                          >
-                            <span className="orders-status-badge__left">
-                              <StatusIcon />
-                              <span>{order.status}</span>
-                            </span>
-                            <LuChevronDown />
-                          </button>
-
-                          {openStatusId === order.id ? (
-                            <div className="orders-status-menu">
-                              <button
-                                type="button"
-                                className="orders-status-menu__header"
-                                onClick={() => updateOrderStatus(order.id, "Ordered")}
-                              >
-                                Send To Auto Order
-                              </button>
-
-                              {orderStatusOptions.map((option) => {
-                                const optionMeta = statusMeta[option];
-                                const OptionIcon = optionMeta.icon;
-
-                                return (
-                                  <button
-                                    type="button"
-                                    className="orders-status-menu__item"
-                                    key={option}
-                                    onClick={() => updateOrderStatus(order.id, option)}
-                                  >
-                                    <OptionIcon />
-                                    <span>{option}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="orders-table__details-cell">
-                        <div className="orders-details">
-                          <span>{order.estimatedArrival}</span>
-                          <button
-                            type="button"
-                            className="orders-details__link"
-                            onClick={() => setOpenDetailsId((current) => (current === order.id ? "" : order.id))}
-                          >
-                            Details
-                          </button>
-
-                          {openDetailsId === order.id ? (
-                            <div className="orders-details__popover">
-                              <span className="orders-details__icon">
-                                <LuInbox />
-                              </span>
-                              <strong>No details yet</strong>
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
+                      {visibleColumns.map((column) => (
+                        <td
+                          key={column.id}
+                          className={[
+                            "orders-table__col",
+                            column.id === "status" ? "orders-table__status-cell" : "",
+                            column.id === "detailsExtended" ? "orders-table__details-cell" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          data-column={column.id}
+                          style={{ minWidth: column.minWidth, width: column.minWidth }}
+                        >
+                          {renderOrderCell(order, column.id, meta, StatusIcon)}
+                        </td>
+                      ))}
 
                       <td className="orders-table__actions-col">
                         <div className="orders-row-actions" onClick={(event) => event.stopPropagation()}>
+                          <div className="orders-row-actions__item">
+                            <button
+                              type="button"
+                              className="orders-row-actions__btn"
+                              aria-label="Print"
+                              aria-expanded={openRowPrintId === order.id}
+                              onClick={() => toggleRowPrintMenu(order.id)}
+                            >
+                              <LuPrinter />
+                            </button>
+                            {openRowPrintId === order.id ? renderRowActionMenu(order.id, orderRowPrintActions) : null}
+                          </div>
+
                           <button
                             type="button"
-                            className="orders-row-actions__icon"
-                            onClick={() => setOpenDetailsId((current) => (current === order.id ? "" : order.id))}
-                            aria-label="Open details"
+                            className="orders-row-actions__btn"
+                            aria-label="Update Pick Status"
+                            onClick={() => handleOrderAction(order.id, "update-pick-status", "Update Pick Status")}
                           >
-                            <LuClipboardList />
+                            <LuClipboardCheck />
                           </button>
+
                           <button
                             type="button"
-                            className="orders-row-actions__icon"
-                            onClick={() => {
-                              setOpenStatusId("");
-                              setOpenActionsId((current) => (current === order.id ? "" : order.id));
-                            }}
-                            aria-label="More options"
+                            className="orders-row-actions__btn"
+                            aria-label="Send Messages"
+                            onClick={() => handleOrderAction(order.id, "send-message", "Send Messages")}
                           >
-                            <LuEllipsisVertical />
+                            <LuSend />
                           </button>
 
-                          {openActionsId === order.id ? (
-                            <div className="orders-actions-menu">
-                              <button type="button" onClick={() => handleOrderAction(order.id, "edit-order")}>
-                                <LuClipboardList />
-                                <span>Edit Order</span>
-                              </button>
-                              <button type="button" onClick={() => handleOrderAction(order.id, "edit-product")}>
-                                <LuBox />
-                                <span>Edit Product</span>
-                              </button>
-                              <button type="button" onClick={() => handleOrderAction(order.id, "ticket")}>
-                                <LuPencil />
-                                <span>Create a ticket about the order</span>
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td>{order.sourcingRequest}</td>
-                      <td>{order.trackingNumber}</td>
-
-                      <td>
-                        <div className="orders-paired-values">
-                          <div>
-                            <span className="orders-paired-values__type">BUY</span>
-                            <span className="orders-paired-values__platform">ebay</span>
-                            <strong>{order.itemBuy}</strong>
-                          </div>
-                          <div>
-                            <span className="orders-paired-values__type">SELL</span>
-                            <span className="orders-paired-values__platform">ebay</span>
-                            <strong>{order.itemSell}</strong>
+                          <div className="orders-row-actions__item">
+                            <button
+                              type="button"
+                              className="orders-row-actions__btn"
+                              aria-label="Order actions"
+                              aria-expanded={openRowBoltId === order.id}
+                              onClick={() => toggleRowBoltMenu(order.id)}
+                            >
+                              <LuBolt />
+                            </button>
+                            {openRowBoltId === order.id
+                              ? renderRowActionMenu(order.id, orderRowBoltActions, "orders-actions-menu--wide")
+                              : null}
                           </div>
                         </div>
                       </td>
-
-                      <td className="orders-table__buyer">{order.buyer}</td>
-
-                      <td>
-                        <div className="orders-paired-values">
-                          <div>
-                            <span className="orders-paired-values__type">BUY</span>
-                            <strong>{order.price}</strong>
-                          </div>
-                          <div>
-                            <span className="orders-paired-values__type">SELL</span>
-                            <strong>{order.price}</strong>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="orders-table__profit">{order.profit}</td>
-                      <td>{order.feeTax}</td>
-
-                      <td>
-                        <div className="orders-paired-values">
-                          <div>
-                            <span className="orders-paired-values__type">BUY</span>
-                            <span className="orders-paired-values__platform">ebay</span>
-                            <strong>{order.orderBuyId}</strong>
-                          </div>
-                          <div>
-                            <span className="orders-paired-values__type">SELL</span>
-                            <span className="orders-paired-values__platform">ebay</span>
-                            <strong>{order.orderSellId}</strong>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>{order.tags}</td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td className="orders-table__empty" colSpan={15}>
+                  <td className="orders-table__empty" colSpan={tableColumnCount}>
                     <LuInbox />
                     <span>No orders match the current filters.</span>
                   </td>

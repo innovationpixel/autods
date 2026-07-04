@@ -30,6 +30,7 @@ import {
   LuZap,
   LuExternalLink,
 } from "react-icons/lu";
+import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
 import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/actions/AliExpressActions";
 import { updateProfileAction } from "../../store/actions/AuthActions";
@@ -49,6 +50,7 @@ import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
 import { getAccountSettings, updateAccountSettings } from "../../services/SettingsService";
+import { getEbayPolicies } from "../../services/ProductService";
 import {
   createStripeSetupIntent,
   deletePaymentMethod,
@@ -107,6 +109,48 @@ function formatBillingDateTime(value) {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+function PlanEbayLogoMark() {
+  return (
+    <span className="plans-settings__ebay-mark" aria-hidden="true">
+      <span className="plans-settings__ebay-mark-e">e</span>
+      <span className="plans-settings__ebay-mark-b">b</span>
+      <span className="plans-settings__ebay-mark-a">a</span>
+      <span className="plans-settings__ebay-mark-y">y</span>
+    </span>
+  );
+}
+
+function PlanPlatformLogo({ logo, name }) {
+  const icon = (() => {
+    switch (logo) {
+      case "ebay":
+        return <PlanEbayLogoMark />;
+      case "shop":
+        return <FaShopify aria-hidden="true" />;
+      case "a":
+        return <FaAmazon aria-hidden="true" />;
+      case "f":
+        return <span className="plans-settings__facebook-mark" aria-hidden="true">f</span>;
+      case "wix":
+        return <FaWix aria-hidden="true" />;
+      case "woo":
+        return <FaWordpress aria-hidden="true" />;
+      default:
+        return name?.slice(0, 2)?.toUpperCase() ?? "?";
+    }
+  })();
+
+  return (
+    <span
+      className={`plans-settings__brand plans-settings__brand--${logo}`}
+      aria-label={`${name} logo`}
+      title={name}
+    >
+      {icon}
+    </span>
+  );
 }
 
 const staticPlanCards = [
@@ -231,24 +275,38 @@ const templateOptions = [
   "Marketplace Growth",
   "High Margin Template",
 ];
-const policyOptions = [
-  "Enter Payment Policy",
-  "Standard Policy",
-  "Fast Payout Policy",
-  "Free Returns Policy",
-];
-const shippingPolicyOptions = [
-  "Enter Shipping Policy",
-  "Free Standard Shipping",
-  "Tracked Saver Shipping",
-  "Express Shipping",
-];
-const returnPolicyOptions = [
-  "Enter Return Policy",
-  "30 Days Free Returns",
-  "Buyer Pays Return Shipping",
-  "No Returns Accepted",
-];
+const policyPlaceholderOption = { value: "", label: "Select a policy" };
+
+function countryToEbaySiteId(country) {
+  const normalized = String(country ?? "US").trim().toUpperCase();
+  const map = {
+    US: "EBAY_US",
+    AU: "EBAY_AU",
+    UK: "EBAY_GB",
+    GB: "EBAY_GB",
+    DE: "EBAY_DE",
+    CA: "EBAY_CA",
+    FR: "EBAY_FR",
+    IT: "EBAY_IT",
+    ES: "EBAY_ES",
+  };
+
+  return map[normalized] ?? `EBAY_${normalized}`;
+}
+
+function mapPolicyOptions(options = []) {
+  if (!Array.isArray(options) || !options.length) {
+    return [policyPlaceholderOption];
+  }
+
+  return [
+    policyPlaceholderOption,
+    ...options.map((option) => ({
+      value: option.id,
+      label: option.name,
+    })),
+  ];
+}
 const shippedStatusOptions = [
   "Shipped Status",
   "Marked as shipped",
@@ -345,9 +403,12 @@ function createInitialSupplierSettings() {
       shippingMethod: "Cheapest with tracking",
       defaultTemplate: "Select default template",
       useDynamicPolicies: false,
-      paymentPolicy: "Enter Payment Policy",
-      shippingPolicy: "Enter Shipping Policy",
-      returnPolicy: "Enter Return Policy",
+      paymentPolicyId: "",
+      shippingPolicyId: "",
+      returnPolicyId: "",
+      paymentPolicy: "",
+      shippingPolicy: "",
+      returnPolicy: "",
       advanced: {
         allowDuplicates: false,
         uploadVariations: true,
@@ -439,10 +500,15 @@ function SettingsField({ label, required = false, help = false, className = "", 
   );
 }
 
-function SettingsSelect({ value, options, onChange }) {
+function SettingsSelect({ value, options, onChange, disabled = false }) {
   return (
     <span className="marketplace-settings__select-wrap">
-      <select className="marketplace-settings__control" value={value} onChange={onChange}>
+      <select
+        className="marketplace-settings__control"
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+      >
         {options.map((option) => {
           const optionValue = typeof option === "object" ? option.value : option;
           const optionLabel = typeof option === "object" ? option.label : option;
@@ -503,7 +569,7 @@ function SettingsPlaceholder({ title }) {
   return (
     <div className="marketplace-settings__placeholder card-wrapper">
       <h2>{title}</h2>
-      <p>This workspace is ready for the next reference set. The current implementation mirrors the Supplier Settings screens you shared.</p>
+      <p>Coming soon — we&apos;re working on something like this.</p>
     </div>
   );
 }
@@ -598,6 +664,12 @@ export default function MarketplaceSettingsPage() {
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [accountSettings, setAccountSettings] = useState(null);
+  const [ebayPolicyOptions, setEbayPolicyOptions] = useState({
+    payment: [policyPlaceholderOption],
+    shipping: [policyPlaceholderOption],
+    return: [policyPlaceholderOption],
+  });
+  const [ebayPoliciesLoading, setEbayPoliciesLoading] = useState(false);
   const [templateCatalog, setTemplateCatalog] = useState({ custom: [], default_id: "" });
   const oauthTabRef = useRef(null);
 
@@ -630,7 +702,26 @@ export default function MarketplaceSettingsPage() {
         const remote = res.data?.settings ?? {};
         setAccountSettings(remote);
         if (remote.suppliers?.length) {
-          const normalized = normalizeSuppliersFromApi(remote.suppliers, createInitialSupplierSettings);
+          const normalized = normalizeSuppliersFromApi(remote.suppliers, createInitialSupplierSettings).map(
+            (supplier) =>
+              remote.ebay
+                ? {
+                    ...supplier,
+                    settings: {
+                      ...supplier.settings,
+                      lister: {
+                        ...supplier.settings.lister,
+                        paymentPolicyId:
+                          remote.ebay.payment_policy_id ?? supplier.settings.lister.paymentPolicyId ?? "",
+                        shippingPolicyId:
+                          remote.ebay.fulfillment_policy_id ?? supplier.settings.lister.shippingPolicyId ?? "",
+                        returnPolicyId:
+                          remote.ebay.return_policy_id ?? supplier.settings.lister.returnPolicyId ?? "",
+                      },
+                    },
+                  }
+                : supplier,
+          );
           setSuppliers(normalized);
           setActiveSupplierId((current) => current || normalized[0]?.id || "");
         }
@@ -649,6 +740,34 @@ export default function MarketplaceSettingsPage() {
                   state: remote.lister.state ?? supplier.settings.lister.state ?? "",
                   shippingMethod: remote.lister.shipping_method ?? supplier.settings.lister.shippingMethod,
                   defaultTemplate: remote.lister.template ?? supplier.settings.lister.defaultTemplate,
+                },
+              },
+            })),
+          );
+        }
+        if (remote.pricing) {
+          setSuppliers((prev) =>
+            prev.map((supplier) => ({
+              ...supplier,
+              settings: {
+                ...supplier.settings,
+                pricing: {
+                  ...supplier.settings.pricing,
+                  feesPercent: String(remote.pricing.fees_percent ?? supplier.settings.pricing.feesPercent),
+                  fixedFeeAmount: String(remote.pricing.fixed_fees ?? supplier.settings.pricing.fixedFeeAmount),
+                  additionalProfitPercent: String(
+                    remote.pricing.profit_percent ?? supplier.settings.pricing.additionalProfitPercent,
+                  ),
+                  additionalProfitAmount: String(
+                    remote.pricing.profit_amount ?? supplier.settings.pricing.additionalProfitAmount,
+                  ),
+                  minimumProfit: String(remote.pricing.minimum_profit ?? supplier.settings.pricing.minimumProfit),
+                  dynamicProfit: remote.pricing.dynamic_profit ?? supplier.settings.pricing.dynamicProfit,
+                  setPriceCentsValue: remote.pricing.round_price_cents ?? supplier.settings.pricing.setPriceCentsValue,
+                  includeShippingPrice:
+                    remote.pricing.include_shipping_price ?? supplier.settings.pricing.includeShippingPrice,
+                  defaultAutomation:
+                    remote.pricing.default_automation ?? supplier.settings.pricing.defaultAutomation,
                 },
               },
             })),
@@ -946,7 +1065,15 @@ export default function MarketplaceSettingsPage() {
                   <p className="marketplace-settings__ebay-sub">
                     Site: {conn.site_id ?? "EBAY_US"}&nbsp;·&nbsp;
                     Connected: {conn.connected_at ? new Date(conn.connected_at).toLocaleDateString() : "—"}
+                    {conn.granted_scope_count ? (
+                      <>&nbsp;·&nbsp;Scopes: {conn.granted_scope_count}</>
+                    ) : null}
                   </p>
+                  {conn.needs_reauthorization ? (
+                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "#b45309", fontWeight: 600 }}>
+                      Missing permissions (orders/inventory). Disconnect and reconnect, or click Reconnect to grant all scopes.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="marketplace-settings__ebay-actions">
@@ -969,6 +1096,16 @@ export default function MarketplaceSettingsPage() {
                     {isSyncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
                     <span>{isSyncing ? "Syncing…" : "Sync"}</span>
                   </button>
+                  {conn.needs_reauthorization ? (
+                    <button
+                      type="button"
+                      className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+                      onClick={startEbayOAuthFlow}
+                    >
+                      <LuLink />
+                      <span>Reconnect</span>
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
@@ -1080,6 +1217,79 @@ export default function MarketplaceSettingsPage() {
   const pricingSummary = buildPricingSummary(currentSettings.pricing);
   const editingMessage = currentSettings.orders.messages.find((message) => message.id === editingMessageId) || null;
 
+  const resolveEbayConnectionForSupplier = (supplier) => {
+    if (!ebayConnections.length) {
+      return null;
+    }
+
+    if (!supplier) {
+      return primaryEbayConnection;
+    }
+
+    const siteId = countryToEbaySiteId(supplier.country);
+
+    return (
+      ebayConnections.find((connection) => connection.site_id === siteId) ??
+      primaryEbayConnection
+    );
+  };
+
+  useEffect(() => {
+    if (activePrimaryTab !== "Supplier Settings" || activeInnerTab !== "Lister") {
+      return undefined;
+    }
+
+    const supplier = suppliers.find((row) => row.id === activeSupplierId) || suppliers[0];
+    const connection = resolveEbayConnectionForSupplier(supplier);
+
+    if (!connection?.id) {
+      setEbayPolicyOptions({
+        payment: [policyPlaceholderOption],
+        shipping: [policyPlaceholderOption],
+        return: [policyPlaceholderOption],
+      });
+      return undefined;
+    }
+
+    let cancelled = false;
+    setEbayPoliciesLoading(true);
+
+    getEbayPolicies(connection.id)
+      .then((res) => {
+        if (cancelled) {
+          return;
+        }
+
+        const data = res.data ?? {};
+        setEbayPolicyOptions({
+          payment: mapPolicyOptions(data.payment_options),
+          shipping: mapPolicyOptions(data.shipping_options),
+          return: mapPolicyOptions(data.return_options),
+        });
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return;
+        }
+
+        toast.error(err.response?.data?.error ?? "Failed to load eBay policies.");
+        setEbayPolicyOptions({
+          payment: [policyPlaceholderOption],
+          shipping: [policyPlaceholderOption],
+          return: [policyPlaceholderOption],
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setEbayPoliciesLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePrimaryTab, activeInnerTab, activeSupplierId, suppliers, ebayConnections, primaryEbayConnection]);
+
   const updateActiveSupplierSettings = (transformer) => {
     setSuppliers((currentSuppliers) =>
       currentSuppliers.map((supplier) =>
@@ -1101,6 +1311,15 @@ export default function MarketplaceSettingsPage() {
         ...patch,
       },
     }));
+  };
+
+  const handlePolicyChange = (labelField, idField, options, value) => {
+    const selected = options.find((option) => option.value === value);
+
+    patchSection("lister", {
+      [idField]: value,
+      [labelField]: selected?.label ?? "",
+    });
   };
 
   const patchNestedSection = (section, nestedSection, key, value) => {
@@ -1265,6 +1484,12 @@ export default function MarketplaceSettingsPage() {
           fees_percent: parseNumericValue(currentSettings.pricing.feesPercent),
           fixed_fees: parseNumericValue(currentSettings.pricing.fixedFeeAmount),
           profit_percent: parseNumericValue(currentSettings.pricing.additionalProfitPercent),
+          profit_amount: parseNumericValue(currentSettings.pricing.additionalProfitAmount),
+          minimum_profit: parseNumericValue(currentSettings.pricing.minimumProfit),
+          dynamic_profit: Boolean(currentSettings.pricing.dynamicProfit),
+          round_price_cents: Boolean(currentSettings.pricing.setPriceCentsValue),
+          include_shipping_price: Boolean(currentSettings.pricing.includeShippingPrice),
+          default_automation: currentSettings.pricing.defaultAutomation,
         },
         orders: {
           auto_deliver: currentSettings.orders.autoDeliver,
@@ -1275,11 +1500,21 @@ export default function MarketplaceSettingsPage() {
           min_product_quantity: Number(currentSettings.general.minimumProductQuantity) || 1,
           max_shipping_days: Number(currentSettings.general.maximumShippingDays) || 30,
         },
+        ebay: {
+          payment_policy_id: currentSettings.lister.paymentPolicyId || null,
+          fulfillment_policy_id: currentSettings.lister.shippingPolicyId || null,
+          return_policy_id: currentSettings.lister.returnPolicyId || null,
+        },
         suppliers,
       });
       setSaveNotice(`${activeInnerTab} settings saved for ${activeSupplier.label}.`);
       setAccountSettings((prev) => ({
         ...(prev ?? {}),
+        ebay: {
+          payment_policy_id: currentSettings.lister.paymentPolicyId || null,
+          fulfillment_policy_id: currentSettings.lister.shippingPolicyId || null,
+          return_policy_id: currentSettings.lister.returnPolicyId || null,
+        },
         lister: {
           default_quantity: Number(currentSettings.lister.defaultQuantity) || 1,
           country: currentSettings.lister.itemCountry,
@@ -1288,6 +1523,18 @@ export default function MarketplaceSettingsPage() {
           zipcode: currentSettings.lister.zipcode,
           shipping_method: currentSettings.lister.shippingMethod,
           template: currentSettings.lister.defaultTemplate,
+        },
+        pricing: {
+          product_cost_percent: 0,
+          fees_percent: parseNumericValue(currentSettings.pricing.feesPercent),
+          fixed_fees: parseNumericValue(currentSettings.pricing.fixedFeeAmount),
+          profit_percent: parseNumericValue(currentSettings.pricing.additionalProfitPercent),
+          profit_amount: parseNumericValue(currentSettings.pricing.additionalProfitAmount),
+          minimum_profit: parseNumericValue(currentSettings.pricing.minimumProfit),
+          dynamic_profit: Boolean(currentSettings.pricing.dynamicProfit),
+          round_price_cents: Boolean(currentSettings.pricing.setPriceCentsValue),
+          include_shipping_price: Boolean(currentSettings.pricing.includeShippingPrice),
+          default_automation: currentSettings.pricing.defaultAutomation,
         },
       }));
       toast.success("Settings saved.");
@@ -1452,28 +1699,60 @@ export default function MarketplaceSettingsPage() {
         <div className="marketplace-settings__grid marketplace-settings__grid--2">
           <SettingsField label="Payment Policy" help>
             <SettingsSelect
-              value={currentSettings.lister.paymentPolicy}
-              options={policyOptions}
-              onChange={(event) => patchSection("lister", { paymentPolicy: event.target.value })}
+              value={currentSettings.lister.paymentPolicyId ?? ""}
+              options={ebayPolicyOptions.payment}
+              disabled={ebayPoliciesLoading || !ebayConnections.length}
+              onChange={(event) =>
+                handlePolicyChange(
+                  "paymentPolicy",
+                  "paymentPolicyId",
+                  ebayPolicyOptions.payment,
+                  event.target.value,
+                )
+              }
             />
           </SettingsField>
 
           <SettingsField label="Shipping Policy" help>
             <SettingsSelect
-              value={currentSettings.lister.shippingPolicy}
-              options={shippingPolicyOptions}
-              onChange={(event) => patchSection("lister", { shippingPolicy: event.target.value })}
+              value={currentSettings.lister.shippingPolicyId ?? ""}
+              options={ebayPolicyOptions.shipping}
+              disabled={ebayPoliciesLoading || !ebayConnections.length}
+              onChange={(event) =>
+                handlePolicyChange(
+                  "shippingPolicy",
+                  "shippingPolicyId",
+                  ebayPolicyOptions.shipping,
+                  event.target.value,
+                )
+              }
             />
           </SettingsField>
 
           <SettingsField label="Return Policy" help>
             <SettingsSelect
-              value={currentSettings.lister.returnPolicy}
-              options={returnPolicyOptions}
-              onChange={(event) => patchSection("lister", { returnPolicy: event.target.value })}
+              value={currentSettings.lister.returnPolicyId ?? ""}
+              options={ebayPolicyOptions.return}
+              disabled={ebayPoliciesLoading || !ebayConnections.length}
+              onChange={(event) =>
+                handlePolicyChange(
+                  "returnPolicy",
+                  "returnPolicyId",
+                  ebayPolicyOptions.return,
+                  event.target.value,
+                )
+              }
             />
           </SettingsField>
         </div>
+
+        {!ebayConnections.length ? (
+          <p className="marketplace-settings__policy-note">
+            Connect your eBay account in Store Settings to load payment, shipping, and return policies.
+          </p>
+        ) : ebayPoliciesLoading ? (
+          <p className="marketplace-settings__policy-note">Loading policies from eBay…</p>
+        ) : null}
       </section>
 
       <section className="marketplace-settings__section marketplace-settings__section--dual">
@@ -2005,12 +2284,12 @@ export default function MarketplaceSettingsPage() {
                 >
                   <div className="plans-settings__integration-top">
                     <div className="plans-settings__integration-brand">
-                      <span className={`plans-settings__brand plans-settings__brand--${plan.logo}`}>
-                        {plan.logo === "ebay" ? "eBay" : plan.logo === "shop" ? "Shop" : plan.logo.toUpperCase()}
-                      </span>
+                      <PlanPlatformLogo logo={plan.logo} name={plan.name} />
                       <div>
                         <h4>{plan.name}</h4>
-                        {plan.summary ? <span>{plan.summary}</span> : null}
+                        {plan.summary ? (
+                          <span className="plans-settings__integration-summary">{plan.summary}</span>
+                        ) : null}
                       </div>
                     </div>
                     <span className={`plans-settings__status ${plan.current ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>

@@ -233,7 +233,7 @@ function DraftsContent({ searchQuery }) {
         }));
       }
 
-      toast.success("Draft saved.");
+      toast.success(res.data?.message ?? "Draft saved.");
       return true;
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to save draft."));

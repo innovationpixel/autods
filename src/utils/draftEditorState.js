@@ -4,66 +4,119 @@ function uid(prefix = "id") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+export function normalizeVariantPricing(variant, fallback = {}) {
+  const buyPrice = roundMoney(
+    variant.buyPrice ?? variant.price ?? fallback.buyPrice ?? 0,
+  );
+  let profit = roundMoney(variant.profit ?? fallback.profit ?? 0);
+  let listingPrice = roundMoney(
+    variant.listingPrice ?? variant.listPrice ?? buyPrice + profit,
+  );
+
+  if (variant.listingPrice != null || variant.listPrice != null) {
+    profit = roundMoney(listingPrice - buyPrice);
+  } else if (variant.profit != null && variant.profit !== "") {
+    listingPrice = roundMoney(buyPrice + profit);
+    profit = roundMoney(listingPrice - buyPrice);
+  }
+
+  return {
+    ...variant,
+    buyPrice,
+    listingPrice,
+    profit,
+    price: listingPrice,
+  };
+}
+
 function buildVariantsFromItem(item) {
+  const fallback = {
+    buyPrice: Number(item.buy_price ?? item.price ?? 0),
+    profit: Number(item.profit ?? 0),
+  };
+
+  const mapVariant = (variant, index) =>
+    normalizeVariantPricing(
+      {
+        id: variant.id ?? uid(`variant-${index}`),
+        label: variant.label ?? `Variant ${index + 1}`,
+        quantity: Number(variant.quantity ?? item.quantity ?? 1),
+        image: normalizeImageUrl(variant.image) ?? null,
+        selected: variant.selected !== false,
+        buyPrice: variant.buyPrice,
+        listingPrice: variant.listingPrice ?? variant.listPrice,
+        profit: variant.profit,
+        price: variant.price,
+        ebaySku: variant.ebaySku ?? null,
+      },
+      fallback,
+    );
   const editorVariants = item.raw_source_data?.draft_editor?.variants;
   if (Array.isArray(editorVariants)) {
     if (editorVariants.length === 0) {
       return [
-        {
-          id: "default",
-          label: "Default",
-          price: Number(item.price ?? 0),
-          quantity: Number(item.quantity ?? 1),
-          image: getListingImageUrl(item),
-          selected: true,
-        },
+        normalizeVariantPricing(
+          {
+            id: "default",
+            label: "Default",
+            buyPrice: Number(item.buy_price ?? item.price ?? 0),
+            quantity: Number(item.quantity ?? 1),
+            image: getListingImageUrl(item),
+            selected: true,
+            profit: Number(item.profit ?? 0),
+          },
+          fallback,
+        ),
       ];
     }
 
-    return editorVariants.map((variant, index) => ({
-      id: variant.id ?? uid(`variant-${index}`),
-      label: variant.label ?? `Variant ${index + 1}`,
-      price: Number(variant.price ?? item.price ?? 0),
-      quantity: Number(variant.quantity ?? item.quantity ?? 1),
-      image: normalizeImageUrl(variant.image) ?? null,
-      selected: variant.selected !== false,
-    }));
+    return editorVariants.map(mapVariant);
   }
 
   const savedVariants = item.raw_source_data?.draft_variants;
   if (Array.isArray(savedVariants) && savedVariants.length) {
-    return savedVariants.map((variant, index) => ({
-      id: variant.id ?? uid(`variant-${index}`),
-      label: variant.label ?? `Variant ${index + 1}`,
-      price: Number(variant.price ?? item.price ?? 0),
-      quantity: Number(variant.quantity ?? item.quantity ?? 1),
-      image: normalizeImageUrl(variant.image) ?? null,
-      selected: variant.selected !== false,
-    }));
+    return savedVariants.map(mapVariant);
   }
 
   const skus = item.raw_source_data?.skus;
   if (Array.isArray(skus) && skus.length) {
-    return skus.map((sku, index) => ({
-      id: String(sku.sku_id ?? sku.id ?? uid(`variant-${index}`)),
-      label:
-        sku.properties?.map((p) => p.value).filter(Boolean).join(" / ") || `Variant ${index + 1}`,
-      price: Number(sku.price ?? item.price ?? 0),
-      quantity: Number(sku.quantity ?? item.quantity ?? 1),
-      image: normalizeImageUrl(sku.properties?.find((p) => p.image)?.image) ?? null,
-      selected: true,
-    }));
+    return skus.map((sku, index) =>
+      normalizeVariantPricing(
+        {
+          id: String(sku.sku_id ?? sku.id ?? uid(`variant-${index}`)),
+          label:
+            sku.properties?.map((p) => p.value).filter(Boolean).join(" / ") || `Variant ${index + 1}`,
+          buyPrice: Number(
+            sku.buy_price ?? sku.buyPrice ?? sku.price ?? item.buy_price ?? item.price ?? 0,
+          ),
+          listingPrice: Number(sku.listing_price ?? sku.listingPrice ?? sku.listPrice ?? 0),
+          profit: Number(sku.profit ?? 0),
+          quantity: Number(sku.stock ?? sku.quantity ?? item.quantity ?? 1),
+          image: normalizeImageUrl(sku.properties?.find((p) => p.image)?.image) ?? null,
+          selected: true,
+        },
+        fallback,
+      ),
+    );
   }
 
   return [
-    {
-      id: "default",
-      label: "Default",
-      price: Number(item.price ?? 0),
-      quantity: Number(item.quantity ?? 1),
-      image: getListingImageUrl(item),
-      selected: true,
-    },
+    normalizeVariantPricing(
+      {
+        id: "default",
+        label: "Default",
+        buyPrice: Number(item.buy_price ?? item.price ?? 0),
+        quantity: Number(item.quantity ?? 1),
+        image: getListingImageUrl(item),
+        selected: true,
+        profit: Number(item.profit ?? 0),
+      },
+      fallback,
+    ),
   ];
 }
 
@@ -194,6 +247,10 @@ export function buildDraftFormState(item) {
     brand: saved.brand ?? item.raw_source_data?.brand ?? "Unbranded",
     mpn: saved.mpn ?? item.raw_source_data?.mpn ?? "Does Not Apply",
     zipCode: saved.zipCode ?? (item.warehouse_country === "US" ? "10001" : ""),
+    shippingMethod:
+      saved.shippingMethod ??
+      item.raw_source_data?.shipping_method ??
+      "Cheapest with tracking",
     allowBestOffer: saved.allowBestOffer ?? false,
     categoryId: saved.categoryId ?? item.category_id ?? "",
     categoryName: saved.categoryName ?? item.category_name ?? "",
@@ -216,16 +273,21 @@ export function mergeDraftFormState(item, overrides = {}) {
   };
 }
 
-function roundMoney(value) {
-  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
-}
-
 export function serializeDraftFormForApi(form) {
   const selectedImages = form.images.filter((image) => image.selected && image.url);
   const primaryImage = selectedImages[0]?.url ?? form.images.find((image) => image.url)?.url ?? null;
-  const buyPrice = roundMoney(form.monitoring.buyPrice);
-  const profit = roundMoney(form.monitoring.profit);
-  const listPrice = roundMoney(buyPrice + profit);
+  const monitoringFallback = {
+    buyPrice: form.monitoring.buyPrice,
+    profit: form.monitoring.profit,
+  };
+  const normalizedVariants = (form.variants ?? []).map((variant) =>
+    normalizeVariantPricing(variant, monitoringFallback),
+  );
+  const primaryVariant =
+    normalizedVariants.find((variant) => variant.selected !== false) ?? normalizedVariants[0];
+  const buyPrice = roundMoney(primaryVariant?.buyPrice ?? form.monitoring.buyPrice);
+  const profit = roundMoney(primaryVariant?.profit ?? form.monitoring.profit);
+  const listPrice = roundMoney(primaryVariant?.listingPrice ?? buyPrice + profit);
 
   return {
     title: form.title,
@@ -237,6 +299,7 @@ export function serializeDraftFormForApi(form) {
     category_name: form.categoryName || null,
     buy_price: buyPrice,
     profit,
+    shipping_method: form.shippingMethod ?? "Cheapest with tracking",
     images: selectedImages.map((image) => ({ url: image.url })),
     image_url: primaryImage,
     draft_editor: {
@@ -244,11 +307,12 @@ export function serializeDraftFormForApi(form) {
       brand: form.brand,
       mpn: form.mpn,
       zipCode: form.zipCode,
+      shippingMethod: form.shippingMethod ?? "Cheapest with tracking",
       allowBestOffer: form.allowBestOffer,
       categoryId: form.categoryId,
       categoryName: form.categoryName,
       description: form.description,
-      variants: form.variants,
+      variants: normalizedVariants,
       images: form.images,
       specifics: form.specifics,
       monitoring: {
@@ -257,7 +321,7 @@ export function serializeDraftFormForApi(form) {
         profit,
       },
     },
-    variants: form.variants,
+    variants: normalizedVariants,
     specifics: form.specifics,
   };
 }

@@ -990,6 +990,9 @@ const MarketplaceDashboard = () => {
         id: 'no-store',
         name: 'connect-ebay',
         sidebarName: 'Connect eBay',
+        platformLabel: 'Platform',
+        platformDisplay: 'EBAY',
+        siteDisplay: 'Connect Store',
         initials: 'EB',
         country: '—',
         marketplace: 'eBay',
@@ -1008,7 +1011,7 @@ const MarketplaceDashboard = () => {
     }
 
     return stores.filter((store) =>
-      [store.name, store.country, store.marketplace, store.sidebarName].join(" ").toLowerCase().includes(query),
+      [store.name, store.country, store.marketplace, store.sidebarName, store.siteDisplay].join(" ").toLowerCase().includes(query),
     );
   }, [storeSwitcherSearch, stores]);
   const hasPendingStoreChanges =
@@ -1615,7 +1618,8 @@ const MarketplaceDashboard = () => {
           <div className="marketplace-sidebar__store-avatar">{activeSidebarStore.initials}</div>
           <div className="marketplace-sidebar__store-copy">
             <button type="button" className="marketplace-sidebar__store-name" onClick={openStoreSwitcherModal}>
-              {activeSidebarStore.sidebarName}
+              <span className="marketplace-sidebar__store-platform-label">{activeSidebarStore.platformLabel}</span>
+              <span className="marketplace-sidebar__store-site">{activeSidebarStore.siteDisplay}</span>
             </button>
           </div>
           <button type="button" className="marketplace-sidebar__edit-btn" aria-label="Edit store" onClick={openStoreSwitcherModal}>

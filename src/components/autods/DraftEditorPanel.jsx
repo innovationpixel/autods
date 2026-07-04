@@ -9,7 +9,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import { getListingImageUrl } from "./helpers";
-import { uid } from "../../utils/draftEditorState";
+import { uid, normalizeVariantPricing } from "../../utils/draftEditorState";
 import DraftDescriptionEditor from "./DraftDescriptionEditor";
 import DraftCategorySelect from "./DraftCategorySelect";
 
@@ -57,10 +57,32 @@ function DraftEditorPanel({
   const updateVariant = (variantId, partial) => {
     patch({
       variants: form.variants.map((variant) =>
-        variant.id === variantId ? { ...variant, ...partial } : variant,
+        variant.id === variantId ? normalizeVariantPricing({ ...variant, ...partial }) : variant,
       ),
     });
   };
+
+  const updateVariantPricing = (variantId, field, value) => {
+    const variant = form.variants.find((entry) => entry.id === variantId);
+    if (!variant) {
+      return;
+    }
+
+    const current = normalizeVariantPricing(variant, form.monitoring);
+    const partial = { [field]: value };
+
+    if (field === "buyPrice") {
+      partial.listingPrice = Number(value) + Number(current.profit);
+    } else if (field === "listingPrice") {
+      partial.profit = Number(value) - Number(current.buyPrice);
+    } else if (field === "profit") {
+      partial.listingPrice = Number(current.buyPrice) + Number(value);
+    }
+
+    updateVariant(variantId, partial);
+  };
+
+  const formatMoney = (value) => `$${Number(value ?? 0).toFixed(2)}`;
 
   const removeVariant = (variantId) => {
     if (form.variants.length <= 1) {
@@ -73,14 +95,20 @@ function DraftEditorPanel({
   };
 
   const addVariant = () => {
-    const next = {
-      id: uid("variant"),
-      label: `Variant ${form.variants.length + 1}`,
-      price: Number(form.price ?? 0),
-      quantity: 1,
-      image: form.images.find((image) => image.selected)?.url ?? null,
-      selected: true,
-    };
+    const buyPrice = Number(form.monitoring.buyPrice ?? 0);
+    const profit = Number(form.monitoring.profit ?? 0);
+    const next = normalizeVariantPricing(
+      {
+        id: uid("variant"),
+        label: `Variant ${form.variants.length + 1}`,
+        buyPrice,
+        profit,
+        quantity: 1,
+        image: form.images.find((image) => image.selected)?.url ?? null,
+        selected: true,
+      },
+      form.monitoring,
+    );
     patch({ variants: [...form.variants, next] });
     setEditingVariantId(next.id);
   };
@@ -328,6 +356,7 @@ function DraftEditorPanel({
                 <div className="draft-editor__variant-list">
                   {form.variants.map((variant) => {
                     const isEditing = editingVariantId === variant.id;
+                    const pricing = normalizeVariantPricing(variant, form.monitoring);
 
                     return (
                       <div
@@ -353,34 +382,66 @@ function DraftEditorPanel({
                         <div className="draft-editor__variant-body">
                           {isEditing ? (
                             <div className="draft-editor__variant-edit-grid">
-                              <label>
+                              <label className="draft-editor__variant-edit-grid__name">
                                 <span>Variant name</span>
                                 <input
                                   type="text"
-                                  value={variant.label}
+                                  value={pricing.label}
                                   onChange={(event) =>
                                     updateVariant(variant.id, { label: event.target.value })
                                   }
                                 />
                               </label>
                               <label>
-                                <span>Price</span>
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={variant.price}
-                                  onChange={(event) =>
-                                    updateVariant(variant.id, { price: event.target.value })
-                                  }
-                                />
+                                <span>Buy price</span>
+                                <div className="draft-editor__money-input">
+                                  <span>$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={pricing.buyPrice}
+                                    onChange={(event) =>
+                                      updateVariantPricing(variant.id, "buyPrice", event.target.value)
+                                    }
+                                  />
+                                </div>
+                              </label>
+                              <label>
+                                <span>Listing price</span>
+                                <div className="draft-editor__money-input">
+                                  <span>$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={pricing.listingPrice}
+                                    onChange={(event) =>
+                                      updateVariantPricing(variant.id, "listingPrice", event.target.value)
+                                    }
+                                  />
+                                </div>
+                              </label>
+                              <label>
+                                <span>Profit</span>
+                                <div className="draft-editor__money-input">
+                                  <span>$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    value={pricing.profit}
+                                    onChange={(event) =>
+                                      updateVariantPricing(variant.id, "profit", event.target.value)
+                                    }
+                                  />
+                                </div>
                               </label>
                               <label>
                                 <span>Qty</span>
                                 <input
                                   type="number"
                                   min="1"
-                                  value={variant.quantity}
+                                  value={pricing.quantity}
                                   onChange={(event) =>
                                     updateVariant(variant.id, { quantity: event.target.value })
                                   }
@@ -389,15 +450,23 @@ function DraftEditorPanel({
                             </div>
                           ) : (
                             <>
-                              <strong>{variant.label}</strong>
+                              <strong>{pricing.label}</strong>
                               <div className="draft-editor__variant-stats">
                                 <div>
-                                  <span>Price</span>
-                                  <span>${Number(variant.price ?? 0).toFixed(2)}</span>
+                                  <span>Buy price</span>
+                                  <span>{formatMoney(pricing.buyPrice)}</span>
+                                </div>
+                                <div>
+                                  <span>Listing price</span>
+                                  <span>{formatMoney(pricing.listingPrice)}</span>
+                                </div>
+                                <div>
+                                  <span>Profit</span>
+                                  <span className="draft-editor__variant-profit">{formatMoney(pricing.profit)}</span>
                                 </div>
                                 <div>
                                   <span>Qty</span>
-                                  <span>{variant.quantity ?? 1}</span>
+                                  <span>{pricing.quantity ?? 1}</span>
                                 </div>
                               </div>
                             </>

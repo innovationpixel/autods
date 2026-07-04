@@ -18,6 +18,15 @@ export function ebaySiteToCountry(siteId) {
   return map[siteId] ?? siteId.replace(/^EBAY_/i, '').slice(0, 3).toUpperCase();
 }
 
+/** Sidebar / store label, e.g. EBAY_US → EBAY US */
+export function ebaySiteToDisplayLabel(siteId) {
+  if (!siteId) {
+    return 'EBAY US';
+  }
+
+  return String(siteId).trim().replace(/_/g, ' ').toUpperCase();
+}
+
 export function storeInitialsFromName(name) {
   const cleaned = String(name ?? '').trim();
   if (!cleaned) {
@@ -52,18 +61,25 @@ export function parseEbayConnectionId(storeId) {
 
 /** Build a store-switcher row from a backend eBay connection. */
 export function mapEbayConnectionToStore(connection) {
-  const username = connection.ebay_username ?? `eBay #${connection.id}`;
-  const name = username.toLowerCase().replace(/\s+/g, '-');
+  const username = connection.ebay_username ?? '';
+  const siteId = connection.site_id ?? 'EBAY_US';
+  const siteDisplay = ebaySiteToDisplayLabel(siteId);
+  const name = username
+    ? username.toLowerCase().replace(/\s+/g, '-')
+    : siteDisplay.toLowerCase().replace(/\s+/g, '-');
 
   return {
     id: ebayConnectionId(connection.id),
     connectionId: connection.id,
     name,
-    sidebarName: truncateStoreLabel(username, 18),
-    initials: storeInitialsFromName(username),
-    country: ebaySiteToCountry(connection.site_id),
+    sidebarName: truncateStoreLabel(username || siteDisplay, 18),
+    platformLabel: 'Platform',
+    platformDisplay: 'EBAY',
+    siteDisplay,
+    initials: username ? storeInitialsFromName(username) : ebaySiteToCountry(siteId) || 'EB',
+    country: ebaySiteToCountry(siteId),
     marketplace: 'eBay',
-    siteId: connection.site_id ?? 'EBAY_US',
+    siteId,
     isPrimary: Boolean(connection.is_primary),
     orders: 0,
     products: 0,

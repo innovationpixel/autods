@@ -122,6 +122,21 @@ export default function EbayOAuthSetupBanner({ onContinue, show = true }) {
         </p>
       ) : null}
 
+      {setup.scopes?.length ? (
+        <div style={{ margin: "0 0 12px" }}>
+          <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
+            Enable these OAuth scopes in the eBay Developer Portal:
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {setup.scopes.map((scope) => (
+              <li key={scope} style={{ fontSize: 12, wordBreak: "break-all" }}>
+                {scope.replace("https://api.ebay.com/oauth/api_scope", "").replace(/^\//, "") || "api_scope (base)"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <a
           href={setup.portal_url}

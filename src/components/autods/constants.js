@@ -6,7 +6,21 @@ import {
   LuCar,
   LuChartLine,
   LuChevronDown,
+  LuCircleDollarSign,
   LuClipboardList,
+  LuEye,
+  LuFileText,
+  LuImage,
+  LuMail,
+  LuMessageCircleMore,
+  LuMousePointerClick,
+  LuPercent,
+  LuReceipt,
+  LuSparkles,
+  LuStar,
+  LuStore,
+  LuTag,
+  LuTrendingUp,
   LuClock3,
   LuDribbble,
   LuExternalLink,
@@ -16,7 +30,6 @@ import {
   LuHouse,
   LuInbox,
   LuMenu,
-  LuMessageCircleMore,
   LuPackage2,
   LuPackagePlus,
   LuPackageSearch,
@@ -27,8 +40,6 @@ import {
   LuSettings2,
   LuShirt,
   LuShoppingCart,
-  LuSparkles,
-  LuStore,
   LuTabletSmartphone,
   LuTrash2,
   LuTruck,
@@ -383,85 +394,182 @@ export const dashboardDateOptions = [
   "2026-04-23",
 ];
 
-export const dashboardStatCards = [
+/** 3Dsellers-style dashboard metric cards (Impressions, CTR, Views, Conversion, Transactions). */
+export const dashboardMetricCards = [
   {
-    label: "Profit",
-    value: "$0",
+    id: "impressions",
+    label: "Impressions",
+    value: "0",
+    help: "Total listing impressions on eBay.",
+    icon: LuEye,
+    tone: "sky",
+  },
+  {
+    id: "ctr",
+    label: "CTR",
+    value: "0%",
+    help: "Click-through rate from search results.",
+    icon: LuMousePointerClick,
+    tone: "violet",
+  },
+  {
+    id: "views",
+    label: "Views",
+    value: "0",
+    help: "Listing page views.",
     icon: LuChartLine,
     tone: "mint",
   },
   {
-    label: "Orders",
-    value: "0",
-    icon: LuClipboardList,
+    id: "conversion",
+    label: "Conversion Rate",
+    value: "0%",
+    help: "Views that converted to a sale.",
+    icon: LuTrendingUp,
     tone: "amber",
   },
   {
-    label: "Total Revenue",
-    value: "$0",
-    icon: LuWalletCards,
+    id: "transactions",
+    label: "Transactions",
+    value: "0",
+    help: "Completed order count.",
+    icon: LuReceipt,
     tone: "peach",
   },
-  {
-    label: "New Products",
-    value: "0",
-    icon: LuPackagePlus,
-    tone: "green",
-  },
 ];
 
-export const dashboardOverviewRows = [
-  { label: "Average Profit", value: "$0" },
-  { label: "Average Sell Order Cost", value: "$0" },
-  { label: "Average Buy Order Cost", value: "$0" },
-  { label: "Max Profit On Order", value: "$0" },
-  { label: "Total Products Cost", value: "$0" },
+export const dashboardProfitCards = [
+  { id: "sales", label: "Total Sales", value: "$0", icon: LuCircleDollarSign, tone: "green" },
+  { id: "fees", label: "Total Fees", value: "$0", icon: LuPercent, tone: "rose" },
+  { id: "profit", label: "Profit", value: "$0", icon: LuTrendingUp, tone: "gold" },
 ];
 
-export const dashboardTopProducts = [
+/** Tool tiles with activate/deactivate toggles — mirrors 3Dsellers dashboard tools grid. */
+export const dashboardTools = [
   {
-    id: "dash-top-1",
-    title: "Leather Mini Coin Purse Handmade Key Case Zipper Small Wallet Short Handbag",
-    sold: "1 sold",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=300&q=80",
-    sparkline: [1, 1, 1, 6, 1, 1, 1],
+    id: "customer-service",
+    name: "Customer Service",
+    description: "Manage buyer messages and support tickets from one workspace.",
+    icon: LuHeadphones,
+    page: "customer-support",
+    enabled: true,
   },
   {
-    id: "dash-top-2",
-    title: "Silicone Treated Gun Sleeve Shotgun/Rifle Sock Shooting Cover Green Gray",
-    sold: "1 sold",
-    image:
-      "https://images.unsplash.com/photo-1606925797300-0b35e9d1794e?auto=format&fit=crop&w=300&q=80",
-    sparkline: [1, 1, 5, 1, 1, 1, 1],
+    id: "listings",
+    name: "Listings Manager",
+    description: "Bulk edit listings, import CSV, and manage inventory.",
+    icon: LuPackage2,
+    page: "products",
+    enabled: true,
   },
   {
-    id: "dash-top-3",
-    title: "Fashion Electronic Watch Waterproof Digital Sport Watch Women Men",
-    sold: "1 sold",
-    image:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80",
-    sparkline: [1, 1, 4, 1, 1, 1, 1],
+    id: "orders",
+    name: "Orders Manager",
+    description: "Fulfill orders, add tracking, and mark items as shipped.",
+    icon: LuClipboardList,
+    page: "orders",
+    enabled: true,
   },
   {
-    id: "dash-top-4",
-    title: "Self-Adhesive Temporary Pleated Blinds Blackout Bathroom Curtains Windows Shade",
-    sold: "1 sold",
-    image:
-      "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=300&q=80",
-    sparkline: [1, 1, 1, 5, 1, 1, 1],
+    id: "offers",
+    name: "Offers Manager",
+    description: "Send bulk offers and auto-accept or counter with rules.",
+    icon: LuTag,
+    page: "products",
+    enabled: false,
   },
   {
-    id: "dash-top-5",
-    title: "USB Data Charger Cable for Apple iPhone 4S 4 3GS iPod Touch iPad 1 2 3 Sync Cord",
-    sold: "1 sold",
-    image:
-      "https://images.unsplash.com/photo-1583394838336-acd977736f90?auto=format&fit=crop&w=300&q=80",
-    sparkline: [1, 1, 1, 1, 1, 5, 1],
+    id: "listing-designer",
+    name: "Listing Designer",
+    description: "Professional listing templates with photo carousels.",
+    icon: LuSparkles,
+    page: "drafts",
+    enabled: false,
+  },
+  {
+    id: "feedback-reminder",
+    name: "Feedback Reminder",
+    description: "Automatically remind buyers to leave feedback.",
+    icon: LuStar,
+    page: "settings",
+    enabled: false,
+  },
+  {
+    id: "auto-messages",
+    name: "Auto Messages",
+    description: "Send custom eBay messages and cross-promoted emails.",
+    icon: LuMail,
+    page: "settings",
+    enabled: false,
+  },
+  {
+    id: "report-center",
+    name: "Report Center",
+    description: "Export orders and items with scheduled custom reports.",
+    icon: LuFileText,
+    page: "settings",
+    enabled: false,
+  },
+  {
+    id: "resolution-center",
+    name: "Resolution Center",
+    description: "Manage returns, inquiries, and cancellations in one place.",
+    icon: LuMessageCircleMore,
+    page: "customer-support",
+    enabled: false,
+  },
+  {
+    id: "webstore",
+    name: "Webstore",
+    description: "Showcase products on a dedicated web storefront.",
+    icon: LuStore,
+    page: "marketplace",
+    enabled: false,
+  },
+  {
+    id: "pdf-catalog",
+    name: "PDF Catalog",
+    description: "Generate printable catalogs for local or email outreach.",
+    icon: LuFileText,
+    page: "marketplace",
+    enabled: false,
+  },
+  {
+    id: "image-editor",
+    name: "Image Editor",
+    description: "Edit listing images directly without re-uploading to eBay.",
+    icon: LuImage,
+    page: "drafts",
+    enabled: false,
   },
 ];
 
 export const orderStatusOptions = ["Pending", "Ordered", "Shipped", "Delivered", "Canceled"];
+
+/** 3Dsellers row Actions column — print dropdown */
+export const orderRowPrintActions = [
+  { id: "generate-invoice", label: "Generate Invoice" },
+  { id: "generate-packing-slip", label: "Generate Packing Slip" },
+  { id: "generate-pick-list", label: "Generate Pick List" },
+  { id: "generate-barcode", label: "Generate Barcode" },
+];
+
+/** 3Dsellers row Actions column — bolt dropdown */
+export const orderRowBoltActions = [
+  { id: "edit-listing", label: "Edit Listing" },
+  { id: "send-ebay-invoice", label: "Send eBay Invoice", disabled: true },
+  { id: "add-tracking", label: "Add/Change tracking number" },
+  { id: "leave-feedback", label: "Leave feedback to buyer" },
+  { id: "issue-refund", label: "Issue refund" },
+  { id: "block-buyer", label: "Block Buyer" },
+  { id: "generate-packing-slip", label: "Generate Packing Slip" },
+  { id: "generate-pick-list", label: "Generate Pick List" },
+  { id: "search-conversation", label: "Search Conversation" },
+  { id: "archive-order", label: "Archive Order" },
+  { id: "cancel-order", label: "Cancel order" },
+  { id: "generate-invoice", label: "Generate Invoice" },
+  { id: "generate-barcode", label: "Generate Barcode" },
+];
 
 export const profileMenuItems = [
   { label: "Support Center", icon: LuInbox },
