@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, syncOrders, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
+import { getOrders, syncOrders, updateOrderStatus as updateOrderStatusApi, getOrdersGoogleSheetStatus, syncOrdersGoogleSheet } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuBox,
@@ -12,6 +12,7 @@ import {
   LuClock3,
   LuEllipsisVertical,
   LuExternalLink,
+  LuFileSpreadsheet,
   LuInbox,
   LuMenu,
   LuPencil,
@@ -24,6 +25,7 @@ import CompactDateRange from "../CompactDateRange";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import { formatDisplayDate } from "../helpers";
+import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderStatusOptions } from "../constants";
 
 function mapApiOrder(order) {
@@ -51,6 +53,12 @@ function OrdersContent({ searchQuery }) {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [sheetStatus, setSheetStatus] = useState({
+    configured: false,
+    spreadsheet_url: "",
+    last_synced_at: null,
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [showOnlyActive, setShowOnlyActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All Statuses");
@@ -66,6 +74,23 @@ function OrdersContent({ searchQuery }) {
   const [openActionsId, setOpenActionsId] = useState("");
   const [openDetailsId, setOpenDetailsId] = useState("");
   const tableScrollRef = useRef(null);
+
+  const loadSheetStatus = async () => {
+    try {
+      const res = await getOrdersGoogleSheetStatus();
+      setSheetStatus({
+        configured: Boolean(res.data?.configured),
+        spreadsheet_url: res.data?.spreadsheet_url ?? "",
+        last_synced_at: res.data?.last_synced_at ?? null,
+      });
+    } catch {
+      setSheetStatus({ configured: false, spreadsheet_url: "", last_synced_at: null });
+    }
+  };
+
+  useEffect(() => {
+    loadSheetStatus();
+  }, []);
 
   const loadOrders = async () => {
     setOrdersLoading(true);
@@ -97,11 +122,47 @@ function OrdersContent({ searchQuery }) {
     try {
       const res = await syncOrders();
       toast.success(res.data?.message ?? "Orders synced.");
+      if (res.data?.sheet?.spreadsheet_url) {
+        setSheetStatus((current) => ({
+          ...current,
+          configured: true,
+          spreadsheet_url: res.data.sheet.spreadsheet_url,
+          last_synced_at: res.data.sheet.last_synced_at ?? current.last_synced_at,
+        }));
+      }
       await loadOrders();
+      await loadSheetStatus();
     } catch (err) {
-      toast.error(err.response?.data?.error ?? "Order sync failed.");
+      toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleOpenSheet = () => {
+    if (!sheetStatus.spreadsheet_url) {
+      toast.warn("Your Google Sheet is not ready yet. Click Sync to Sheet first.");
+      return;
+    }
+
+    window.open(sheetStatus.spreadsheet_url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSyncToSheet = async () => {
+    setSheetSyncing(true);
+    try {
+      const res = await syncOrdersGoogleSheet();
+      toast.success(res.data?.message ?? "Orders synced to Google Sheets.");
+      setSheetStatus((current) => ({
+        ...current,
+        configured: true,
+        spreadsheet_url: res.data?.sheet?.spreadsheet_url ?? current.spreadsheet_url,
+        last_synced_at: res.data?.sheet?.last_synced_at ?? current.last_synced_at,
+      }));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Google Sheets sync failed."));
+    } finally {
+      setSheetSyncing(false);
     }
   };
 
@@ -299,12 +360,44 @@ function OrdersContent({ searchQuery }) {
         </div>
 
         <div className="orders-toolbar__actions">
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={handleOpenSheet}
+            disabled={!sheetStatus.spreadsheet_url}
+          >
+            <LuFileSpreadsheet />
+            <span>Open Sheet</span>
+          </button>
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={handleSyncToSheet}
+            disabled={sheetSyncing || !sheetStatus.configured}
+          >
+            <LuRefreshCcw />
+            <span>{sheetSyncing ? "Syncing sheet…" : "Sync to Sheet"}</span>
+          </button>
           <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={handleSyncOrders} disabled={syncing}>
             <LuRefreshCcw />
             <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
           </button>
         </div>
       </div>
+
+      {!sheetStatus.configured ? (
+        <div className="orders-inline-note">
+          <LuFileSpreadsheet />
+          <span>Google Sheets export is not configured on the server yet.</span>
+        </div>
+      ) : null}
+
+      {sheetStatus.configured && sheetStatus.last_synced_at ? (
+        <div className="orders-inline-note">
+          <LuFileSpreadsheet />
+          <span>Google Sheet last updated: {formatDisplayDate(sheetStatus.last_synced_at.slice(0, 10))}</span>
+        </div>
+      ) : null}
 
       {ordersNotice ? (
         <div className="orders-inline-note orders-inline-note--success">

@@ -8,3 +8,9 @@ export const syncOrders = () =>
 
 export const updateOrderStatus = (id, status) =>
     axiosInstance.patch(`/orders/${id}/status`, { status });
+
+export const getOrdersGoogleSheetStatus = () =>
+    axiosInstance.get('/orders/google-sheet');
+
+export const syncOrdersGoogleSheet = () =>
+    axiosInstance.post('/orders/google-sheet/sync');
