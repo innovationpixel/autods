@@ -24,12 +24,11 @@ function mapAliItemToCard(item) {
 function MarketplaceSections({
   aliLoading = false,
   aliError = null,
-  aliRequiresAuth = false,
+  aliPlatformUnavailable = false,
+  aliConnectionLoading = false,
   aliCredentialsMissing = false,
   aliCredentialsConfigured = true,
   aliItems = [],
-  aliConnecting = false,
-  onConnectAliExpress,
   expandedProductsTitle = "",
   visibleProducts = [],
   visibleSections = [],
@@ -39,6 +38,26 @@ function MarketplaceSections({
 }) {
   const hasKeywordSearch = Boolean(keywordSearch.trim());
   const aliCards = aliItems.map(mapAliItemToCard);
+
+  if (hasKeywordSearch && aliConnectionLoading) {
+    return (
+      <div className="marketplace-products__empty">
+        <LuLoader className="spin-icon" style={{ fontSize: 28 }} />
+        <p>Checking AliExpress availability…</p>
+      </div>
+    );
+  }
+
+  if (hasKeywordSearch && aliPlatformUnavailable) {
+    return (
+      <div className="marketplace-products__empty">
+        <LuStore style={{ fontSize: 28 }} />
+        <p>
+          Platform AliExpress is not connected yet. Ask your super admin to connect it from Admin → Settings.
+        </p>
+      </div>
+    );
+  }
 
   if (aliLoading && hasKeywordSearch) {
     return (
@@ -104,25 +123,17 @@ function MarketplaceSections({
         </div>
       ) : null}
 
-      {aliRequiresAuth ? (
+      {aliPlatformUnavailable ? (
         <div className="marketplace-inline-notice">
           <LuStore />
           <div className="marketplace-inline-notice__copy">
-            <strong>Connect AliExpress</strong>
-            <p>Authorize your AliExpress Dropshipping account to browse live supplier products.</p>
+            <strong>Platform AliExpress not available</strong>
+            <p>AliExpress is connected once by your super admin for all users. Ask them to connect it from Admin → Settings.</p>
           </div>
-          <button
-            type="button"
-            className="marketplace-inline-notice__action"
-            onClick={onConnectAliExpress}
-            disabled={aliConnecting}
-          >
-            {aliConnecting ? "Opening…" : "Connect"}
-          </button>
         </div>
       ) : null}
 
-      {aliError ? (
+      {aliError && !aliPlatformUnavailable ? (
         <div className="marketplace-inline-notice marketplace-inline-notice--error">
           <p>{aliError}</p>
         </div>

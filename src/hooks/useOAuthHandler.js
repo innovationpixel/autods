@@ -21,10 +21,8 @@ function applyOAuthResult(data, handlers) {
     if (platform === 'aliexpress') {
         if (status === 'connected') {
             onAliConnected?.();
-            toast.success('AliExpress account connected successfully!');
         } else if (status === 'error') {
             onAliError?.(reason);
-            toast.error(`AliExpress connection failed: ${reason ?? 'Unknown error'}`);
         }
     }
 }

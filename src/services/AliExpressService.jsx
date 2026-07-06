@@ -9,14 +9,6 @@ export const getAliExpressTop = (params = {}) =>
 export const getAliExpressStatus = () =>
     axiosInstance.get('/aliexpress/status');
 
-export const getAliExpressAuthUrl = () =>
-    axiosInstance.get('/aliexpress/auth-url', {
-        params: { return_origin: window.location.origin },
-    });
-
-export const disconnectAliExpressApi = () =>
-    axiosInstance.delete('/aliexpress/disconnect');
-
 export const getAliExpressFeeds = () =>
     axiosInstance.get('/aliexpress/feeds');
 

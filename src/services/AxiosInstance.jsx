@@ -52,6 +52,7 @@ axiosInstance.interceptors.response.use(
         if (
             error.response?.status !== 401 ||
             error.response?.data?.requires_auth ||
+            error.response?.data?.platform_unavailable ||
             !originalRequest ||
             originalRequest._skipAuthRefresh ||
             isAuthEndpoint(originalRequest.url)

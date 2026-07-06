@@ -20,6 +20,7 @@ const initialState = {
     connection: {
         loading: false,
         connected: false,
+        platform_import_available: false,
         credentials_configured: false,
         needs_reconnect: false,
         ae_user_nick: null,
@@ -69,7 +70,10 @@ export function AliExpressReducer(state = initialState, action) {
                 ...state,
                 connection: { ...state.connection, loading: true, error: null },
             };
-        case ALI_STATUS_SUCCESS:
+        case ALI_STATUS_SUCCESS: {
+            const platformReady = Boolean(
+                action.payload.connected || action.payload.platform_import_available,
+            );
             return {
                 ...state,
                 connection: {
@@ -78,7 +82,15 @@ export function AliExpressReducer(state = initialState, action) {
                     loading: false,
                     error: null,
                 },
+                marketplace: platformReady
+                    ? {
+                          ...state.marketplace,
+                          requires_auth: false,
+                          error: state.marketplace.requires_auth ? null : state.marketplace.error,
+                      }
+                    : state.marketplace,
             };
+        }
         case ALI_STATUS_FAILURE:
             return {
                 ...state,

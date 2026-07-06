@@ -32,7 +32,6 @@ import {
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
-import { fetchAliExpressStatus } from "../../store/actions/AliExpressActions";
 import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
@@ -40,11 +39,9 @@ import EbayOAuthSetupBanner from "../autods/EbayOAuthSetupBanner";
 import ShipFromSetupNotice from "../autods/ShipFromSetupNotice";
 import {
   buildSupplierProfile,
-  listAvailableSupplierProfiles,
   normalizeSuppliersFromApi,
 } from "../../utils/supplierProfiles";
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
-import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
@@ -609,7 +606,6 @@ export default function MarketplaceSettingsPage() {
   const ebayConnections        = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
   const ebaySyncingIds         = useSelector(selectEbaySyncingIds);
-  const aliConnection          = useSelector(selectAliConnection);
   const user                   = useSelector(selectUser);
 
   const initialTab = useMemo(() => {
@@ -690,10 +686,9 @@ export default function MarketplaceSettingsPage() {
     setEditAllItemSpecifics(false);
   }, [activeInnerTab, activePrimaryTab, activeSupplierId]);
 
-  // ─── eBay + AliExpress connection status ─────────────────────────────────────
+  // ─── eBay connection status ───────────────────────────────────────────────────
   useEffect(() => {
     dispatch(fetchEbayStatus());
-    dispatch(fetchAliExpressStatus());
 
     getAccountSettings()
       .then((res) => {
@@ -788,19 +783,12 @@ export default function MarketplaceSettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const ebay = params.get("ebay");
-    const aliexpress = params.get("aliexpress");
     const reason = params.get("reason");
 
     if (ebay === "connected") {
       dispatch(fetchEbayStatus());
     } else if (ebay === "error") {
       toast.error(`eBay connection failed: ${reason ?? "Unknown error"}`);
-    }
-
-    if (aliexpress === "connected") {
-      dispatch(fetchAliExpressStatus());
-    } else if (aliexpress === "error") {
-      toast.error(`AliExpress connection failed: ${reason ?? "Unknown error"}`);
     }
   }, [search, dispatch]);
 
@@ -875,18 +863,6 @@ export default function MarketplaceSettingsPage() {
     return ["Select default template", ...names];
   }, [templateCatalog.custom]);
 
-  const addSupplierProfile = () => {
-    const available = listAvailableSupplierProfiles(suppliers);
-    const nextOption = available[0];
-    if (!nextOption) {
-      toast.info("All supplier profiles for enabled marketplaces are already added.");
-      return;
-    }
-    const next = createSupplierFromOption(nextOption);
-    setSuppliers((current) => [...current, next]);
-    setActiveSupplierId(next.id);
-  };
-
   const renderSupplierSidebar = () => (
     <aside className="marketplace-settings__sidebar">
       <div className="marketplace-settings__sidebar-field">
@@ -914,14 +890,10 @@ export default function MarketplaceSettingsPage() {
               ))
             ) : (
               <p style={{ margin: 0, padding: "12px 14px", color: "#6b7280", fontSize: 13, lineHeight: 1.5 }}>
-                No supplier profiles yet. Import a product from Add Product to auto-create one (e.g. Walmart US), or click Add Supplier Profile.
+                No supplier profiles yet. Import a product from Add Product to auto-create one (e.g. Walmart US).
               </p>
             )}
           </div>
-          <button type="button" className="marketplace-settings__add-supplier" onClick={addSupplierProfile}>
-            <LuPlus />
-            <span>Add Supplier Profile</span>
-          </button>
         </div>
       </div>
     </aside>
@@ -1085,64 +1057,6 @@ export default function MarketplaceSettingsPage() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* ── AliExpress platform status (super admin connects in Admin → Manage Plans) ── */}
-      {!aliConnection.credentials_configured && !aliConnection.loading && (
-        <div
-          className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected"
-          style={{ marginTop: 28, padding: "14px 16px", borderRadius: 8, background: "#fef2f2", border: "1px solid #fecaca" }}
-        >
-          <span style={{ color: "#991b1b" }}>
-            Server AliExpress API keys are missing. Set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET in autods-backend/.env, then restart Laravel.
-          </span>
-        </div>
-      )}
-
-      <div className="marketplace-settings__store-settings-header" style={{ marginTop: 28 }}>
-        <div>
-          <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#e43226" }}>
-            Ali<span style={{ color: "#ff6a00" }}>Express</span>
-          </h3>
-          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
-            Platform AliExpress is managed by a super admin for all users.
-          </p>
-        </div>
-      </div>
-
-      {aliConnection.loading ? (
-        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading" style={{ padding: "16px 0" }}>
-          <LuLoader className="spin-icon" />
-          <span>Checking platform status…</span>
-        </div>
-      ) : aliConnection.platform_import_available || aliConnection.connected ? (
-        <div className="marketplace-settings__ebay-card" style={{ marginTop: 12, background: "#fff7f0", border: "1px solid #fed7aa" }}>
-          <div className="marketplace-settings__ebay-info">
-            <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
-              <LuBadgeCheck style={{ color: "#c2410c" }} />
-              <span>
-                Platform connected
-                {(aliConnection.ae_user_nick || aliConnection.ae_account) && (
-                  <>
-                    {" "}
-                    as <strong>{aliConnection.ae_user_nick ?? aliConnection.ae_account}</strong>
-                  </>
-                )}
-              </span>
-            </div>
-            <p className="marketplace-settings__ebay-sub">
-              Browse and import AliExpress products are enabled for your account.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
-          <LuUnplug />
-          <span>
-            Platform AliExpress is not connected yet. Ask your super admin to connect it from{" "}
-            <strong>Admin → Manage Plans</strong>.
-          </span>
         </div>
       )}
     </div>

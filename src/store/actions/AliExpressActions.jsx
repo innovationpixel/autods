@@ -2,7 +2,6 @@ import {
     browseAliExpress,
     getAliExpressTop,
     getAliExpressStatus,
-    disconnectAliExpressApi,
 } from '../../services/AliExpressService';
 import {
     ALI_SEARCH_REQUEST,
@@ -11,14 +10,14 @@ import {
     ALI_STATUS_REQUEST,
     ALI_STATUS_SUCCESS,
     ALI_STATUS_FAILURE,
-    ALI_DISCONNECT_SUCCESS,
 } from '../reducers/AliExpressReducer';
 
 const handleAliError = (err) => {
     const data = err.response?.data ?? {};
+    const platformUnavailable = Boolean(data.platform_unavailable ?? data.requires_auth);
     return {
         error: data.error ?? 'AliExpress request failed.',
-        requires_auth: data.requires_auth ?? false,
+        requires_auth: platformUnavailable,
         credentials_missing: data.credentials_missing ?? false,
     };
 };
@@ -43,15 +42,6 @@ export const fetchAliExpressStatus = () => (dispatch) => {
         .then((res) => dispatch({ type: ALI_STATUS_SUCCESS, payload: res.data }))
         .catch((err) => {
             const msg = err.response?.data?.error ?? 'Failed to load AliExpress status.';
-            dispatch({ type: ALI_STATUS_FAILURE, payload: msg });
-        });
-};
-
-export const disconnectAliExpressAction = () => (dispatch) => {
-    return disconnectAliExpressApi()
-        .then(() => dispatch({ type: ALI_DISCONNECT_SUCCESS }))
-        .catch((err) => {
-            const msg = err.response?.data?.error ?? 'Failed to disconnect AliExpress.';
             dispatch({ type: ALI_STATUS_FAILURE, payload: msg });
         });
 };

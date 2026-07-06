@@ -98,19 +98,18 @@ import {
   openOAuthTab,
   watchOAuthTab,
   markOAuthReturnOrigin,
-  ALIEXPRESS_OAUTH_HINT,
   OAUTH_TAB_HINT,
 } from '../../utils/oauthBridge';
 import {
   selectAliItems,
   selectAliLoading,
   selectAliError,
-  selectAliRequiresAuth,
   selectAliCredentialsMissing,
-  selectAliConnected,
+  selectAliPlatformReady,
+  selectAliPlatformUnavailable,
+  selectAliConnectionLoading,
   selectAliCredentialsConfigured,
 } from '../../store/selectors/AliExpressSelectors';
-import { getAliExpressAuthUrl } from '../../services/AliExpressService';
 import { importProduct, importProductsBulk, getImportBatch } from '../../services/ProductService';
 import {
   applyDetectedImportSupplier,
@@ -627,9 +626,10 @@ const MarketplaceDashboard = () => {
   const aliItems        = useSelector(selectAliItems);
   const aliLoading      = useSelector(selectAliLoading);
   const aliError        = useSelector(selectAliError);
-  const aliRequiresAuth = useSelector(selectAliRequiresAuth);
   const aliCredentialsMissing = useSelector(selectAliCredentialsMissing);
-  const aliConnected    = useSelector(selectAliConnected);
+  const aliPlatformReady = useSelector(selectAliPlatformReady);
+  const aliPlatformUnavailable = useSelector(selectAliPlatformUnavailable);
+  const aliConnectionLoading = useSelector(selectAliConnectionLoading);
   const aliCredentialsConfigured = useSelector(selectAliCredentialsConfigured);
   const ebayConnections = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
@@ -639,7 +639,6 @@ const MarketplaceDashboard = () => {
   const profileShortName = useMemo(() => getUserShortName(authUser), [authUser]);
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
   const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
-  const [aliConnecting, setAliConnecting] = useState(false);
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [storeOverrides, setStoreOverrides] = useState({});
   const navigate = useNavigate();
@@ -860,11 +859,6 @@ const MarketplaceDashboard = () => {
       onEbayError: () => {
         dispatch(fetchEbayStatus());
       },
-      onAliConnected: () => {
-        setAliConnecting(false);
-        dispatch(fetchAliExpressStatus());
-      },
-      onAliError: () => setAliConnecting(false),
     }),
     [dispatch],
   );
@@ -900,35 +894,12 @@ const MarketplaceDashboard = () => {
 
   const connectEbay = () => startEbayOAuthFlow();
 
-  const connectAliExpress = async () => {
-    try {
-      setAliConnecting(true);
-      markOAuthReturnOrigin();
-      const res = await getAliExpressAuthUrl();
-      const tab = openOAuthTab(res.data.url);
-
-      if (!tab) {
-        setAliConnecting(false);
-        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
-        return;
-      }
-
-      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
-
-      watchOAuthTab(tab, () => {
-        setAliConnecting(false);
-        dispatch(fetchAliExpressStatus());
-      });
-    } catch (err) {
-      setAliConnecting(false);
-      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
-    }
-  };
-
-  // AliExpress browse — fires when marketplace is active and filters change
+  // AliExpress browse — uses the platform account connected by super admin
   useEffect(() => {
     if (activePage !== "marketplace") return;
     if (!aliCredentialsConfigured) return;
+    if (aliConnectionLoading) return;
+    if (!aliPlatformReady) return;
 
     if (aliSearchTimer.current) clearTimeout(aliSearchTimer.current);
 
@@ -973,7 +944,8 @@ const MarketplaceDashboard = () => {
     selectedPill,
     currency,
     aliCredentialsConfigured,
-    aliConnected,
+    aliConnectionLoading,
+    aliPlatformReady,
     keywordSearch,
   ]);
 
@@ -2695,12 +2667,11 @@ const MarketplaceDashboard = () => {
                   <MarketplaceSections
                     aliLoading={aliLoading}
                     aliError={aliError}
-                    aliRequiresAuth={aliRequiresAuth}
+                    aliPlatformUnavailable={aliPlatformUnavailable}
+                    aliConnectionLoading={aliConnectionLoading}
                     aliCredentialsMissing={aliCredentialsMissing}
                     aliCredentialsConfigured={aliCredentialsConfigured}
                     aliItems={aliItems}
-                    aliConnecting={aliConnecting}
-                    onConnectAliExpress={connectAliExpress}
                     expandedProductsTitle={expandedProductsTitle}
                     visibleProducts={visibleProducts}
                     visibleSections={visibleSections}
