@@ -76,7 +76,10 @@ const Markup = () => {
                     <Route path="/wallet" element={<Home />} />
                     <Route path="/settings" element={<Home />} />
                     <Route path="/plans" element={<Home />} />
+                    <Route path="/admin" element={<Home />} />
+                    <Route path="/admin/clients" element={<Home />} />
                     <Route path="/admin/plans" element={<Home />} />
+                    <Route path="/admin/settings" element={<Home />} />
 
                     <Route element={<MainLayout />}>
                         {dashboardRoutes.map((r) => (

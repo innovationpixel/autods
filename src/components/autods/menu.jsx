@@ -9,6 +9,7 @@ import {
   LuPackageSearch,
   LuSettings2,
   LuStore,
+  LuUsers,
 } from "react-icons/lu";
 
 /** Marketplace dashboard sidebar — edit groups and items here. */
@@ -38,6 +39,22 @@ export const sidebarGroups = [
   ],
 ];
 
+/** Super admin sidebar items. */
+export const adminSidebarItems = [
+  { label: "Dashboard", page: "admin", icon: LuGauge, marker: "#c4b5fd" },
+  { label: "Clients", page: "admin/clients", icon: LuUsers, marker: "#93c5fd" },
+  { label: "Plans", page: "admin/plans", icon: LuBadgeCheck, marker: "#f6c6c4" },
+  { label: "Settings", page: "admin/settings", icon: LuSettings2, marker: "#9ad2c0" },
+];
+
+/** Super admin routes — separate from the client marketplace shell. */
+export const adminPages = [
+  "admin",
+  "admin/clients",
+  "admin/plans",
+  "admin/settings",
+];
+
 /** Routes reachable in the marketplace shell (sidebar + header shortcuts). */
 export const marketplacePages = [
   ...sidebarGroups
@@ -47,5 +64,4 @@ export const marketplacePages = [
   "support-center",
   "wallet",
   "plans",
-  "admin/plans",
 ];

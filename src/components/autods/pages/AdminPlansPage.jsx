@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuBadgeCheck, LuLink, LuLoader, LuPencil, LuPlus, LuTrash2, LuUnplug } from "react-icons/lu";
+import {
+  LuCalendar,
+  LuCheck,
+  LuCrown,
+  LuLoader,
+  LuPencil,
+  LuPlus,
+  LuSparkles,
+  LuTrash2,
+  LuZap,
+} from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import {
@@ -10,12 +20,6 @@ import {
   getAdminPlans,
   updateAdminPlan,
 } from "../../../services/PlanService";
-import {
-  disconnectAdminAliExpress,
-  getAdminAliExpressAuthUrl,
-  getAdminAliExpressStatus,
-} from "../../../services/AdminService";
-import { ALIEXPRESS_OAUTH_HINT, markOAuthReturnOrigin, openOAuthTab, OAUTH_TAB_HINT, watchOAuthTab } from "../../../utils/oauthBridge";
 
 const emptyPlan = {
   title: "",
@@ -29,22 +33,26 @@ const emptyPlan = {
   sort_order: 0,
 };
 
+function formatPlanInterval(plan) {
+  if (plan.billing_type === "monthly") {
+    return "month";
+  }
+  return `${plan.duration_days ?? 30} days`;
+}
+
 function AdminPlansPage() {
   const role = useSelector(selectUserRole);
   const navigate = useNavigate();
-  const { search } = useLocation();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyPlan);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [aliStatus, setAliStatus] = useState({ loading: true, connected: false });
-  const [aliConnecting, setAliConnecting] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
-      navigate("/plans");
+      navigate("/");
     }
   }, [role, navigate]);
 
@@ -55,29 +63,11 @@ function AdminPlansPage() {
       .finally(() => setLoading(false));
   };
 
-  const loadAliExpressStatus = () => {
-    setAliStatus((prev) => ({ ...prev, loading: true }));
-    getAdminAliExpressStatus()
-      .then((res) => setAliStatus({ ...res.data, loading: false }))
-      .catch(() => setAliStatus({ loading: false, connected: false }));
-  };
-
   useEffect(() => {
     if (role === "super_admin") {
       loadPlans();
-      loadAliExpressStatus();
     }
   }, [role]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(search);
-    if (params.get("aliexpress") === "connected") {
-      toast.success("Platform AliExpress account connected.");
-      loadAliExpressStatus();
-    } else if (params.get("aliexpress") === "error") {
-      toast.error(`AliExpress connection failed: ${params.get("reason") ?? "Unknown error"}`);
-    }
-  }, [search]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -129,207 +119,186 @@ function AdminPlansPage() {
     }
   };
 
-  const connectPlatformAliExpress = async () => {
-    try {
-      setAliConnecting(true);
-      markOAuthReturnOrigin();
-      const res = await getAdminAliExpressAuthUrl("/admin/plans");
-      const tab = openOAuthTab(res.data.url);
-
-      if (!tab) {
-        setAliConnecting(false);
-        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
-        return;
-      }
-
-      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
-
-      watchOAuthTab(tab, () => {
-        setAliConnecting(false);
-        loadAliExpressStatus();
-      });
-    } catch (err) {
-      setAliConnecting(false);
-      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
-    }
-  };
-
-  const disconnectPlatformAliExpress = async () => {
-    if (!window.confirm("Disconnect the platform AliExpress account for all users?")) return;
-    try {
-      await disconnectAdminAliExpress();
-      toast.success("Platform AliExpress disconnected.");
-      loadAliExpressStatus();
-    } catch (err) {
-      toast.error(err.response?.data?.error ?? "Failed to disconnect AliExpress.");
-    }
-  };
-
   if (role !== "super_admin") {
     return null;
   }
 
   if (loading) {
     return (
-      <section className="plans-page card-wrapper" style={{ padding: 40, textAlign: "center" }}>
-        <LuLoader style={{ animation: "spin 1s linear infinite" }} />
+      <section className="admin-page admin-plans-page">
+        <div className="admin-page__loading card-wrapper">
+          <LuLoader className="spin-icon" />
+          <span>Loading plans…</span>
+        </div>
       </section>
     );
   }
 
+  const activeCount = plans.filter((plan) => plan.is_active).length;
+
   return (
-    <section className="plans-page admin-plans-page">
-      <div className="admin-plans-page__ali card-wrapper" style={{ marginBottom: 20, padding: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>Platform AliExpress</h2>
-            <p style={{ margin: 0, color: "#6b7280", fontSize: 14, maxWidth: 640 }}>
-              Connect the shared AliExpress Dropshipping account used for product browse and import across all clients.
-              Tokens are saved securely on the server and refreshed automatically.
-            </p>
-          </div>
-          {!aliStatus.loading && !aliStatus.connected ? (
-            <button
-              type="button"
-              className="marketplace-settings__plan-btn"
-              onClick={connectPlatformAliExpress}
-              disabled={aliConnecting || aliStatus.credentials_configured === false}
-            >
-              {aliConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
-              <span>{aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}</span>
-            </button>
-          ) : null}
+    <section className="admin-page admin-plans-page">
+      <header className="admin-page__hero admin-page__hero--split">
+        <div>
+          <span className="admin-page__eyebrow"><LuSparkles /> Subscription Plans</span>
+          <h1>Manage Plans</h1>
+          <p>Create pricing tiers, set billing cycles, and control which plans clients can purchase.</p>
         </div>
-
-        {aliStatus.credentials_configured === false ? (
-          <p style={{ margin: "14px 0 0", color: "#991b1b", fontSize: 13 }}>
-            Set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET in the backend .env file first.
-          </p>
-        ) : null}
-
-        {aliStatus.loading ? (
-          <p style={{ margin: "14px 0 0", color: "#6b7280" }}>Checking platform connection…</p>
-        ) : aliStatus.connected ? (
-          <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#166534" }}>
-              <LuBadgeCheck />
-              <span>
-                Connected as <strong>{aliStatus.ae_user_nick ?? aliStatus.ae_account ?? "AliExpress Seller"}</strong>
-              </span>
-            </div>
-            {aliStatus.token_expires_at ? (
-              <span style={{ color: "#6b7280", fontSize: 13 }}>
-                Access token expires: {new Date(aliStatus.token_expires_at).toLocaleString()}
-              </span>
-            ) : null}
-            {aliStatus.needs_reconnect ? (
-              <span style={{ color: "#b45309", fontSize: 13 }}>Refresh token expired — reconnect AliExpress.</span>
-            ) : null}
-            <button
-              type="button"
-              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
-              onClick={disconnectPlatformAliExpress}
-              style={{ width: "fit-content", marginTop: 4 }}
-            >
-              <LuUnplug />
-              <span>Disconnect platform account</span>
-            </button>
-          </div>
-        ) : (
-          <p style={{ margin: "14px 0 0", color: "#6b7280", fontSize: 13 }}>
-            Not connected. Clients cannot browse or import AliExpress products until you connect here.
-          </p>
-        )}
-      </div>
-
-      <div className="admin-plans-page__head">
-        <h2>Manage Plans</h2>
-        <button type="button" className="marketplace-settings__plan-btn" onClick={openCreate}>
-          <LuPlus /> Add Plan
+        <button type="button" className="admin-page__btn admin-page__btn--primary" onClick={openCreate}>
+          <LuPlus />
+          <span>Add Plan</span>
         </button>
+      </header>
+
+      <div className="admin-plans-page__summary card-wrapper">
+        <div>
+          <strong>{plans.length}</strong>
+          <span>Total plans</span>
+        </div>
+        <div>
+          <strong>{activeCount}</strong>
+          <span>Active plans</span>
+        </div>
+        <div>
+          <strong>{plans.filter((plan) => plan.billing_type === "monthly").length}</strong>
+          <span>Monthly plans</span>
+        </div>
       </div>
 
-      <div className="admin-plans-table card-wrapper">
-        <table className="products-table">
-          <thead>
-            <tr>
-              <th>Title</th>
-              <th>Price</th>
-              <th>Billing</th>
-              <th>Active</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {plans.map((plan) => (
-              <tr key={plan.id}>
-                <td>{plan.title}</td>
-                <td>${Number(plan.price).toFixed(2)} {plan.currency}</td>
-                <td>{plan.billing_type}</td>
-                <td>{plan.is_active ? "Yes" : "No"}</td>
-                <td>
-                  <button type="button" className="orders-icon-btn" onClick={() => openEdit(plan)} aria-label="Edit">
-                    <LuPencil />
-                  </button>
-                  <button type="button" className="orders-icon-btn" onClick={() => removePlan(plan.id)} aria-label="Delete">
-                    <LuTrash2 />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="admin-plans-page__grid">
+        {plans.map((plan, index) => {
+          const isFeatured = index === 1 || (/pro/i.test(plan.title) && plan.billing_type === "monthly");
+          const Icon = plan.billing_type === "monthly" ? LuZap : LuCrown;
+
+          return (
+            <article
+              key={plan.id}
+              className={`admin-plans-page__card card-wrapper ${isFeatured ? "admin-plans-page__card--featured" : ""} ${plan.is_active ? "" : "admin-plans-page__card--inactive"}`}
+            >
+              {isFeatured ? <span className="admin-plans-page__ribbon">Popular</span> : null}
+              {!plan.is_active ? <span className="admin-plans-page__ribbon admin-plans-page__ribbon--inactive">Inactive</span> : null}
+
+              <div className="admin-plans-page__card-head">
+                <span className="admin-plans-page__card-icon"><Icon /></span>
+                <div>
+                  <h2>{plan.title}</h2>
+                  <p>{plan.description || "No description provided."}</p>
+                </div>
+              </div>
+
+              <div className="admin-plans-page__price">
+                <strong>${Number(plan.price).toFixed(2)}</strong>
+                <span>{plan.currency} / {formatPlanInterval(plan)}</span>
+              </div>
+
+              <ul className="admin-plans-page__features">
+                {(plan.inclusions ?? []).filter(Boolean).slice(0, 5).map((item) => (
+                  <li key={item}><LuCheck /> {item}</li>
+                ))}
+                {!(plan.inclusions ?? []).filter(Boolean).length ? (
+                  <li className="admin-plans-page__features-empty">No inclusions listed</li>
+                ) : null}
+              </ul>
+
+              <div className="admin-plans-page__meta">
+                <span><LuCalendar /> {plan.billing_type === "monthly" ? "Monthly billing" : `One-time · ${plan.duration_days ?? 30} days`}</span>
+                <span>Sort order: {plan.sort_order ?? 0}</span>
+              </div>
+
+              <div className="admin-plans-page__actions">
+                <button type="button" className="admin-page__btn admin-page__btn--ghost" onClick={() => openEdit(plan)}>
+                  <LuPencil />
+                  <span>Edit</span>
+                </button>
+                <button type="button" className="admin-page__btn admin-page__btn--danger" onClick={() => removePlan(plan.id)}>
+                  <LuTrash2 />
+                  <span>Deactivate</span>
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
+
+      {!plans.length ? (
+        <div className="admin-page__empty card-wrapper">
+          <p>No plans yet. Create your first subscription plan.</p>
+          <button type="button" className="admin-page__btn admin-page__btn--primary" onClick={openCreate}>
+            <LuPlus />
+            <span>Add Plan</span>
+          </button>
+        </div>
+      ) : null}
 
       {modalOpen ? (
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
-          <div className="orders-modal__card admin-plans-modal">
+          <div className="orders-modal__card admin-modal">
             <h3>{editingId ? "Edit Plan" : "Create Plan"}</h3>
-            <label className="marketplace-settings__field">
-              <span>Title</span>
-              <input className="marketplace-settings__control" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            </label>
-            <label className="marketplace-settings__field">
-              <span>Description</span>
-              <textarea className="marketplace-settings__control" value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-            </label>
-            <label className="marketplace-settings__field">
-              <span>Price</span>
-              <input type="number" className="marketplace-settings__control" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-            </label>
-            <label className="marketplace-settings__field">
-              <span>Currency</span>
-              <input className="marketplace-settings__control" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} />
-            </label>
-            <label className="marketplace-settings__field">
-              <span>Billing Type</span>
-              <select className="marketplace-settings__control" value={form.billing_type} onChange={(e) => setForm({ ...form, billing_type: e.target.value })}>
-                <option value="monthly">Monthly</option>
-                <option value="one_time">One Time</option>
-              </select>
-            </label>
-            {form.billing_type === "one_time" ? (
-              <label className="marketplace-settings__field">
-                <span>Duration (days)</span>
-                <input type="number" className="marketplace-settings__control" value={form.duration_days ?? 30} onChange={(e) => setForm({ ...form, duration_days: Number(e.target.value) })} />
+
+            <div className="admin-modal__grid">
+              <label className="marketplace-settings__field admin-modal__full">
+                <span>Title</span>
+                <input className="marketplace-settings__control" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
               </label>
-            ) : null}
-            <label className="marketplace-settings__field">
-              <span>Inclusions (one per line)</span>
-              <textarea
-                className="marketplace-settings__control"
-                value={(form.inclusions ?? []).join("\n")}
-                onChange={(e) => setForm({ ...form, inclusions: e.target.value.split("\n") })}
-              />
-            </label>
-            <label className="marketplace-settings__field">
+
+              <label className="marketplace-settings__field admin-modal__full">
+                <span>Description</span>
+                <textarea className="marketplace-settings__control" rows={3} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+              </label>
+
+              <label className="marketplace-settings__field">
+                <span>Price</span>
+                <input type="number" min="0" step="0.01" className="marketplace-settings__control" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+              </label>
+
+              <label className="marketplace-settings__field">
+                <span>Currency</span>
+                <input className="marketplace-settings__control" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} />
+              </label>
+
+              <label className="marketplace-settings__field">
+                <span>Billing Type</span>
+                <select className="marketplace-settings__control" value={form.billing_type} onChange={(e) => setForm({ ...form, billing_type: e.target.value })}>
+                  <option value="monthly">Monthly</option>
+                  <option value="one_time">One Time</option>
+                </select>
+              </label>
+
+              <label className="marketplace-settings__field">
+                <span>Sort Order</span>
+                <input type="number" min="0" className="marketplace-settings__control" value={form.sort_order ?? 0} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
+              </label>
+
+              {form.billing_type === "one_time" ? (
+                <label className="marketplace-settings__field">
+                  <span>Duration (days)</span>
+                  <input type="number" min="1" className="marketplace-settings__control" value={form.duration_days ?? 30} onChange={(e) => setForm({ ...form, duration_days: Number(e.target.value) })} />
+                </label>
+              ) : null}
+
+              <label className="marketplace-settings__field admin-modal__full">
+                <span>Inclusions (one per line)</span>
+                <textarea
+                  className="marketplace-settings__control"
+                  rows={5}
+                  value={(form.inclusions ?? []).join("\n")}
+                  onChange={(e) => setForm({ ...form, inclusions: e.target.value.split("\n") })}
+                />
+              </label>
+            </div>
+
+            <label className="marketplace-settings__field admin-modal__checkbox">
               <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} />
-              <span>Active</span>
+              <span>Active plan</span>
             </label>
-            <button type="button" className="orders-modal__primary" disabled={saving} onClick={savePlan}>
-              {saving ? "Saving…" : "Save Plan"}
-            </button>
+
+            <div className="admin-modal__footer">
+              <button type="button" className="admin-page__btn admin-page__btn--ghost" onClick={() => setModalOpen(false)}>Cancel</button>
+              <button type="button" className="admin-page__btn admin-page__btn--primary" disabled={saving} onClick={savePlan}>
+                {saving ? "Saving…" : "Save Plan"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

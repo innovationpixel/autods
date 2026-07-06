@@ -118,7 +118,6 @@ import {
   isImportSupplierEnabled,
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
-import AdminPlansPage from '../autods/pages/AdminPlansPage';
 import { toast } from '../../utils/toast';
 const catalogSections = [
   {
@@ -1580,8 +1579,6 @@ const MarketplaceDashboard = () => {
               ? `Upload (${draftsMeta?.total ?? 0})`
               : activePage === "plans"
                 ? "Plans"
-                : activePage === "admin/plans"
-                  ? "Manage Plans"
               : activePage === "customer-support"
                 ? "Customer Support"
                 : activePage === "support-center"
@@ -2555,8 +2552,6 @@ const MarketplaceDashboard = () => {
               <MarketplaceSettingsPage />
             ) : activePage === "plans" ? (
               <PlansPage />
-            ) : activePage === "admin/plans" ? (
-              <AdminPlansPage />
             ) : (
               <>
                 <section className="marketplace-search-panel card-wrapper">

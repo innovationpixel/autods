@@ -32,7 +32,7 @@ export function loginAction(email, password, navigate) {
                 saveSession(response.data);
                 dispatch(loginConfirmedAction(response.data));
                 toast.success('Logged in successfully.');
-                navigate('/');
+                navigate(response.data?.user?.role === 'super_admin' ? '/admin' : '/');
             })
             .catch((error) => {
                 const { message, fieldErrors } = parseApiErrors(error);
@@ -88,7 +88,7 @@ export function checkAutoLogin(dispatch, navigate) {
         });
 
     if (window.location.pathname === '/user/login') {
-        navigate('/');
+        navigate(user?.role === 'super_admin' ? '/admin' : '/');
     }
 }
 
