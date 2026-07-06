@@ -32,7 +32,7 @@ import {
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
-import { fetchAliExpressStatus, disconnectAliExpressAction } from "../../store/actions/AliExpressActions";
+import { fetchAliExpressStatus } from "../../store/actions/AliExpressActions";
 import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
@@ -43,12 +43,11 @@ import {
   listAvailableSupplierProfiles,
   normalizeSuppliersFromApi,
 } from "../../utils/supplierProfiles";
-import { getAliExpressAuthUrl } from "../../services/AliExpressService";
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
 import { selectAliConnection } from "../../store/selectors/AliExpressSelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
-import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, ALIEXPRESS_OAUTH_HINT, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
+import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
 import { getAccountSettings, updateAccountSettings } from "../../services/SettingsService";
 import { getEbayPolicies } from "../../services/ProductService";
 import {
@@ -656,7 +655,6 @@ export default function MarketplaceSettingsPage() {
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [ebayCompleting, setEbayCompleting] = useState(false);
   const [ebayPasteUrl, setEbayPasteUrl] = useState("");
-  const [aliConnecting, setAliConnecting] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -869,37 +867,6 @@ export default function MarketplaceSettingsPage() {
   };
 
   const setPrimaryEbay = (id) => dispatch(setEbayPrimaryAction(id));
-
-  const connectAliExpress = async () => {
-    try {
-      setAliConnecting(true);
-      markOAuthReturnOrigin();
-      const res = await getAliExpressAuthUrl();
-      const tab = openOAuthTab(res.data.url);
-      oauthTabRef.current = tab;
-
-      if (!tab) {
-        setAliConnecting(false);
-        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
-        return;
-      }
-
-      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
-
-      watchOAuthTab(tab, () => {
-        setAliConnecting(false);
-        dispatch(fetchAliExpressStatus());
-      });
-    } catch (err) {
-      setAliConnecting(false);
-      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
-    }
-  };
-
-  const disconnectAliExpress = () => {
-    if (!window.confirm('Disconnect your AliExpress account?')) return;
-    dispatch(disconnectAliExpressAction());
-  };
 
   const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
 
@@ -1121,7 +1088,7 @@ export default function MarketplaceSettingsPage() {
         </div>
       )}
 
-      {/* ── AliExpress section ───────────────────────────────────────────────── */}
+      {/* ── AliExpress platform status (super admin connects in Admin → Manage Plans) ── */}
       {!aliConnection.credentials_configured && !aliConnection.loading && (
         <div
           className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected"
@@ -1134,79 +1101,48 @@ export default function MarketplaceSettingsPage() {
       )}
 
       <div className="marketplace-settings__store-settings-header" style={{ marginTop: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#e43226" }}>
-              Ali<span style={{ color: "#ff6a00" }}>Express</span>
-            </h3>
-            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
-              Authorize your AliExpress DS account to browse and import supplier products.
-            </p>
-          </div>
-          {!aliConnection.connected && (
-            <button
-              type="button"
-              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
-              onClick={connectAliExpress}
-              disabled={aliConnecting}
-              style={{ flexShrink: 0 }}
-            >
-              {aliConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
-              <span>{aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}</span>
-            </button>
-          )}
+        <div>
+          <h3 style={{ margin: 0, fontWeight: 900, fontSize: 20, color: "#e43226" }}>
+            Ali<span style={{ color: "#ff6a00" }}>Express</span>
+          </h3>
+          <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
+            Platform AliExpress is managed by a super admin for all users.
+          </p>
         </div>
       </div>
 
       {aliConnection.loading ? (
         <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading" style={{ padding: "16px 0" }}>
           <LuLoader className="spin-icon" />
-          <span>Checking connection status…</span>
+          <span>Checking platform status…</span>
         </div>
-      ) : aliConnection.connected ? (
+      ) : aliConnection.platform_import_available || aliConnection.connected ? (
         <div className="marketplace-settings__ebay-card" style={{ marginTop: 12, background: "#fff7f0", border: "1px solid #fed7aa" }}>
           <div className="marketplace-settings__ebay-info">
             <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
               <LuBadgeCheck style={{ color: "#c2410c" }} />
               <span>
-                Connected as <strong>{aliConnection.ae_user_nick ?? aliConnection.ae_account ?? "AliExpress Seller"}</strong>
+                Platform connected
+                {(aliConnection.ae_user_nick || aliConnection.ae_account) && (
+                  <>
+                    {" "}
+                    as <strong>{aliConnection.ae_user_nick ?? aliConnection.ae_account}</strong>
+                  </>
+                )}
               </span>
             </div>
-            {aliConnection.ae_account && (
-              <p className="marketplace-settings__ebay-sub">
-                Account: {aliConnection.ae_account}&nbsp;·&nbsp;
-                Connected: {aliConnection.connected_at ? new Date(aliConnection.connected_at).toLocaleDateString() : "—"}
-              </p>
-            )}
-          </div>
-          <div className="marketplace-settings__ebay-actions">
-            <button
-              type="button"
-              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
-              onClick={disconnectAliExpress}
-            >
-              <LuUnplug />
-              <span>Disconnect</span>
-            </button>
+            <p className="marketplace-settings__ebay-sub">
+              Browse and import AliExpress products are enabled for your account.
+            </p>
           </div>
         </div>
       ) : (
         <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected" style={{ padding: "20px 0" }}>
           <LuUnplug />
           <span>
-            {aliConnection.needs_reconnect
-              ? "Authorization expired — click Connect AliExpress to sign in again."
-              : (
-                <>
-                  Not connected — join the{" "}
-                  <a href="https://ds.aliexpress.com" target="_blank" rel="noreferrer">Dropshipping Center</a>
-                  , then click <em>Connect AliExpress</em>.
-                </>
-              )}
+            Platform AliExpress is not connected yet. Ask your super admin to connect it from{" "}
+            <strong>Admin → Manage Plans</strong>.
           </span>
-          <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280", maxWidth: 520 }}>
-            {ALIEXPRESS_OAUTH_HINT} Authorization opens in a new browser tab.
-          </p>
         </div>
       )}
     </div>

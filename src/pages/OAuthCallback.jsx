@@ -10,13 +10,16 @@ export default function OAuthCallback() {
         const params = new URLSearchParams(window.location.search);
         const platform = params.get('platform');
         const callbackStatus = params.get('status') ?? 'connected';
+        const returnPath = params.get('return_path');
         const base = `${returnOrigin}/settings?tab=store`;
 
         if (platform === 'ebay') {
             return `${base}&ebay=${callbackStatus}`;
         }
         if (platform === 'aliexpress') {
-            return `${base}&aliexpress=${callbackStatus}`;
+            const path = returnPath ?? '/settings?tab=store';
+            const connector = path.includes('?') ? '&' : '?';
+            return `${returnOrigin}${path}${connector}aliexpress=${callbackStatus}`;
         }
 
         return base;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuLoader, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
+import { LuBadgeCheck, LuLink, LuLoader, LuPencil, LuPlus, LuTrash2, LuUnplug } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import {
@@ -10,6 +10,12 @@ import {
   getAdminPlans,
   updateAdminPlan,
 } from "../../../services/PlanService";
+import {
+  disconnectAdminAliExpress,
+  getAdminAliExpressAuthUrl,
+  getAdminAliExpressStatus,
+} from "../../../services/AdminService";
+import { ALIEXPRESS_OAUTH_HINT, markOAuthReturnOrigin, openOAuthTab, OAUTH_TAB_HINT, watchOAuthTab } from "../../../utils/oauthBridge";
 
 const emptyPlan = {
   title: "",
@@ -26,12 +32,15 @@ const emptyPlan = {
 function AdminPlansPage() {
   const role = useSelector(selectUserRole);
   const navigate = useNavigate();
+  const { search } = useLocation();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyPlan);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [aliStatus, setAliStatus] = useState({ loading: true, connected: false });
+  const [aliConnecting, setAliConnecting] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -46,11 +55,29 @@ function AdminPlansPage() {
       .finally(() => setLoading(false));
   };
 
+  const loadAliExpressStatus = () => {
+    setAliStatus((prev) => ({ ...prev, loading: true }));
+    getAdminAliExpressStatus()
+      .then((res) => setAliStatus({ ...res.data, loading: false }))
+      .catch(() => setAliStatus({ loading: false, connected: false }));
+  };
+
   useEffect(() => {
     if (role === "super_admin") {
       loadPlans();
+      loadAliExpressStatus();
     }
   }, [role]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get("aliexpress") === "connected") {
+      toast.success("Platform AliExpress account connected.");
+      loadAliExpressStatus();
+    } else if (params.get("aliexpress") === "error") {
+      toast.error(`AliExpress connection failed: ${params.get("reason") ?? "Unknown error"}`);
+    }
+  }, [search]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -102,6 +129,42 @@ function AdminPlansPage() {
     }
   };
 
+  const connectPlatformAliExpress = async () => {
+    try {
+      setAliConnecting(true);
+      markOAuthReturnOrigin();
+      const res = await getAdminAliExpressAuthUrl("/admin/plans");
+      const tab = openOAuthTab(res.data.url);
+
+      if (!tab) {
+        setAliConnecting(false);
+        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
+        return;
+      }
+
+      toast.info(`${ALIEXPRESS_OAUTH_HINT} ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
+
+      watchOAuthTab(tab, () => {
+        setAliConnecting(false);
+        loadAliExpressStatus();
+      });
+    } catch (err) {
+      setAliConnecting(false);
+      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
+    }
+  };
+
+  const disconnectPlatformAliExpress = async () => {
+    if (!window.confirm("Disconnect the platform AliExpress account for all users?")) return;
+    try {
+      await disconnectAdminAliExpress();
+      toast.success("Platform AliExpress disconnected.");
+      loadAliExpressStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to disconnect AliExpress.");
+    }
+  };
+
   if (role !== "super_admin") {
     return null;
   }
@@ -116,6 +179,69 @@ function AdminPlansPage() {
 
   return (
     <section className="plans-page admin-plans-page">
+      <div className="admin-plans-page__ali card-wrapper" style={{ marginBottom: 20, padding: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <h2 style={{ margin: "0 0 6px", fontSize: 20 }}>Platform AliExpress</h2>
+            <p style={{ margin: 0, color: "#6b7280", fontSize: 14, maxWidth: 640 }}>
+              Connect the shared AliExpress Dropshipping account used for product browse and import across all clients.
+              Tokens are saved securely on the server and refreshed automatically.
+            </p>
+          </div>
+          {!aliStatus.loading && !aliStatus.connected ? (
+            <button
+              type="button"
+              className="marketplace-settings__plan-btn"
+              onClick={connectPlatformAliExpress}
+              disabled={aliConnecting || aliStatus.credentials_configured === false}
+            >
+              {aliConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+              <span>{aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}</span>
+            </button>
+          ) : null}
+        </div>
+
+        {aliStatus.credentials_configured === false ? (
+          <p style={{ margin: "14px 0 0", color: "#991b1b", fontSize: 13 }}>
+            Set ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET in the backend .env file first.
+          </p>
+        ) : null}
+
+        {aliStatus.loading ? (
+          <p style={{ margin: "14px 0 0", color: "#6b7280" }}>Checking platform connection…</p>
+        ) : aliStatus.connected ? (
+          <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#166534" }}>
+              <LuBadgeCheck />
+              <span>
+                Connected as <strong>{aliStatus.ae_user_nick ?? aliStatus.ae_account ?? "AliExpress Seller"}</strong>
+              </span>
+            </div>
+            {aliStatus.token_expires_at ? (
+              <span style={{ color: "#6b7280", fontSize: 13 }}>
+                Access token expires: {new Date(aliStatus.token_expires_at).toLocaleString()}
+              </span>
+            ) : null}
+            {aliStatus.needs_reconnect ? (
+              <span style={{ color: "#b45309", fontSize: 13 }}>Refresh token expired — reconnect AliExpress.</span>
+            ) : null}
+            <button
+              type="button"
+              className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
+              onClick={disconnectPlatformAliExpress}
+              style={{ width: "fit-content", marginTop: 4 }}
+            >
+              <LuUnplug />
+              <span>Disconnect platform account</span>
+            </button>
+          </div>
+        ) : (
+          <p style={{ margin: "14px 0 0", color: "#6b7280", fontSize: 13 }}>
+            Not connected. Clients cannot browse or import AliExpress products until you connect here.
+          </p>
+        )}
+      </div>
+
       <div className="admin-plans-page__head">
         <h2>Manage Plans</h2>
         <button type="button" className="marketplace-settings__plan-btn" onClick={openCreate}>
