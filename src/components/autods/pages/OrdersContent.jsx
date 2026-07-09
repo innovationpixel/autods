@@ -17,7 +17,6 @@ import {
   LuPlus,
   LuPrinter,
   LuRefreshCcw,
-  LuSend,
   LuSlidersHorizontal,
   LuTruck,
   LuX,
@@ -204,7 +203,6 @@ function OrdersContent({ searchQuery }) {
   const [openDetailsId, setOpenDetailsId] = useState("");
   const [openBulkMenu, setOpenBulkMenu] = useState(false);
   const [openPrintMenu, setOpenPrintMenu] = useState(false);
-  const [searchType, setSearchType] = useState("buyer_id");
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleColumnIds);
   const tableScrollRef = useRef(null);
 
@@ -480,8 +478,6 @@ function OrdersContent({ searchQuery }) {
 
     if (action === "update-pick-status") {
       toast.info("Update Pick Status — coming soon.");
-    } else if (action === "send-message") {
-      toast.info("Send Messages — coming soon.");
     } else {
       toast.info(`${label} for order ${orderLabel} — coming soon.`);
     }
@@ -568,14 +564,6 @@ function OrdersContent({ searchQuery }) {
 
             {openStatusId === order.id ? (
               <div className="orders-status-menu">
-                <button
-                  type="button"
-                  className="orders-status-menu__header"
-                  onClick={() => updateOrderStatus(order.id, "Ordered")}
-                >
-                  Send To Auto Order
-                </button>
-
                 {orderStatusOptions.map((option) => {
                   const optionMeta = statusMeta[option];
                   const OptionIcon = optionMeta.icon;
@@ -659,12 +647,6 @@ function OrdersContent({ searchQuery }) {
   };
 
   const hasSelection = selectedIds.length > 0;
-  const searchTypeLabels = {
-    buyer_id: "Buyer ID:",
-    order_id: "Order ID:",
-    sku: "SKU:",
-    item_id: "Item ID:",
-  };
 
   return (
     <section className="orders-page-content">
@@ -701,7 +683,6 @@ function OrdersContent({ searchQuery }) {
               <div className="orders-toolbar-dropdown__menu">
                 <button type="button" onClick={() => toast.info("Mark as shipped — coming soon.")}>Mark as shipped</button>
                 <button type="button" onClick={() => toast.info("Add tracking — coming soon.")}>Add tracking</button>
-                <button type="button" onClick={() => toast.info("Send message — coming soon.")}>Send message</button>
               </div>
             ) : null}
           </div>
@@ -747,15 +728,6 @@ function OrdersContent({ searchQuery }) {
         </div>
 
         <div className="orders-toolbar__actions orders-toolbar__actions--search">
-          <label className="orders-search-type">
-            <select value={searchType} onChange={(event) => setSearchType(event.target.value)}>
-              <option value="buyer_id">Buyer ID:</option>
-              <option value="order_id">Order ID:</option>
-              <option value="sku">SKU:</option>
-              <option value="item_id">Item ID:</option>
-            </select>
-          </label>
-          <span className="orders-search-type__label">{searchTypeLabels[searchType]}</span>
           <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh orders grid">
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
@@ -948,15 +920,6 @@ function OrdersContent({ searchQuery }) {
                             onClick={() => handleOrderAction(order.id, "update-pick-status", "Update Pick Status")}
                           >
                             <LuClipboardCheck />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="orders-row-actions__btn"
-                            aria-label="Send Messages"
-                            onClick={() => handleOrderAction(order.id, "send-message", "Send Messages")}
-                          >
-                            <LuSend />
                           </button>
 
                           <div className="orders-row-actions__item">
