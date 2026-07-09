@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuBadgeCheck, LuLink, LuLoader, LuPlug, LuSettings2, LuUnplug } from "react-icons/lu";
+import { LuBadgeCheck, LuLink, LuLoader, LuPlug, LuSettings2, LuSheet, LuUnplug } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import {
   disconnectAdminAliExpress,
   getAdminAliExpressAuthUrl,
   getAdminAliExpressStatus,
+  disconnectAdminGoogle,
+  getAdminGoogleAuthUrl,
+  getAdminGoogleStatus,
 } from "../../../services/AdminService";
 import { ALIEXPRESS_OAUTH_HINT, markOAuthReturnOrigin, openOAuthTab, OAUTH_TAB_HINT, watchOAuthTab } from "../../../utils/oauthBridge";
 
@@ -17,6 +20,8 @@ function AdminSettingsPage() {
   const { search } = useLocation();
   const [aliStatus, setAliStatus] = useState({ loading: true, connected: false });
   const [aliConnecting, setAliConnecting] = useState(false);
+  const [googleStatus, setGoogleStatus] = useState({ loading: true, connected: false });
+  const [googleConnecting, setGoogleConnecting] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -31,9 +36,17 @@ function AdminSettingsPage() {
       .catch(() => setAliStatus({ loading: false, connected: false }));
   };
 
+  const loadGoogleStatus = () => {
+    setGoogleStatus((prev) => ({ ...prev, loading: true }));
+    getAdminGoogleStatus()
+      .then((res) => setGoogleStatus({ ...res.data, loading: false }))
+      .catch(() => setGoogleStatus({ loading: false, connected: false }));
+  };
+
   useEffect(() => {
     if (role === "super_admin") {
       loadAliExpressStatus();
+      loadGoogleStatus();
     }
   }, [role]);
 
@@ -44,6 +57,13 @@ function AdminSettingsPage() {
       loadAliExpressStatus();
     } else if (params.get("aliexpress") === "error") {
       toast.error(`AliExpress connection failed: ${params.get("reason") ?? "Unknown error"}`);
+    }
+
+    if (params.get("google") === "connected") {
+      toast.success("Google account connected for Sheets export.");
+      loadGoogleStatus();
+    } else if (params.get("google") === "error") {
+      toast.error(`Google connection failed: ${params.get("reason") ?? "Unknown error"}`);
     }
   }, [search]);
 
@@ -82,6 +102,44 @@ function AdminSettingsPage() {
       loadAliExpressStatus();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to disconnect AliExpress.");
+    }
+  };
+
+  const connectGoogle = async () => {
+    try {
+      setGoogleConnecting(true);
+      markOAuthReturnOrigin();
+      const res = await getAdminGoogleAuthUrl("/admin/settings");
+      const tab = openOAuthTab(res.data?.url);
+
+      if (!tab) {
+        setGoogleConnecting(false);
+        toast.error(OAUTH_TAB_HINT);
+        return;
+      }
+
+      toast.info(`Sign in with the Google account that should own all client order sheets. ${OAUTH_TAB_HINT}`, { autoClose: 10000 });
+      watchOAuthTab(tab, () => {
+        setGoogleConnecting(false);
+        loadGoogleStatus();
+      });
+    } catch (err) {
+      setGoogleConnecting(false);
+      toast.error(err.response?.data?.error ?? "Failed to start Google authorization.");
+    }
+  };
+
+  const disconnectGoogle = async () => {
+    if (!window.confirm("Disconnect the Google account? Order exports will stop until reconnected.")) {
+      return;
+    }
+
+    try {
+      await disconnectAdminGoogle();
+      toast.success("Google account disconnected.");
+      loadGoogleStatus();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to disconnect Google.");
     }
   };
 
@@ -165,6 +223,70 @@ function AdminSettingsPage() {
             >
               {aliConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
               <span>{aliConnecting ? "Opening AliExpress…" : "Connect AliExpress"}</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="admin-settings-page__card card-wrapper">
+        <div className="admin-settings-page__card-head">
+          <div className="admin-settings-page__icon-wrap">
+            <LuSheet />
+          </div>
+          <div>
+            <h2>Google Sheets Export</h2>
+            <p>
+              Connect one Google account that will own every client&apos;s order spreadsheet.
+              Each client gets their own sheet created in this account and shared with them.
+            </p>
+          </div>
+        </div>
+
+        {googleStatus.credentials_configured === false ? (
+          <div className="admin-settings-page__alert admin-settings-page__alert--error">
+            Set <code>GOOGLE_OAUTH_CLIENT_ID</code> and <code>GOOGLE_OAUTH_CLIENT_SECRET</code> in the backend <code>.env</code> file first.
+          </div>
+        ) : null}
+
+        {googleStatus.loading ? (
+          <div className="admin-settings-page__loading">
+            <LuLoader className="spin-icon" />
+            <span>Checking connection…</span>
+          </div>
+        ) : googleStatus.connected ? (
+          <div className="admin-settings-page__status admin-settings-page__status--connected">
+            <div className="admin-settings-page__status-row">
+              <LuBadgeCheck />
+              <div>
+                <strong>Connected</strong>
+                <span>Signed in as {googleStatus.email ?? "Google account"}</span>
+              </div>
+            </div>
+            <p className="admin-settings-page__meta">
+              All client order sheets are created in and owned by this account.
+            </p>
+            <button
+              type="button"
+              className="admin-page__btn admin-page__btn--danger"
+              onClick={disconnectGoogle}
+            >
+              <LuUnplug />
+              <span>Disconnect</span>
+            </button>
+          </div>
+        ) : (
+          <div className="admin-settings-page__status">
+            <p className="admin-settings-page__meta">
+              Not connected. Clients cannot export orders to Google Sheets until you connect an account here.
+            </p>
+            <button
+              type="button"
+              className="admin-page__btn admin-page__btn--primary"
+              onClick={connectGoogle}
+              disabled={googleConnecting || googleStatus.credentials_configured === false}
+            >
+              {googleConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+              <span>{googleConnecting ? "Opening Google…" : "Connect Google"}</span>
             </button>
           </div>
         )}

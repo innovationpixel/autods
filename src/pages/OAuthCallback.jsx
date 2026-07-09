@@ -21,6 +21,13 @@ export default function OAuthCallback() {
             const connector = path.includes('?') ? '&' : '?';
             return `${returnOrigin}${path}${connector}aliexpress=${callbackStatus}`;
         }
+        if (platform === 'google') {
+            const path = returnPath ?? '/admin/settings';
+            const connector = path.includes('?') ? '&' : '?';
+            const reason = params.get('reason');
+            const reasonQuery = callbackStatus === 'error' && reason ? `&reason=${encodeURIComponent(reason)}` : '';
+            return `${returnOrigin}${path}${connector}google=${callbackStatus}${reasonQuery}`;
+        }
 
         return base;
     }, [returnOrigin]);

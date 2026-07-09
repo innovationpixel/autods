@@ -31,3 +31,17 @@ export const getAdminAliExpressAuthUrl = (returnPath = '/admin/settings') =>
 
 export const disconnectAdminAliExpress = () =>
     axiosInstance.delete('/admin/aliexpress/disconnect');
+
+export const getAdminGoogleStatus = () =>
+    axiosInstance.get('/admin/google/status');
+
+export const getAdminGoogleAuthUrl = (returnPath = '/admin/settings') =>
+    axiosInstance.get('/admin/google/auth-url', {
+        params: {
+            return_origin: window.location.origin,
+            return_path: returnPath,
+        },
+    });
+
+export const disconnectAdminGoogle = () =>
+    axiosInstance.delete('/admin/google/disconnect');
