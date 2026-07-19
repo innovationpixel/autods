@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, pushOrderTracking, syncOrders, updateOrderSource, updateOrderTracking, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
+import { getOrders, pushOrderTracking, syncOrders, updateOrderFulfillment, updateOrderSource, updateOrderTracking, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuBolt,
-  LuCheck,
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
@@ -13,7 +12,6 @@ import {
   LuClock3,
   LuExternalLink,
   LuInbox,
-  LuLoader,
   LuMenu,
   LuPencil,
   LuPlus,
@@ -37,6 +35,7 @@ import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
 import ProductItemIdCell from "../ProductItemIdCell";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
+import QuickEditModal from "../QuickEditModal";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
@@ -57,6 +56,16 @@ const ORDER_SORT_OPTIONS = [
 ];
 
 const DEFAULT_DATE_PRESET = "30days";
+
+const ORDER_TOTAL_COLUMNS = {
+  total: { accessor: (order) => order.totalValue, format: "money" },
+  totalQuantity: { accessor: (order) => order.totalQuantity, format: "number" },
+  profit: { accessor: (order) => order.profitValue, format: "money" },
+  refundTotal: { accessor: (order) => order.refundTotalValue, format: "money" },
+  shippingPrice: { accessor: (order) => order.shippingPriceValue, format: "money" },
+  prepCost: { accessor: (order) => order.prepCost, format: "money" },
+  shippingCost: { accessor: (order) => order.shippingCost, format: "money" },
+};
 
 function formatDateInput(date) {
   const year = date.getFullYear();
@@ -252,6 +261,7 @@ function mapApiOrder(order) {
     transactionId: firstItem.lineItemId ?? raw.salesRecordReference ?? "—",
     refundDate: refund.refundDate ? String(refund.refundDate).slice(0, 10) : "—",
     refundTotal: formatMoney(refund.amount?.value ?? raw.refundAmount?.value, refund.amount?.currency ?? currency),
+    refundTotalValue: Number(refund.amount?.value ?? raw.refundAmount?.value ?? 0) || 0,
     cancelStatus: raw.cancelStatus?.cancelState ?? "—",
     returnStatus: raw.returnStatus ?? raw.cancelStatus?.cancelState ?? "—",
     inquiryStatus: raw.inquiryStatus ?? "—",
@@ -265,6 +275,7 @@ function mapApiOrder(order) {
     shippingStatus,
     shippingService: shippingStep.shippingServiceCode ?? fulfillment.shippingStep?.shippingCarrierCode ?? "—",
     shippingPrice: formatMoney(delivery.shippingCost?.value ?? delivery.amount?.value, delivery.shippingCost?.currency ?? currency),
+    shippingPriceValue: Number(delivery.shippingCost?.value ?? delivery.amount?.value ?? 0) || 0,
     trackingNumber: trackingValue || "—",
     trackingNumberRaw: trackingValue,
     carrier: carrierRaw || "—",
@@ -303,6 +314,13 @@ function mapApiOrder(order) {
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     totalValue: Number(sellPrice) || 0,
     profitValue: profit != null && !Number.isNaN(Number(profit)) ? Number(profit) : null,
+    currency,
+    aliexpressOrderId: order.aliexpress_order_id ?? "—",
+    aliexpressOrderIdRaw: order.aliexpress_order_id ?? "",
+    aliexpressStatus: order.aliexpress_order_status ?? "—",
+    aliexpressStatusRaw: order.aliexpress_order_status ?? "",
+    prepCost: order.prep_cost ?? 0,
+    shippingCost: order.shipping_cost ?? 0,
   };
 }
 
@@ -341,6 +359,9 @@ function OrdersContent({ searchQuery }) {
   const [carrierDraft, setCarrierDraft] = useState("");
   const [savingTrackingId, setSavingTrackingId] = useState("");
   const [pushingTrackingId, setPushingTrackingId] = useState("");
+  const [editingFulfillment, setEditingFulfillment] = useState(null);
+  const [fulfillmentDraft, setFulfillmentDraft] = useState("");
+  const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
   const tableScrollRef = useRef(null);
 
   const visibleColumns = useMemo(
@@ -463,6 +484,55 @@ function OrdersContent({ searchQuery }) {
     }
   };
 
+  const FULFILLMENT_FIELDS = {
+    aliexpressOrderId: { key: "aliexpress_order_id", label: "AliExpress order ID" },
+    aliexpressStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
+    prepCost: { key: "prep_cost", label: "Prep cost" },
+    shippingCost: { key: "shipping_cost", label: "Shipping cost" },
+  };
+
+  const startEditFulfillment = (order, columnId) => {
+    setEditingFulfillment({ orderId: order.id, columnId });
+    setFulfillmentDraft(
+      columnId === "prepCost" || columnId === "shippingCost"
+        ? String(order[columnId] ?? 0)
+        : order[`${columnId}Raw`] ?? "",
+    );
+  };
+
+  const cancelEditFulfillment = () => {
+    setEditingFulfillment(null);
+    setFulfillmentDraft("");
+  };
+
+  const saveFulfillment = async (order, columnId) => {
+    const field = FULFILLMENT_FIELDS[columnId];
+    const isNumeric = columnId === "prepCost" || columnId === "shippingCost";
+
+    let value = fulfillmentDraft.trim();
+    if (isNumeric) {
+      const parsed = Number.parseFloat(value || "0");
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        toast.warn(`Enter a valid ${field.label.toLowerCase()}.`);
+        return;
+      }
+      value = Number(parsed.toFixed(2));
+    }
+
+    const fulfillmentKey = `${order.id}:${columnId}`;
+    setSavingFulfillmentKey(fulfillmentKey);
+    try {
+      await updateOrderFulfillment(order.id, { [field.key]: value });
+      toast.success(`${field.label} updated.`);
+      cancelEditFulfillment();
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, `Could not update ${field.label.toLowerCase()}.`));
+    } finally {
+      setSavingFulfillmentKey("");
+    }
+  };
+
   const startEditTracking = (order) => {
     setEditingTrackingId(order.id);
     setTrackingDraft(order.trackingNumberRaw ?? "");
@@ -552,6 +622,28 @@ function OrdersContent({ searchQuery }) {
       compact={compact}
     />
   );
+
+  const renderFulfillmentCell = (order, columnId) => {
+    const isNumeric = columnId === "prepCost" || columnId === "shippingCost";
+    const displayValue = isNumeric ? formatMoney(order[columnId] ?? 0) : order[columnId];
+
+    return (
+      <button
+        type="button"
+        className="products-tracking-btn"
+        onClick={(event) => {
+          event.stopPropagation();
+          startEditFulfillment(order, columnId);
+        }}
+        title={`Edit ${FULFILLMENT_FIELDS[columnId].label}`}
+      >
+        <span className={displayValue && displayValue !== "—" ? undefined : "products-tracking-btn__placeholder"}>
+          {displayValue || "—"}
+        </span>
+        <LuPencil className="products-tracking-btn__icon" />
+      </button>
+    );
+  };
 
   useEffect(() => {
     const handleDocumentClick = () => {
@@ -660,6 +752,19 @@ function OrdersContent({ searchQuery }) {
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const visibleOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  const columnTotals = useMemo(() => {
+    const sums = {};
+
+    Object.entries(ORDER_TOTAL_COLUMNS).forEach(([columnId, { accessor }]) => {
+      sums[columnId] = filteredOrders.reduce((sum, order) => {
+        const value = accessor(order);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+    });
+
+    return sums;
+  }, [filteredOrders]);
   const allVisibleSelected =
     visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id));
   const tableColumnCount = visibleColumns.length + 2;
@@ -971,62 +1076,22 @@ function OrdersContent({ searchQuery }) {
             <div>
               <span className="orders-paired-values__type">BUY</span>
               <span className="orders-paired-values__platform">{platformLabel(order.sourcePlatform)}</span>
-              {editingBuySourceId === order.id ? (
-                <div className="products-source-edit" onClick={(event) => event.stopPropagation()}>
-                  <input
-                    type="text"
-                    className="products-source-edit__input"
-                    placeholder="Item ID or source URL"
-                    value={buySourceDraft}
-                    onChange={(event) => setBuySourceDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        saveBuySource(order);
-                      }
-                      if (event.key === "Escape") {
-                        cancelEditBuySource();
-                      }
-                    }}
-                    autoFocus
-                    disabled={savingBuySourceId === order.id}
-                  />
-                  <button
-                    type="button"
-                    className="products-source-edit__btn products-source-edit__btn--save"
-                    onClick={() => saveBuySource(order)}
-                    disabled={savingBuySourceId === order.id}
-                    aria-label="Save source link"
-                  >
-                    {savingBuySourceId === order.id ? <LuLoader className="products-source-edit__spin" /> : <LuCheck />}
-                  </button>
-                  <button
-                    type="button"
-                    className="products-source-edit__btn"
-                    onClick={cancelEditBuySource}
-                    disabled={savingBuySourceId === order.id}
-                    aria-label="Cancel source edit"
-                  >
-                    <LuX />
-                  </button>
-                </div>
-              ) : (
-                <div className="products-source-cell">
-                  {order.itemBuyUrl || (order.itemBuy && order.itemBuy !== "—") ? (
-                    <ProductItemIdCell itemId={order.itemBuy} sku={order.listingSku} url={order.itemBuyUrl} />
-                  ) : (
-                    <span className="products-source-btn__placeholder">Add source</span>
-                  )}
-                  <button
-                    type="button"
-                    className="products-source-cell__edit"
-                    onClick={() => startEditBuySource(order)}
-                    title="Edit source link"
-                    aria-label="Edit source link"
-                  >
-                    <LuPencil />
-                  </button>
-                </div>
-              )}
+              <div className="products-source-cell">
+                {order.itemBuyUrl || (order.itemBuy && order.itemBuy !== "—") ? (
+                  <ProductItemIdCell itemId={order.itemBuy} sku={order.listingSku} url={order.itemBuyUrl} />
+                ) : (
+                  <span className="products-source-btn__placeholder">Add source</span>
+                )}
+                <button
+                  type="button"
+                  className="products-source-cell__edit"
+                  onClick={() => startEditBuySource(order)}
+                  title="Edit source link"
+                  aria-label="Edit source link"
+                >
+                  <LuPencil />
+                </button>
+              </div>
             </div>
             <div>
               <span className="orders-paired-values__type">SELL</span>
@@ -1062,6 +1127,11 @@ function OrdersContent({ searchQuery }) {
         return renderTrackingEditor(order);
       case "carrier":
         return editingTrackingId === order.id ? renderTrackingEditor(order, true) : renderTrackingEditor(order, true);
+      case "aliexpressOrderId":
+      case "aliexpressStatus":
+      case "prepCost":
+      case "shippingCost":
+        return renderFulfillmentCell(order, columnId);
       case "invoice":
       case "packingSlip":
         return (
@@ -1335,6 +1405,28 @@ function OrdersContent({ searchQuery }) {
         <div className="orders-table-scroll" ref={tableScrollRef}>
           <table className="orders-table" style={{ minWidth: tableMinWidth }}>
             <thead>
+              <tr className="orders-table__totals-row">
+                <td className="orders-table__checkbox-col">Totals</td>
+                {visibleColumns.map((column) => {
+                  const totalColumn = ORDER_TOTAL_COLUMNS[column.id];
+
+                  return (
+                    <td
+                      key={column.id}
+                      className="orders-table__col"
+                      data-column={column.id}
+                      style={{ minWidth: column.minWidth, width: column.minWidth }}
+                    >
+                      {totalColumn
+                        ? totalColumn.format === "money"
+                          ? formatMoney(columnTotals[column.id], filteredOrders[0]?.currency)
+                          : columnTotals[column.id]
+                        : ""}
+                    </td>
+                  );
+                })}
+                <td className="orders-table__actions-col" />
+              </tr>
               <tr>
                 <th className="orders-table__checkbox-col" />
                 {visibleColumns.map((column) => (
@@ -1488,6 +1580,48 @@ function OrdersContent({ searchQuery }) {
           </div>
         </div>
       </div>
+
+      <QuickEditModal
+        open={Boolean(editingBuySourceId)}
+        title="Edit Source Link"
+        description="Paste the AliExpress (or other supplier) URL or item ID this order was sourced from."
+        label="Source link or item ID"
+        value={buySourceDraft}
+        onChange={setBuySourceDraft}
+        onSave={() => saveBuySource(orders.find((order) => order.id === editingBuySourceId))}
+        onClose={cancelEditBuySource}
+        saving={savingBuySourceId === editingBuySourceId}
+        placeholder="https://www.aliexpress.com/item/... or item ID"
+      />
+
+      <QuickEditModal
+        open={Boolean(editingFulfillment)}
+        title={editingFulfillment ? `Edit ${FULFILLMENT_FIELDS[editingFulfillment.columnId].label}` : ""}
+        label={editingFulfillment ? FULFILLMENT_FIELDS[editingFulfillment.columnId].label : ""}
+        type={
+          editingFulfillment?.columnId === "prepCost" || editingFulfillment?.columnId === "shippingCost"
+            ? "number"
+            : "text"
+        }
+        min={
+          editingFulfillment?.columnId === "prepCost" || editingFulfillment?.columnId === "shippingCost"
+            ? "0"
+            : undefined
+        }
+        step={
+          editingFulfillment?.columnId === "prepCost" || editingFulfillment?.columnId === "shippingCost"
+            ? "0.01"
+            : undefined
+        }
+        value={fulfillmentDraft}
+        onChange={setFulfillmentDraft}
+        onSave={() => saveFulfillment(orders.find((order) => order.id === editingFulfillment.orderId), editingFulfillment.columnId)}
+        onClose={cancelEditFulfillment}
+        saving={Boolean(savingFulfillmentKey)}
+        placeholder={
+          editingFulfillment?.columnId === "prepCost" || editingFulfillment?.columnId === "shippingCost" ? "0.00" : "—"
+        }
+      />
     </section>
   );
 }

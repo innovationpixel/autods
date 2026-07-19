@@ -6,7 +6,6 @@ import {
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
-  LuCheck,
   LuEllipsisVertical,
   LuExternalLink,
   LuInbox,
@@ -38,6 +37,7 @@ import {
 import { bulkDeleteProducts, deleteProduct, getImportHistory, publishProduct, syncProductToStore, updateProduct } from "../../../services/ProductService";
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
 import ProductEditorModal from "../ProductEditorModal";
+import QuickEditModal from "../QuickEditModal";
 import { buildDraftFormState, serializeDraftFormForApi } from "../../../utils/draftEditorState";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import UploadHistoryPanel from "../UploadHistoryPanel";
@@ -50,6 +50,7 @@ import {
   resolveVisibleProductColumns,
   saveVisibleProductColumnIds,
 } from "../productColumns";
+import ProductItemIdCell from "../ProductItemIdCell";
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -88,7 +89,7 @@ function buildImportBatchAlert(batch) {
   };
 }
 
-import ProductItemIdCell from "../ProductItemIdCell";
+function mapListingRow(item) {
   const available = Math.max(0, Number(item.quantity ?? 0));
   const sold = Number(item.quantity_sold ?? 0);
   const onHold = 0;
@@ -150,6 +151,9 @@ function ProductsContent({ searchQuery }) {
   const [editingBuySourceId, setEditingBuySourceId] = useState("");
   const [buySourceDraft, setBuySourceDraft] = useState("");
   const [savingBuySourceId, setSavingBuySourceId] = useState("");
+  const [editingSellIdId, setEditingSellIdId] = useState("");
+  const [sellIdDraft, setSellIdDraft] = useState("");
+  const [savingSellIdId, setSavingSellIdId] = useState("");
   const [tableView, setTableView] = useState("compact");
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleProductColumnIds);
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
@@ -269,6 +273,33 @@ function ProductsContent({ searchQuery }) {
       toast.error(getApiErrorMessage(err, "Could not update source link."));
     } finally {
       setSavingBuySourceId("");
+    }
+  };
+
+  const startEditSellId = (item) => {
+    setEditingSellIdId(item.id);
+    setSellIdDraft(item.itemSell !== "—" ? item.itemSell : "");
+    setOpenMenuId("");
+  };
+
+  const cancelEditSellId = () => {
+    setEditingSellIdId("");
+    setSellIdDraft("");
+  };
+
+  const saveSellId = async (item) => {
+    const trimmed = sellIdDraft.trim();
+
+    setSavingSellIdId(item.id);
+    try {
+      const res = await updateProduct(item.id, { ebay_item_id: trimmed || null });
+      toast.success(res.data?.message ?? "Item ID (Sell) updated.");
+      cancelEditSellId();
+      loadListings();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update Item ID (Sell)."));
+    } finally {
+      setSavingSellIdId("");
     }
   };
 
@@ -548,46 +579,7 @@ function ProductsContent({ searchQuery }) {
       case "store":
         return <span className="products-store-chip">{item.storeName}</span>;
       case "stockAvailable":
-        return editingStockId === item.id ? (
-          <div className="products-stock-edit" onClick={(e) => e.stopPropagation()}>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              className="products-stock-edit__input"
-              value={stockDraft}
-              onChange={(e) => setStockDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  saveStockQty(item);
-                }
-                if (e.key === "Escape") {
-                  cancelEditStock();
-                }
-              }}
-              autoFocus
-              disabled={savingStockId === item.id}
-            />
-            <button
-              type="button"
-              className="products-stock-edit__btn products-stock-edit__btn--save"
-              onClick={() => saveStockQty(item)}
-              disabled={savingStockId === item.id}
-              aria-label="Save stock quantity"
-            >
-              {savingStockId === item.id ? <LuLoader className="products-stock-edit__spin" /> : <LuCheck />}
-            </button>
-            <button
-              type="button"
-              className="products-stock-edit__btn"
-              onClick={cancelEditStock}
-              disabled={savingStockId === item.id}
-              aria-label="Cancel stock edit"
-            >
-              <LuX />
-            </button>
-          </div>
-        ) : (
+        return (
           <button type="button" className="products-stock-btn" onClick={() => startEditStock(item)} title="Update stock quantity">
             <span className={`products-count ${item.available === 0 ? "products-count--red" : "products-count--green"}`}>{item.available}</span>
             <LuPencil className="products-stock-btn__icon" />
@@ -621,45 +613,7 @@ function ProductsContent({ searchQuery }) {
       case "dws":
         return item.dws;
       case "itemIdBuy":
-        return editingBuySourceId === item.id ? (
-          <div className="products-source-edit" onClick={(e) => e.stopPropagation()}>
-            <input
-              type="text"
-              className="products-source-edit__input"
-              placeholder="Item ID or source URL"
-              value={buySourceDraft}
-              onChange={(e) => setBuySourceDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  saveBuySource(item);
-                }
-                if (e.key === "Escape") {
-                  cancelEditBuySource();
-                }
-              }}
-              autoFocus
-              disabled={savingBuySourceId === item.id}
-            />
-            <button
-              type="button"
-              className="products-source-edit__btn products-source-edit__btn--save"
-              onClick={() => saveBuySource(item)}
-              disabled={savingBuySourceId === item.id}
-              aria-label="Save source link"
-            >
-              {savingBuySourceId === item.id ? <LuLoader className="products-source-edit__spin" /> : <LuCheck />}
-            </button>
-            <button
-              type="button"
-              className="products-source-edit__btn"
-              onClick={cancelEditBuySource}
-              disabled={savingBuySourceId === item.id}
-              aria-label="Cancel source edit"
-            >
-              <LuX />
-            </button>
-          </div>
-        ) : (
+        return (
           <div className="products-source-cell">
             {item.itemBuyUrl || (item.itemBuy && item.itemBuy !== "—") ? (
               <ProductItemIdCell itemId={item.itemBuy} sku={item.listingSku} url={item.itemBuyUrl} />
@@ -678,7 +632,24 @@ function ProductsContent({ searchQuery }) {
           </div>
         );
       case "itemIdSell":
-        return <ProductItemIdCell itemId={item.itemSell} sku={item.listingSku} url={item.itemSellUrl} />;
+        return (
+          <div className="products-source-cell">
+            {item.itemSellUrl || (item.itemSell && item.itemSell !== "—") ? (
+              <ProductItemIdCell itemId={item.itemSell} sku={item.listingSku} url={item.itemSellUrl} />
+            ) : (
+              <span className="products-source-btn__placeholder">Add item ID</span>
+            )}
+            <button
+              type="button"
+              className="products-source-cell__edit"
+              onClick={() => startEditSellId(item)}
+              title="Edit Item ID (Sell)"
+              aria-label="Edit Item ID (Sell)"
+            >
+              <LuPencil />
+            </button>
+          </div>
+        );
       case "tags":
         return "—";
       case "asin":
@@ -1117,6 +1088,47 @@ function ProductsContent({ searchQuery }) {
         onChange={setEditorForm}
         onSave={saveProductEditor}
         onClose={closeProductEditor}
+      />
+
+      <QuickEditModal
+        open={Boolean(editingBuySourceId)}
+        title="Edit Source Link"
+        description="Paste the AliExpress (or other supplier) URL or item ID this product was sourced from."
+        label="Source link or item ID"
+        value={buySourceDraft}
+        onChange={setBuySourceDraft}
+        onSave={() => saveBuySource(rows.find((row) => row.id === editingBuySourceId))}
+        onClose={cancelEditBuySource}
+        saving={savingBuySourceId === editingBuySourceId}
+        placeholder="https://www.aliexpress.com/item/... or item ID"
+      />
+
+      <QuickEditModal
+        open={Boolean(editingSellIdId)}
+        title="Edit Item ID (Sell)"
+        description="The eBay listing item ID this product is published as."
+        label="eBay item ID"
+        value={sellIdDraft}
+        onChange={setSellIdDraft}
+        onSave={() => saveSellId(rows.find((row) => row.id === editingSellIdId))}
+        onClose={cancelEditSellId}
+        saving={savingSellIdId === editingSellIdId}
+        placeholder="e.g. 397686874847"
+      />
+
+      <QuickEditModal
+        open={Boolean(editingStockId)}
+        title="Update Stock Quantity"
+        label="Available quantity"
+        type="number"
+        min="0"
+        step="1"
+        value={stockDraft}
+        onChange={setStockDraft}
+        onSave={() => saveStockQty(rows.find((row) => row.id === editingStockId))}
+        onClose={cancelEditStock}
+        saving={savingStockId === editingStockId}
+        placeholder="0"
       />
     </section>
   );

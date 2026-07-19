@@ -47,6 +47,10 @@ const COLUMN_MIN_WIDTHS = {
   taxRef: 110,
   channel: 130,
   teammate: 120,
+  aliexpressOrderId: 160,
+  aliexpressStatus: 160,
+  prepCost: 110,
+  shippingCost: 110,
 };
 
 export const ORDER_TABLE_FIXED_WIDTH = {
@@ -100,6 +104,10 @@ export const orderTableColumns = [
   { id: "taxRef", label: "Tax Ref", defaultVisible: false, manage: true },
   { id: "channel", label: "Channel", defaultVisible: false, manage: true },
   { id: "teammate", label: "Teammate", defaultVisible: false, manage: true },
+  { id: "aliexpressOrderId", label: "Aliexpress Order ID", defaultVisible: true, manage: true },
+  { id: "aliexpressStatus", label: "Aliexpress Order Status", defaultVisible: true, manage: true },
+  { id: "prepCost", label: "Prep", defaultVisible: false, manage: true },
+  { id: "shippingCost", label: "Shipping", defaultVisible: false, manage: true },
 ].map((column) => ({
   ...column,
   minWidth: COLUMN_MIN_WIDTHS[column.id] ?? 120,

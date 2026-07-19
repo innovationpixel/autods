@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet } from "../../../services/OrderService";
+import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -11,6 +11,7 @@ import {
   LuExternalLink,
   LuFileSpreadsheet,
   LuMenu,
+  LuPencil,
   LuRefreshCcw,
   LuTruck,
   LuUserPlus,
@@ -27,6 +28,7 @@ import {
 } from "../helpers";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import InviteSheetMembersModal from "../InviteSheetMembersModal";
+import QuickEditModal from "../QuickEditModal";
 
 const ebayStatusIcons = {
   pending: LuClock3,
@@ -58,6 +60,9 @@ function CalculationsContent({ searchQuery = "" }) {
     spreadsheet_url: "",
     last_synced_at: null,
   });
+  const [editingCostId, setEditingCostId] = useState("");
+  const [costDraft, setCostDraft] = useState("");
+  const [savingCostId, setSavingCostId] = useState("");
 
   const loadSheetStatus = async () => {
     try {
@@ -130,6 +135,46 @@ function CalculationsContent({ searchQuery = "" }) {
       toast.error(getApiErrorMessage(err, "Could not invite team members."));
     } finally {
       setSheetInviting(false);
+    }
+  };
+
+  const handleStartCostEdit = (row) => {
+    setEditingCostId(row.id);
+    setCostDraft(row.cost ? String(row.cost) : "");
+  };
+
+  const handleCancelCostEdit = () => {
+    setEditingCostId("");
+    setCostDraft("");
+  };
+
+  const handleSaveCost = async (row) => {
+    const parsed = Number.parseFloat(costDraft);
+
+    if (costDraft.trim() !== "" && (!Number.isFinite(parsed) || parsed < 0)) {
+      toast.warn("Enter a valid cost amount.");
+      return;
+    }
+
+    const cost = costDraft.trim() === "" ? null : Number(parsed.toFixed(2));
+
+    setSavingCostId(row.id);
+    try {
+      const res = await updateOrderCost(row.id, { cost });
+      const updatedBuyPrice = res.data?.order?.buy_price ?? cost;
+
+      setOrders((current) =>
+        current.map((order) =>
+          String(order.id) === row.id ? { ...order, buy_price: updatedBuyPrice, profit: null } : order,
+        ),
+      );
+      toast.success("Cost updated.");
+      setEditingCostId("");
+      setCostDraft("");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to update cost."));
+    } finally {
+      setSavingCostId("");
     }
   };
 
@@ -268,6 +313,22 @@ function CalculationsContent({ searchQuery = "" }) {
         onInvite={handleInviteMembers}
       />
 
+      <QuickEditModal
+        open={Boolean(editingCostId)}
+        title="Edit Cost"
+        description="The AliExpress (or other supplier) cost for this order."
+        label="Cost"
+        type="number"
+        min="0"
+        step="0.01"
+        value={costDraft}
+        onChange={setCostDraft}
+        onSave={() => handleSaveCost(calculationRows.find((row) => row.id === editingCostId))}
+        onClose={handleCancelCostEdit}
+        saving={savingCostId === editingCostId}
+        placeholder="0.00"
+      />
+
       <section className="calculations-table-panel card-wrapper">
         <div className="calculations-table-toolbar">
           <strong>{filteredRows.length} orders</strong>
@@ -340,7 +401,17 @@ function CalculationsContent({ searchQuery = "" }) {
                           </span>
                         </td>
 
-                        <td className="calculations-table__money">{formatCalculationAmount(row.cost)}</td>
+                        <td className="calculations-table__money calculations-table__money--cost">
+                          <button
+                            type="button"
+                            className="products-tracking-btn"
+                            onClick={() => handleStartCostEdit(row)}
+                            title="Edit cost"
+                          >
+                            <span>{formatCalculationAmount(row.cost)}</span>
+                            <LuPencil className="products-tracking-btn__icon" />
+                          </button>
+                        </td>
                         <td className="calculations-table__money">{formatCalculationAmount(row.shipping)}</td>
                         <td className="calculations-table__money">{formatCalculationAmount(row.earn)}</td>
                         <td className="calculations-table__money calculations-table__money--profit">

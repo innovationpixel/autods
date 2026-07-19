@@ -2,11 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   LuArrowDownLeft,
   LuArrowDownToLine,
-  LuBadgeCheck,
-  LuChevronDown,
-  LuCircleHelp,
   LuClock3,
   LuCreditCard,
+  LuLoader,
   LuPlus,
   LuSparkles,
   LuTrendingDown,
@@ -14,16 +12,15 @@ import {
   LuX,
   LuZap,
 } from "react-icons/lu";
-import {
-  orderProcessingBalanceDefaults,
-  orderProcessingFundAmounts,
-  orderProcessingPaymentMethods,
-} from "../constants";
+import { orderProcessingFundAmounts } from "../constants";
+import { toast } from "../../../utils/toast";
+import { openPaymentCheckout } from "../../../utils/paymentCheckout";
+import { depositWalletPayPal, depositWalletStripe, getWalletSummary } from "../../../services/WalletService";
 
 const balanceMetrics = [
-  { key: "deposits", label: "Deposits", icon: LuArrowDownLeft, tone: "emerald", hint: "Total funds loaded" },
-  { key: "spend", label: "Spend", icon: LuTrendingDown, tone: "rose", hint: "Used on fulfillment" },
-  { key: "pending", label: "Pending", icon: LuClock3, tone: "amber", hint: "Awaiting clearance" },
+  { key: "total_deposited", label: "Deposits", icon: LuArrowDownLeft, tone: "emerald", hint: "Total funds loaded" },
+  { key: "total_spent", label: "Spend", icon: LuTrendingDown, tone: "rose", hint: "Used on fulfillment" },
+  { key: "total_pending", label: "Pending", icon: LuClock3, tone: "amber", hint: "Awaiting clearance" },
 ];
 
 function formatUsd(value) {
@@ -32,32 +29,14 @@ function formatUsd(value) {
     currency: "USD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(Number(value) || 0);
 }
 
-function FeeTooltip({ text }) {
-  return (
-    <span className="order-processing-tooltip">
-      <button type="button" className="order-processing-tooltip__trigger" aria-label="View processing fee details">
-        <LuCircleHelp />
-      </button>
-      <span className="order-processing-tooltip__content" role="tooltip">
-        {text}
-      </span>
-    </span>
-  );
-}
-
-function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
+function AddFundsModal({ isOpen, currentBalance, onClose, onDeposit }) {
   const [selectedAmount, setSelectedAmount] = useState(50);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustomAmount, setUseCustomAmount] = useState(false);
-  const [paymentMethodId, setPaymentMethodId] = useState(orderProcessingPaymentMethods[0]?.id ?? "");
-  const [paymentMenuOpen, setPaymentMenuOpen] = useState(false);
-  const [showAddPayment, setShowAddPayment] = useState(false);
-  const [newPaymentLabel, setNewPaymentLabel] = useState("");
-
-  const selectedPayment = orderProcessingPaymentMethods.find((method) => method.id === paymentMethodId);
+  const [checkoutProvider, setCheckoutProvider] = useState("");
 
   const resolvedAmount = useMemo(() => {
     if (useCustomAmount) {
@@ -67,11 +46,6 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
 
     return selectedAmount;
   }, [customAmount, selectedAmount, useCustomAmount]);
-
-  const feeRate = paymentMethodId === "paypal" ? 0.029 : 0.05;
-  const flatFee = paymentMethodId === "paypal" && resolvedAmount > 0 ? 0.3 : 0;
-  const processingFee = resolvedAmount > 0 ? resolvedAmount * feeRate + flatFee : 0;
-  const totalCharge = resolvedAmount + processingFee;
 
   useEffect(() => {
     if (!isOpen) {
@@ -100,6 +74,20 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
     setUseCustomAmount(true);
   };
 
+  const handleDeposit = async (provider) => {
+    if (resolvedAmount < 5) {
+      toast.warn("Enter an amount of at least $5.");
+      return;
+    }
+
+    setCheckoutProvider(provider);
+    try {
+      await onDeposit(provider, resolvedAmount);
+    } finally {
+      setCheckoutProvider("");
+    }
+  };
+
   return (
     <div className="balance-modal-layer order-processing-modal-layer" role="presentation">
       <button type="button" className="balance-modal-layer__backdrop" aria-label="Close add funds modal" onClick={onClose} />
@@ -122,7 +110,7 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
           </span>
           <div>
             <h2>Add funds</h2>
-            <p>Instantly top up your wallet and keep orders moving without delays.</p>
+            <p>Top up your wallet and keep orders moving without delays.</p>
           </div>
         </div>
 
@@ -172,9 +160,9 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
               <span>$</span>
               <input
                 type="number"
-                min="1"
+                min="5"
                 step="0.01"
-                placeholder="Enter custom amount"
+                placeholder="Enter custom amount (min $5)"
                 value={customAmount}
                 onChange={(event) => setCustomAmount(event.target.value)}
               />
@@ -182,112 +170,34 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
           ) : null}
         </div>
 
-        <div className="order-processing-funds-modal__section">
-          <div className="order-processing-funds-modal__section-head">
-            <span className="order-processing-funds-modal__step">2</span>
-            <label className="order-processing-funds-modal__label">Select payment method</label>
-            {selectedPayment ? <FeeTooltip text={selectedPayment.feeNote} /> : null}
-          </div>
-
-          <div className="order-processing-funds-modal__payment-picker">
-            <button
-              type="button"
-              className="order-processing-funds-modal__payment-select"
-              aria-expanded={paymentMenuOpen}
-              onClick={() => setPaymentMenuOpen((current) => !current)}
-            >
-              <span className="order-processing-funds-modal__payment-icon">
-                <LuWalletCards />
-              </span>
-              <span>
-                {selectedPayment?.label}
-                {selectedPayment?.last4 ? ` •••• ${selectedPayment.last4}` : ""}
-              </span>
-              <LuChevronDown className={paymentMenuOpen ? "order-processing-funds-modal__chevron--open" : ""} />
-            </button>
-
-            {paymentMenuOpen ? (
-              <div className="order-processing-funds-modal__payment-menu">
-                {orderProcessingPaymentMethods.map((method) => (
-                  <button
-                    type="button"
-                    key={method.id}
-                    className={
-                      method.id === paymentMethodId
-                        ? "order-processing-funds-modal__payment-option order-processing-funds-modal__payment-option--active"
-                        : "order-processing-funds-modal__payment-option"
-                    }
-                    onClick={() => {
-                      setPaymentMethodId(method.id);
-                      setPaymentMenuOpen(false);
-                    }}
-                  >
-                    <LuCreditCard />
-                    <span>{method.label}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            className="order-processing-funds-modal__add-payment"
-            onClick={() => setShowAddPayment((current) => !current)}
-          >
-            <LuPlus />
-            <span>{showAddPayment ? "Hide add payment method" : "Add payment method"}</span>
-          </button>
-
-          {showAddPayment ? (
-            <div className="order-processing-funds-modal__add-payment-form">
-              <input
-                type="text"
-                placeholder="Payment method name (e.g. Business Visa)"
-                value={newPaymentLabel}
-                onChange={(event) => setNewPaymentLabel(event.target.value)}
-              />
-              <button
-                type="button"
-                className="order-processing-funds-modal__save-payment"
-                onClick={() => {
-                  setNewPaymentLabel("");
-                  setShowAddPayment(false);
-                }}
-              >
-                Save payment method
-              </button>
-            </div>
-          ) : null}
-        </div>
-
         <div className="order-processing-funds-modal__summary">
-          <div className="order-processing-funds-modal__summary-row">
-            <span>Deposit amount</span>
-            <strong>{formatUsd(resolvedAmount)}</strong>
-          </div>
-          <div className="order-processing-funds-modal__summary-row">
-            <span>Processing fee</span>
-            <strong>{formatUsd(processingFee)}</strong>
-          </div>
           <div className="order-processing-funds-modal__summary-row order-processing-funds-modal__summary-row--total">
-            <span>Total charge</span>
-            <strong>{formatUsd(totalCharge)}</strong>
+            <span>You will deposit</span>
+            <strong>{formatUsd(resolvedAmount)}</strong>
           </div>
         </div>
 
         <div className="order-processing-funds-modal__footer">
-          <button type="button" className="order-processing-funds-modal__cancel" onClick={onClose}>
+          <button type="button" className="order-processing-funds-modal__cancel" onClick={onClose} disabled={Boolean(checkoutProvider)}>
             Cancel
           </button>
           <button
             type="button"
             className="order-processing-funds-modal__confirm"
-            disabled={resolvedAmount <= 0}
-            onClick={() => onConfirm({ amount: resolvedAmount, paymentMethodId, totalCharge })}
+            disabled={resolvedAmount <= 0 || Boolean(checkoutProvider)}
+            onClick={() => handleDeposit("paypal")}
           >
-            <LuZap />
-            <span>Add {resolvedAmount > 0 ? formatUsd(resolvedAmount) : "funds"}</span>
+            {checkoutProvider === "paypal" ? <LuLoader className="spin-icon" /> : <LuZap />}
+            <span>Pay with PayPal</span>
+          </button>
+          <button
+            type="button"
+            className="order-processing-funds-modal__confirm"
+            disabled={resolvedAmount <= 0 || Boolean(checkoutProvider)}
+            onClick={() => handleDeposit("stripe")}
+          >
+            {checkoutProvider === "stripe" ? <LuLoader className="spin-icon" /> : <LuCreditCard />}
+            <span>Pay with Stripe</span>
           </button>
         </div>
       </section>
@@ -296,32 +206,67 @@ function AddFundsModal({ isOpen, currentBalance, onClose, onConfirm }) {
 }
 
 function OrderProcessingContent() {
-  const [balances, setBalances] = useState(orderProcessingBalanceDefaults);
-  const [activeMetric, setActiveMetric] = useState("deposits");
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeMetric, setActiveMetric] = useState("total_deposited");
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [notice, setNotice] = useState("");
 
-  const availableBalance = balances.deposits - balances.spend;
+  const availableBalance = summary?.balance ?? 0;
   const activeMetricConfig = balanceMetrics.find((metric) => metric.key === activeMetric) ?? balanceMetrics[0];
 
-  const handleAddFunds = ({ amount, paymentMethodId, totalCharge }) => {
-    setBalances((current) => ({
-      ...current,
-      deposits: current.deposits + amount,
-      pending: current.pending + amount * 0.05,
-    }));
-    setAddFundsOpen(false);
-    setNotice(
-      `${formatUsd(amount)} added via ${orderProcessingPaymentMethods.find((m) => m.id === paymentMethodId)?.label ?? "payment method"} (charged ${formatUsd(totalCharge)}).`,
-    );
+  const loadWallet = async () => {
+    try {
+      const res = await getWalletSummary();
+      setSummary(res.data);
+    } catch {
+      toast.error("Failed to load order processing balance.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    loadWallet();
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("focus", loadWallet);
+    return () => window.removeEventListener("focus", loadWallet);
+  }, []);
+
+  const handleDeposit = async (provider, amount) => {
+    try {
+      const res = provider === "stripe"
+        ? await depositWalletStripe(amount)
+        : await depositWalletPayPal(amount);
+
+      if (res.data?.url) {
+        setAddFundsOpen(false);
+        openPaymentCheckout(res.data.url);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Checkout failed.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <section className="order-processing-page">
+        <div className="wallet-hub__loading">
+          <LuLoader className="spin-icon" />
+          <span>Loading order processing balance…</span>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="order-processing-page">
       {notice ? (
         <div className="order-processing-notice">
           <span className="order-processing-notice__icon">
-            <LuBadgeCheck />
+            <LuWalletCards />
           </span>
           <span className="order-processing-notice__copy">{notice}</span>
           <button type="button" aria-label="Dismiss notice" onClick={() => setNotice("")}>
@@ -351,7 +296,7 @@ function OrderProcessingContent() {
             <div className="order-processing-hero__spotlight">
               <span>Available to spend</span>
               <strong>{formatUsd(Math.max(availableBalance, 0))}</strong>
-              <em>Updated in real time</em>
+              <em>{summary?.currency ?? "USD"} · Updated in real time</em>
             </div>
           </header>
 
@@ -369,7 +314,7 @@ function OrderProcessingContent() {
                 </span>
                 <span className="order-processing-btn__copy">
                   <strong>Add funds</strong>
-                  <small>Load balance instantly</small>
+                  <small>Pay securely with Stripe or PayPal</small>
                 </span>
               </button>
 
@@ -412,7 +357,7 @@ function OrderProcessingContent() {
                       </span>
                       <span className="order-processing-metric__copy">
                         <span className="order-processing-metric__label">{metric.label}</span>
-                        <strong className="order-processing-metric__value">{formatUsd(balances[metric.key])}</strong>
+                        <strong className="order-processing-metric__value">{formatUsd(summary?.[metric.key])}</strong>
                         <span className="order-processing-metric__hint">{metric.hint}</span>
                       </span>
                       {isActive ? <span className="order-processing-metric__pulse" aria-hidden="true" /> : null}
@@ -424,7 +369,7 @@ function OrderProcessingContent() {
               <div className={`order-processing-hero__insight order-processing-hero__insight--${activeMetricConfig.tone}`}>
                 <span>Selected</span>
                 <strong>
-                  {activeMetricConfig.label}: {formatUsd(balances[activeMetricConfig.key])}
+                  {activeMetricConfig.label}: {formatUsd(summary?.[activeMetricConfig.key])}
                 </strong>
               </div>
             </div>
@@ -436,7 +381,7 @@ function OrderProcessingContent() {
         isOpen={addFundsOpen}
         currentBalance={availableBalance}
         onClose={() => setAddFundsOpen(false)}
-        onConfirm={handleAddFunds}
+        onDeposit={handleDeposit}
       />
     </section>
   );

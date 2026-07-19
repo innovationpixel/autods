@@ -12,6 +12,12 @@ export const updateOrderStatus = (id, status) =>
 export const updateOrderSource = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/source`, payload);
 
+export const updateOrderCost = (id, payload) =>
+    axiosInstance.patch(`/orders/${id}/cost`, payload);
+
+export const updateOrderFulfillment = (id, payload) =>
+    axiosInstance.patch(`/orders/${id}/fulfillment`, payload);
+
 export const updateOrderTracking = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/tracking`, payload);
 
