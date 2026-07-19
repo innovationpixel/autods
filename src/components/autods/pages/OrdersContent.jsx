@@ -57,16 +57,6 @@ const ORDER_SORT_OPTIONS = [
 
 const DEFAULT_DATE_PRESET = "30days";
 
-const ORDER_TOTAL_COLUMNS = {
-  total: { accessor: (order) => order.totalValue, format: "money" },
-  totalQuantity: { accessor: (order) => order.totalQuantity, format: "number" },
-  profit: { accessor: (order) => order.profitValue, format: "money" },
-  refundTotal: { accessor: (order) => order.refundTotalValue, format: "money" },
-  shippingPrice: { accessor: (order) => order.shippingPriceValue, format: "money" },
-  prepCost: { accessor: (order) => order.prepCost, format: "money" },
-  shippingCost: { accessor: (order) => order.shippingCost, format: "money" },
-};
-
 function formatDateInput(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -261,7 +251,6 @@ function mapApiOrder(order) {
     transactionId: firstItem.lineItemId ?? raw.salesRecordReference ?? "—",
     refundDate: refund.refundDate ? String(refund.refundDate).slice(0, 10) : "—",
     refundTotal: formatMoney(refund.amount?.value ?? raw.refundAmount?.value, refund.amount?.currency ?? currency),
-    refundTotalValue: Number(refund.amount?.value ?? raw.refundAmount?.value ?? 0) || 0,
     cancelStatus: raw.cancelStatus?.cancelState ?? "—",
     returnStatus: raw.returnStatus ?? raw.cancelStatus?.cancelState ?? "—",
     inquiryStatus: raw.inquiryStatus ?? "—",
@@ -275,7 +264,6 @@ function mapApiOrder(order) {
     shippingStatus,
     shippingService: shippingStep.shippingServiceCode ?? fulfillment.shippingStep?.shippingCarrierCode ?? "—",
     shippingPrice: formatMoney(delivery.shippingCost?.value ?? delivery.amount?.value, delivery.shippingCost?.currency ?? currency),
-    shippingPriceValue: Number(delivery.shippingCost?.value ?? delivery.amount?.value ?? 0) || 0,
     trackingNumber: trackingValue || "—",
     trackingNumberRaw: trackingValue,
     carrier: carrierRaw || "—",
@@ -314,7 +302,6 @@ function mapApiOrder(order) {
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     totalValue: Number(sellPrice) || 0,
     profitValue: profit != null && !Number.isNaN(Number(profit)) ? Number(profit) : null,
-    currency,
     aliexpressOrderId: order.aliexpress_order_id ?? "—",
     aliexpressOrderIdRaw: order.aliexpress_order_id ?? "",
     aliexpressStatus: order.aliexpress_order_status ?? "—",
@@ -753,18 +740,6 @@ function OrdersContent({ searchQuery }) {
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const visibleOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const columnTotals = useMemo(() => {
-    const sums = {};
-
-    Object.entries(ORDER_TOTAL_COLUMNS).forEach(([columnId, { accessor }]) => {
-      sums[columnId] = filteredOrders.reduce((sum, order) => {
-        const value = accessor(order);
-        return sum + (Number.isFinite(value) ? value : 0);
-      }, 0);
-    });
-
-    return sums;
-  }, [filteredOrders]);
   const allVisibleSelected =
     visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id));
   const tableColumnCount = visibleColumns.length + 2;
@@ -1405,28 +1380,6 @@ function OrdersContent({ searchQuery }) {
         <div className="orders-table-scroll" ref={tableScrollRef}>
           <table className="orders-table" style={{ minWidth: tableMinWidth }}>
             <thead>
-              <tr className="orders-table__totals-row">
-                <td className="orders-table__checkbox-col">Totals</td>
-                {visibleColumns.map((column) => {
-                  const totalColumn = ORDER_TOTAL_COLUMNS[column.id];
-
-                  return (
-                    <td
-                      key={column.id}
-                      className="orders-table__col"
-                      data-column={column.id}
-                      style={{ minWidth: column.minWidth, width: column.minWidth }}
-                    >
-                      {totalColumn
-                        ? totalColumn.format === "money"
-                          ? formatMoney(columnTotals[column.id], filteredOrders[0]?.currency)
-                          : columnTotals[column.id]
-                        : ""}
-                    </td>
-                  );
-                })}
-                <td className="orders-table__actions-col" />
-              </tr>
               <tr>
                 <th className="orders-table__checkbox-col" />
                 {visibleColumns.map((column) => (

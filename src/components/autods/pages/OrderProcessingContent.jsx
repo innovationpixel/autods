@@ -1,280 +1,237 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  LuArrowDownLeft,
-  LuArrowDownToLine,
-  LuClock3,
-  LuCreditCard,
-  LuLoader,
-  LuPlus,
-  LuSparkles,
-  LuTrendingDown,
-  LuWalletCards,
-  LuX,
-  LuZap,
-} from "react-icons/lu";
-import { orderProcessingFundAmounts } from "../constants";
+import { LuCheck, LuClipboardList, LuLoader, LuPackageCheck, LuPencil, LuRefreshCcw } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
-import { openPaymentCheckout } from "../../../utils/paymentCheckout";
-import { depositWalletPayPal, depositWalletStripe, getWalletSummary } from "../../../services/WalletService";
+import { getApiErrorMessage } from "../../../utils/apiErrors";
+import {
+  getOrders,
+  syncOrders,
+  updateOrderCost,
+  updateOrderFulfillment,
+  updateOrderSource,
+  updateOrderStatus,
+} from "../../../services/OrderService";
+import { buildSourceProductUrl, formatDisplayDate, normalizeListingSourceInput } from "../helpers";
+import ProductItemIdCell from "../ProductItemIdCell";
+import QuickEditModal from "../QuickEditModal";
 
-const balanceMetrics = [
-  { key: "total_deposited", label: "Deposits", icon: LuArrowDownLeft, tone: "emerald", hint: "Total funds loaded" },
-  { key: "total_spent", label: "Spend", icon: LuTrendingDown, tone: "rose", hint: "Used on fulfillment" },
-  { key: "total_pending", label: "Pending", icon: LuClock3, tone: "amber", hint: "Awaiting clearance" },
-];
+const PLACEHOLDER_IMAGE =
+  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
 
-function formatUsd(value) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(Number(value) || 0);
-}
-
-function AddFundsModal({ isOpen, currentBalance, onClose, onDeposit }) {
-  const [selectedAmount, setSelectedAmount] = useState(50);
-  const [customAmount, setCustomAmount] = useState("");
-  const [useCustomAmount, setUseCustomAmount] = useState(false);
-  const [checkoutProvider, setCheckoutProvider] = useState("");
-
-  const resolvedAmount = useMemo(() => {
-    if (useCustomAmount) {
-      const parsed = Number.parseFloat(customAmount);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-    }
-
-    return selectedAmount;
-  }, [customAmount, selectedAmount, useCustomAmount]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
-    }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
-
-  if (!isOpen) {
-    return null;
+function formatMoney(value, currency = "USD") {
+  if (value === null || value === undefined || value === "") {
+    return "—";
   }
 
-  const selectPresetAmount = (amount) => {
-    setUseCustomAmount(false);
-    setSelectedAmount(amount);
-    setCustomAmount("");
+  const amount = Number(value);
+  if (Number.isNaN(amount)) {
+    return "—";
+  }
+
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(amount);
+  } catch {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+function mapProcessingOrder(order) {
+  const raw = order.raw_data ?? {};
+  const lineItems = raw.lineItems ?? [];
+  const firstItem = lineItems[0] ?? {};
+  const buyer = raw.buyer ?? {};
+  const pricing = raw.pricingSummary ?? {};
+  const fulfillment = raw.fulfillmentStartInstructions?.[0] ?? {};
+  const shipTo = fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
+  const sellPrice = order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0;
+  const currency = order.currency ?? pricing.total?.currency ?? "USD";
+  const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
+  const sourcePlatform = order.source_platform ?? "aliexpress";
+  const sourceUrl = order.source_url ?? null;
+
+  return {
+    id: String(order.id),
+    title: order.item_title ?? firstItem.title ?? "Order item",
+    image: firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
+    ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
+    orderDate: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
+    buyerName: shipTo.fullName ?? buyer.buyerRegistrationAddress?.fullName ?? order.buyer_name ?? "—",
+    location: [shipTo.contactAddress?.city ?? shipTo.city, shipTo.contactAddress?.countryCode ?? shipTo.countryCode]
+      .filter(Boolean)
+      .join(", ") || "—",
+    sellPrice: Number(sellPrice) || 0,
+    currency,
+    itemBuy: sourceProductId ?? "—",
+    itemBuyUrl: buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl),
+    sourceUrl,
+    sourcePlatform,
+    hasSource: Boolean(sourceProductId || sourceUrl),
+    buyPrice: order.buy_price != null ? Number(order.buy_price) : null,
+    aliexpressOrderId: order.aliexpress_order_id ?? "",
+    aliexpressOrderStatus: order.aliexpress_order_status ?? "",
   };
-
-  const selectCustomAmount = () => {
-    setUseCustomAmount(true);
-  };
-
-  const handleDeposit = async (provider) => {
-    if (resolvedAmount < 5) {
-      toast.warn("Enter an amount of at least $5.");
-      return;
-    }
-
-    setCheckoutProvider(provider);
-    try {
-      await onDeposit(provider, resolvedAmount);
-    } finally {
-      setCheckoutProvider("");
-    }
-  };
-
-  return (
-    <div className="balance-modal-layer order-processing-modal-layer" role="presentation">
-      <button type="button" className="balance-modal-layer__backdrop" aria-label="Close add funds modal" onClick={onClose} />
-
-      <section
-        className="order-processing-funds-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Add funds to order processing balance"
-      >
-        <div className="order-processing-funds-modal__accent" aria-hidden="true" />
-
-        <button type="button" className="order-processing-funds-modal__close" aria-label="Close" onClick={onClose}>
-          <LuX />
-        </button>
-
-        <div className="order-processing-funds-modal__head">
-          <span className="order-processing-funds-modal__icon">
-            <LuSparkles />
-          </span>
-          <div>
-            <h2>Add funds</h2>
-            <p>Top up your wallet and keep orders moving without delays.</p>
-          </div>
-        </div>
-
-        <div className="order-processing-funds-modal__balance-card">
-          <span>Current available balance</span>
-          <strong>{formatUsd(currentBalance)}</strong>
-        </div>
-
-        <div className="order-processing-funds-modal__section">
-          <div className="order-processing-funds-modal__section-head">
-            <span className="order-processing-funds-modal__step">1</span>
-            <label className="order-processing-funds-modal__label">Choose amount</label>
-          </div>
-
-          <div className="order-processing-funds-modal__amount-grid">
-            {orderProcessingFundAmounts.map((amount) => (
-              <button
-                type="button"
-                key={amount}
-                className={
-                  !useCustomAmount && selectedAmount === amount
-                    ? "order-processing-funds-modal__amount order-processing-funds-modal__amount--active"
-                    : "order-processing-funds-modal__amount"
-                }
-                onClick={() => selectPresetAmount(amount)}
-              >
-                <strong>${amount}</strong>
-              </button>
-            ))}
-
-            <button
-              type="button"
-              className={
-                useCustomAmount
-                  ? "order-processing-funds-modal__amount order-processing-funds-modal__amount--active order-processing-funds-modal__amount--custom"
-                  : "order-processing-funds-modal__amount order-processing-funds-modal__amount--custom"
-              }
-              onClick={selectCustomAmount}
-            >
-              <strong>Custom</strong>
-              <span>Any amount</span>
-            </button>
-          </div>
-
-          {useCustomAmount ? (
-            <div className="order-processing-funds-modal__custom-field">
-              <span>$</span>
-              <input
-                type="number"
-                min="5"
-                step="0.01"
-                placeholder="Enter custom amount (min $5)"
-                value={customAmount}
-                onChange={(event) => setCustomAmount(event.target.value)}
-              />
-            </div>
-          ) : null}
-        </div>
-
-        <div className="order-processing-funds-modal__summary">
-          <div className="order-processing-funds-modal__summary-row order-processing-funds-modal__summary-row--total">
-            <span>You will deposit</span>
-            <strong>{formatUsd(resolvedAmount)}</strong>
-          </div>
-        </div>
-
-        <div className="order-processing-funds-modal__footer">
-          <button type="button" className="order-processing-funds-modal__cancel" onClick={onClose} disabled={Boolean(checkoutProvider)}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="order-processing-funds-modal__confirm"
-            disabled={resolvedAmount <= 0 || Boolean(checkoutProvider)}
-            onClick={() => handleDeposit("paypal")}
-          >
-            {checkoutProvider === "paypal" ? <LuLoader className="spin-icon" /> : <LuZap />}
-            <span>Pay with PayPal</span>
-          </button>
-          <button
-            type="button"
-            className="order-processing-funds-modal__confirm"
-            disabled={resolvedAmount <= 0 || Boolean(checkoutProvider)}
-            onClick={() => handleDeposit("stripe")}
-          >
-            {checkoutProvider === "stripe" ? <LuLoader className="spin-icon" /> : <LuCreditCard />}
-            <span>Pay with Stripe</span>
-          </button>
-        </div>
-      </section>
-    </div>
-  );
 }
 
 function OrderProcessingContent() {
-  const [summary, setSummary] = useState(null);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeMetric, setActiveMetric] = useState("total_deposited");
-  const [addFundsOpen, setAddFundsOpen] = useState(false);
-  const [notice, setNotice] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [markingId, setMarkingId] = useState("");
 
-  const availableBalance = summary?.balance ?? 0;
-  const activeMetricConfig = balanceMetrics.find((metric) => metric.key === activeMetric) ?? balanceMetrics[0];
+  const [editingSourceId, setEditingSourceId] = useState("");
+  const [sourceDraft, setSourceDraft] = useState("");
+  const [savingSourceId, setSavingSourceId] = useState("");
 
-  const loadWallet = async () => {
+  const [editingCostId, setEditingCostId] = useState("");
+  const [costDraft, setCostDraft] = useState("");
+  const [savingCostId, setSavingCostId] = useState("");
+
+  const [editingFulfillment, setEditingFulfillment] = useState(null);
+  const [fulfillmentDraft, setFulfillmentDraft] = useState("");
+  const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
+
+  const FULFILLMENT_FIELDS = {
+    aliexpressOrderId: { key: "aliexpress_order_id", label: "AliExpress order ID" },
+    aliexpressOrderStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
+  };
+
+  const loadPendingOrders = async () => {
+    setLoading(true);
     try {
-      const res = await getWalletSummary();
-      setSummary(res.data);
-    } catch {
-      toast.error("Failed to load order processing balance.");
+      const res = await getOrders({ status: "Pending", sort: "asc", limit: 100 });
+      setOrders((res.data?.data ?? []).map(mapProcessingOrder));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to load orders."));
+      setOrders([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadWallet();
+    loadPendingOrders();
   }, []);
 
-  useEffect(() => {
-    window.addEventListener("focus", loadWallet);
-    return () => window.removeEventListener("focus", loadWallet);
-  }, []);
+  const totalValue = useMemo(
+    () => orders.reduce((sum, order) => sum + (Number.isFinite(order.sellPrice) ? order.sellPrice : 0), 0),
+    [orders],
+  );
 
-  const handleDeposit = async (provider, amount) => {
+  const handleSync = async () => {
+    setSyncing(true);
     try {
-      const res = provider === "stripe"
-        ? await depositWalletStripe(amount)
-        : await depositWalletPayPal(amount);
-
-      if (res.data?.url) {
-        setAddFundsOpen(false);
-        openPaymentCheckout(res.data.url);
-      }
+      const res = await syncOrders();
+      toast.success(res.data?.message ?? "Orders synced.");
+      await loadPendingOrders();
     } catch (err) {
-      toast.error(err.response?.data?.error ?? "Checkout failed.");
+      toast.error(getApiErrorMessage(err, "Order sync failed."));
+    } finally {
+      setSyncing(false);
     }
   };
 
-  if (loading) {
-    return (
-      <section className="order-processing-page">
-        <div className="wallet-hub__loading">
-          <LuLoader className="spin-icon" />
-          <span>Loading order processing balance…</span>
-        </div>
-      </section>
-    );
-  }
+  const startEditSource = (order) => {
+    setEditingSourceId(order.id);
+    setSourceDraft(order.sourceUrl ?? (order.itemBuy !== "—" ? order.itemBuy : ""));
+  };
+
+  const saveSource = async () => {
+    const order = orders.find((item) => item.id === editingSourceId);
+    const trimmed = sourceDraft.trim();
+    if (!order || !trimmed) {
+      toast.error("Enter a source link or item ID.");
+      return;
+    }
+
+    setSavingSourceId(order.id);
+    try {
+      const source = normalizeListingSourceInput(trimmed, order.sourcePlatform);
+      const res = await updateOrderSource(order.id, {
+        source_input: source.source_input,
+        source_platform: source.source_platform,
+      });
+      toast.success(res.data?.message ?? "Source link updated.");
+      setEditingSourceId("");
+      setSourceDraft("");
+      await loadPendingOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update source link."));
+    } finally {
+      setSavingSourceId("");
+    }
+  };
+
+  const startEditCost = (order) => {
+    setEditingCostId(order.id);
+    setCostDraft(order.buyPrice != null ? String(order.buyPrice) : "");
+  };
+
+  const saveCost = async () => {
+    const order = orders.find((item) => item.id === editingCostId);
+    if (!order) return;
+
+    const parsed = Number.parseFloat(costDraft);
+    if (costDraft.trim() !== "" && (!Number.isFinite(parsed) || parsed < 0)) {
+      toast.warn("Enter a valid cost amount.");
+      return;
+    }
+
+    const cost = costDraft.trim() === "" ? null : Number(parsed.toFixed(2));
+
+    setSavingCostId(order.id);
+    try {
+      await updateOrderCost(order.id, { cost });
+      toast.success("Cost updated.");
+      setEditingCostId("");
+      setCostDraft("");
+      await loadPendingOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to update cost."));
+    } finally {
+      setSavingCostId("");
+    }
+  };
+
+  const startEditFulfillment = (order, field) => {
+    setEditingFulfillment({ orderId: order.id, field });
+    setFulfillmentDraft(order[field] ?? "");
+  };
+
+  const saveFulfillment = async () => {
+    if (!editingFulfillment) return;
+    const order = orders.find((item) => item.id === editingFulfillment.orderId);
+    const fieldMeta = FULFILLMENT_FIELDS[editingFulfillment.field];
+    if (!order) return;
+
+    const fulfillmentKey = `${order.id}:${editingFulfillment.field}`;
+    setSavingFulfillmentKey(fulfillmentKey);
+    try {
+      await updateOrderFulfillment(order.id, { [fieldMeta.key]: fulfillmentDraft.trim() || null });
+      toast.success(`${fieldMeta.label} updated.`);
+      setEditingFulfillment(null);
+      setFulfillmentDraft("");
+      await loadPendingOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, `Could not update ${fieldMeta.label.toLowerCase()}.`));
+    } finally {
+      setSavingFulfillmentKey("");
+    }
+  };
+
+  const markAsOrdered = async (order) => {
+    setMarkingId(order.id);
+    try {
+      await updateOrderStatus(order.id, "Ordered");
+      toast.success(`Order ${order.ebayOrderId} marked as ordered.`);
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update order status."));
+    } finally {
+      setMarkingId("");
+    }
+  };
 
   return (
     <section className="order-processing-page">
-      {notice ? (
-        <div className="order-processing-notice">
-          <span className="order-processing-notice__icon">
-            <LuWalletCards />
-          </span>
-          <span className="order-processing-notice__copy">{notice}</span>
-          <button type="button" aria-label="Dismiss notice" onClick={() => setNotice("")}>
-            <LuX />
-          </button>
-        </div>
-      ) : null}
-
       <section className="order-processing-hero">
         <div className="order-processing-hero__mesh" aria-hidden="true" />
         <div className="order-processing-hero__orb order-processing-hero__orb--one" aria-hidden="true" />
@@ -284,104 +241,211 @@ function OrderProcessingContent() {
           <header className="order-processing-hero__header">
             <div>
               <span className="order-processing-hero__eyebrow">
-                <LuWalletCards />
-                Order wallet
+                <LuPackageCheck />
+                Order processing
               </span>
-              <h2 className="order-processing-hero__title">Order Processing Balance</h2>
+              <h2 className="order-processing-hero__title">Process Pending Orders</h2>
               <p className="order-processing-hero__subtitle">
-                Manage deposits, track spend, and fund automation in one place.
+                Source each order from AliExpress, record the cost, and mark it ordered to move it forward.
               </p>
             </div>
 
             <div className="order-processing-hero__spotlight">
-              <span>Available to spend</span>
-              <strong>{formatUsd(Math.max(availableBalance, 0))}</strong>
-              <em>{summary?.currency ?? "USD"} · Updated in real time</em>
+              <span>Waiting to be processed</span>
+              <strong>{orders.length}</strong>
+              <em>{formatMoney(totalValue)} in pending order value</em>
             </div>
           </header>
 
-          <div className="order-processing-hero__grid">
-            <div className="order-processing-hero__actions">
-              <p className="order-processing-hero__panel-label">Quick actions</p>
-
-              <button
-                type="button"
-                className="order-processing-btn order-processing-btn--primary"
-                onClick={() => setAddFundsOpen(true)}
-              >
-                <span className="order-processing-btn__icon">
-                  <LuPlus />
-                </span>
-                <span className="order-processing-btn__copy">
-                  <strong>Add funds</strong>
-                  <small>Pay securely with Stripe or PayPal</small>
-                </span>
-              </button>
-
-              <button
-                type="button"
-                className="order-processing-btn order-processing-btn--secondary"
-                onClick={() => setNotice("Withdraw flow will be available once your payout method is verified.")}
-              >
-                <span className="order-processing-btn__icon">
-                  <LuArrowDownToLine />
-                </span>
-                <span className="order-processing-btn__copy">
-                  <strong>Withdraw</strong>
-                  <small>Transfer to your bank</small>
-                </span>
-              </button>
-            </div>
-
-            <div className="order-processing-hero__metrics">
-              <p className="order-processing-hero__panel-label">Balance overview</p>
-
-              <div className="order-processing-metrics">
-                {balanceMetrics.map((metric) => {
-                  const Icon = metric.icon;
-                  const isActive = activeMetric === metric.key;
-
-                  return (
-                    <button
-                      type="button"
-                      key={metric.key}
-                      className={
-                        isActive
-                          ? `order-processing-metric order-processing-metric--${metric.tone} order-processing-metric--active`
-                          : `order-processing-metric order-processing-metric--${metric.tone}`
-                      }
-                      onClick={() => setActiveMetric(metric.key)}
-                    >
-                      <span className={`order-processing-metric__icon order-processing-metric__icon--${metric.tone}`}>
-                        <Icon />
-                      </span>
-                      <span className="order-processing-metric__copy">
-                        <span className="order-processing-metric__label">{metric.label}</span>
-                        <strong className="order-processing-metric__value">{formatUsd(summary?.[metric.key])}</strong>
-                        <span className="order-processing-metric__hint">{metric.hint}</span>
-                      </span>
-                      {isActive ? <span className="order-processing-metric__pulse" aria-hidden="true" /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={`order-processing-hero__insight order-processing-hero__insight--${activeMetricConfig.tone}`}>
-                <span>Selected</span>
-                <strong>
-                  {activeMetricConfig.label}: {formatUsd(summary?.[activeMetricConfig.key])}
-                </strong>
-              </div>
-            </div>
+          <div className="order-processing-hero__actions">
+            <button type="button" className="order-processing-btn order-processing-btn--primary" onClick={handleSync} disabled={syncing}>
+              <span className="order-processing-btn__icon">
+                {syncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+              </span>
+              <span className="order-processing-btn__copy">
+                <strong>{syncing ? "Syncing…" : "Sync Orders"}</strong>
+                <small>Pull the latest orders from eBay</small>
+              </span>
+            </button>
           </div>
         </div>
       </section>
 
-      <AddFundsModal
-        isOpen={addFundsOpen}
-        currentBalance={availableBalance}
-        onClose={() => setAddFundsOpen(false)}
-        onDeposit={handleDeposit}
+      <section className="calculations-table-panel card-wrapper">
+        <div className="calculations-table-toolbar">
+          <strong>{orders.length} orders to process</strong>
+        </div>
+
+        <div className="orders-table-shell">
+          <div className="orders-table-scroll">
+            <table className="orders-table calculations-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Date</th>
+                  <th>Buyer</th>
+                  <th>Sell Price</th>
+                  <th>Source (AliExpress)</th>
+                  <th>Cost</th>
+                  <th>AliExpress Order ID</th>
+                  <th>AliExpress Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td className="orders-table__empty" colSpan={9}>
+                      <LuRefreshCcw className="spin-icon" />
+                      <span>Loading orders…</span>
+                    </td>
+                  </tr>
+                ) : orders.length ? (
+                  orders.map((order) => (
+                    <tr className="orders-table__row" key={order.id}>
+                      <td>
+                        <div className="orders-product calculations-product">
+                          <div className="orders-product__thumb">
+                            <img src={order.image} alt={order.title} />
+                          </div>
+                          <div className="orders-product__copy calculations-product__copy">
+                            <h3>{order.title}</h3>
+                            <p className="calculations-product__description">{order.ebayOrderId}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="orders-table__date">{formatDisplayDate(order.orderDate)}</td>
+                      <td>
+                        <div className="orders-table__buyer-cell">
+                          <strong>{order.buyerName}</strong>
+                          <span>{order.location}</span>
+                        </div>
+                      </td>
+                      <td className="calculations-table__money">{formatMoney(order.sellPrice, order.currency)}</td>
+                      <td>
+                        <div className="products-source-cell">
+                          {order.hasSource ? (
+                            <ProductItemIdCell itemId={order.itemBuy} url={order.itemBuyUrl} />
+                          ) : (
+                            <span className="products-source-btn__placeholder">Add source</span>
+                          )}
+                          <button
+                            type="button"
+                            className="products-source-cell__edit"
+                            onClick={() => startEditSource(order)}
+                            title="Edit source link"
+                            aria-label="Edit source link"
+                          >
+                            <LuPencil />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="calculations-table__money">
+                        <button type="button" className="products-tracking-btn" onClick={() => startEditCost(order)} title="Edit cost">
+                          <span className={order.buyPrice != null ? undefined : "products-tracking-btn__placeholder"}>
+                            {order.buyPrice != null ? formatMoney(order.buyPrice, order.currency) : "—"}
+                          </span>
+                          <LuPencil className="products-tracking-btn__icon" />
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="products-tracking-btn"
+                          onClick={() => startEditFulfillment(order, "aliexpressOrderId")}
+                          title="Edit AliExpress order ID"
+                        >
+                          <span className={order.aliexpressOrderId ? undefined : "products-tracking-btn__placeholder"}>
+                            {order.aliexpressOrderId || "—"}
+                          </span>
+                          <LuPencil className="products-tracking-btn__icon" />
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="products-tracking-btn"
+                          onClick={() => startEditFulfillment(order, "aliexpressOrderStatus")}
+                          title="Edit AliExpress order status"
+                        >
+                          <span className={order.aliexpressOrderStatus ? undefined : "products-tracking-btn__placeholder"}>
+                            {order.aliexpressOrderStatus || "—"}
+                          </span>
+                          <LuPencil className="products-tracking-btn__icon" />
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="order-processing-mark-btn"
+                          onClick={() => markAsOrdered(order)}
+                          disabled={markingId === order.id || !order.hasSource || order.buyPrice == null}
+                          title={
+                            !order.hasSource || order.buyPrice == null
+                              ? "Add a source link and cost before marking as ordered"
+                              : "Mark this order as ordered"
+                          }
+                        >
+                          {markingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                          <span>Mark Ordered</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="orders-table__empty" colSpan={9}>
+                      <LuClipboardList />
+                      <span>No orders waiting to be processed.</span>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <QuickEditModal
+        open={Boolean(editingSourceId)}
+        title="Edit Source Link"
+        description="Paste the AliExpress URL or item ID this order should be fulfilled from."
+        label="Source link or item ID"
+        value={sourceDraft}
+        onChange={setSourceDraft}
+        onSave={saveSource}
+        onClose={() => setEditingSourceId("")}
+        saving={Boolean(savingSourceId)}
+        placeholder="https://www.aliexpress.com/item/... or item ID"
+      />
+
+      <QuickEditModal
+        open={Boolean(editingCostId)}
+        title="Edit Cost"
+        description="The AliExpress (or other supplier) cost for this order."
+        label="Cost"
+        type="number"
+        min="0"
+        step="0.01"
+        value={costDraft}
+        onChange={setCostDraft}
+        onSave={saveCost}
+        onClose={() => setEditingCostId("")}
+        saving={Boolean(savingCostId)}
+        placeholder="0.00"
+      />
+
+      <QuickEditModal
+        open={Boolean(editingFulfillment)}
+        title={editingFulfillment ? `Edit ${FULFILLMENT_FIELDS[editingFulfillment.field].label}` : ""}
+        label={editingFulfillment ? FULFILLMENT_FIELDS[editingFulfillment.field].label : ""}
+        value={fulfillmentDraft}
+        onChange={setFulfillmentDraft}
+        onSave={saveFulfillment}
+        onClose={() => setEditingFulfillment(null)}
+        saving={Boolean(savingFulfillmentKey)}
+        placeholder="—"
       />
     </section>
   );

@@ -347,6 +347,17 @@ function CalculationsContent({ searchQuery = "" }) {
           <div className="orders-table-scroll calculations-table-scroll" ref={tableScrollRef}>
             <table className="orders-table calculations-table">
               <thead>
+                <tr className="calculations-table__totals-row">
+                  <td>Totals</td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                  <td className="calculations-table__money">{formatCalculationAmount(totals.cost)}</td>
+                  <td className="calculations-table__money">{formatCalculationAmount(totals.shipping)}</td>
+                  <td className="calculations-table__money">{formatCalculationAmount(totals.earn)}</td>
+                  <td className="calculations-table__money">{formatCalculationAmount(totals.profit)}</td>
+                  <td className="calculations-table__money">{formatCalculationRoi(totals.roi)}</td>
+                </tr>
                 <tr>
                   <th>Order Id</th>
                   <th>Name</th>
