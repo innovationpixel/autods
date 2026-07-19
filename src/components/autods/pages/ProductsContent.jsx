@@ -6,6 +6,7 @@ import {
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
+  LuCheck,
   LuEllipsisVertical,
   LuExternalLink,
   LuInbox,
@@ -13,13 +14,14 @@ import {
   LuLoader,
   LuMenu,
   LuPencil,
+  LuPackage,
   LuRefreshCcw,
   LuSlidersHorizontal,
   LuStore,
   LuTrash2,
   LuX,
 } from "react-icons/lu";
-import { buildPaginationItems, formatDisplayDate, getListingImageUrl } from "../helpers";
+import { buildEbayListingProductUrl, buildPaginationItems, buildSourceProductUrl, formatDisplayDate, getListingImageUrl, normalizeListingSourceInput } from "../helpers";
 import {
   selectEbayConnected,
   selectEbayConnections,
@@ -33,10 +35,21 @@ import {
   fetchEbayListings,
   syncEbayListingsAction,
 } from "../../../store/actions/EbayActions";
-import { bulkDeleteProducts, deleteProduct, getImportHistory } from "../../../services/ProductService";
+import { bulkDeleteProducts, deleteProduct, getImportHistory, publishProduct, syncProductToStore, updateProduct } from "../../../services/ProductService";
+import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
+import ProductEditorModal from "../ProductEditorModal";
+import { buildDraftFormState, serializeDraftFormForApi } from "../../../utils/draftEditorState";
+import { getApiErrorMessage } from "../../../utils/apiErrors";
 import UploadHistoryPanel from "../UploadHistoryPanel";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterSelect } from "../FilterField";
+import ProductColumnManager from "../ProductColumnManager";
+import {
+  getVisibleProductTableMinWidth,
+  loadVisibleProductColumnIds,
+  resolveVisibleProductColumns,
+  saveVisibleProductColumnIds,
+} from "../productColumns";
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -75,7 +88,7 @@ function buildImportBatchAlert(batch) {
   };
 }
 
-function mapListingRow(item) {
+import ProductItemIdCell from "../ProductItemIdCell";
   const available = Math.max(0, Number(item.quantity ?? 0));
   const sold = Number(item.quantity_sold ?? 0);
   const onHold = 0;
@@ -84,6 +97,9 @@ function mapListingRow(item) {
   const storeName = item.connection?.ebay_username ?? "—";
   const itemBuy = item.source_product_id ?? "—";
   const itemSell = item.ebay_item_id ?? "—";
+  const listingSku = item.sku ?? "—";
+  const itemBuyUrl = buildSourceProductUrl(item.source_platform, item.source_product_id, item.source_url);
+  const itemSellUrl = buildEbayListingProductUrl(item);
   const asin = item.source_platform === "amazon" ? item.source_product_id : "—";
 
   return {
@@ -97,9 +113,11 @@ function mapListingRow(item) {
     storeName,
     itemBuy,
     itemSell,
+    listingSku,
+    itemBuyUrl,
+    itemSellUrl,
     asin,
     dws: item.days_without_sale ?? "—",
-    profitValue: item.profit,
     warning: item.import_status === "failed" || available === 0,
   };
 }
@@ -126,8 +144,42 @@ function ProductsContent({ searchQuery }) {
   const [filterStore, setFilterStore] = useState("");
   const [filterSupplier, setFilterSupplier] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
+  const [editingStockId, setEditingStockId] = useState("");
+  const [stockDraft, setStockDraft] = useState("");
+  const [savingStockId, setSavingStockId] = useState("");
+  const [editingBuySourceId, setEditingBuySourceId] = useState("");
+  const [buySourceDraft, setBuySourceDraft] = useState("");
+  const [savingBuySourceId, setSavingBuySourceId] = useState("");
   const [tableView, setTableView] = useState("compact");
+  const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleProductColumnIds);
+  const [bulkEditTargets, setBulkEditTargets] = useState([]);
+  const [bulkEditing, setBulkEditing] = useState(false);
+  const [bulkWorking, setBulkWorking] = useState(false);
+  const [editorProduct, setEditorProduct] = useState(null);
+  const [editorForm, setEditorForm] = useState(null);
+  const [editorTab, setEditorTab] = useState("general");
+  const [editorSaving, setEditorSaving] = useState(false);
+  const [syncingId, setSyncingId] = useState("");
   const tableScrollRef = useRef(null);
+
+  const visibleColumns = useMemo(
+    () => resolveVisibleProductColumns(visibleColumnIds),
+    [visibleColumnIds],
+  );
+
+  const visibleStockColumns = useMemo(
+    () => visibleColumns.filter((column) => column.group === "stock"),
+    [visibleColumns],
+  );
+
+  const hasStockGroup = visibleStockColumns.length > 0;
+  const tableColumnCount = visibleColumns.length + 2;
+  const tableMinWidth = useMemo(() => getVisibleProductTableMinWidth(visibleColumnIds), [visibleColumnIds]);
+
+  const handleVisibleColumnsChange = (nextIds) => {
+    setVisibleColumnIds(nextIds);
+    saveVisibleProductColumnIds(nextIds);
+  };
 
   const clearProductFilters = () => {
     setFilterStatus("Active");
@@ -140,7 +192,7 @@ function ProductsContent({ searchQuery }) {
   const hasProductFilters =
     filterStatus !== "Active" || filterStore || filterSupplier || tableView !== "compact";
 
-  const loadListings = () => {
+  const loadListings = () =>
     dispatch(
       fetchEbayListings({
         page: currentPage,
@@ -151,6 +203,73 @@ function ProductsContent({ searchQuery }) {
         q: searchQuery,
       }),
     );
+
+  const startEditStock = (item) => {
+    setEditingStockId(item.id);
+    setStockDraft(String(item.available));
+    setOpenMenuId("");
+  };
+
+  const cancelEditStock = () => {
+    setEditingStockId("");
+    setStockDraft("");
+  };
+
+  const saveStockQty = async (item) => {
+    const qty = Number.parseInt(stockDraft, 10);
+    if (!Number.isFinite(qty) || qty < 0) {
+      toast.error("Enter a valid stock quantity (0 or more).");
+      return;
+    }
+
+    setSavingStockId(item.id);
+    try {
+      const res = await updateProduct(item.id, { quantity: qty });
+      toast.success(res.data?.message ?? "Stock quantity updated.");
+      cancelEditStock();
+      loadListings();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Could not update stock quantity.");
+    } finally {
+      setSavingStockId("");
+    }
+  };
+
+  const startEditBuySource = (item) => {
+    setEditingBuySourceId(item.id);
+    setBuySourceDraft(item.source_url ?? (item.itemBuy !== "—" ? item.itemBuy : ""));
+    setOpenMenuId("");
+  };
+
+  const cancelEditBuySource = () => {
+    setEditingBuySourceId("");
+    setBuySourceDraft("");
+  };
+
+  const saveBuySource = async (item) => {
+    const trimmed = buySourceDraft.trim();
+    if (!trimmed) {
+      toast.error("Enter a source link or item ID.");
+      return;
+    }
+
+    setSavingBuySourceId(item.id);
+    try {
+      const source = normalizeListingSourceInput(trimmed, item.source_platform);
+      const res = await updateProduct(item.id, {
+        source_input: source.source_input,
+        source_url: source.source_url,
+        source_product_id: source.source_product_id,
+        source_platform: source.source_platform,
+      });
+      toast.success(res.data?.message ?? "Source link updated.");
+      cancelEditBuySource();
+      loadListings();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update source link."));
+    } finally {
+      setSavingBuySourceId("");
+    }
   };
 
   useEffect(() => {
@@ -250,6 +369,9 @@ function ProductsContent({ searchQuery }) {
       toast.warn("Select at least one product to use bulk actions.");
       return;
     }
+
+    const items = sortedRows.filter((item) => selectedIds.includes(item.id));
+
     if (action === "delete") {
       try {
         await bulkDeleteProducts(selectedIds);
@@ -261,12 +383,116 @@ function ProductsContent({ searchQuery }) {
       }
       return;
     }
-    const labels = {
-      relist: `${selectedIds.length} products marked for relist.`,
-      rewrite: `${selectedIds.length} product titles queued for AI rewrite.`,
-      edit: `${selectedIds.length} products opened for bulk edit.`,
-    };
-    toast.info(labels[action] ?? "Action applied.");
+
+    if (action === "edit") {
+      setBulkEditTargets(items);
+      return;
+    }
+
+    if (action === "relist") {
+      setBulkWorking(true);
+      let updated = 0;
+      let failed = 0;
+
+      for (const item of items) {
+        try {
+          await publishProduct(item.id);
+          updated += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      setBulkWorking(false);
+      await loadListings();
+
+      if (updated) {
+        toast.success(`${updated} product${updated === 1 ? "" : "s"} relisted or published.`);
+      }
+      if (failed) {
+        toast.error(`${failed} product${failed === 1 ? "" : "s"} could not be relisted.`);
+      }
+    }
+  };
+
+  const confirmBulkEdit = async (changes) => {
+    if (!bulkEditTargets.length) {
+      return;
+    }
+
+    setBulkEditing(true);
+    let updated = 0;
+    let failed = 0;
+
+    for (const item of bulkEditTargets) {
+      try {
+        const baseForm = buildDraftFormState(item);
+        const nextForm = applyBulkEditToForm(baseForm, changes);
+        await updateProduct(item.id, serializeDraftFormForApi(nextForm));
+        updated += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setBulkEditing(false);
+    setBulkEditTargets([]);
+    await loadListings();
+
+    if (updated) {
+      toast.success(`Bulk edit applied to ${updated} product${updated === 1 ? "" : "s"}.`);
+    }
+    if (failed) {
+      toast.error(`${failed} product${failed === 1 ? "" : "s"} could not be updated.`);
+    }
+  };
+
+  const openProductEditor = (item) => {
+    setEditorProduct(item);
+    setEditorForm(buildDraftFormState(item));
+    setEditorTab("general");
+    setOpenMenuId("");
+  };
+
+  const closeProductEditor = () => {
+    if (editorSaving) {
+      return;
+    }
+    setEditorProduct(null);
+    setEditorForm(null);
+  };
+
+  const saveProductEditor = async () => {
+    if (!editorProduct || !editorForm) {
+      return;
+    }
+
+    setEditorSaving(true);
+    try {
+      const res = await updateProduct(editorProduct.id, serializeDraftFormForApi(editorForm));
+      toast.success(res.data?.message ?? "Product updated.");
+      setEditorProduct(null);
+      setEditorForm(null);
+      loadListings();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not save product."));
+    } finally {
+      setEditorSaving(false);
+    }
+  };
+
+  const handleSyncToStore = async (item) => {
+    setSyncingId(String(item.id));
+    setOpenMenuId("");
+    try {
+      const res = await syncProductToStore(item.id);
+      toast.success(res.data?.message ?? "Synced to store.");
+      loadListings();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Sync to store failed."));
+    } finally {
+      setSyncingId("");
+    }
   };
 
   const handleSyncNow = () => {
@@ -280,6 +506,217 @@ function ProductsContent({ searchQuery }) {
     const el = tableScrollRef.current;
     if (!el) return;
     el.scrollTo({ left: position === "end" ? el.scrollWidth : 0, behavior: "smooth" });
+  };
+
+  const renderProductColumnHeader = (column) => {
+    if (column.sortable) {
+      return (
+        <button type="button" className="orders-sort-btn" onClick={() => setSortDirection((c) => (c === "desc" ? "asc" : "desc"))}>
+          <span>{column.label}</span>
+          <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
+        </button>
+      );
+    }
+
+    return column.label;
+  };
+
+  const renderProductCell = (item, columnId, imageUrl) => {
+    switch (columnId) {
+      case "name":
+        return (
+          <div className="products-item">
+            {imageUrl ? (
+              <div className="products-item__thumb">
+                <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" />
+              </div>
+            ) : (
+              <div className="products-item__thumb products-item__thumb--empty">
+                <LuStore />
+              </div>
+            )}
+            <div className="products-item__copy">
+              <h3>{item.title}</h3>
+              <button type="button" className="products-sourcing-btn" onClick={() => toast.info("Sourcing request flow opens for this product.")}>
+                Sourcing Request
+              </button>
+            </div>
+          </div>
+        );
+      case "uploaded":
+        return item.uploaded ? formatDisplayDate(String(item.uploaded).slice(0, 10)) : "—";
+      case "store":
+        return <span className="products-store-chip">{item.storeName}</span>;
+      case "stockAvailable":
+        return editingStockId === item.id ? (
+          <div className="products-stock-edit" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="number"
+              min="0"
+              step="1"
+              className="products-stock-edit__input"
+              value={stockDraft}
+              onChange={(e) => setStockDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  saveStockQty(item);
+                }
+                if (e.key === "Escape") {
+                  cancelEditStock();
+                }
+              }}
+              autoFocus
+              disabled={savingStockId === item.id}
+            />
+            <button
+              type="button"
+              className="products-stock-edit__btn products-stock-edit__btn--save"
+              onClick={() => saveStockQty(item)}
+              disabled={savingStockId === item.id}
+              aria-label="Save stock quantity"
+            >
+              {savingStockId === item.id ? <LuLoader className="products-stock-edit__spin" /> : <LuCheck />}
+            </button>
+            <button
+              type="button"
+              className="products-stock-edit__btn"
+              onClick={cancelEditStock}
+              disabled={savingStockId === item.id}
+              aria-label="Cancel stock edit"
+            >
+              <LuX />
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="products-stock-btn" onClick={() => startEditStock(item)} title="Update stock quantity">
+            <span className={`products-count ${item.available === 0 ? "products-count--red" : "products-count--green"}`}>{item.available}</span>
+            <LuPencil className="products-stock-btn__icon" />
+          </button>
+        );
+      case "stockOnHold":
+        return <span className="products-count products-count--amber">{item.onHold}</span>;
+      case "stockOos":
+        return <span className={`products-count ${item.outOfStock ? "products-count--red" : "products-count--green"}`}>{item.outOfStock}</span>;
+      case "stockTotal":
+        return item.totalStock;
+      case "cost":
+        return (
+          <div className="products-paired-values">
+            {item.buy_price != null ? (
+              <div>
+                <span className="orders-paired-values__type">BUY</span>
+                <span className="orders-paired-values__platform">{platformLabel(item.source_platform)}</span>
+                <strong>{formatMoney(item.buy_price, item.currency)}</strong>
+              </div>
+            ) : null}
+            <div>
+              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__platform">ebay</span>
+              <strong>{formatMoney(item.price, item.currency)}</strong>
+            </div>
+          </div>
+        );
+      case "sold":
+        return item.sold;
+      case "dws":
+        return item.dws;
+      case "itemIdBuy":
+        return editingBuySourceId === item.id ? (
+          <div className="products-source-edit" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="text"
+              className="products-source-edit__input"
+              placeholder="Item ID or source URL"
+              value={buySourceDraft}
+              onChange={(e) => setBuySourceDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  saveBuySource(item);
+                }
+                if (e.key === "Escape") {
+                  cancelEditBuySource();
+                }
+              }}
+              autoFocus
+              disabled={savingBuySourceId === item.id}
+            />
+            <button
+              type="button"
+              className="products-source-edit__btn products-source-edit__btn--save"
+              onClick={() => saveBuySource(item)}
+              disabled={savingBuySourceId === item.id}
+              aria-label="Save source link"
+            >
+              {savingBuySourceId === item.id ? <LuLoader className="products-source-edit__spin" /> : <LuCheck />}
+            </button>
+            <button
+              type="button"
+              className="products-source-edit__btn"
+              onClick={cancelEditBuySource}
+              disabled={savingBuySourceId === item.id}
+              aria-label="Cancel source edit"
+            >
+              <LuX />
+            </button>
+          </div>
+        ) : (
+          <div className="products-source-cell">
+            {item.itemBuyUrl || (item.itemBuy && item.itemBuy !== "—") ? (
+              <ProductItemIdCell itemId={item.itemBuy} sku={item.listingSku} url={item.itemBuyUrl} />
+            ) : (
+              <span className="products-source-btn__placeholder">Add source</span>
+            )}
+            <button
+              type="button"
+              className="products-source-cell__edit"
+              onClick={() => startEditBuySource(item)}
+              title="Edit source link"
+              aria-label="Edit source link"
+            >
+              <LuPencil />
+            </button>
+          </div>
+        );
+      case "itemIdSell":
+        return <ProductItemIdCell itemId={item.itemSell} sku={item.listingSku} url={item.itemSellUrl} />;
+      case "tags":
+        return "—";
+      case "asin":
+        return item.asin;
+      case "views":
+        return item.views ?? 0;
+      case "watchers":
+        return item.watchers ?? 0;
+      case "daysLeft":
+        return item.days_left != null ? `${item.days_left}d` : "—";
+      case "warnings":
+        return item.warning ? (
+          <span className="products-warning-icon" title="Needs attention">
+            <LuTriangleAlert />
+          </span>
+        ) : null;
+      default:
+        return "—";
+    }
+  };
+
+  const getProductCellClassName = (columnId) => {
+    switch (columnId) {
+      case "uploaded":
+        return "products-table__date";
+      case "store":
+        return "products-table__store";
+      case "stockAvailable":
+        return "products-table__group--divider";
+      case "itemIdBuy":
+      case "itemIdSell":
+      case "asin":
+        return "products-table__mono";
+      case "tags":
+        return "products-table__tags";
+      default:
+        return undefined;
+    }
   };
 
   const dismissAlert = (batchId) => {
@@ -432,18 +869,15 @@ function ProductsContent({ searchQuery }) {
             <span>{selectedIds.length} Results Selected</span>
           </label>
 
-          <div className="products-bulk-actions">
-            <button type="button" onClick={() => applyBulkAction("edit")}>
+          <div className={`products-bulk-actions ${selectedIds.length && !bulkWorking && !bulkEditing ? "" : "products-bulk-actions--disabled"}`}>
+            <button type="button" onClick={() => applyBulkAction("edit")} disabled={bulkWorking || bulkEditing}>
               Bulk Edit
             </button>
-            <button type="button" onClick={() => applyBulkAction("relist")}>
-              Bulk Relist
+            <button type="button" onClick={() => applyBulkAction("relist")} disabled={bulkWorking || bulkEditing}>
+              {bulkWorking ? "Working…" : "Bulk Relist"}
             </button>
-            <button type="button" onClick={() => applyBulkAction("delete")}>
+            <button type="button" onClick={() => applyBulkAction("delete")} disabled={bulkWorking || bulkEditing}>
               Bulk Delete
-            </button>
-            <button type="button" onClick={() => applyBulkAction("rewrite")}>
-              Bulk AI Rewrite
             </button>
           </div>
         </div>
@@ -456,6 +890,7 @@ function ProductsContent({ searchQuery }) {
           >
             View History
           </button>
+          <ProductColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
           <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
             <LuMenu />
           </button>
@@ -469,47 +904,57 @@ function ProductsContent({ searchQuery }) {
 
       <div className="products-table-shell card-wrapper">
         <div className="products-table-scroll" ref={tableScrollRef}>
-          <table className={`products-table ${tableView === "comfortable" ? "products-table--comfortable" : ""}`}>
+          <table
+            className={`products-table ${tableView === "comfortable" ? "products-table--comfortable" : ""}`}
+            style={{ minWidth: tableMinWidth }}
+          >
             <thead>
               <tr className="products-table__group-row">
-                <th className="products-table__checkbox-col" rowSpan={2} />
-                <th rowSpan={2}>Name</th>
-                <th rowSpan={2}>
-                  <button type="button" className="orders-sort-btn" onClick={() => setSortDirection((c) => (c === "desc" ? "asc" : "desc"))}>
-                    <span>Uploaded</span>
-                    <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
-                  </button>
-                </th>
-                <th rowSpan={2}>Store</th>
-                <th className="products-table__group products-table__group--divider" colSpan={4}>
-                  Stock
-                </th>
-                <th rowSpan={2}>Price (Buy / Sell)</th>
-                <th rowSpan={2}>Sold</th>
-                <th rowSpan={2}>DWS</th>
-                <th rowSpan={2}>Profit</th>
-                <th rowSpan={2}>Item ID (Buy)</th>
-                <th rowSpan={2}>Item ID (Sell)</th>
-                <th rowSpan={2}>Tags</th>
-                <th rowSpan={2}>ASIN</th>
-                <th rowSpan={2}>Views</th>
-                <th rowSpan={2}>Watchers</th>
-                <th rowSpan={2}>Days Left</th>
-                <th rowSpan={2} aria-label="Warnings" />
-                <th className="products-table__actions-col" rowSpan={2} />
+                <th className="products-table__checkbox-col" rowSpan={hasStockGroup ? 2 : 1} />
+                {visibleColumns.map((column) => {
+                  if (column.group === "stock") {
+                    if (column.id !== visibleStockColumns[0]?.id) {
+                      return null;
+                    }
+
+                    return (
+                      <th
+                        key="stock-group"
+                        className="products-table__group products-table__group--divider"
+                        colSpan={visibleStockColumns.length}
+                      >
+                        Stock
+                      </th>
+                    );
+                  }
+
+                  return (
+                    <th key={column.id} rowSpan={hasStockGroup ? 2 : 1} style={{ minWidth: column.minWidth }}>
+                      {renderProductColumnHeader(column)}
+                    </th>
+                  );
+                })}
+                <th className="products-table__actions-col" rowSpan={hasStockGroup ? 2 : 1} />
               </tr>
-              <tr className="products-table__sub-row">
-                <th className="products-table__group--divider">Available</th>
-                <th>On Hold</th>
-                <th>OOS</th>
-                <th>Total</th>
-              </tr>
+              {hasStockGroup ? (
+                <tr className="products-table__sub-row">
+                  {visibleStockColumns.map((column, index) => (
+                    <th
+                      key={column.id}
+                      className={index === 0 ? "products-table__group--divider" : undefined}
+                      style={{ minWidth: column.minWidth }}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              ) : null}
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td className="orders-table__empty" colSpan={21}>
+                  <td className="orders-table__empty" colSpan={tableColumnCount}>
                     <LuLoader className="spin-icon" />
                     <span>Loading products…</span>
                   </td>
@@ -524,78 +969,16 @@ function ProductsContent({ searchQuery }) {
                         <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} />
                       </td>
 
-                      <td>
-                        <div className="products-item">
-                          {imageUrl ? (
-                            <div className="products-item__thumb">
-                              <img src={imageUrl} alt={item.title} referrerPolicy="no-referrer" />
-                            </div>
-                          ) : (
-                            <div className="products-item__thumb products-item__thumb--empty">
-                              <LuStore />
-                            </div>
-                          )}
-                          <div className="products-item__copy">
-                            <h3>{item.title}</h3>
-                            <button type="button" className="products-sourcing-btn" onClick={() => toast.info("Sourcing request flow opens for this product.")}>
-                              Sourcing Request
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="products-table__date">{item.uploaded ? formatDisplayDate(String(item.uploaded).slice(0, 10)) : "—"}</td>
-
-                      <td className="products-table__store">
-                        <span className="products-store-chip">{item.storeName}</span>
-                      </td>
-
-                      <td className="products-table__group--divider">
-                        <span className="products-count products-count--green">{item.available}</span>
-                      </td>
-                      <td>
-                        <span className="products-count products-count--amber">{item.onHold}</span>
-                      </td>
-                      <td>
-                        <span className={`products-count ${item.outOfStock ? "products-count--red" : "products-count--green"}`}>{item.outOfStock}</span>
-                      </td>
-                      <td>{item.totalStock}</td>
-
-                      <td>
-                        <div className="products-paired-values">
-                          {item.buy_price != null ? (
-                            <div>
-                              <span className="orders-paired-values__type">BUY</span>
-                              <span className="orders-paired-values__platform">{platformLabel(item.source_platform)}</span>
-                              <strong>{formatMoney(item.buy_price, item.currency)}</strong>
-                            </div>
-                          ) : null}
-                          <div>
-                            <span className="orders-paired-values__type">SELL</span>
-                            <span className="orders-paired-values__platform">ebay</span>
-                            <strong>{formatMoney(item.price, item.currency)}</strong>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td>{item.sold}</td>
-                      <td>{item.dws}</td>
-                      <td>{item.profitValue != null ? formatMoney(item.profitValue, item.currency) : "—"}</td>
-                      <td className="products-table__mono">{item.itemBuy}</td>
-                      <td className="products-table__mono">{item.itemSell}</td>
-                      <td className="products-table__tags">—</td>
-                      <td className="products-table__mono">{item.asin}</td>
-                      <td>{item.views ?? 0}</td>
-                      <td>{item.watchers ?? 0}</td>
-                      <td>{item.days_left != null ? `${item.days_left}d` : "—"}</td>
-
-                      <td>
-                        {item.warning ? (
-                          <span className="products-warning-icon" title="Needs attention">
-                            <LuTriangleAlert />
-                          </span>
-                        ) : null}
-                      </td>
+                      {visibleColumns.map((column) => (
+                        <td
+                          key={column.id}
+                          className={getProductCellClassName(column.id)}
+                          data-column={column.id}
+                          style={{ minWidth: column.minWidth }}
+                        >
+                          {renderProductCell(item, column.id, imageUrl)}
+                        </td>
+                      ))}
 
                       <td className="products-table__actions-col">
                         <div className="products-row-actions" onClick={(e) => e.stopPropagation()}>
@@ -610,12 +993,24 @@ function ProductsContent({ searchQuery }) {
 
                           {openMenuId === item.id ? (
                             <div className="products-actions-menu">
-                              <button type="button" onClick={() => toast.info("Edit product panel opened.")}>
+                              <button type="button" onClick={() => openProductEditor(item)}>
                                 <LuPencil />
                                 <span>Edit Product</span>
                               </button>
-                              <button type="button" onClick={() => toast.info("Sync queued for this listing.")}>
-                                <LuRefreshCcw />
+                              <button type="button" onClick={() => startEditStock(item)}>
+                                <LuPackage />
+                                <span>Update Stock Qty</span>
+                              </button>
+                              <button type="button" onClick={() => startEditBuySource(item)}>
+                                <LuLink />
+                                <span>Edit Source Link</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSyncToStore(item)}
+                                disabled={syncingId === String(item.id)}
+                              >
+                                {syncingId === String(item.id) ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
                                 <span>Sync To Store</span>
                               </button>
                               <button
@@ -643,7 +1038,7 @@ function ProductsContent({ searchQuery }) {
                 })
               ) : (
                 <tr>
-                  <td className="orders-table__empty" colSpan={21}>
+                  <td className="orders-table__empty" colSpan={tableColumnCount}>
                     <LuInbox />
                     <span>No products found. Publish drafts or click &quot;Sync from eBay&quot; to load live listings.</span>
                   </td>
@@ -702,6 +1097,27 @@ function ProductsContent({ searchQuery }) {
           </div>
         </div>
       </div>
+
+      <BulkEditDraftsModal
+        open={bulkEditTargets.length > 0}
+        drafts={bulkEditTargets}
+        saving={bulkEditing}
+        onClose={() => setBulkEditTargets([])}
+        onApply={confirmBulkEdit}
+        itemLabel="product"
+      />
+
+      <ProductEditorModal
+        open={Boolean(editorProduct && editorForm)}
+        product={editorProduct}
+        form={editorForm}
+        activeTab={editorTab}
+        saving={editorSaving}
+        onTabChange={setEditorTab}
+        onChange={setEditorForm}
+        onSave={saveProductEditor}
+        onClose={closeProductEditor}
+      />
     </section>
   );
 }

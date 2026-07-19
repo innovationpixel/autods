@@ -18,6 +18,9 @@ export const getImportBatch = (id) =>
 export const getImportHistory = (params = {}) =>
     axiosInstance.get('/products/import/history', { params });
 
+export const syncProductToStore = (id) =>
+    axiosInstance.post(`/products/${id}/sync-to-store`);
+
 export const publishProduct = (id) =>
     axiosInstance.post(`/products/${id}/publish`);
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "../../../utils/toast";
+import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -7,27 +9,31 @@ import {
   LuClipboardList,
   LuClock3,
   LuExternalLink,
+  LuFileSpreadsheet,
   LuMenu,
+  LuRefreshCcw,
   LuTruck,
+  LuUserPlus,
   LuWalletCards,
   LuX,
 } from "react-icons/lu";
-import { initialOrders } from "../constants";
 import {
-  buildOrderCalculation,
   buildPaginationItems,
   formatCalculationAmount,
   formatCalculationRoi,
   formatDisplayDate,
+  mapApiOrderToCalculationRow,
   summarizeCalculations,
 } from "../helpers";
+import { getApiErrorMessage } from "../../../utils/apiErrors";
+import InviteSheetMembersModal from "../InviteSheetMembersModal";
 
-const statusMeta = {
-  Pending: { icon: LuClock3, className: "pending" },
-  Ordered: { icon: LuClipboardList, className: "ordered" },
-  Shipped: { icon: LuTruck, className: "shipped" },
-  Delivered: { icon: LuBadgeCheck, className: "delivered" },
-  Canceled: { icon: LuX, className: "canceled" },
+const ebayStatusIcons = {
+  pending: LuClock3,
+  ordered: LuClipboardList,
+  shipped: LuTruck,
+  delivered: LuBadgeCheck,
+  canceled: LuX,
 };
 
 const summaryCards = [
@@ -42,10 +48,94 @@ function CalculationsContent({ searchQuery = "" }) {
   const tableScrollRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [sheetInviting, setSheetInviting] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [sheetStatus, setSheetStatus] = useState({
+    configured: false,
+    spreadsheet_url: "",
+    last_synced_at: null,
+  });
+
+  const loadSheetStatus = async () => {
+    try {
+      const res = await getOrdersGoogleSheetStatus();
+      setSheetStatus({
+        configured: Boolean(res.data?.configured),
+        spreadsheet_url: res.data?.spreadsheet_url ?? "",
+        last_synced_at: res.data?.last_synced_at ?? null,
+      });
+    } catch {
+      setSheetStatus({ configured: false, spreadsheet_url: "", last_synced_at: null });
+    }
+  };
+
+  useEffect(() => {
+    loadSheetStatus();
+  }, []);
+
+  const loadOrders = async () => {
+    setOrdersLoading(true);
+    try {
+      const res = await getOrders({ limit: 500, sort: "desc" });
+      setOrders(res.data?.data ?? []);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to load orders."));
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
+
+  const handleOpenSheet = () => {
+    if (!sheetStatus.spreadsheet_url) {
+      toast.warn("Your Google Sheet is not ready yet. Click Sync to Sheet first.");
+      return;
+    }
+
+    window.open(sheetStatus.spreadsheet_url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleSyncToSheet = async () => {
+    setSheetSyncing(true);
+    try {
+      const res = await syncOrdersGoogleSheet();
+      toast.success(res.data?.message ?? "Orders synced to Google Sheets.");
+      setSheetStatus((current) => ({
+        ...current,
+        configured: true,
+        spreadsheet_url: res.data?.sheet?.spreadsheet_url ?? current.spreadsheet_url,
+        last_synced_at: res.data?.sheet?.last_synced_at ?? current.last_synced_at,
+      }));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Google Sheets sync failed."));
+    } finally {
+      setSheetSyncing(false);
+    }
+  };
+
+  const handleInviteMembers = async (emails) => {
+    setSheetInviting(true);
+    try {
+      const res = await inviteOrdersGoogleSheetMembers({ emails });
+      toast.success(res.data?.message ?? "Team members invited.");
+      setInviteModalOpen(false);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not invite team members."));
+    } finally {
+      setSheetInviting(false);
+    }
+  };
 
   const calculationRows = useMemo(
-    () => initialOrders.map((order, index) => buildOrderCalculation(order, index)),
-    [],
+    () => orders.map((order) => mapApiOrderToCalculationRow(order)),
+    [orders],
   );
 
   const filteredRows = useMemo(() => {
@@ -56,7 +146,7 @@ function CalculationsContent({ searchQuery = "" }) {
     }
 
     return calculationRows.filter((row) =>
-      [row.orderId, row.title, row.description, row.status, row.date]
+      [row.orderId, row.title, row.description, row.ebayStatus, row.date]
         .join(" ")
         .toLowerCase()
         .includes(query),
@@ -119,6 +209,65 @@ function CalculationsContent({ searchQuery = "" }) {
         </div>
       </section>
 
+      <div className="orders-toolbar orders-toolbar--secondary calculations-sheet-toolbar">
+        <div className="orders-toolbar__actions">
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={handleOpenSheet}
+            disabled={!sheetStatus.spreadsheet_url}
+          >
+            <LuFileSpreadsheet />
+            <span>Open Sheet</span>
+          </button>
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={() => setInviteModalOpen(true)}
+            disabled={!sheetStatus.spreadsheet_url || sheetInviting}
+          >
+            <LuUserPlus />
+            <span>Invite Members</span>
+          </button>
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={handleSyncToSheet}
+            disabled={sheetSyncing || !sheetStatus.configured}
+          >
+            <LuRefreshCcw />
+            <span>{sheetSyncing ? "Syncing sheet…" : "Sync to Sheet"}</span>
+          </button>
+        </div>
+      </div>
+
+      {!sheetStatus.configured ? (
+        <div className="orders-inline-note">
+          <LuFileSpreadsheet />
+          <span>Google Sheets export is not configured on the server yet.</span>
+        </div>
+      ) : null}
+
+      {sheetStatus.configured && sheetStatus.last_synced_at ? (
+        <div className="orders-inline-note">
+          <LuFileSpreadsheet />
+          <span>
+            Google Sheet last updated: {formatDisplayDate(sheetStatus.last_synced_at.slice(0, 10))}. Sheets are view-only and public by default.
+          </span>
+        </div>
+      ) : null}
+
+      <InviteSheetMembersModal
+        open={inviteModalOpen}
+        saving={sheetInviting}
+        onClose={() => {
+          if (!sheetInviting) {
+            setInviteModalOpen(false);
+          }
+        }}
+        onInvite={handleInviteMembers}
+      />
+
       <section className="calculations-table-panel card-wrapper">
         <div className="calculations-table-toolbar">
           <strong>{filteredRows.length} orders</strong>
@@ -141,7 +290,7 @@ function CalculationsContent({ searchQuery = "" }) {
                   <th>Order Id</th>
                   <th>Name</th>
                   <th>Date</th>
-                  <th>Order Status</th>
+                  <th>eBay Status</th>
                   <th>Cost</th>
                   <th>Shipping</th>
                   <th>Earn</th>
@@ -151,10 +300,16 @@ function CalculationsContent({ searchQuery = "" }) {
               </thead>
 
               <tbody>
-                {visibleRows.length ? (
+                {ordersLoading ? (
+                  <tr>
+                    <td className="orders-table__empty" colSpan={9}>
+                      <LuRefreshCcw className="spin-icon" />
+                      <span>Loading orders…</span>
+                    </td>
+                  </tr>
+                ) : visibleRows.length ? (
                   visibleRows.map((row) => {
-                    const meta = statusMeta[row.status] || statusMeta.Pending;
-                    const StatusIcon = meta.icon;
+                    const StatusIcon = ebayStatusIcons[row.ebayStatusClass] ?? LuClock3;
 
                     return (
                       <tr className="orders-table__row" key={row.id}>
@@ -175,10 +330,12 @@ function CalculationsContent({ searchQuery = "" }) {
                         <td className="orders-table__date">{formatDisplayDate(row.date)}</td>
 
                         <td className="orders-table__status-cell">
-                          <span className={`orders-status-badge orders-status-badge--${meta.className} calculations-status-badge`}>
+                          <span
+                            className={`orders-status-badge orders-status-badge--${row.ebayStatusClass} calculations-status-badge`}
+                          >
                             <span className="orders-status-badge__left">
                               <StatusIcon />
-                              <span>{row.status}</span>
+                              <span>{row.ebayStatus}</span>
                             </span>
                           </span>
                         </td>

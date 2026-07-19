@@ -8,7 +8,7 @@ import {
   LuTrash2,
   LuX,
 } from "react-icons/lu";
-import { getListingImageUrl } from "./helpers";
+import { buildSourceProductUrl, getListingImageUrl, normalizeListingSourceInput } from "./helpers";
 import { uid, normalizeVariantPricing } from "../../utils/draftEditorState";
 import DraftDescriptionEditor from "./DraftDescriptionEditor";
 import DraftCategorySelect from "./DraftCategorySelect";
@@ -51,6 +51,12 @@ function DraftEditorPanel({
 
   const imageUrl = getListingImageUrl(item);
   const selectedImageCount = form.images.filter((image) => image.selected).length;
+  const resolvedSource = normalizeListingSourceInput(form.sourceInput ?? "", form.sourcePlatform ?? item.source_platform ?? "aliexpress");
+  const sourcePreviewUrl = buildSourceProductUrl(
+    resolvedSource.source_platform,
+    resolvedSource.source_product_id,
+    resolvedSource.source_url,
+  );
 
   const patch = (partial) => onChange({ ...form, ...partial });
 
@@ -181,11 +187,19 @@ function DraftEditorPanel({
                 <div className="drafts-row__meta">
                   <span>Warehouse: {item.warehouse_country ?? "CN"}</span>
                   <i aria-hidden="true" />
-                  <span>Source: {item.source_platform ?? "aliexpress"}</span>
-                  {item.source_product_id ? (
+                  <span>Source: {resolvedSource.source_platform ?? "aliexpress"}</span>
+                  {resolvedSource.source_product_id ? (
                     <>
                       <i aria-hidden="true" />
-                      <span>Buy Item Id: {item.source_product_id}</span>
+                      <span>Buy Item Id: {resolvedSource.source_product_id}</span>
+                    </>
+                  ) : null}
+                  {sourcePreviewUrl ? (
+                    <>
+                      <i aria-hidden="true" />
+                      <a href={sourcePreviewUrl} target="_blank" rel="noopener noreferrer" className="draft-editor__source-link">
+                        Open source
+                      </a>
                     </>
                   ) : null}
                 </div>
@@ -279,6 +293,32 @@ function DraftEditorPanel({
                       value={form.quantity ?? ""}
                       onChange={(event) => patch({ quantity: event.target.value })}
                     />
+                  </label>
+                </div>
+
+                <div className="draft-editor__grid">
+                  <label>
+                    <span>Source link / Item ID (Buy)</span>
+                    <input
+                      type="text"
+                      value={form.sourceInput ?? ""}
+                      placeholder="https://... or product ID"
+                      onChange={(event) => patch({ sourceInput: event.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span>Source platform</span>
+                    <select
+                      className="draft-editor__native-select"
+                      value={form.sourcePlatform ?? "aliexpress"}
+                      onChange={(event) => patch({ sourcePlatform: event.target.value })}
+                    >
+                      <option value="aliexpress">AliExpress</option>
+                      <option value="amazon">Amazon</option>
+                      <option value="walmart">Walmart</option>
+                      <option value="etsy">Etsy</option>
+                      <option value="ebay">eBay</option>
+                    </select>
                   </label>
                 </div>
 

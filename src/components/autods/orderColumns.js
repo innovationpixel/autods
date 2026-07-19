@@ -1,5 +1,5 @@
 /** 3Dsellers Orders Manager — 45 data columns + checkbox + actions = 47 grid columns. */
-export const ORDER_COLUMN_STORAGE_KEY = "autods_orders_visible_columns_v2";
+export const ORDER_COLUMN_STORAGE_KEY = "autods_orders_visible_columns_v4";
 
 const COLUMN_MIN_WIDTHS = {
   name: 280,
@@ -85,8 +85,8 @@ export const orderTableColumns = [
   { id: "shippingStatus", label: "Shipping Status", defaultVisible: false, manage: true },
   { id: "shippingService", label: "Shipping Service", defaultVisible: false, manage: true },
   { id: "shippingPrice", label: "Shipping Price", defaultVisible: false, manage: true },
-  { id: "trackingNumber", label: "Tracking Number", defaultVisible: false, manage: true },
-  { id: "carrier", label: "Carrier", defaultVisible: false, manage: true },
+  { id: "trackingNumber", label: "Tracking Number", defaultVisible: true, manage: true },
+  { id: "carrier", label: "Carrier", defaultVisible: true, manage: true },
   { id: "shippingAddress", label: "Shipping Address", defaultVisible: false, manage: true },
   { id: "shipBy", label: "Ship By", defaultVisible: false, manage: true },
   { id: "shippingDate", label: "Shipping Date", defaultVisible: false, manage: true },
@@ -143,6 +143,10 @@ export function allManageableColumnIds() {
 
 export function getColumnById(id) {
   return orderTableColumns.find((column) => column.id === id);
+}
+
+export function resolveVisibleOrderColumns(visibleColumnIds) {
+  return visibleColumnIds.map((id) => getColumnById(id)).filter(Boolean);
 }
 
 export function getVisibleTableMinWidth(visibleColumnIds) {

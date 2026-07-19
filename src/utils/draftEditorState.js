@@ -1,4 +1,4 @@
-import { getListingImageUrl, getMarketplaceProductImages, normalizeImageUrl } from "../components/autods/helpers";
+import { getListingImageUrl, getMarketplaceProductImages, normalizeImageUrl, normalizeListingSourceInput } from "../components/autods/helpers";
 
 function uid(prefix = "id") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -263,6 +263,8 @@ export function buildDraftFormState(item) {
       buyPrice: Number(monitoring.buyPrice ?? item.buy_price ?? 0),
       profit: Number(monitoring.profit ?? item.profit ?? 0),
     },
+    sourceInput: saved.sourceInput ?? item.source_url ?? item.source_product_id ?? "",
+    sourcePlatform: saved.sourcePlatform ?? item.source_platform ?? "aliexpress",
   };
 }
 
@@ -288,6 +290,7 @@ export function serializeDraftFormForApi(form) {
   const buyPrice = roundMoney(primaryVariant?.buyPrice ?? form.monitoring.buyPrice);
   const profit = roundMoney(primaryVariant?.profit ?? form.monitoring.profit);
   const listPrice = roundMoney(primaryVariant?.listingPrice ?? buyPrice + profit);
+  const source = normalizeListingSourceInput(form.sourceInput ?? "", form.sourcePlatform ?? "aliexpress");
 
   return {
     title: form.title,
@@ -300,6 +303,10 @@ export function serializeDraftFormForApi(form) {
     buy_price: buyPrice,
     profit,
     shipping_method: form.shippingMethod ?? "Cheapest with tracking",
+    source_input: source.source_input || null,
+    source_url: source.source_url,
+    source_product_id: source.source_product_id,
+    source_platform: source.source_platform,
     images: selectedImages.map((image) => ({ url: image.url })),
     image_url: primaryImage,
     draft_editor: {
@@ -320,6 +327,8 @@ export function serializeDraftFormForApi(form) {
         buyPrice,
         profit,
       },
+      sourceInput: form.sourceInput ?? "",
+      sourcePlatform: source.source_platform,
     },
     variants: normalizedVariants,
     specifics: form.specifics,

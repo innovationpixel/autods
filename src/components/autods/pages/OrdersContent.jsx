@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, syncOrders, updateOrderStatus as updateOrderStatusApi, getOrdersGoogleSheetStatus, syncOrdersGoogleSheet } from "../../../services/OrderService";
+import { getOrders, pushOrderTracking, syncOrders, updateOrderSource, updateOrderTracking, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuBolt,
+  LuCheck,
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
@@ -11,9 +12,10 @@ import {
   LuClipboardList,
   LuClock3,
   LuExternalLink,
-  LuFileSpreadsheet,
   LuInbox,
+  LuLoader,
   LuMenu,
+  LuPencil,
   LuPlus,
   LuPrinter,
   LuRefreshCcw,
@@ -21,22 +23,99 @@ import {
   LuTruck,
   LuX,
 } from "react-icons/lu";
-import CompactDateRange from "../CompactDateRange";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import OrderColumnManager from "../OrderColumnManager";
 import {
   getVisibleTableMinWidth,
   loadVisibleColumnIds,
-  orderTableColumns,
+  resolveVisibleOrderColumns,
   saveVisibleColumnIds,
 } from "../orderColumns";
-import { formatDisplayDate } from "../helpers";
+import { buildEbayListingProductUrl, buildSourceProductUrl, detectTrackingCarrier, formatDisplayDate, getEbayOrderDetailUrl, normalizeListingSourceInput, normalizeTrackingCarrier } from "../helpers";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
+import ProductItemIdCell from "../ProductItemIdCell";
+import OrdersTrackingEditor from "../OrdersTrackingEditor";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
+
+const ORDER_DATE_PRESETS = [
+  { id: "today", label: "Today" },
+  { id: "7days", label: "7 days" },
+  { id: "15days", label: "15 days" },
+  { id: "30days", label: "30 days" },
+  { id: "month", label: "This month" },
+  { id: "all", label: "All time" },
+];
+
+const ORDER_SORT_OPTIONS = [
+  { id: "orderDate", label: "Order date" },
+  { id: "total", label: "Total amount" },
+  { id: "profit", label: "Profit" },
+];
+
+const DEFAULT_DATE_PRESET = "30days";
+
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function getDateRangeForPreset(preset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const to = formatDateInput(today);
+
+  switch (preset) {
+    case "today":
+      return { from: to, to };
+    case "7days": {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 6);
+      return { from: formatDateInput(from), to };
+    }
+    case "15days": {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 14);
+      return { from: formatDateInput(from), to };
+    }
+    case "30days": {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 29);
+      return { from: formatDateInput(from), to };
+    }
+    case "month": {
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { from: formatDateInput(from), to };
+    }
+    case "all":
+      return { from: "", to: "" };
+    default:
+      return null;
+  }
+}
+
+function getDefaultOrderFilters() {
+  const range = getDateRangeForPreset(DEFAULT_DATE_PRESET);
+
+  return {
+    dateRangePreset: DEFAULT_DATE_PRESET,
+    fromDate: range?.from ?? "",
+    toDate: range?.to ?? "",
+    sortBy: "orderDate",
+    sortDirection: "desc",
+    statusFilter: "All Statuses",
+    buyerFilter: "",
+    orderIdFilter: "",
+    storeFilter: "All Stores",
+    showOnlyActive: true,
+  };
+}
 
 function formatMoney(value, currency = "USD") {
   if (value === null || value === undefined || value === "") {
@@ -61,6 +140,27 @@ function formatMoney(value, currency = "USD") {
 
 function joinAddress(parts) {
   return parts.filter(Boolean).join(", ") || "—";
+}
+
+function normalizeTrackingValue(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) {
+    return "";
+  }
+
+  return trimmed;
+}
+
+function platformLabel(platform) {
+  if (!platform) return "—";
+  const map = {
+    aliexpress: "AE",
+    amazon: "AMZ",
+    walmart: "WMT",
+    etsy: "ETSY",
+    ebay: "eBay",
+  };
+  return map[platform] ?? platform.slice(0, 3).toUpperCase();
 }
 
 function mapApiOrder(order) {
@@ -107,6 +207,19 @@ function mapApiOrder(order) {
 
   const refund = raw.refundSummary ?? raw.paymentSummary?.refunds?.[0] ?? {};
   const shippingStep = fulfillment.shippingStep ?? {};
+  const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
+  const sourcePlatform = order.source_platform ?? "aliexpress";
+  const sourceUrl = order.source_url ?? null;
+  const itemBuy = sourceProductId ?? "—";
+  const itemBuyUrl = buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl);
+  const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
+  const trackingValue =
+    normalizeTrackingValue(order.tracking_number) || normalizeTrackingValue(shippingStep.shipmentTrackingNumber);
+  const carrierRaw =
+    normalizeTrackingCarrier(order.carrier) ||
+    normalizeTrackingCarrier(shippingStep.shippingCarrierCode) ||
+    detectTrackingCarrier(trackingValue) ||
+    "";
 
   return {
     id: String(order.id),
@@ -120,6 +233,10 @@ function mapApiOrder(order) {
     bundleDetails: firstItem.bundleDetails ?? "—",
     listingsTags: firstItem.listingTags ?? "—",
     orderId: order.ebay_order_id ?? raw.orderId ?? "—",
+    orderDetailUrl: getEbayOrderDetailUrl(
+      order.ebay_order_id ?? raw.orderId,
+      order.connection?.site_id,
+    ),
     detailsExtended: [
       paymentStatus !== "—" ? `Payment: ${paymentStatus}` : null,
       shippingStatus !== "—" ? `Shipping: ${shippingStatus}` : null,
@@ -148,8 +265,12 @@ function mapApiOrder(order) {
     shippingStatus,
     shippingService: shippingStep.shippingServiceCode ?? fulfillment.shippingStep?.shippingCarrierCode ?? "—",
     shippingPrice: formatMoney(delivery.shippingCost?.value ?? delivery.amount?.value, delivery.shippingCost?.currency ?? currency),
-    trackingNumber: order.tracking_number ?? shippingStep.shipmentTrackingNumber ?? "—",
-    carrier: shippingStep.shippingCarrierCode ?? "—",
+    trackingNumber: trackingValue || "—",
+    trackingNumberRaw: trackingValue,
+    carrier: carrierRaw || "—",
+    carrierRaw,
+    trackingPushed: Boolean(order.tracking_pushed_at),
+    trackingPushedAt: order.tracking_pushed_at ?? null,
     shippingAddress: joinAddress([
       shipTo.contactAddress?.addressLine1 ?? shipTo.addressLine1,
       shipTo.contactAddress?.city ?? shipTo.city,
@@ -168,31 +289,39 @@ function mapApiOrder(order) {
     record: raw.salesRecordReference ?? String(order.id ?? "—"),
     taxRef: raw.taxReference ?? "—",
     channel: order.store_name ? `${order.store_name} · eBay` : "eBay",
+    storeName: order.store_name ?? "eBay",
     teammate: order.teammate ?? "—",
-    itemBuy: order.item_buy_id ?? "—",
+    itemBuy,
     itemSell: order.item_sell_id ?? "—",
+    itemBuyUrl,
+    itemSellUrl,
+    sourcePlatform,
+    sourceUrl,
+    sourceProductId,
+    listingSku: order.listing_sku ?? firstItem.sku ?? "—",
     buyer: buyer.username ?? order.buyer_name ?? "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
+    totalValue: Number(sellPrice) || 0,
+    profitValue: profit != null && !Number.isNaN(Number(profit)) ? Number(profit) : null,
   };
 }
 
 function OrdersContent({ searchQuery }) {
+  const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [sheetSyncing, setSheetSyncing] = useState(false);
-  const [sheetStatus, setSheetStatus] = useState({
-    configured: false,
-    spreadsheet_url: "",
-    last_synced_at: null,
-  });
   const [showFilters, setShowFilters] = useState(false);
-  const [showOnlyActive, setShowOnlyActive] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("All Statuses");
-  const [buyerFilter, setBuyerFilter] = useState("");
-  const [fromDate, setFromDate] = useState("2026-04-17");
-  const [toDate, setToDate] = useState("2026-04-21");
-  const [sortDirection, setSortDirection] = useState("desc");
+  const [showOnlyActive, setShowOnlyActive] = useState(defaultFilters.showOnlyActive);
+  const [statusFilter, setStatusFilter] = useState(defaultFilters.statusFilter);
+  const [buyerFilter, setBuyerFilter] = useState(defaultFilters.buyerFilter);
+  const [orderIdFilter, setOrderIdFilter] = useState(defaultFilters.orderIdFilter);
+  const [storeFilter, setStoreFilter] = useState(defaultFilters.storeFilter);
+  const [dateRangePreset, setDateRangePreset] = useState(defaultFilters.dateRangePreset);
+  const [fromDate, setFromDate] = useState(defaultFilters.fromDate);
+  const [toDate, setToDate] = useState(defaultFilters.toDate);
+  const [sortBy, setSortBy] = useState(defaultFilters.sortBy);
+  const [sortDirection, setSortDirection] = useState(defaultFilters.sortDirection);
   const [ordersNotice, setOrdersNotice] = useState("");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,10 +333,18 @@ function OrdersContent({ searchQuery }) {
   const [openBulkMenu, setOpenBulkMenu] = useState(false);
   const [openPrintMenu, setOpenPrintMenu] = useState(false);
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleColumnIds);
+  const [editingBuySourceId, setEditingBuySourceId] = useState("");
+  const [buySourceDraft, setBuySourceDraft] = useState("");
+  const [savingBuySourceId, setSavingBuySourceId] = useState("");
+  const [editingTrackingId, setEditingTrackingId] = useState("");
+  const [trackingDraft, setTrackingDraft] = useState("");
+  const [carrierDraft, setCarrierDraft] = useState("");
+  const [savingTrackingId, setSavingTrackingId] = useState("");
+  const [pushingTrackingId, setPushingTrackingId] = useState("");
   const tableScrollRef = useRef(null);
 
   const visibleColumns = useMemo(
-    () => orderTableColumns.filter((column) => visibleColumnIds.includes(column.id)),
+    () => resolveVisibleOrderColumns(visibleColumnIds),
     [visibleColumnIds],
   );
 
@@ -218,35 +355,54 @@ function OrdersContent({ searchQuery }) {
     saveVisibleColumnIds(nextIds);
   };
 
-  const loadSheetStatus = async () => {
-    try {
-      const res = await getOrdersGoogleSheetStatus();
-      setSheetStatus({
-        configured: Boolean(res.data?.configured),
-        spreadsheet_url: res.data?.spreadsheet_url ?? "",
-        last_synced_at: res.data?.last_synced_at ?? null,
-      });
-    } catch {
-      setSheetStatus({ configured: false, spreadsheet_url: "", last_synced_at: null });
+  const applyDatePreset = (preset) => {
+    setDateRangePreset(preset);
+    const range = getDateRangeForPreset(preset);
+    if (range) {
+      setFromDate(range.from);
+      setToDate(range.to);
     }
   };
 
-  useEffect(() => {
-    loadSheetStatus();
-  }, []);
+  const handleFromDateChange = (value) => {
+    setFromDate(value);
+    setDateRangePreset("custom");
+  };
+
+  const handleToDateChange = (value) => {
+    setToDate(value);
+    setDateRangePreset("custom");
+  };
+
+  const storeOptions = useMemo(() => {
+    const stores = new Set(
+      orders.map((order) => order.storeName).filter((name) => name && name !== "—"),
+    );
+
+    return ["All Stores", ...Array.from(stores).sort((left, right) => left.localeCompare(right))];
+  }, [orders]);
 
   const loadOrders = async () => {
     setOrdersLoading(true);
     try {
-      const res = await getOrders({
+      const params = {
         q: searchQuery,
         status: statusFilter,
         buyer: buyerFilter,
-        from_date: fromDate,
-        to_date: toDate,
         hide_canceled: showOnlyActive ? 1 : 0,
+        sort: sortDirection,
         limit: 500,
-      });
+      };
+
+      if (fromDate) {
+        params.from_date = fromDate;
+      }
+
+      if (toDate) {
+        params.to_date = toDate;
+      }
+
+      const res = await getOrders(params);
       const rows = (res.data?.data ?? []).map(mapApiOrder);
       setOrders(rows);
     } catch (err) {
@@ -258,23 +414,14 @@ function OrdersContent({ searchQuery }) {
 
   useEffect(() => {
     loadOrders();
-  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive]);
+  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection]);
 
   const handleSyncOrders = async () => {
     setSyncing(true);
     try {
       const res = await syncOrders();
       toast.success(res.data?.message ?? "Orders synced.");
-      if (res.data?.sheet?.spreadsheet_url) {
-        setSheetStatus((current) => ({
-          ...current,
-          configured: true,
-          spreadsheet_url: res.data.sheet.spreadsheet_url,
-          last_synced_at: res.data.sheet.last_synced_at ?? current.last_synced_at,
-        }));
-      }
       await loadOrders();
-      await loadSheetStatus();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {
@@ -282,32 +429,129 @@ function OrdersContent({ searchQuery }) {
     }
   };
 
-  const handleOpenSheet = () => {
-    if (!sheetStatus.spreadsheet_url) {
-      toast.warn("Your Google Sheet is not ready yet. Click Sync to Sheet first.");
+  const startEditBuySource = (order) => {
+    setEditingBuySourceId(order.id);
+    setBuySourceDraft(order.sourceUrl ?? (order.itemBuy !== "—" ? order.itemBuy : ""));
+  };
+
+  const cancelEditBuySource = () => {
+    setEditingBuySourceId("");
+    setBuySourceDraft("");
+  };
+
+  const saveBuySource = async (order) => {
+    const trimmed = buySourceDraft.trim();
+    if (!trimmed) {
+      toast.error("Enter a source link or item ID.");
       return;
     }
 
-    window.open(sheetStatus.spreadsheet_url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleSyncToSheet = async () => {
-    setSheetSyncing(true);
+    setSavingBuySourceId(order.id);
     try {
-      const res = await syncOrdersGoogleSheet();
-      toast.success(res.data?.message ?? "Orders synced to Google Sheets.");
-      setSheetStatus((current) => ({
-        ...current,
-        configured: true,
-        spreadsheet_url: res.data?.sheet?.spreadsheet_url ?? current.spreadsheet_url,
-        last_synced_at: res.data?.sheet?.last_synced_at ?? current.last_synced_at,
-      }));
+      const source = normalizeListingSourceInput(trimmed, order.sourcePlatform);
+      const res = await updateOrderSource(order.id, {
+        source_input: source.source_input,
+        source_platform: source.source_platform,
+      });
+      toast.success(res.data?.message ?? "Source link updated.");
+      cancelEditBuySource();
+      await loadOrders();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Google Sheets sync failed."));
+      toast.error(getApiErrorMessage(err, "Could not update source link."));
     } finally {
-      setSheetSyncing(false);
+      setSavingBuySourceId("");
     }
   };
+
+  const startEditTracking = (order) => {
+    setEditingTrackingId(order.id);
+    setTrackingDraft(order.trackingNumberRaw ?? "");
+    setCarrierDraft(order.carrierRaw || detectTrackingCarrier(order.trackingNumberRaw) || "");
+  };
+
+  const cancelEditTracking = () => {
+    setEditingTrackingId("");
+    setTrackingDraft("");
+    setCarrierDraft("");
+  };
+
+  const handleTrackingDraftChange = (value) => {
+    setTrackingDraft(value);
+    const detected = detectTrackingCarrier(value);
+    if (detected) {
+      setCarrierDraft(detected);
+    }
+  };
+
+  const saveTrackingNumber = async (order) => {
+    setSavingTrackingId(order.id);
+    try {
+      const res = await updateOrderTracking(order.id, {
+        tracking_number: trackingDraft.trim() || null,
+        carrier: carrierDraft || null,
+      });
+      toast.success(res.data?.message ?? "Tracking updated.");
+      cancelEditTracking();
+      await loadOrders();
+      return true;
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update tracking."));
+      return false;
+    } finally {
+      setSavingTrackingId("");
+    }
+  };
+
+  const pushTrackingToEbay = async (order) => {
+    const isEditing = editingTrackingId === order.id;
+    const tracking = (isEditing ? trackingDraft : order.trackingNumberRaw).trim();
+    const carrier =
+      normalizeTrackingCarrier(isEditing ? carrierDraft : order.carrierRaw) || detectTrackingCarrier(tracking);
+
+    if (!tracking) {
+      toast.error("Enter a tracking number first.");
+      return;
+    }
+
+    if (!carrier) {
+      toast.error("Select or detect a carrier first.");
+      return;
+    }
+
+    setPushingTrackingId(order.id);
+    try {
+      await updateOrderTracking(order.id, {
+        tracking_number: tracking,
+        carrier,
+      });
+      const res = await pushOrderTracking(order.id);
+      toast.success(res.data?.message ?? "Tracking pushed to eBay.");
+      cancelEditTracking();
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not push tracking to eBay."));
+    } finally {
+      setPushingTrackingId("");
+    }
+  };
+
+  const renderTrackingEditor = (order, compact = false) => (
+    <OrdersTrackingEditor
+      order={order}
+      isEditing={editingTrackingId === order.id}
+      trackingDraft={trackingDraft}
+      carrierDraft={carrierDraft}
+      saving={savingTrackingId === order.id}
+      pushing={pushingTrackingId === order.id}
+      onStartEdit={startEditTracking}
+      onCancel={cancelEditTracking}
+      onTrackingChange={handleTrackingDraftChange}
+      onCarrierChange={setCarrierDraft}
+      onSave={saveTrackingNumber}
+      onPushToEbay={pushTrackingToEbay}
+      compact={compact}
+    />
+  );
 
   useEffect(() => {
     const handleDocumentClick = () => {
@@ -341,7 +585,25 @@ function OrdersContent({ searchQuery }) {
         }
       }
 
-      if (order.date < fromDate || order.date > toDate) {
+      if (orderIdFilter.trim()) {
+        const orderIdQuery = orderIdFilter.trim().toLowerCase();
+        if (
+          !order.orderId.toLowerCase().includes(orderIdQuery) &&
+          !order.id.toLowerCase().includes(orderIdQuery)
+        ) {
+          return false;
+        }
+      }
+
+      if (storeFilter !== "All Stores" && order.storeName !== storeFilter) {
+        return false;
+      }
+
+      if (fromDate && order.date < fromDate) {
+        return false;
+      }
+
+      if (toDate && order.date > toDate) {
         return false;
       }
 
@@ -365,10 +627,32 @@ function OrdersContent({ searchQuery }) {
         .includes(query);
     });
 
-    return nextOrders.sort((left, right) =>
-      sortDirection === "desc" ? right.date.localeCompare(left.date) : left.date.localeCompare(right.date),
-    );
-  }, [buyerFilter, fromDate, orders, searchQuery, showOnlyActive, sortDirection, statusFilter, toDate]);
+    return nextOrders.sort((left, right) => {
+      let comparison = 0;
+
+      if (sortBy === "total") {
+        comparison = left.totalValue - right.totalValue;
+      } else if (sortBy === "profit") {
+        comparison = (left.profitValue ?? Number.NEGATIVE_INFINITY) - (right.profitValue ?? Number.NEGATIVE_INFINITY);
+      } else {
+        comparison = left.date.localeCompare(right.date);
+      }
+
+      return sortDirection === "desc" ? -comparison : comparison;
+    });
+  }, [
+    buyerFilter,
+    fromDate,
+    orderIdFilter,
+    orders,
+    searchQuery,
+    showOnlyActive,
+    sortBy,
+    sortDirection,
+    statusFilter,
+    storeFilter,
+    toDate,
+  ]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -381,13 +665,37 @@ function OrdersContent({ searchQuery }) {
   const tableColumnCount = visibleColumns.length + 2;
 
   const activeFilterChips = [
-    showOnlyActive
+    dateRangePreset !== DEFAULT_DATE_PRESET && dateRangePreset !== "custom"
       ? {
-          key: "active",
-          label: "Active",
-          onRemove: () => setShowOnlyActive(false),
+          key: "date-preset",
+          label: ORDER_DATE_PRESETS.find((preset) => preset.id === dateRangePreset)?.label ?? "Date range",
+          onRemove: () => applyDatePreset(DEFAULT_DATE_PRESET),
         }
       : null,
+    dateRangePreset === "custom" && (fromDate || toDate)
+      ? {
+          key: "date-custom",
+          label: fromDate && toDate ? `${fromDate} – ${toDate}` : fromDate || toDate,
+          onRemove: () => applyDatePreset(DEFAULT_DATE_PRESET),
+        }
+      : null,
+    sortBy !== defaultFilters.sortBy || sortDirection !== defaultFilters.sortDirection
+      ? {
+          key: "sort",
+          label: `${ORDER_SORT_OPTIONS.find((option) => option.id === sortBy)?.label ?? "Sort"} · ${sortDirection === "desc" ? "Desc" : "Asc"}`,
+          onRemove: () => {
+            setSortBy(defaultFilters.sortBy);
+            setSortDirection(defaultFilters.sortDirection);
+          },
+        }
+      : null,
+    showOnlyActive
+      ? null
+      : {
+          key: "active",
+          label: "Including canceled",
+          onRemove: () => setShowOnlyActive(true),
+        },
     statusFilter !== "All Statuses"
       ? {
           key: "status",
@@ -402,22 +710,42 @@ function OrdersContent({ searchQuery }) {
           onRemove: () => setBuyerFilter(""),
         }
       : null,
+    orderIdFilter.trim()
+      ? {
+          key: "order-id",
+          label: `Order ${orderIdFilter.trim()}`,
+          onRemove: () => setOrderIdFilter(""),
+        }
+      : null,
+    storeFilter !== "All Stores"
+      ? {
+          key: "store",
+          label: storeFilter,
+          onRemove: () => setStoreFilter("All Stores"),
+        }
+      : null,
   ].filter(Boolean);
 
   const clearOrderFilters = () => {
-    setShowOnlyActive(true);
-    setStatusFilter("All Statuses");
-    setBuyerFilter("");
-    setFromDate("2026-04-17");
-    setToDate("2026-04-21");
+    setShowOnlyActive(defaultFilters.showOnlyActive);
+    setStatusFilter(defaultFilters.statusFilter);
+    setBuyerFilter(defaultFilters.buyerFilter);
+    setOrderIdFilter(defaultFilters.orderIdFilter);
+    setStoreFilter(defaultFilters.storeFilter);
+    setSortBy(defaultFilters.sortBy);
+    setSortDirection(defaultFilters.sortDirection);
+    applyDatePreset(defaultFilters.dateRangePreset);
   };
 
   const hasOrderFilters =
+    dateRangePreset !== DEFAULT_DATE_PRESET ||
+    sortBy !== defaultFilters.sortBy ||
+    sortDirection !== defaultFilters.sortDirection ||
     !showOnlyActive ||
     statusFilter !== "All Statuses" ||
     buyerFilter.trim() ||
-    fromDate !== "2026-04-17" ||
-    toDate !== "2026-04-21";
+    orderIdFilter.trim() ||
+    storeFilter !== "All Stores";
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
@@ -474,7 +802,18 @@ function OrdersContent({ searchQuery }) {
   };
 
   const handleOrderAction = (orderId, action, label) => {
-    const orderLabel = orderId.startsWith("order-") ? orderId.replace("order-", "#") : `#${orderId}`;
+    const order = orders.find((row) => String(row.id) === String(orderId));
+    const orderLabel = order?.orderId ?? orderId;
+
+    if (action === "add-tracking") {
+      if (order) {
+        startEditTracking(order);
+      } else {
+        toast.error("Order not found.");
+      }
+      closeRowActionMenus();
+      return;
+    }
 
     if (action === "update-pick-status") {
       toast.info("Update Pick Status — coming soon.");
@@ -515,14 +854,25 @@ function OrdersContent({ searchQuery }) {
 
   const renderColumnHeader = (column) => {
     if (column.sortable) {
+      const isActive = sortBy === "orderDate";
+
       return (
         <button
           type="button"
           className="orders-sort-btn"
-          onClick={() => setSortDirection((current) => (current === "desc" ? "asc" : "desc"))}
+          onClick={() => {
+            setSortBy("orderDate");
+            setSortDirection((current) => (current === "desc" ? "asc" : "desc"));
+          }}
         >
           <span>{column.label}</span>
-          <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
+          <LuChevronDown
+            className={
+              isActive && sortDirection === "asc"
+                ? "orders-sort-btn__icon orders-sort-btn__icon--asc"
+                : "orders-sort-btn__icon"
+            }
+          />
         </button>
       );
     }
@@ -620,20 +970,98 @@ function OrdersContent({ searchQuery }) {
           <div className="orders-paired-values">
             <div>
               <span className="orders-paired-values__type">BUY</span>
-              <span className="orders-paired-values__platform">ebay</span>
-              <strong>{order.itemBuy}</strong>
+              <span className="orders-paired-values__platform">{platformLabel(order.sourcePlatform)}</span>
+              {editingBuySourceId === order.id ? (
+                <div className="products-source-edit" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    type="text"
+                    className="products-source-edit__input"
+                    placeholder="Item ID or source URL"
+                    value={buySourceDraft}
+                    onChange={(event) => setBuySourceDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        saveBuySource(order);
+                      }
+                      if (event.key === "Escape") {
+                        cancelEditBuySource();
+                      }
+                    }}
+                    autoFocus
+                    disabled={savingBuySourceId === order.id}
+                  />
+                  <button
+                    type="button"
+                    className="products-source-edit__btn products-source-edit__btn--save"
+                    onClick={() => saveBuySource(order)}
+                    disabled={savingBuySourceId === order.id}
+                    aria-label="Save source link"
+                  >
+                    {savingBuySourceId === order.id ? <LuLoader className="products-source-edit__spin" /> : <LuCheck />}
+                  </button>
+                  <button
+                    type="button"
+                    className="products-source-edit__btn"
+                    onClick={cancelEditBuySource}
+                    disabled={savingBuySourceId === order.id}
+                    aria-label="Cancel source edit"
+                  >
+                    <LuX />
+                  </button>
+                </div>
+              ) : (
+                <div className="products-source-cell">
+                  {order.itemBuyUrl || (order.itemBuy && order.itemBuy !== "—") ? (
+                    <ProductItemIdCell itemId={order.itemBuy} sku={order.listingSku} url={order.itemBuyUrl} />
+                  ) : (
+                    <span className="products-source-btn__placeholder">Add source</span>
+                  )}
+                  <button
+                    type="button"
+                    className="products-source-cell__edit"
+                    onClick={() => startEditBuySource(order)}
+                    title="Edit source link"
+                    aria-label="Edit source link"
+                  >
+                    <LuPencil />
+                  </button>
+                </div>
+              )}
             </div>
             <div>
               <span className="orders-paired-values__type">SELL</span>
               <span className="orders-paired-values__platform">ebay</span>
-              <strong>{order.itemSell}</strong>
+              {order.itemSellUrl ? (
+                <a href={order.itemSellUrl} target="_blank" rel="noopener noreferrer" className="products-item-id-link">
+                  <strong>{order.itemSell}</strong>
+                </a>
+              ) : (
+                <strong>{order.itemSell}</strong>
+              )}
             </div>
           </div>
         );
       case "orderId":
+        if (order.orderDetailUrl) {
+          return (
+            <a
+              href={order.orderDetailUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="orders-order-id-link"
+            >
+              <strong>{order.orderId}</strong>
+            </a>
+          );
+        }
+
         return <strong>{order.orderId}</strong>;
       case "profit":
         return <span className="orders-table__profit">{order.profit}</span>;
+      case "trackingNumber":
+        return renderTrackingEditor(order);
+      case "carrier":
+        return editingTrackingId === order.id ? renderTrackingEditor(order, true) : renderTrackingEditor(order, true);
       case "invoice":
       case "packingSlip":
         return (
@@ -682,7 +1110,18 @@ function OrdersContent({ searchQuery }) {
             {openBulkMenu && hasSelection ? (
               <div className="orders-toolbar-dropdown__menu">
                 <button type="button" onClick={() => toast.info("Mark as shipped — coming soon.")}>Mark as shipped</button>
-                <button type="button" onClick={() => toast.info("Add tracking — coming soon.")}>Add tracking</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const order = orders.find((row) => selectedIds.includes(row.id));
+                    if (order) {
+                      startEditTracking(order);
+                      setOpenBulkMenu(false);
+                    }
+                  }}
+                >
+                  Add tracking
+                </button>
               </div>
             ) : null}
           </div>
@@ -737,44 +1176,12 @@ function OrdersContent({ searchQuery }) {
 
       <div className="orders-toolbar orders-toolbar--secondary">
         <div className="orders-toolbar__actions">
-          <button
-            type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
-            onClick={handleOpenSheet}
-            disabled={!sheetStatus.spreadsheet_url}
-          >
-            <LuFileSpreadsheet />
-            <span>Open Sheet</span>
-          </button>
-          <button
-            type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
-            onClick={handleSyncToSheet}
-            disabled={sheetSyncing || !sheetStatus.configured}
-          >
-            <LuRefreshCcw />
-            <span>{sheetSyncing ? "Syncing sheet…" : "Sync to Sheet"}</span>
-          </button>
           <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={handleSyncOrders} disabled={syncing}>
             <LuRefreshCcw />
             <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
           </button>
         </div>
       </div>
-
-      {!sheetStatus.configured ? (
-        <div className="orders-inline-note">
-          <LuFileSpreadsheet />
-          <span>Google Sheets export is not configured on the server yet.</span>
-        </div>
-      ) : null}
-
-      {sheetStatus.configured && sheetStatus.last_synced_at ? (
-        <div className="orders-inline-note">
-          <LuFileSpreadsheet />
-          <span>Google Sheet last updated: {formatDisplayDate(sheetStatus.last_synced_at.slice(0, 10))}</span>
-        </div>
-      ) : null}
 
       {ordersNotice ? (
         <div className="orders-inline-note orders-inline-note--success">
@@ -785,6 +1192,56 @@ function OrdersContent({ searchQuery }) {
           </button>
         </div>
       ) : null}
+
+      <div className="orders-quick-filters">
+        <div className="orders-quick-filters__group">
+          <span className="orders-quick-filters__label">Date</span>
+          <div className="orders-quick-filters__pills">
+            {ORDER_DATE_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`orders-quick-filters__pill ${dateRangePreset === preset.id ? "orders-quick-filters__pill--active" : ""}`}
+                onClick={() => applyDatePreset(preset.id)}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="orders-quick-filters__group">
+          <span className="orders-quick-filters__label">Sort</span>
+          <div className="orders-quick-filters__controls">
+            <select
+              className="orders-quick-filters__select"
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              aria-label="Sort orders by"
+            >
+              {ORDER_SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={`orders-quick-filters__pill ${sortDirection === "desc" ? "orders-quick-filters__pill--active" : ""}`}
+              onClick={() => setSortDirection("desc")}
+            >
+              Desc
+            </button>
+            <button
+              type="button"
+              className={`orders-quick-filters__pill ${sortDirection === "asc" ? "orders-quick-filters__pill--active" : ""}`}
+              onClick={() => setSortDirection("asc")}
+            >
+              Asc
+            </button>
+          </div>
+        </div>
+      </div>
 
       {showFilters ? (
         <PageFilterPanel layout="orders" onClear={hasOrderFilters ? clearOrderFilters : undefined}>
@@ -797,6 +1254,31 @@ function OrdersContent({ searchQuery }) {
             ))}
           </FilterSelect>
 
+          <FilterSelect label="Store" value={storeFilter} onChange={(event) => setStoreFilter(event.target.value)}>
+            {storeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect label="Sort by" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            {ORDER_SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect
+            label="Sort direction"
+            value={sortDirection}
+            onChange={(event) => setSortDirection(event.target.value)}
+          >
+            <option value="desc">Descending (newest / highest first)</option>
+            <option value="asc">Ascending (oldest / lowest first)</option>
+          </FilterSelect>
+
           <FilterInput
             label="Buyer username"
             value={buyerFilter}
@@ -804,15 +1286,29 @@ function OrdersContent({ searchQuery }) {
             placeholder="Search buyer"
           />
 
-          <CompactDateRange
-            from={fromDate}
-            to={toDate}
-            onFromChange={setFromDate}
-            onToChange={setToDate}
+          <FilterInput
+            label="Order ID"
+            value={orderIdFilter}
+            onChange={(event) => setOrderIdFilter(event.target.value)}
+            placeholder="eBay order ID"
+          />
+
+          <FilterInput
+            label="From date"
+            type="date"
+            value={fromDate}
+            onChange={(event) => handleFromDateChange(event.target.value)}
+          />
+
+          <FilterInput
+            label="To date"
+            type="date"
+            value={toDate}
+            onChange={(event) => handleToDateChange(event.target.value)}
           />
 
           <FilterCheckbox
-            label="Show active orders only"
+            label="Hide canceled orders"
             checked={showOnlyActive}
             onChange={(event) => setShowOnlyActive(event.target.checked)}
           />

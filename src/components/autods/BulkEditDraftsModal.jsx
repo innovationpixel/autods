@@ -44,7 +44,15 @@ function BulkFieldRow({ enabled, onToggle, label, children }) {
   );
 }
 
-function BulkEditDraftsModal({ open, drafts = [], saving = false, onClose, onApply }) {
+function BulkEditDraftsModal({
+  open,
+  drafts = [],
+  saving = false,
+  onClose,
+  onApply,
+  itemLabel = "draft",
+  itemLabelPlural,
+}) {
   const [fields, setFields] = useState(INITIAL_STATE);
 
   useEffect(() => {
@@ -58,6 +66,8 @@ function BulkEditDraftsModal({ open, drafts = [], saving = false, onClose, onApp
   }
 
   const count = drafts.length;
+  const pluralLabel = itemLabelPlural ?? `${itemLabel}s`;
+  const dialogLabel = `Bulk edit ${pluralLabel}`;
   const hasSelection =
     fields.quantityEnabled ||
     fields.conditionEnabled ||
@@ -91,7 +101,7 @@ function BulkEditDraftsModal({ open, drafts = [], saving = false, onClose, onApp
         onClick={handleClose}
       />
 
-      <section className="bulk-edit-modal" role="dialog" aria-modal="true" aria-label="Bulk edit drafts">
+      <section className="bulk-edit-modal" role="dialog" aria-modal="true" aria-label={dialogLabel}>
         <button type="button" className="bulk-edit-modal__close" aria-label="Close" onClick={handleClose}>
           <LuX />
         </button>
@@ -103,7 +113,7 @@ function BulkEditDraftsModal({ open, drafts = [], saving = false, onClose, onApp
           <div>
             <h2>Bulk Edit</h2>
             <p>
-              Update {count} selected draft{count === 1 ? "" : "s"}. Check the fields you want to change, then apply.
+              Update {count} selected {count === 1 ? itemLabel : pluralLabel}. Check the fields you want to change, then apply.
             </p>
           </div>
         </div>
@@ -277,7 +287,7 @@ function BulkEditDraftsModal({ open, drafts = [], saving = false, onClose, onApp
                 <span>Applying…</span>
               </>
             ) : (
-              <span>Apply to {count} draft{count === 1 ? "" : "s"}</span>
+              <span>Apply to {count} {count === 1 ? itemLabel : pluralLabel}</span>
             )}
           </button>
         </div>
