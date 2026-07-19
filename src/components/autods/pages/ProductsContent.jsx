@@ -38,6 +38,7 @@ import { bulkDeleteProducts, deleteProduct, getImportHistory, publishProduct, sy
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
 import ProductEditorModal from "../ProductEditorModal";
 import QuickEditModal from "../QuickEditModal";
+import ConfirmModal from "../ConfirmModal";
 import { buildDraftFormState, serializeDraftFormForApi } from "../../../utils/draftEditorState";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import UploadHistoryPanel from "../UploadHistoryPanel";
@@ -159,6 +160,8 @@ function ProductsContent({ searchQuery }) {
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
   const [bulkEditing, setBulkEditing] = useState(false);
   const [bulkWorking, setBulkWorking] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [editorProduct, setEditorProduct] = useState(null);
   const [editorForm, setEditorForm] = useState(null);
   const [editorTab, setEditorTab] = useState("general");
@@ -404,14 +407,7 @@ function ProductsContent({ searchQuery }) {
     const items = sortedRows.filter((item) => selectedIds.includes(item.id));
 
     if (action === "delete") {
-      try {
-        await bulkDeleteProducts(selectedIds);
-        toast.success(`${selectedIds.length} products deleted.`);
-        setSelectedIds([]);
-        loadListings();
-      } catch (err) {
-        toast.error(err.response?.data?.error ?? "Bulk delete failed.");
-      }
+      setDeleteConfirm({ type: "bulk", ids: selectedIds });
       return;
     }
 
@@ -443,6 +439,30 @@ function ProductsContent({ searchQuery }) {
       if (failed) {
         toast.error(`${failed} product${failed === 1 ? "" : "s"} could not be relisted.`);
       }
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      if (deleteConfirm.type === "bulk") {
+        await bulkDeleteProducts(deleteConfirm.ids);
+        toast.success(`${deleteConfirm.ids.length} products deleted.`);
+        setSelectedIds([]);
+      } else {
+        await deleteProduct(deleteConfirm.id);
+        toast.success("Product deleted.");
+      }
+      setDeleteConfirm(null);
+      loadListings();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Delete failed.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -986,14 +1006,8 @@ function ProductsContent({ searchQuery }) {
                               </button>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  try {
-                                    await deleteProduct(item.id);
-                                    toast.success("Product deleted.");
-                                    loadListings();
-                                  } catch (err) {
-                                    toast.error(err.response?.data?.error ?? "Delete failed.");
-                                  }
+                                onClick={() => {
+                                  setDeleteConfirm({ type: "single", id: item.id });
                                   setOpenMenuId("");
                                 }}
                               >
@@ -1129,6 +1143,16 @@ function ProductsContent({ searchQuery }) {
         onClose={cancelEditStock}
         saving={savingStockId === editingStockId}
         placeholder="0"
+      />
+
+      <ConfirmModal
+        open={Boolean(deleteConfirm)}
+        title={deleteConfirm?.type === "bulk" ? `Delete ${deleteConfirm.ids.length} products?` : "Delete this product?"}
+        description="This will permanently remove the product listing. This cannot be undone."
+        confirmLabel="Delete"
+        saving={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteConfirm(null)}
       />
     </section>
   );

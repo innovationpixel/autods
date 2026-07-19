@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LuCopy, LuEye, LuPencil, LuPlus, LuTrash2, LuX } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
 import { updateAccountSettings } from "../../../services/SettingsService";
+import ConfirmModal from "../ConfirmModal";
 import {
   TEMPLATE_PLACEHOLDERS,
   builtInTemplates,
@@ -20,6 +21,7 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
   const [editorName, setEditorName] = useState("");
   const [editorHtml, setEditorHtml] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     setCustomTemplates(initialCustomTemplates);
@@ -99,8 +101,16 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
     await persistTemplates(nextCustom);
   };
 
-  const deleteTemplate = async (templateId) => {
-    if (!window.confirm("Delete this custom template?")) return;
+  const deleteTemplate = (template) => {
+    setDeleteConfirm(template);
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!deleteConfirm) {
+      return;
+    }
+
+    const templateId = deleteConfirm.id;
     const nextCustom = customTemplates.filter((item) => item.id !== templateId);
     let nextDefault = defaultTemplateId;
     if (defaultTemplateId === templateId) {
@@ -108,6 +118,7 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
       setDefaultTemplateId(nextDefault);
     }
     setCustomTemplates(nextCustom);
+    setDeleteConfirm(null);
     await persistTemplates(nextCustom, nextDefault);
   };
 
@@ -165,7 +176,7 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
               </button>
             ) : null}
             {template.custom ? (
-              <button type="button" className="templates-settings__danger" onClick={() => deleteTemplate(template.id)}>
+              <button type="button" className="templates-settings__danger" onClick={() => deleteTemplate(template)}>
                 <LuTrash2 />
               </button>
             ) : null}
@@ -291,6 +302,16 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={Boolean(deleteConfirm)}
+        title={`Delete "${deleteConfirm?.name ?? "this template"}"?`}
+        description="This custom template will be permanently removed."
+        confirmLabel="Delete"
+        saving={saving}
+        onConfirm={confirmDeleteTemplate}
+        onClose={() => setDeleteConfirm(null)}
+      />
     </section>
   );
 }

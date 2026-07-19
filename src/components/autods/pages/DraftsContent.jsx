@@ -21,6 +21,7 @@ import UploadHistoryPanel from "../UploadHistoryPanel";
 import PageFilterPanel from "../PageFilterPanel";
 import ScheduleListingModal from "../ScheduleListingModal";
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
+import ConfirmModal from "../ConfirmModal";
 import { FilterSelect } from "../FilterField";
 import {
   selectEbayConnected,
@@ -78,6 +79,8 @@ function DraftsContent({ searchQuery }) {
   const [scheduling, setScheduling] = useState(false);
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
   const [bulkEditing, setBulkEditing] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [accountSettings, setAccountSettings] = useState(null);
 
   const ensureShipFromReady = async () => {
@@ -256,14 +259,7 @@ function DraftsContent({ searchQuery }) {
     }
 
     if (action === "remove") {
-      try {
-        await bulkDeleteProducts(selectedIds);
-        toast.success(`${selectedIds.length} draft(s) removed.`);
-        setSelectedIds([]);
-        loadDrafts();
-      } catch (err) {
-        toast.error(err.response?.data?.error ?? "Bulk delete failed.");
-      }
+      setDeleteConfirm({ type: "bulk", ids: selectedIds });
       return;
     }
 
@@ -398,18 +394,36 @@ function DraftsContent({ searchQuery }) {
 
   const handleDraftMenu = async (id, action) => {
     if (action === "delete") {
-      try {
-        await deleteProduct(id);
-        toast.success("Draft deleted.");
-        loadDrafts();
-      } catch (err) {
-        toast.error(err.response?.data?.error ?? "Delete failed.");
-      }
+      setDeleteConfirm({ type: "single", id });
     }
     if (action === "schedule") {
       await openScheduleModal([id]);
     }
     setOpenMenuId("");
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      if (deleteConfirm.type === "bulk") {
+        await bulkDeleteProducts(deleteConfirm.ids);
+        toast.success(`${deleteConfirm.ids.length} draft(s) removed.`);
+        setSelectedIds([]);
+      } else {
+        await deleteProduct(deleteConfirm.id);
+        toast.success("Draft deleted.");
+      }
+      setDeleteConfirm(null);
+      loadDrafts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Delete failed.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (!connected) {
@@ -710,6 +724,16 @@ function DraftsContent({ searchQuery }) {
         saving={bulkEditing}
         onClose={() => setBulkEditTargets([])}
         onApply={confirmBulkEdit}
+      />
+
+      <ConfirmModal
+        open={Boolean(deleteConfirm)}
+        title={deleteConfirm?.type === "bulk" ? `Remove ${deleteConfirm.ids.length} draft(s)?` : "Remove this draft?"}
+        description="This will permanently remove the draft. This cannot be undone."
+        confirmLabel="Delete"
+        saving={deleting}
+        onConfirm={confirmDelete}
+        onClose={() => setDeleteConfirm(null)}
       />
     </section>
   );

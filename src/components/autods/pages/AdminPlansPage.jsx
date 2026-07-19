@@ -14,6 +14,7 @@ import {
 } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
+import ConfirmModal from "../ConfirmModal";
 import {
   createAdminPlan,
   deleteAdminPlan,
@@ -49,6 +50,8 @@ function AdminPlansPage() {
   const [form, setForm] = useState(emptyPlan);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -108,14 +111,25 @@ function AdminPlansPage() {
     }
   };
 
-  const removePlan = async (id) => {
-    if (!window.confirm("Deactivate this plan?")) return;
+  const removePlan = (plan) => {
+    setDeleteConfirm(plan);
+  };
+
+  const confirmDeletePlan = async () => {
+    if (!deleteConfirm) {
+      return;
+    }
+
+    setDeleting(true);
     try {
-      await deleteAdminPlan(id);
+      await deleteAdminPlan(deleteConfirm.id);
       toast.success("Plan deactivated.");
+      setDeleteConfirm(null);
       loadPlans();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Delete failed.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -210,7 +224,7 @@ function AdminPlansPage() {
                   <LuPencil />
                   <span>Edit</span>
                 </button>
-                <button type="button" className="admin-page__btn admin-page__btn--danger" onClick={() => removePlan(plan.id)}>
+                <button type="button" className="admin-page__btn admin-page__btn--danger" onClick={() => removePlan(plan)}>
                   <LuTrash2 />
                   <span>Deactivate</span>
                 </button>
@@ -302,6 +316,15 @@ function AdminPlansPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={Boolean(deleteConfirm)}
+        title={`Deactivate ${deleteConfirm?.title ?? "this plan"}?`}
+        confirmLabel="Deactivate"
+        saving={deleting}
+        onConfirm={confirmDeletePlan}
+        onClose={() => setDeleteConfirm(null)}
+      />
     </section>
   );
 }

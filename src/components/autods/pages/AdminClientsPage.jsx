@@ -5,6 +5,7 @@ import { LuLoader, LuPencil, LuPlus, LuSearch, LuTrash2, LuUsers } from "react-i
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import { getAdminPlans } from "../../../services/PlanService";
+import ConfirmModal from "../ConfirmModal";
 import {
   createAdminUser,
   deleteAdminUser,
@@ -60,6 +61,8 @@ function AdminClientsPage() {
   const [form, setForm] = useState(emptyClientForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -162,17 +165,25 @@ function AdminClientsPage() {
     }
   };
 
-  const removeClient = async (client) => {
-    if (!window.confirm(`Delete ${client.name}? This cannot be undone.`)) {
+  const removeClient = (client) => {
+    setDeleteConfirm(client);
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!deleteConfirm) {
       return;
     }
 
+    setDeleting(true);
     try {
-      await deleteAdminUser(client.id);
+      await deleteAdminUser(deleteConfirm.id);
       toast.success("Client deleted.");
+      setDeleteConfirm(null);
       loadClients();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Delete failed.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -347,6 +358,16 @@ function AdminClientsPage() {
           </div>
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={Boolean(deleteConfirm)}
+        title={`Delete ${deleteConfirm?.name ?? "this client"}?`}
+        description="This cannot be undone."
+        confirmLabel="Delete"
+        saving={deleting}
+        onConfirm={confirmDeleteClient}
+        onClose={() => setDeleteConfirm(null)}
+      />
     </section>
   );
 }

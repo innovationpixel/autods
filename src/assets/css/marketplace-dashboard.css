@@ -2158,6 +2158,26 @@
   cursor: not-allowed;
 }
 
+.confirm-modal__icon--danger {
+  background: #fde8ec;
+  color: #d6395a;
+}
+
+.confirm-modal__btn--danger {
+  border: 0;
+  background: #d6395a;
+  color: #ffffff;
+}
+
+.confirm-modal__btn--danger:hover {
+  background: #c22c4b;
+}
+
+.confirm-modal__btn--danger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .bulk-edit-modal-layer__backdrop {
   position: absolute;
   inset: 0;
