@@ -8117,6 +8117,13 @@
   text-transform: uppercase;
 }
 
+.orders-tracking-combined {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .orders-tracking-display {
   display: flex;
   flex-direction: column;

@@ -1099,10 +1099,12 @@ function OrdersContent({ searchQuery }) {
       case "profit":
         return <span className="orders-table__profit">{order.profit}</span>;
       case "trackingNumber":
-        return renderTrackingEditor(order);
-      case "carrier":
-        return editingTrackingId === order.id ? renderTrackingEditor(order, true) : renderTrackingEditor(order, true);
-      case "aliexpressOrderId":
+        return (
+          <div className="orders-tracking-combined">
+            {renderFulfillmentCell(order, "aliexpressOrderId")}
+            {renderTrackingEditor(order)}
+          </div>
+        );
       case "aliexpressStatus":
       case "prepCost":
       case "shippingCost":

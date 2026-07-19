@@ -15,11 +15,11 @@ export default function OrdersTrackingEditor({
   onCarrierChange,
   onSave,
   onPushToEbay,
-  compact = false,
 }) {
   const detectedCarrier = detectTrackingCarrier(trackingDraft);
   const resolvedCarrier = carrierDraft || detectedCarrier || order.carrierRaw || "";
   const canPush = Boolean(order.trackingNumberRaw?.trim() && resolvedCarrier);
+  const carrierLabel = order.carrierRaw || detectTrackingCarrier(order.trackingNumberRaw) || "";
 
   useEffect(() => {
     if (!isEditing) {
@@ -34,26 +34,14 @@ export default function OrdersTrackingEditor({
     };
   }, [isEditing]);
 
-  const trigger = compact ? (
-    (() => {
-      const carrierLabel = order.carrierRaw || detectTrackingCarrier(order.trackingNumberRaw) || "";
-
-      return (
-        <button type="button" className="products-tracking-btn" onClick={() => onStartEdit(order)} title="Edit tracking & carrier">
-          <span className={carrierLabel ? "orders-table__carrier" : "products-tracking-btn__placeholder"}>
-            {carrierLabel || "—"}
-          </span>
-          <LuPencil className="products-tracking-btn__icon" />
-        </button>
-      );
-    })()
-  ) : (
+  const trigger = (
     <div className="orders-tracking-display">
       <button type="button" className="products-tracking-btn" onClick={() => onStartEdit(order)} title="Edit tracking">
         <span className="orders-tracking-display__copy">
           <span className={order.trackingNumberRaw ? "orders-table__mono" : "products-tracking-btn__placeholder"}>
             {order.trackingNumberRaw || "Add tracking"}
           </span>
+          {carrierLabel ? <span className="orders-table__carrier">{carrierLabel}</span> : null}
           {order.trackingPushed ? <span className="orders-tracking-display__badge">On eBay</span> : null}
         </span>
         <LuPencil className="products-tracking-btn__icon" />
