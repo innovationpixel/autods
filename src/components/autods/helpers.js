@@ -213,6 +213,7 @@ export function buildSourceProductUrl(platform, productId, sourceUrl) {
 
   switch (String(platform ?? "").toLowerCase()) {
     case "aliexpress":
+    case "appmarketplace":
       return `https://www.aliexpress.com/item/${id}.html`;
     case "amazon":
       return `https://www.amazon.com/dp/${id}`;
@@ -443,6 +444,32 @@ export function getEbayOrderStatusMeta(raw = {}) {
 const CALCULATION_PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
 
+function normalizeCalculationTracking(value) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) {
+    return "";
+  }
+
+  return trimmed;
+}
+
+function buildCalculationAddress(raw) {
+  const buyer = raw.buyer ?? {};
+  const fulfillment = raw.fulfillmentStartInstructions?.[0] ?? {};
+  const shipTo = fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
+  const contact = shipTo.contactAddress ?? shipTo;
+
+  return [
+    contact.addressLine1 ?? shipTo.addressLine1,
+    contact.city ?? shipTo.city,
+    contact.stateOrProvince ?? shipTo.stateOrProvince,
+    contact.postalCode ?? shipTo.postalCode,
+    contact.countryCode ?? shipTo.countryCode,
+  ]
+    .filter(Boolean)
+    .join(", ") || "—";
+}
+
 export function mapApiOrderToCalculationRow(order) {
   const raw = order.raw_data ?? {};
   const lineItems = raw.lineItems ?? [];
@@ -450,6 +477,7 @@ export function mapApiOrderToCalculationRow(order) {
   const pricing = raw.pricingSummary ?? {};
   const delivery = raw.deliveryCost ?? {};
   const ebayStatus = getEbayOrderStatusMeta(raw);
+  const shippingStep = raw.fulfillmentStartInstructions?.[0]?.shippingStep ?? {};
 
   const earn = Number(order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0);
   const cost = order.buy_price != null ? Number(order.buy_price) : 0;
@@ -457,6 +485,17 @@ export function mapApiOrderToCalculationRow(order) {
   const profit =
     order.profit != null ? Number(order.profit) : Number((earn - cost - shipping).toFixed(2));
   const roi = cost > 0 ? Number(((profit / cost) * 100).toFixed(1)) : 0;
+  const tax = Number(order.tax_amount ?? 0);
+  const afterTaxEbay = Number((earn - tax).toFixed(2));
+  const prep = Number(order.prep_cost ?? 0);
+  const qty = Math.max(
+    lineItems.reduce((sum, item) => sum + Number(item.quantity ?? 1), 0),
+    1,
+  );
+  const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
+  const trackingNumber =
+    normalizeCalculationTracking(order.tracking_number) ||
+    normalizeCalculationTracking(shippingStep.shipmentTrackingNumber);
 
   const variationAspects = firstItem.lineItemFulfillmentInstructions?.variations
     ?? firstItem.variationAspects
@@ -480,16 +519,29 @@ export function mapApiOrderToCalculationRow(order) {
     id: String(order.id),
     orderId: order.ebay_order_id ?? raw.orderId ?? String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? CALCULATION_PLACEHOLDER_IMAGE,
+    image: order.listing_image_url ?? firstItem.image?.imageUrl ?? CALCULATION_PLACEHOLDER_IMAGE,
     description: variationText || order.item_title || firstItem.title || "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     ebayStatus: ebayStatus.label,
     ebayStatusClass: ebayStatus.className,
+    status: order.status,
+    storeName: order.store_name ?? "eBay",
+    buyer: raw.buyer?.username ?? order.buyer_name ?? "—",
     cost,
     shipping,
     earn,
     profit,
     roi,
+    itemSell: order.item_sell_id ?? "—",
+    itemSellUrl,
+    trackingNumber: trackingNumber || "—",
+    qty,
+    address: buildCalculationAddress(raw),
+    tax,
+    afterTaxEbay,
+    prep,
+    aliexpressOrderId: order.aliexpress_order_id ?? "—",
+    aliexpressStatus: order.aliexpress_order_status ?? "—",
   };
 }
 
@@ -519,9 +571,13 @@ export function summarizeCalculations(rows) {
       acc.shipping += row.shipping;
       acc.earn += row.earn;
       acc.profit += row.profit;
+      acc.qty += row.qty ?? 0;
+      acc.tax += row.tax ?? 0;
+      acc.afterTaxEbay += row.afterTaxEbay ?? 0;
+      acc.prep += row.prep ?? 0;
       return acc;
     },
-    { cost: 0, shipping: 0, earn: 0, profit: 0 },
+    { cost: 0, shipping: 0, earn: 0, profit: 0, qty: 0, tax: 0, afterTaxEbay: 0, prep: 0 },
   );
 
   const roi = totals.cost > 0 ? Number(((totals.profit / totals.cost) * 100).toFixed(1)) : 0;

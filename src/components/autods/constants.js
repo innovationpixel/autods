@@ -126,6 +126,7 @@ export const multipleProductsTabs = [
 
 /** Buy-side suppliers shown in Add Product modal (AutoDS-style). */
 export const importSuppliers = [
+  { id: "appmarketplace", label: "App in-build marketplace", color: "#6366f1", enabled: true },
   { id: "aliexpress", label: "Aliexpress", color: "#e62e04", enabled: true },
   { id: "amazon", label: "Amazon", color: "#ff9900", enabled: true },
   { id: "walmart", label: "Walmart", color: "#0071ce", enabled: true },
@@ -545,6 +546,28 @@ export const dashboardTools = [
 ];
 
 export const orderStatusOptions = ["Pending", "Ordered", "Shipped", "Delivered", "Canceled"];
+
+/** Countries the AliExpress integration (and eBay site mapping) fully supports end-to-end. */
+export const MARKETPLACE_COUNTRIES = [
+  { code: "US", label: "United States" },
+  { code: "CA", label: "Canada" },
+  { code: "GB", label: "United Kingdom" },
+  { code: "AU", label: "Australia" },
+  { code: "DE", label: "Germany" },
+  { code: "FR", label: "France" },
+];
+
+/** Toggleable super-admin permission modules. Keep in sync with backend UserController::ADMIN_MODULES. */
+export const ADMIN_MODULES = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "clients", label: "Clients" },
+  { key: "plans", label: "Plans" },
+  { key: "categories", label: "Categories" },
+  { key: "trending_products", label: "Trending Products" },
+  { key: "hand_picked_products", label: "Hand-Picked Products" },
+  { key: "admin_users", label: "Admin Users" },
+  { key: "settings", label: "Settings" },
+];
 
 /** 3Dsellers row Actions column — print dropdown */
 export const orderRowPrintActions = [

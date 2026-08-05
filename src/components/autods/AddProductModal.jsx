@@ -15,6 +15,10 @@ import {
 } from "./constants";
 import { importSupplierHint } from "../../utils/detectImportSupplier";
 
+// "App in-build marketplace" is auto-tagged when a product is imported from the
+// in-app browse grid — it isn't something a user pastes a URL against manually.
+const manualImportSuppliers = importSuppliers.filter((supplier) => supplier.id !== "appmarketplace");
+
 function supplierDot(supplier) {
   if (!supplier?.color) return null;
   return (
@@ -219,7 +223,7 @@ function AddProductModal({
                 <ImportMetaDropdown
                   label="Supplier Source:"
                   value={importSupplier}
-                  options={importSuppliers}
+                  options={manualImportSuppliers}
                   onChange={onImportSupplierChange}
                   renderTriggerExtra={supplierDot}
                 />
@@ -280,7 +284,7 @@ function AddProductModal({
               <ImportMetaDropdown
                 label="Supplier Source:"
                 value={importSupplier}
-                options={importSuppliers}
+                options={manualImportSuppliers}
                 onChange={onImportSupplierChange}
                 renderTriggerExtra={supplierDot}
               />

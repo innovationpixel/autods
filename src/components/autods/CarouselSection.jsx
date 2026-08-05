@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import ProductCard from "./ProductCard";
 
-function CarouselSection({ onSeeMore, section }) {
+function CarouselSection({ onSeeMore, section, onImport, importingId }) {
   const trackRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
@@ -70,7 +70,7 @@ function CarouselSection({ onSeeMore, section }) {
 
         <div ref={trackRef} className="marketplace-carousel__track" onScroll={updateNavState}>
           {section.items.map((item) => (
-            <ProductCard item={item} key={item.id} />
+            <ProductCard item={item} key={item.id} onImport={onImport} importing={importingId === item.id} />
           ))}
         </div>
 

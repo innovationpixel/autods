@@ -11,6 +11,8 @@ const initialState = {
     marketplace: {
         items: [],
         total: 0,
+        current_page: 1,
+        total_pages: 1,
         search_id: null,
         requires_auth: false,
         credentials_missing: false,
@@ -46,6 +48,8 @@ export function AliExpressReducer(state = initialState, action) {
                 marketplace: {
                     items: action.payload.items ?? [],
                     total: action.payload.total ?? 0,
+                    current_page: action.payload.current_page ?? 1,
+                    total_pages: action.payload.total_pages ?? 1,
                     search_id: action.payload.search_id ?? null,
                     requires_auth: false,
                     credentials_missing: false,

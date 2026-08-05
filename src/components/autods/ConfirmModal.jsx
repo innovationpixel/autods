@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LuLoader, LuTriangleAlert, LuX } from "react-icons/lu";
 
 function ConfirmModal({
@@ -9,14 +9,19 @@ function ConfirmModal({
   cancelLabel = "Cancel",
   danger = true,
   saving = false,
+  requireAgreement = false,
+  agreementLabel = "I agree to the Terms & Conditions.",
   onConfirm,
   onClose,
 }) {
+  const [agreed, setAgreed] = useState(false);
+
   useEffect(() => {
     if (!open) {
       return undefined;
     }
 
+    setAgreed(false);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -48,6 +53,13 @@ function ConfirmModal({
           </div>
         </div>
 
+        {requireAgreement ? (
+          <label className="confirm-modal__agreement">
+            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} disabled={saving} />
+            <span>{agreementLabel}</span>
+          </label>
+        ) : null}
+
         <div className="quick-edit-modal__actions">
           <button type="button" className="quick-edit-modal__btn quick-edit-modal__btn--ghost" onClick={onClose} disabled={saving}>
             {cancelLabel}
@@ -56,7 +68,7 @@ function ConfirmModal({
             type="button"
             className={danger ? "quick-edit-modal__btn confirm-modal__btn--danger" : "quick-edit-modal__btn quick-edit-modal__btn--primary"}
             onClick={onConfirm}
-            disabled={saving}
+            disabled={saving || (requireAgreement && !agreed)}
           >
             {saving ? (
               <>

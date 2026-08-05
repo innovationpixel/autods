@@ -40,6 +40,7 @@ function normalizePaginatedPayload(payload) {
         total,
         from,
         to,
+        counts,
     } = payload;
 
     return {
@@ -51,6 +52,7 @@ function normalizePaginatedPayload(payload) {
             total,
             from,
             to,
+            counts,
         },
     };
 }

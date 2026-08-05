@@ -37,6 +37,7 @@ import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
 import EbayOAuthSetupBanner from "../autods/EbayOAuthSetupBanner";
 import ShipFromSetupNotice from "../autods/ShipFromSetupNotice";
+import ConfirmModal from "../autods/ConfirmModal";
 import {
   buildSupplierProfile,
   normalizeSuppliersFromApi,
@@ -194,7 +195,6 @@ const staticPlanCards = [
 
 const addOnIconMap = {
   "finding-hub": LuPackageSearch,
-  "ai-ugc": LuSparkles,
   "orders-processor": LuZap,
 };
 
@@ -207,15 +207,6 @@ const settingsAddOns = [
     actionLabel: "Enable",
     footerLink: "See how it works",
     accent: "amber",
-  },
-  {
-    id: "ai-ugc",
-    title: "AI UGC Video Ads Creator",
-    copy: "Generate TikTok, Facebook, and Instagram ad creatives in under a minute.",
-    linkLabel: "Learn more",
-    actionLabel: "Enable",
-    tag: "New",
-    accent: "violet",
   },
   {
     id: "orders-processor",
@@ -643,6 +634,7 @@ export default function MarketplaceSettingsPage() {
   const primaryEbayConnection = ebayConnections.find((c) => c.is_primary) ?? ebayConnections[0] ?? null;
   const [suppliers, setSuppliers] = useState(createInitialSuppliers);
   const [activeSupplierId, setActiveSupplierId] = useState("");
+  const [switchingSupplierId, setSwitchingSupplierId] = useState("");
   const [itemSpecificDraft, setItemSpecificDraft] = useState({ name: "", description: "" });
   const [editAllItemSpecifics, setEditAllItemSpecifics] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState("");
@@ -654,6 +646,8 @@ export default function MarketplaceSettingsPage() {
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [addOns, setAddOns] = useState(settingsAddOns);
+  const [addOnTermsTarget, setAddOnTermsTarget] = useState(null);
   const [paypalEmail, setPaypalEmail] = useState("");
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
@@ -863,6 +857,21 @@ export default function MarketplaceSettingsPage() {
     return ["Select default template", ...names];
   }, [templateCatalog.custom]);
 
+  const handleSwitchSupplier = (supplierId) => {
+    if (supplierId === activeSupplierId || switchingSupplierId) {
+      return;
+    }
+
+    setSwitchingSupplierId(supplierId);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setActiveSupplierId(supplierId);
+        setSwitchingSupplierId("");
+      });
+    });
+  };
+
   const renderSupplierSidebar = () => (
     <aside className="marketplace-settings__sidebar">
       <div className="marketplace-settings__sidebar-field">
@@ -878,9 +887,14 @@ export default function MarketplaceSettingsPage() {
                   <button
                     type="button"
                     className="marketplace-settings__supplier-main"
-                    onClick={() => setActiveSupplierId(supplier.id)}
+                    onClick={() => handleSwitchSupplier(supplier.id)}
+                    disabled={Boolean(switchingSupplierId)}
                   >
-                    <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
+                    {switchingSupplierId === supplier.id ? (
+                      <LuLoader className="spin-icon marketplace-settings__supplier-badge" />
+                    ) : (
+                      <span className="marketplace-settings__supplier-badge">{supplier.badge}</span>
+                    )}
                     <span>{supplier.label}</span>
                   </button>
                   <button type="button" className="marketplace-settings__supplier-menu" aria-label={`${supplier.label} options`}>
@@ -2020,11 +2034,45 @@ export default function MarketplaceSettingsPage() {
     </div>
   );
 
+  const formatAddOnStartDate = () =>
+    new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+
+  const openAddOnTerms = (addOn) => {
+    setAddOnTermsTarget(addOn);
+  };
+
+  const confirmEnableAddOn = () => {
+    if (!addOnTermsTarget) {
+      return;
+    }
+
+    setAddOns((current) =>
+      current.map((addOn) =>
+        addOn.id === addOnTermsTarget.id
+          ? { ...addOn, active: true, actionLabel: "Cancel", tag: "Active", startedOn: `Started ${formatAddOnStartDate()}` }
+          : addOn,
+      ),
+    );
+    toast.success(`${addOnTermsTarget.title} enabled.`);
+    setAddOnTermsTarget(null);
+  };
+
+  const handleCancelAddOn = (addOn) => {
+    setAddOns((current) =>
+      current.map((item) =>
+        item.id === addOn.id
+          ? { ...item, active: false, actionLabel: "Enable", tag: undefined, startedOn: undefined }
+          : item,
+      ),
+    );
+    toast.info(`${addOn.title} canceled.`);
+  };
+
   const renderPlansAddOnsTab = () => {
     const ebayConnected = ebayConnections.length > 0;
     const activePlan = currentSubscription?.current_plan;
     const planExpires = currentSubscription?.plan_expires_at;
-    const activeAddOnCount = settingsAddOns.filter((addOn) => addOn.active).length;
+    const activeAddOnCount = addOns.filter((addOn) => addOn.active).length;
 
     const ebayCard = ebayConnected
       ? {
@@ -2211,7 +2259,7 @@ export default function MarketplaceSettingsPage() {
             </div>
 
             <div className="plans-settings__addons">
-              {settingsAddOns.map((addOn) => {
+              {addOns.map((addOn) => {
                 const AddOnIcon = addOnIconMap[addOn.id] ?? LuZap;
 
                 return (
@@ -2252,6 +2300,7 @@ export default function MarketplaceSettingsPage() {
                       <button
                         type="button"
                         className={addOn.active ? "plans-settings__btn plans-settings__btn--muted" : "plans-settings__btn plans-settings__btn--primary"}
+                        onClick={() => (addOn.active ? handleCancelAddOn(addOn) : openAddOnTerms(addOn))}
                       >
                         {addOn.actionLabel}
                       </button>
@@ -2274,6 +2323,26 @@ export default function MarketplaceSettingsPage() {
             </article>
           </aside>
         </div>
+
+        <ConfirmModal
+          open={Boolean(addOnTermsTarget)}
+          title={`Enable ${addOnTermsTarget?.title ?? "add-on"}?`}
+          description={addOnTermsTarget?.copy}
+          confirmLabel="Agree & Enable"
+          danger={false}
+          requireAgreement
+          agreementLabel={
+            <>
+              I agree to the{" "}
+              <a href="/terms-and-conditions" target="_blank" rel="noopener noreferrer">
+                Terms &amp; Conditions
+              </a>{" "}
+              for this add-on.
+            </>
+          }
+          onConfirm={confirmEnableAddOn}
+          onClose={() => setAddOnTermsTarget(null)}
+        />
       </section>
     );
   };

@@ -73,7 +73,8 @@ export function checkAutoLogin(dispatch, navigate) {
             if (
                 fresh.name  !== user.name  ||
                 fresh.email !== user.email ||
-                fresh.role  !== user.role
+                fresh.role  !== user.role  ||
+                JSON.stringify(fresh.admin_modules) !== JSON.stringify(user.admin_modules)
             ) {
                 saveSession({ access_token: token, user: fresh });
                 dispatch(loginConfirmedAction({ access_token: token, user: fresh }));

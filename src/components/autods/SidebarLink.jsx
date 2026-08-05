@@ -1,6 +1,6 @@
 import { LuChevronDown } from "react-icons/lu";
 
-function SidebarLink({ item, isOpen, onSelect, onToggle }) {
+function SidebarLink({ item, isOpen, onSelect, onToggle, onSelectChild }) {
   const Icon = item.icon;
   const hasChildren = Array.isArray(item.children) && item.children.length > 0;
   const handleClick = () => {
@@ -52,6 +52,7 @@ function SidebarLink({ item, isOpen, onSelect, onToggle }) {
                   type="button"
                   key={child.label}
                   className={`marketplace-sidebar__sub-link ${child.badge ? "marketplace-sidebar__sub-link--badge" : ""}`}
+                  onClick={() => onSelectChild?.(child)}
                 >
                   <span className="marketplace-sidebar__sub-icon">
                     <ChildIcon />

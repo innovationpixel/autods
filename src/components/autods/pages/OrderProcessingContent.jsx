@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { LuCheck, LuClipboardList, LuLoader, LuPackageCheck, LuPencil, LuRefreshCcw } from "react-icons/lu";
+import { LuCheck, LuClipboardList, LuLoader, LuPackageCheck, LuPencil, LuRefreshCcw, LuZap } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import {
   getOrders,
+  placeAliExpressOrder,
   syncOrders,
   updateOrderCost,
   updateOrderFulfillment,
   updateOrderSource,
   updateOrderStatus,
 } from "../../../services/OrderService";
+import { getWalletSummary } from "../../../services/WalletService";
 import { buildSourceProductUrl, formatDisplayDate, normalizeListingSourceInput } from "../helpers";
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
@@ -76,6 +78,8 @@ function OrderProcessingContent() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [markingId, setMarkingId] = useState("");
+  const [placingId, setPlacingId] = useState("");
+  const [wallet, setWallet] = useState(null);
 
   const [editingSourceId, setEditingSourceId] = useState("");
   const [sourceDraft, setSourceDraft] = useState("");
@@ -107,8 +111,18 @@ function OrderProcessingContent() {
     }
   };
 
+  const loadWallet = async () => {
+    try {
+      const res = await getWalletSummary();
+      setWallet(res.data ?? null);
+    } catch {
+      setWallet(null);
+    }
+  };
+
   useEffect(() => {
     loadPendingOrders();
+    loadWallet();
   }, []);
 
   const totalValue = useMemo(
@@ -217,6 +231,20 @@ function OrderProcessingContent() {
     }
   };
 
+  const handlePlaceOrder = async (order) => {
+    setPlacingId(order.id);
+    try {
+      const res = await placeAliExpressOrder(order.id);
+      toast.success(res.data?.message ?? "Order placed on AliExpress.");
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      loadWallet();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not place the order on AliExpress."));
+    } finally {
+      setPlacingId("");
+    }
+  };
+
   const markAsOrdered = async (order) => {
     setMarkingId(order.id);
     try {
@@ -246,7 +274,7 @@ function OrderProcessingContent() {
               </span>
               <h2 className="order-processing-hero__title">Process Pending Orders</h2>
               <p className="order-processing-hero__subtitle">
-                Source each order from AliExpress, record the cost, and mark it ordered to move it forward.
+                Add an AliExpress source and click "Place on AliExpress" to auto-purchase and ship straight to the buyer — charged to your wallet.
               </p>
             </div>
 
@@ -267,6 +295,13 @@ function OrderProcessingContent() {
                 <small>Pull the latest orders from eBay</small>
               </span>
             </button>
+
+            {wallet ? (
+              <div className="order-processing-wallet-chip">
+                <span>Wallet balance</span>
+                <strong>{formatMoney(wallet.balance, wallet.currency)}</strong>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -376,20 +411,35 @@ function OrderProcessingContent() {
                         </button>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="order-processing-mark-btn"
-                          onClick={() => markAsOrdered(order)}
-                          disabled={markingId === order.id || !order.hasSource || order.buyPrice == null}
-                          title={
-                            !order.hasSource || order.buyPrice == null
-                              ? "Add a source link and cost before marking as ordered"
-                              : "Mark this order as ordered"
-                          }
-                        >
-                          {markingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                          <span>Mark Ordered</span>
-                        </button>
+                        <div className="order-processing-actions">
+                          {(order.sourcePlatform === "aliexpress" || order.sourcePlatform === "appmarketplace") && order.hasSource ? (
+                            <button
+                              type="button"
+                              className="order-processing-mark-btn order-processing-mark-btn--primary"
+                              onClick={() => handlePlaceOrder(order)}
+                              disabled={placingId === order.id || markingId === order.id}
+                              title="Automatically purchase this item on AliExpress and ship it to the buyer"
+                            >
+                              {placingId === order.id ? <LuLoader className="spin-icon" /> : <LuZap />}
+                              <span>{placingId === order.id ? "Placing…" : "Place on AliExpress"}</span>
+                            </button>
+                          ) : null}
+
+                          <button
+                            type="button"
+                            className="order-processing-mark-btn"
+                            onClick={() => markAsOrdered(order)}
+                            disabled={markingId === order.id || placingId === order.id || !order.hasSource || order.buyPrice == null}
+                            title={
+                              !order.hasSource || order.buyPrice == null
+                                ? "Add a source link and cost before marking as ordered"
+                                : "Mark this order as ordered manually"
+                            }
+                          >
+                            {markingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                            <span>Mark Ordered</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

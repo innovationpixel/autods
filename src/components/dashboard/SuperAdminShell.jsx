@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -12,11 +12,16 @@ import {
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
 import { ThemeContext } from "../../context/ThemeContext";
-import { adminPages, adminSidebarItems } from "../autods/menu";
+import { adminPageModuleMap, adminPages, adminSidebarItems } from "../autods/menu";
 import SidebarLink from "../autods/SidebarLink";
 import AdminDashboardPage from "../autods/pages/AdminDashboardPage";
 import AdminClientsPage from "../autods/pages/AdminClientsPage";
 import AdminPlansPage from "../autods/pages/AdminPlansPage";
+import AdminCategoriesPage from "../autods/pages/AdminCategoriesPage";
+import AdminTrendingProductsPage from "../autods/pages/AdminTrendingProductsPage";
+import AdminHandPickedProductsPage from "../autods/pages/AdminHandPickedProductsPage";
+import AdminUsersPage from "../autods/pages/AdminUsersPage";
+import AdminSupportTicketsPage from "../autods/pages/AdminSupportTicketsPage";
 import AdminSettingsPage from "../autods/pages/AdminSettingsPage";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { getUserEmail, getUserFullName, getUserShortName } from "../../utils/userDisplay";
@@ -40,11 +45,31 @@ function SuperAdminShell() {
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
   const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
 
+  const hasModuleAccess = useCallback(
+    (page) => {
+      const moduleKey = adminPageModuleMap[page];
+      if (!moduleKey || !authUser?.admin_modules) {
+        return true;
+      }
+      return authUser.admin_modules.includes(moduleKey);
+    },
+    [authUser],
+  );
+
+  const visibleSidebarItems = useMemo(
+    () => adminSidebarItems.filter((item) => hasModuleAccess(item.page)),
+    [hasModuleAccess],
+  );
+
   useEffect(() => {
     if (pathname === "/" || !adminPages.includes(activePage)) {
       navigate("/admin", { replace: true });
+      return;
     }
-  }, [activePage, navigate, pathname]);
+    if (!hasModuleAccess(activePage)) {
+      navigate("/admin", { replace: true });
+    }
+  }, [activePage, hasModuleAccess, navigate, pathname]);
 
   useEffect(() => {
     const closeProfileMenu = (event) => {
@@ -69,6 +94,11 @@ function SuperAdminShell() {
     admin: "Dashboard",
     "admin/clients": "Clients",
     "admin/plans": "Plans",
+    "admin/categories": "Categories",
+    "admin/trending-products": "Trending Products",
+    "admin/hand-picked-products": "Hand-Picked Products",
+    "admin/admin-users": "Admin Users",
+    "admin/support": "Customer Support",
     "admin/settings": "Settings",
   };
 
@@ -78,6 +108,11 @@ function SuperAdminShell() {
     admin: () => setActivePage("admin"),
     "admin/clients": () => setActivePage("admin/clients"),
     "admin/plans": () => setActivePage("admin/plans"),
+    "admin/categories": () => setActivePage("admin/categories"),
+    "admin/trending-products": () => setActivePage("admin/trending-products"),
+    "admin/hand-picked-products": () => setActivePage("admin/hand-picked-products"),
+    "admin/admin-users": () => setActivePage("admin/admin-users"),
+    "admin/support": () => setActivePage("admin/support"),
     "admin/settings": () => setActivePage("admin/settings"),
   };
 
@@ -103,7 +138,7 @@ function SuperAdminShell() {
 
         <nav className="marketplace-sidebar__nav" aria-label="Admin navigation">
           <div className="marketplace-sidebar__group">
-            {adminSidebarItems.map((item) => (
+            {visibleSidebarItems.map((item) => (
               <SidebarLink
                 item={{
                   ...item,
@@ -218,6 +253,16 @@ function SuperAdminShell() {
               <AdminClientsPage />
             ) : activePage === "admin/plans" ? (
               <AdminPlansPage />
+            ) : activePage === "admin/categories" ? (
+              <AdminCategoriesPage />
+            ) : activePage === "admin/trending-products" ? (
+              <AdminTrendingProductsPage />
+            ) : activePage === "admin/hand-picked-products" ? (
+              <AdminHandPickedProductsPage />
+            ) : activePage === "admin/admin-users" ? (
+              <AdminUsersPage />
+            ) : activePage === "admin/support" ? (
+              <AdminSupportTicketsPage />
             ) : activePage === "admin/settings" ? (
               <AdminSettingsPage />
             ) : (

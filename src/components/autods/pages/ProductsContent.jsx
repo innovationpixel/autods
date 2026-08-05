@@ -62,6 +62,7 @@ function formatMoney(value, currency = "USD") {
 function platformLabel(platform) {
   if (!platform) return "—";
   const map = {
+    appmarketplace: "APP",
     aliexpress: "AE",
     amazon: "AMZ",
     walmart: "WMT",
@@ -167,6 +168,7 @@ function ProductsContent({ searchQuery }) {
   const [editorTab, setEditorTab] = useState("general");
   const [editorSaving, setEditorSaving] = useState(false);
   const [syncingId, setSyncingId] = useState("");
+  const [publishingIds, setPublishingIds] = useState([]);
   const tableScrollRef = useRef(null);
 
   const visibleColumns = useMemo(
@@ -422,11 +424,14 @@ function ProductsContent({ searchQuery }) {
       let failed = 0;
 
       for (const item of items) {
+        setPublishingIds((cur) => [...cur, item.id]);
         try {
           await publishProduct(item.id);
           updated += 1;
         } catch {
           failed += 1;
+        } finally {
+          setPublishingIds((cur) => cur.filter((x) => x !== item.id));
         }
       }
 
@@ -588,9 +593,16 @@ function ProductsContent({ searchQuery }) {
             )}
             <div className="products-item__copy">
               <h3>{item.title}</h3>
-              <button type="button" className="products-sourcing-btn" onClick={() => toast.info("Sourcing request flow opens for this product.")}>
-                Sourcing Request
-              </button>
+              {publishingIds.includes(item.id) ? (
+                <div className="products-item__processing" role="status">
+                  <LuLoader className="spin-icon" />
+                  <span>Publishing…</span>
+                </div>
+              ) : (
+                <button type="button" className="products-sourcing-btn" onClick={() => toast.info("Sourcing request flow opens for this product.")}>
+                  Sourcing Request
+                </button>
+              )}
             </div>
           </div>
         );

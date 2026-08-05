@@ -82,6 +82,7 @@ function DraftsContent({ searchQuery }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [accountSettings, setAccountSettings] = useState(null);
+  const [publishingIds, setPublishingIds] = useState([]);
 
   const ensureShipFromReady = async () => {
     let settings = accountSettings;
@@ -133,6 +134,10 @@ function DraftsContent({ searchQuery }) {
   }, [dispatch, connected, searchQuery, activeTab, filterStatus, filterStore]);
 
   useEffect(() => {
+    setSelectedIds([]);
+  }, [activeTab]);
+
+  useEffect(() => {
     const closeMenu = () => setOpenMenuId("");
     document.addEventListener("click", closeMenu);
     return () => document.removeEventListener("click", closeMenu);
@@ -144,8 +149,9 @@ function DraftsContent({ searchQuery }) {
     }
     return true;
   });
-  const scheduledCount = activeTab === "scheduled" ? (meta?.total ?? drafts.length) : 0;
-  const failedCount = drafts.filter((d) => d.import_status === "failed").length;
+  const draftsCount = meta?.counts?.drafts ?? (activeTab === "drafts" ? (meta?.total ?? drafts.length) : 0);
+  const scheduledCount = meta?.counts?.scheduled ?? (activeTab === "scheduled" ? (meta?.total ?? drafts.length) : 0);
+  const failedCount = meta?.counts?.failed ?? (activeTab === "failed" ? (meta?.total ?? drafts.length) : 0);
 
   const allVisibleSelected =
     visibleDrafts.length > 0 && visibleDrafts.every((item) => selectedIds.includes(item.id));
@@ -266,18 +272,31 @@ function DraftsContent({ searchQuery }) {
     if (action === "import") {
       if (!(await ensureShipFromReady())) return;
 
+      let succeeded = 0;
+      let failed = 0;
+
       for (const id of selectedIds) {
+        setPublishingIds((cur) => [...cur, id]);
         try {
           const item = drafts.find((draft) => draft.id === id);
           if (item) {
             await saveDraftIfDirty(item);
           }
           await publishProduct(id);
+          succeeded += 1;
         } catch {
-          // continue
+          failed += 1;
+        } finally {
+          setPublishingIds((cur) => cur.filter((x) => x !== id));
         }
       }
-      toast.success("Publish queued for selected drafts.");
+
+      if (succeeded) {
+        toast.success(`${succeeded} draft${succeeded === 1 ? "" : "s"} published.`);
+      }
+      if (failed) {
+        toast.error(`${failed} draft${failed === 1 ? "" : "s"} could not be published.`);
+      }
       loadDrafts();
       return;
     }
@@ -451,7 +470,7 @@ function DraftsContent({ searchQuery }) {
     <section className="drafts-page-content">
       <nav className="drafts-tabs" aria-label="Upload sections">
         {[
-          ["drafts", `Drafts (${meta?.total ?? drafts.length})`],
+          ["drafts", `Drafts (${draftsCount})`],
           ["scheduled", `Scheduled (${scheduledCount})`],
           ["failed", `Failed (${failedCount})`],
         ].map(([key, label]) => (
@@ -585,6 +604,7 @@ function DraftsContent({ searchQuery }) {
             const hasError = item.import_status === "failed";
             const imageUrl = getListingImageUrl(item);
             const statusLabel = hasError ? "Failed" : item.status === "draft" ? "Draft" : item.status ?? "Draft";
+            const isPublishing = publishingIds.includes(item.id);
 
             return (
               <div className="drafts-entry" key={item.id}>
@@ -623,6 +643,12 @@ function DraftsContent({ searchQuery }) {
                       {hasError ? <span className="drafts-row__error">!</span> : null}
                       <span>{item.title}</span>
                     </h3>
+                    {isPublishing ? (
+                      <div className="drafts-row__processing" role="status">
+                        <LuLoader className="spin-icon" />
+                        <span>Publishing…</span>
+                      </div>
+                    ) : null}
                     <div className="drafts-row__meta">
                       {item.source_product_id ? <span>Buy Item Id: {item.source_product_id}</span> : null}
                       {item.source_product_id ? <i aria-hidden="true" /> : null}

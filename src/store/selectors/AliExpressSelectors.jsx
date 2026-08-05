@@ -2,6 +2,8 @@ export const selectAliItems        = (state) => state.aliexpress.marketplace.ite
 export const selectAliLoading      = (state) => state.aliexpress.marketplace.loading;
 export const selectAliError        = (state) => state.aliexpress.marketplace.error;
 export const selectAliTotal        = (state) => state.aliexpress.marketplace.total;
+export const selectAliCurrentPage  = (state) => state.aliexpress.marketplace.current_page;
+export const selectAliTotalPages   = (state) => state.aliexpress.marketplace.total_pages;
 export const selectAliSearchId     = (state) => state.aliexpress.marketplace.search_id;
 export const selectAliRequiresAuth = (state) => state.aliexpress.marketplace.requires_auth;
 export const selectAliCredentialsMissing = (state) => state.aliexpress.marketplace.credentials_missing;

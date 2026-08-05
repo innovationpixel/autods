@@ -7,7 +7,6 @@ import {
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
-  LuClipboardCheck,
   LuClipboardList,
   LuClock3,
   LuExternalLink,
@@ -30,91 +29,23 @@ import {
   resolveVisibleOrderColumns,
   saveVisibleColumnIds,
 } from "../orderColumns";
-import { buildEbayListingProductUrl, buildSourceProductUrl, detectTrackingCarrier, formatDisplayDate, getEbayOrderDetailUrl, normalizeListingSourceInput, normalizeTrackingCarrier } from "../helpers";
+import { buildEbayListingProductUrl, buildSourceProductUrl, detectTrackingCarrier, formatDisplayDate, getEbayOrderDetailUrl, normalizeTrackingCarrier } from "../helpers";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
 import ProductItemIdCell from "../ProductItemIdCell";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
 import QuickEditModal from "../QuickEditModal";
+import OrderSourceModal from "../OrderSourceModal";
+import {
+  DEFAULT_DATE_PRESET,
+  ORDER_DATE_PRESETS,
+  ORDER_SORT_OPTIONS,
+  getDateRangeForPreset,
+  getDefaultOrderFilters,
+} from "../orderFilters";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
-
-const ORDER_DATE_PRESETS = [
-  { id: "today", label: "Today" },
-  { id: "7days", label: "7 days" },
-  { id: "15days", label: "15 days" },
-  { id: "30days", label: "30 days" },
-  { id: "month", label: "This month" },
-  { id: "all", label: "All time" },
-];
-
-const ORDER_SORT_OPTIONS = [
-  { id: "orderDate", label: "Order date" },
-  { id: "total", label: "Total amount" },
-  { id: "profit", label: "Profit" },
-];
-
-const DEFAULT_DATE_PRESET = "30days";
-
-function formatDateInput(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-
-function getDateRangeForPreset(preset) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const to = formatDateInput(today);
-
-  switch (preset) {
-    case "today":
-      return { from: to, to };
-    case "7days": {
-      const from = new Date(today);
-      from.setDate(from.getDate() - 6);
-      return { from: formatDateInput(from), to };
-    }
-    case "15days": {
-      const from = new Date(today);
-      from.setDate(from.getDate() - 14);
-      return { from: formatDateInput(from), to };
-    }
-    case "30days": {
-      const from = new Date(today);
-      from.setDate(from.getDate() - 29);
-      return { from: formatDateInput(from), to };
-    }
-    case "month": {
-      const from = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { from: formatDateInput(from), to };
-    }
-    case "all":
-      return { from: "", to: "" };
-    default:
-      return null;
-  }
-}
-
-function getDefaultOrderFilters() {
-  const range = getDateRangeForPreset(DEFAULT_DATE_PRESET);
-
-  return {
-    dateRangePreset: DEFAULT_DATE_PRESET,
-    fromDate: range?.from ?? "",
-    toDate: range?.to ?? "",
-    sortBy: "orderDate",
-    sortDirection: "desc",
-    statusFilter: "All Statuses",
-    buyerFilter: "",
-    orderIdFilter: "",
-    storeFilter: "All Stores",
-    showOnlyActive: true,
-  };
-}
 
 function formatMoney(value, currency = "USD") {
   if (value === null || value === undefined || value === "") {
@@ -153,6 +84,7 @@ function normalizeTrackingValue(value) {
 function platformLabel(platform) {
   if (!platform) return "—";
   const map = {
+    appmarketplace: "APP",
     aliexpress: "AE",
     amazon: "AMZ",
     walmart: "WMT",
@@ -209,6 +141,11 @@ function mapApiOrder(order) {
   const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
   const sourcePlatform = order.source_platform ?? "aliexpress";
   const sourceUrl = order.source_url ?? null;
+  const sourceSkuId = order.source_sku_id ?? null;
+  const sourceVariation = Array.isArray(order.source_variation) ? order.source_variation : null;
+  const sourceVariationText = sourceVariation?.length
+    ? sourceVariation.map((entry) => [entry.name, entry.value].filter(Boolean).join(": ")).join(", ")
+    : "";
   const itemBuy = sourceProductId ?? "—";
   const itemBuyUrl = buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl);
   const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
@@ -223,7 +160,7 @@ function mapApiOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
+    image: order.listing_image_url ?? firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
     color: variationText || "—",
     pickStatus: raw.pickStatus ?? "—",
     itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
@@ -297,6 +234,9 @@ function mapApiOrder(order) {
     sourcePlatform,
     sourceUrl,
     sourceProductId,
+    sourceSkuId,
+    sourceVariation,
+    sourceVariationText,
     listingSku: order.listing_sku ?? firstItem.sku ?? "—",
     buyer: buyer.username ?? order.buyer_name ?? "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
@@ -338,8 +278,7 @@ function OrdersContent({ searchQuery }) {
   const [openBulkMenu, setOpenBulkMenu] = useState(false);
   const [openPrintMenu, setOpenPrintMenu] = useState(false);
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleColumnIds);
-  const [editingBuySourceId, setEditingBuySourceId] = useState("");
-  const [buySourceDraft, setBuySourceDraft] = useState("");
+  const [editingBuySourceOrder, setEditingBuySourceOrder] = useState(null);
   const [savingBuySourceId, setSavingBuySourceId] = useState("");
   const [editingTrackingId, setEditingTrackingId] = useState("");
   const [trackingDraft, setTrackingDraft] = useState("");
@@ -438,29 +377,22 @@ function OrdersContent({ searchQuery }) {
   };
 
   const startEditBuySource = (order) => {
-    setEditingBuySourceId(order.id);
-    setBuySourceDraft(order.sourceUrl ?? (order.itemBuy !== "—" ? order.itemBuy : ""));
+    setEditingBuySourceOrder(order);
   };
 
   const cancelEditBuySource = () => {
-    setEditingBuySourceId("");
-    setBuySourceDraft("");
+    setEditingBuySourceOrder(null);
   };
 
-  const saveBuySource = async (order) => {
-    const trimmed = buySourceDraft.trim();
-    if (!trimmed) {
-      toast.error("Enter a source link or item ID.");
+  const saveBuySource = async (payload) => {
+    const order = editingBuySourceOrder;
+    if (!order) {
       return;
     }
 
     setSavingBuySourceId(order.id);
     try {
-      const source = normalizeListingSourceInput(trimmed, order.sourcePlatform);
-      const res = await updateOrderSource(order.id, {
-        source_input: source.source_input,
-        source_platform: source.source_platform,
-      });
+      const res = await updateOrderSource(order.id, payload);
       toast.success(res.data?.message ?? "Source link updated.");
       cancelEditBuySource();
       await loadOrders();
@@ -895,11 +827,7 @@ function OrdersContent({ searchQuery }) {
       return;
     }
 
-    if (action === "update-pick-status") {
-      toast.info("Update Pick Status — coming soon.");
-    } else {
-      toast.info(`${label} for order ${orderLabel} — coming soon.`);
-    }
+    toast.info(`${label} for order ${orderLabel} — coming soon.`);
 
     closeRowActionMenus();
   };
@@ -1053,7 +981,7 @@ function OrdersContent({ searchQuery }) {
               <span className="orders-paired-values__platform">{platformLabel(order.sourcePlatform)}</span>
               <div className="products-source-cell">
                 {order.itemBuyUrl || (order.itemBuy && order.itemBuy !== "—") ? (
-                  <ProductItemIdCell itemId={order.itemBuy} sku={order.listingSku} url={order.itemBuyUrl} />
+                  <ProductItemIdCell itemId={order.itemBuy} url={order.itemBuyUrl} />
                 ) : (
                   <span className="products-source-btn__placeholder">Add source</span>
                 )}
@@ -1067,6 +995,9 @@ function OrdersContent({ searchQuery }) {
                   <LuPencil />
                 </button>
               </div>
+              {order.sourceVariationText ? (
+                <span className="orders-source-cell__variation">{order.sourceVariationText}</span>
+              ) : null}
             </div>
             <div>
               <span className="orders-paired-values__type">SELL</span>
@@ -1456,15 +1387,6 @@ function OrdersContent({ searchQuery }) {
                             {openRowPrintId === order.id ? renderRowActionMenu(order.id, orderRowPrintActions) : null}
                           </div>
 
-                          <button
-                            type="button"
-                            className="orders-row-actions__btn"
-                            aria-label="Update Pick Status"
-                            onClick={() => handleOrderAction(order.id, "update-pick-status", "Update Pick Status")}
-                          >
-                            <LuClipboardCheck />
-                          </button>
-
                           <div className="orders-row-actions__item">
                             <button
                               type="button"
@@ -1536,17 +1458,12 @@ function OrdersContent({ searchQuery }) {
         </div>
       </div>
 
-      <QuickEditModal
-        open={Boolean(editingBuySourceId)}
-        title="Edit Source Link"
-        description="Paste the AliExpress (or other supplier) URL or item ID this order was sourced from."
-        label="Source link or item ID"
-        value={buySourceDraft}
-        onChange={setBuySourceDraft}
-        onSave={() => saveBuySource(orders.find((order) => order.id === editingBuySourceId))}
+      <OrderSourceModal
+        open={Boolean(editingBuySourceOrder)}
+        order={editingBuySourceOrder}
+        saving={Boolean(editingBuySourceOrder) && savingBuySourceId === editingBuySourceOrder.id}
         onClose={cancelEditBuySource}
-        saving={savingBuySourceId === editingBuySourceId}
-        placeholder="https://www.aliexpress.com/item/... or item ID"
+        onSave={saveBuySource}
       />
 
       <QuickEditModal

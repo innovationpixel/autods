@@ -185,18 +185,21 @@ function BulkEditDraftsModal({
           </BulkFieldRow>
 
           <BulkFieldRow
-            label="Profit"
+            label="Profit %"
             enabled={fields.profitEnabled}
             onToggle={(profitEnabled) => patch({ profitEnabled })}
           >
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={fields.profit}
-              disabled={!fields.profitEnabled}
-              onChange={(event) => patch({ profit: event.target.value })}
-            />
+            <div className="bulk-edit-modal__percent">
+              <input
+                type="number"
+                step="0.1"
+                placeholder="e.g. 20"
+                value={fields.profit}
+                disabled={!fields.profitEnabled}
+                onChange={(event) => patch({ profit: event.target.value })}
+              />
+              <span className="bulk-edit-modal__percent-suffix">%</span>
+            </div>
           </BulkFieldRow>
 
           <BulkFieldRow
@@ -315,9 +318,11 @@ export function applyBulkEditToForm(form, changes) {
   }
 
   if (changes.profitEnabled) {
+    const buyPrice = Number(next.monitoring?.buyPrice) || 0;
+    const profitPercent = Number(changes.profit) || 0;
     next.monitoring = {
       ...next.monitoring,
-      profit: Number(changes.profit) || 0,
+      profit: Math.round(buyPrice * (profitPercent / 100) * 100) / 100,
     };
   }
 

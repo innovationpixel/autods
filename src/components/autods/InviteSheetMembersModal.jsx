@@ -10,12 +10,19 @@ function parseEmails(value) {
   )];
 }
 
+const ACCESS_OPTIONS = [
+  { value: "reader", label: "Viewer", description: "Can view the sheet, but not make changes." },
+  { value: "writer", label: "Editor", description: "Can view and edit the sheet." },
+];
+
 function InviteSheetMembersModal({ open, saving = false, onClose, onInvite }) {
   const [emailsInput, setEmailsInput] = useState("");
+  const [role, setRole] = useState("reader");
 
   useEffect(() => {
     if (open) {
       setEmailsInput("");
+      setRole("reader");
     }
   }, [open]);
 
@@ -30,7 +37,7 @@ function InviteSheetMembersModal({ open, saving = false, onClose, onInvite }) {
       return;
     }
 
-    onInvite(emails);
+    onInvite(emails, role);
   };
 
   return (
@@ -53,7 +60,7 @@ function InviteSheetMembersModal({ open, saving = false, onClose, onInvite }) {
           </span>
           <div>
             <h2>Invite Team Members</h2>
-            <p>Send view-only access to your orders Google Sheet. Separate multiple emails with commas.</p>
+            <p>Invite teammates to your orders Google Sheet. Separate multiple emails with commas.</p>
           </div>
         </div>
 
@@ -67,6 +74,31 @@ function InviteSheetMembersModal({ open, saving = false, onClose, onInvite }) {
             disabled={saving}
           />
         </label>
+
+        <div className="invite-sheet-modal__field">
+          <span>Access type</span>
+          <div className="invite-sheet-modal__access-options">
+            {ACCESS_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={`invite-sheet-modal__access-option ${role === option.value ? "invite-sheet-modal__access-option--active" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="invite-sheet-access"
+                  value={option.value}
+                  checked={role === option.value}
+                  onChange={() => setRole(option.value)}
+                  disabled={saving}
+                />
+                <span>
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
 
         <div className="invite-sheet-modal__actions">
           <button type="button" className="invite-sheet-modal__btn invite-sheet-modal__btn--ghost" onClick={onClose} disabled={saving}>

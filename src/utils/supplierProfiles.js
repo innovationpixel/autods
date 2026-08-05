@@ -1,6 +1,7 @@
 import { importSuppliers, importWarehouses } from "../components/autods/constants";
 
 const PLATFORM_LABELS = {
+  appmarketplace: "App in-build marketplace",
   aliexpress: "AliExpress",
   amazon: "Amazon",
   walmart: "Walmart",
@@ -19,6 +20,7 @@ const COUNTRY_LABELS = {
 };
 
 const BADGES = {
+  appmarketplace: "app",
   aliexpress: "ae",
   amazon: "amz",
   walmart: "wm",

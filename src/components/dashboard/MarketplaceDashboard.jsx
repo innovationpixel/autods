@@ -70,6 +70,7 @@ import SelectField from '../autods/SelectField';
 import ConnectEbayModal from '../autods/ConnectEbayModal';
 import AddProductModal from '../autods/AddProductModal';
 import MarketplaceSections from '../autods/pages/MarketplaceSections';
+import CuratedProductsPage from '../autods/pages/CuratedProductsPage';
 import PrintOnDemandContent from '../autods/pages/PrintOnDemandContent';
 import DashboardContent from '../autods/pages/DashboardContent';
 import OrdersContent from '../autods/pages/OrdersContent';
@@ -109,6 +110,8 @@ import {
   selectAliPlatformUnavailable,
   selectAliConnectionLoading,
   selectAliCredentialsConfigured,
+  selectAliCurrentPage,
+  selectAliTotalPages,
 } from '../../store/selectors/AliExpressSelectors';
 import { importProduct, importProductsBulk, getImportBatch } from '../../services/ProductService';
 import {
@@ -631,6 +634,10 @@ const MarketplaceDashboard = () => {
   const aliPlatformUnavailable = useSelector(selectAliPlatformUnavailable);
   const aliConnectionLoading = useSelector(selectAliConnectionLoading);
   const aliCredentialsConfigured = useSelector(selectAliCredentialsConfigured);
+  const aliCurrentPage = useSelector(selectAliCurrentPage);
+  const aliTotalPages = useSelector(selectAliTotalPages);
+  const [aliPage, setAliPage] = useState(1);
+  const [importingCardId, setImportingCardId] = useState(null);
   const ebayConnections = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
   const listingsMeta = useSelector(selectEbayListingsMeta);
@@ -698,6 +705,7 @@ const MarketplaceDashboard = () => {
   const [activeSubfilter, setActiveSubfilter] = useState("");
   const [expandedProductsTitle, setExpandedProductsTitle] = useState("");
   const [selectedPill, setSelectedPill] = useState("");
+  const [curatedType, setCuratedType] = useState(null);
   const [sortBy, setSortBy] = useState("By Relevance");
   const [openMenus, setOpenMenus] = useState({
     Marketplace: true,
@@ -913,6 +921,7 @@ const MarketplaceDashboard = () => {
       const params = {
         sort,
         limit: 20,
+        page_no: aliPage,
         ships_to: shipsTo,
         currency,
       };
@@ -947,7 +956,13 @@ const MarketplaceDashboard = () => {
     aliConnectionLoading,
     aliPlatformReady,
     keywordSearch,
+    aliPage,
   ]);
+
+  // Jump back to page 1 whenever the active filters change (a new filter combo is a new result set).
+  useEffect(() => {
+    setAliPage(1);
+  }, [activeCategory, activeSubfilter, selectedPill, sortBy, priceRange, shipsTo, currency, keywordSearch]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
@@ -1149,6 +1164,7 @@ const MarketplaceDashboard = () => {
     setExpandedProductsTitle("");
     setSelectedPill("");
     setKeywordSearch("");
+    setCuratedType(null);
   };
 
   const openMarketplacePage = () => {
@@ -1293,6 +1309,37 @@ const MarketplaceDashboard = () => {
   const refreshProductData = () => {
     dispatch(fetchEbayDrafts());
     dispatch(fetchEbayListings());
+  };
+
+  const handleMarketplaceCardImport = async (item) => {
+    const connectionIds = getSelectedConnectionIds();
+    if (!connectionIds.length) {
+      toast.error("Select at least one eBay store.");
+      return;
+    }
+
+    const urlOrId = item.listingUrl || item.id;
+    if (!urlOrId) {
+      toast.error("This product is missing a valid AliExpress link.");
+      return;
+    }
+
+    setImportingCardId(item.id);
+    try {
+      const res = await importProduct({
+        url_or_id: urlOrId,
+        connection_ids: connectionIds,
+        action: "draft",
+        warehouse: importWarehouse,
+        supplier: "appmarketplace",
+      });
+      toast.success(res.data?.message ?? "Product imported to Drafts.");
+      refreshProductData();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Import failed.");
+    } finally {
+      setImportingCardId(null);
+    }
   };
 
   const pollImportBatch = (batchId) => {
@@ -1669,11 +1716,21 @@ const MarketplaceDashboard = () => {
                         "sourcing-request": openSourcingRequestPage,
                         products: openProductsPage,
                         drafts: openDraftsPage,
+                        wallet: openWalletPage,
                         "customer-support": openCustomerSupportPage,
                         settings: openSettingsPage,
                       };
 
                       pageHandlers[selectedItem.page]?.();
+                    }}
+                    onSelectChild={(child) => {
+                      if (!child.curatedType) {
+                        return;
+                      }
+
+                      setActivePage("marketplace");
+                      setCuratedType(child.curatedType);
+                      setSearchAnything("");
                     }}
                     onToggle={() =>
                       setOpenMenus((current) => ({
@@ -2542,11 +2599,6 @@ const MarketplaceDashboard = () => {
                     <button type="button" className="button-base button-primary marketplace-search-panel__submit">
                       Search
                     </button>
-
-                    <button type="button" className="marketplace-search-panel__ugc-btn">
-                      <span aria-hidden="true">✦</span>
-                      <span>UGC Video Ads</span>
-                    </button>
                   </div>
 
                   <div className="marketplace-search-panel__filters">
@@ -2664,21 +2716,37 @@ const MarketplaceDashboard = () => {
                 </section>
 
                 <div className="marketplace-sections">
-                  <MarketplaceSections
-                    aliLoading={aliLoading}
-                    aliError={aliError}
-                    aliPlatformUnavailable={aliPlatformUnavailable}
-                    aliConnectionLoading={aliConnectionLoading}
-                    aliCredentialsMissing={aliCredentialsMissing}
-                    aliCredentialsConfigured={aliCredentialsConfigured}
-                    aliItems={aliItems}
-                    expandedProductsTitle={expandedProductsTitle}
-                    visibleProducts={visibleProducts}
-                    visibleSections={visibleSections}
-                    keywordSearch={keywordSearch}
-                    onSeeMore={openProductsView}
-                    onResetView={resetMarketplaceView}
-                  />
+                  {curatedType ? (
+                    <CuratedProductsPage
+                      type={curatedType}
+                      title={curatedType === "trending" ? "Trending Products" : "Hand-Picked Products"}
+                      onBack={resetMarketplaceView}
+                      onImport={handleMarketplaceCardImport}
+                      importingId={importingCardId}
+                    />
+                  ) : (
+                    <MarketplaceSections
+                      aliLoading={aliLoading}
+                      aliError={aliError}
+                      aliPlatformUnavailable={aliPlatformUnavailable}
+                      aliConnectionLoading={aliConnectionLoading}
+                      aliCredentialsMissing={aliCredentialsMissing}
+                      aliCredentialsConfigured={aliCredentialsConfigured}
+                      aliPlatformReady={aliPlatformReady}
+                      aliItems={aliItems}
+                      aliCurrentPage={aliCurrentPage}
+                      aliTotalPages={aliTotalPages}
+                      onAliPageChange={setAliPage}
+                      expandedProductsTitle={expandedProductsTitle}
+                      visibleProducts={visibleProducts}
+                      visibleSections={visibleSections}
+                      keywordSearch={keywordSearch}
+                      onSeeMore={openProductsView}
+                      onResetView={resetMarketplaceView}
+                      onImport={handleMarketplaceCardImport}
+                      importingId={importingCardId}
+                    />
+                  )}
                 </div>
               </>
             )}

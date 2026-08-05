@@ -12,6 +12,7 @@ import { buildSourceProductUrl, getListingImageUrl, normalizeListingSourceInput 
 import { uid, normalizeVariantPricing } from "../../utils/draftEditorState";
 import DraftDescriptionEditor from "./DraftDescriptionEditor";
 import DraftCategorySelect from "./DraftCategorySelect";
+import BulkEditVariantsModal, { applyBulkEditToVariant } from "./BulkEditVariantsModal";
 
 const EDITOR_TABS = [
   { id: "general", label: "General" },
@@ -48,6 +49,7 @@ function DraftEditorPanel({
 }) {
   const [editingVariantId, setEditingVariantId] = useState(null);
   const [editingSpecificId, setEditingSpecificId] = useState(null);
+  const [bulkEditingVariants, setBulkEditingVariants] = useState(false);
 
   const imageUrl = getListingImageUrl(item);
   const selectedImageCount = form.images.filter((image) => image.selected).length;
@@ -117,6 +119,15 @@ function DraftEditorPanel({
     );
     patch({ variants: [...form.variants, next] });
     setEditingVariantId(next.id);
+  };
+
+  const applyBulkVariantEdit = (changes) => {
+    patch({
+      variants: form.variants.map((variant) =>
+        normalizeVariantPricing(applyBulkEditToVariant(normalizeVariantPricing(variant, form.monitoring), changes)),
+      ),
+    });
+    setBulkEditingVariants(false);
   };
 
   const toggleImageSelected = (imageId, selected) => {
@@ -388,10 +399,21 @@ function DraftEditorPanel({
               <div className="draft-editor__variants">
                 <div className="draft-editor__variants-head">
                   <strong>{form.variants.length} variant{form.variants.length !== 1 ? "s" : ""}</strong>
-                  <button type="button" onClick={addVariant}>
-                    <LuPlus />
-                    <span>Add variant</span>
-                  </button>
+                  <div className="draft-editor__variants-head-actions">
+                    <button
+                      type="button"
+                      className="draft-editor__bulk-edit-btn"
+                      onClick={() => setBulkEditingVariants(true)}
+                      disabled={!form.variants.length}
+                    >
+                      <LuPencil />
+                      <span>Bulk edit</span>
+                    </button>
+                    <button type="button" onClick={addVariant}>
+                      <LuPlus />
+                      <span>Add variant</span>
+                    </button>
+                  </div>
                 </div>
                 <div className="draft-editor__variant-list">
                   {form.variants.map((variant) => {
@@ -725,6 +747,13 @@ function DraftEditorPanel({
           </div>
         </div>
       </div>
+
+      <BulkEditVariantsModal
+        open={bulkEditingVariants}
+        variantCount={form.variants.length}
+        onClose={() => setBulkEditingVariants(false)}
+        onApply={applyBulkVariantEdit}
+      />
     </div>
   );
 }

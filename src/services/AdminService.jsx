@@ -45,3 +45,15 @@ export const getAdminGoogleAuthUrl = (returnPath = '/admin/settings') =>
 
 export const disconnectAdminGoogle = () =>
     axiosInstance.delete('/admin/google/disconnect');
+
+export const getAdminSupportTickets = (params = {}) =>
+    axiosInstance.get('/admin/support-tickets', { params });
+
+export const getAdminSupportTicket = (id) =>
+    axiosInstance.get(`/admin/support-tickets/${id}`);
+
+export const replyAdminSupportTicket = (id, message) =>
+    axiosInstance.post(`/admin/support-tickets/${id}/reply`, { message });
+
+export const updateAdminSupportTicketStatus = (id, status) =>
+    axiosInstance.patch(`/admin/support-tickets/${id}/status`, { status });
