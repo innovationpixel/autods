@@ -57,12 +57,19 @@ import {
   saveStripePaymentMethod,
 } from "../../services/BillingService";
 import { getCurrentPlan } from "../../services/PlanService";
+import {
+  getBuyerAccounts,
+  getBuyerAccountAuthUrl,
+  updateBuyerAccount,
+  disconnectBuyerAccount,
+} from "../../services/BuyerAccountService";
 import SettingsTemplatesPanel from "../autods/settings/SettingsTemplatesPanel";
 import { allTemplates } from "../autods/settings/settingsTemplates";
 
 const settingsPrimaryTabs = [
   "Store Settings",
   "Supplier Settings",
+  "Buyer Accounts",
   "Automations",
   "Templates",
   "Keywords",
@@ -333,7 +340,7 @@ const monitoringToggleOptions = [
 function formatAud(value) {
   const numericValue = Number.isFinite(value) ? value : 0;
   const precision = Number.isInteger(numericValue) ? 0 : 2;
-  return `A$${numericValue.toFixed(precision)}`;
+  return `$${numericValue.toFixed(precision)}`;
 }
 
 function parseNumericValue(value) {
@@ -643,6 +650,12 @@ export default function MarketplaceSettingsPage() {
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [ebayCompleting, setEbayCompleting] = useState(false);
   const [ebayPasteUrl, setEbayPasteUrl] = useState("");
+  const [buyerAccounts, setBuyerAccounts] = useState([]);
+  const [buyerAccountsLoading, setBuyerAccountsLoading] = useState(true);
+  const [buyerAccountConnecting, setBuyerAccountConnecting] = useState(false);
+  const [editingBuyerAccountId, setEditingBuyerAccountId] = useState("");
+  const [buyerAccountNicknameDraft, setBuyerAccountNicknameDraft] = useState("");
+  const [savingBuyerAccountId, setSavingBuyerAccountId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -851,6 +864,75 @@ export default function MarketplaceSettingsPage() {
   const setPrimaryEbay = (id) => dispatch(setEbayPrimaryAction(id));
 
   const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
+
+  const loadBuyerAccounts = () => {
+    setBuyerAccountsLoading(true);
+    return getBuyerAccounts()
+      .then((res) => setBuyerAccounts(res.data?.accounts ?? []))
+      .catch(() => setBuyerAccounts([]))
+      .finally(() => setBuyerAccountsLoading(false));
+  };
+
+  useEffect(() => {
+    loadBuyerAccounts();
+  }, []);
+
+  const connectBuyerAccount = async () => {
+    try {
+      setBuyerAccountConnecting(true);
+      markOAuthReturnOrigin();
+
+      const res = await getBuyerAccountAuthUrl();
+      const tab = openOAuthTab(res.data.url);
+
+      if (!tab) {
+        setBuyerAccountConnecting(false);
+        toast.error("Your browser blocked the new tab. Allow popups for this site and try again.");
+        return;
+      }
+
+      toast.info(OAUTH_TAB_HINT, { autoClose: 8000 });
+
+      watchOAuthTab(tab, () => {
+        setBuyerAccountConnecting(false);
+        loadBuyerAccounts();
+      });
+    } catch (err) {
+      setBuyerAccountConnecting(false);
+      toast.error(err.response?.data?.error ?? "Failed to start AliExpress authorization.");
+    }
+  };
+
+  const startEditBuyerAccountNickname = (account) => {
+    setEditingBuyerAccountId(account.id);
+    setBuyerAccountNicknameDraft(account.nickname ?? "");
+  };
+
+  const saveBuyerAccountNickname = async (account) => {
+    setSavingBuyerAccountId(account.id);
+    try {
+      await updateBuyerAccount(account.id, { nickname: buyerAccountNicknameDraft.trim() || null });
+      toast.success("Buyer account updated.");
+      setEditingBuyerAccountId("");
+      setBuyerAccountNicknameDraft("");
+      loadBuyerAccounts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Could not update buyer account.");
+    } finally {
+      setSavingBuyerAccountId("");
+    }
+  };
+
+  const removeBuyerAccount = (id) => {
+    if (!window.confirm("Disconnect this buyer account? Orders already processed through it keep their history.")) return;
+
+    disconnectBuyerAccount(id)
+      .then(() => {
+        toast.success("Buyer account disconnected.");
+        loadBuyerAccounts();
+      })
+      .catch((err) => toast.error(err.response?.data?.error ?? "Could not disconnect buyer account."));
+  };
 
   const templateSelectOptions = useMemo(() => {
     const names = allTemplates(templateCatalog.custom).map((template) => template.name);
@@ -1814,7 +1896,7 @@ export default function MarketplaceSettingsPage() {
                 <span>{formatAud(pricingSummary.percentFee)}</span>
               </div>
               <div>
-                <strong>+ A$ Fee</strong>
+                <strong>+ $ Fee</strong>
                 <span>{formatAud(pricingSummary.fixedFee)}</span>
               </div>
               <div>
@@ -1825,7 +1907,7 @@ export default function MarketplaceSettingsPage() {
           </div>
 
           <div className="marketplace-settings__pricing-example">
-            <span>{currentSettings.pricing.productCost ? formatAud(pricingSummary.productCost) : "e.g: A$100"}</span>
+            <span>{currentSettings.pricing.productCost ? formatAud(pricingSummary.productCost) : "e.g: $100"}</span>
             <span>{formatAud(pricingSummary.profit)}</span>
             <span>{formatAud(pricingSummary.percentFee)}</span>
             <span>{formatAud(pricingSummary.fixedFee)}</span>
@@ -1842,11 +1924,11 @@ export default function MarketplaceSettingsPage() {
             />
           </SettingsField>
 
-          <SettingsField label="A$ Fee Amount">
+          <SettingsField label="$ Fee Amount">
             <SettingsInput
               value={currentSettings.pricing.fixedFeeAmount}
               onChange={(event) => patchSection("pricing", { fixedFeeAmount: event.target.value })}
-              placeholder="A$0"
+              placeholder="$0"
             />
           </SettingsField>
 
@@ -1858,11 +1940,11 @@ export default function MarketplaceSettingsPage() {
             />
           </SettingsField>
 
-          <SettingsField label="Additional Profit in A$">
+          <SettingsField label="Additional Profit in $">
             <SettingsInput
               value={currentSettings.pricing.additionalProfitAmount}
               onChange={(event) => patchSection("pricing", { additionalProfitAmount: event.target.value })}
-              placeholder="A$0"
+              placeholder="$0"
             />
           </SettingsField>
 
@@ -1878,7 +1960,7 @@ export default function MarketplaceSettingsPage() {
             <SettingsInput
               value={currentSettings.pricing.minimumProfit}
               onChange={(event) => patchSection("pricing", { minimumProfit: event.target.value })}
-              placeholder="A$0"
+              placeholder="$0"
             />
           </SettingsField>
         </div>
@@ -2067,6 +2149,126 @@ export default function MarketplaceSettingsPage() {
     );
     toast.info(`${addOn.title} canceled.`);
   };
+
+  const renderBuyerAccountsTab = () => (
+    <div className="marketplace-settings__store-settings card-wrapper">
+      <div className="marketplace-settings__store-settings-header">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Buyer Accounts</h3>
+            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
+              Connect your own AliExpress account(s) to use as the "Buyer" processing method in Order Processing — orders are billed directly by AliExpress to that account instead of your AutoDS processing wallet.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+            onClick={connectBuyerAccount}
+            disabled={buyerAccountConnecting}
+            style={{ flexShrink: 0 }}
+          >
+            {buyerAccountConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
+            <span>{buyerAccountConnecting ? "Opening AliExpress…" : "Connect Buyer Account"}</span>
+          </button>
+        </div>
+      </div>
+
+      {buyerAccountsLoading ? (
+        <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--loading" style={{ padding: "16px 0" }}>
+          <LuLoader className="spin-icon" />
+          <span>Checking connected accounts…</span>
+        </div>
+      ) : buyerAccounts.length === 0 ? (
+        <div style={{ padding: "20px 0" }}>
+          <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected">
+            <LuUnplug />
+            <span>No buyer accounts connected. Click <em>Connect Buyer Account</em> to link your AliExpress login.</span>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+          {buyerAccounts.map((account) => (
+            <div
+              key={account.id}
+              className="marketplace-settings__ebay-card"
+              style={{ background: account.is_primary ? "#f0fdf4" : undefined, border: account.is_primary ? "1px solid #bbf7d0" : undefined }}
+            >
+              <div className="marketplace-settings__ebay-info">
+                <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--connected">
+                  <LuBadgeCheck />
+                  {editingBuyerAccountId === account.id ? (
+                    <input
+                      className="marketplace-settings__control"
+                      style={{ maxWidth: 220 }}
+                      value={buyerAccountNicknameDraft}
+                      onChange={(e) => setBuyerAccountNicknameDraft(e.target.value)}
+                      placeholder={account.ae_user_nick ?? "Nickname"}
+                      autoFocus
+                    />
+                  ) : (
+                    <span>
+                      <strong>{account.nickname || account.ae_user_nick || "AliExpress Account"}</strong>
+                      {account.is_primary && (
+                        <span style={{ marginLeft: 8, fontSize: 11, background: "#065f46", color: "#fff", borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>
+                          DEFAULT
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <p className="marketplace-settings__ebay-sub">
+                  {account.ae_user_nick ? `AliExpress: ${account.ae_user_nick}` : "AliExpress account"}
+                  &nbsp;·&nbsp;
+                  Connected: {account.connected_at ? new Date(account.connected_at).toLocaleDateString() : "—"}
+                </p>
+              </div>
+
+              <div className="marketplace-settings__ebay-actions">
+                {editingBuyerAccountId === account.id ? (
+                  <>
+                    <button
+                      type="button"
+                      className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
+                      onClick={() => saveBuyerAccountNickname(account)}
+                      disabled={savingBuyerAccountId === account.id}
+                    >
+                      {savingBuyerAccountId === account.id ? <LuLoader className="spin-icon" /> : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className="marketplace-settings__ebay-btn"
+                      style={{ background: "#f3f4f6", color: "#374151" }}
+                      onClick={() => setEditingBuyerAccountId("")}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="marketplace-settings__ebay-btn"
+                    style={{ background: "#f3f4f6", color: "#374151" }}
+                    onClick={() => startEditBuyerAccountNickname(account)}
+                  >
+                    <LuPencil />
+                    <span>Rename</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--disconnect"
+                  onClick={() => removeBuyerAccount(account.id)}
+                >
+                  <LuTrash2 />
+                  <span>Disconnect</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const renderPlansAddOnsTab = () => {
     const ebayConnected = ebayConnections.length > 0;
@@ -2844,6 +3046,8 @@ export default function MarketplaceSettingsPage() {
         />
       ) : activePrimaryTab === "Store Settings" ? (
         renderStoreSettingsTab()
+      ) : activePrimaryTab === "Buyer Accounts" ? (
+        renderBuyerAccountsTab()
       ) : (
         <SettingsPlaceholder title={activePrimaryTab} />
       )}

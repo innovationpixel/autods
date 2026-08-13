@@ -15,6 +15,7 @@ import {
   LuRefreshCcw,
   LuSlidersHorizontal,
   LuTrash2,
+  LuX,
 } from "react-icons/lu";
 import DraftEditorPanel from "../DraftEditorPanel";
 import UploadHistoryPanel from "../UploadHistoryPanel";
@@ -38,6 +39,7 @@ import {
   deleteProduct,
   bulkDeleteProducts,
   scheduleProducts,
+  getImportHistory,
 } from "../../../services/ProductService";
 import { formatDisplayDateTime, getListingImageUrl } from "../helpers";
 import {
@@ -52,6 +54,29 @@ import {
   SHIP_FROM_CLIENT_MESSAGE,
   SHIP_FROM_SETTINGS_PATH,
 } from "../../../utils/ebayShipFrom";
+
+function buildScheduleBatchAlert(batch) {
+  const total = Number(batch.total ?? 0);
+  const completed = Number(batch.completed ?? 0);
+  const failed = Number(batch.failed ?? 0);
+  const isActive = batch.status === "pending" || batch.status === "processing";
+  const productLabel = `${total} product${total === 1 ? "" : "s"}`;
+
+  const message =
+    batch.status === "pending"
+      ? `Scheduling ${productLabel} — waiting for scheduled time`
+      : isActive
+        ? `Processing ${productLabel} — ${completed} completed, ${failed} failed`
+        : `Scheduled batch finished — ${completed} completed, ${failed} failed`;
+
+  return {
+    id: `schedule-batch-${batch.id}`,
+    batchId: batch.id,
+    tone: !isActive && failed > 0 ? "danger" : "warning",
+    message,
+    isActive,
+  };
+}
 
 function DraftsContent({ searchQuery }) {
   const dispatch = useDispatch();
@@ -83,6 +108,8 @@ function DraftsContent({ searchQuery }) {
   const [deleting, setDeleting] = useState(false);
   const [accountSettings, setAccountSettings] = useState(null);
   const [publishingIds, setPublishingIds] = useState([]);
+  const [scheduleBatches, setScheduleBatches] = useState([]);
+  const [dismissedScheduleBatchIds, setDismissedScheduleBatchIds] = useState([]);
 
   const ensureShipFromReady = async () => {
     let settings = accountSettings;
@@ -124,6 +151,16 @@ function DraftsContent({ searchQuery }) {
 
   const hasDraftFilters = Boolean(filterStatus || filterSource || filterStore);
 
+  const loadScheduleBatches = () =>
+    getImportHistory({ limit: 10 })
+      .then((res) => {
+        const batches = (res.data?.batches ?? []).filter(
+          (batch) => batch.action === "schedule" && Number(batch.total ?? 0) > 0,
+        );
+        setScheduleBatches(batches);
+      })
+      .catch(() => {});
+
   useEffect(() => {
     if (connected) {
       loadDrafts();
@@ -142,6 +179,40 @@ function DraftsContent({ searchQuery }) {
     document.addEventListener("click", closeMenu);
     return () => document.removeEventListener("click", closeMenu);
   }, []);
+
+  useEffect(() => {
+    if (connected) {
+      loadScheduleBatches();
+    }
+  }, [connected]);
+
+  const hasActiveScheduleBatches = scheduleBatches.some(
+    (batch) => batch.status === "pending" || batch.status === "processing",
+  );
+
+  useEffect(() => {
+    if (!connected || !hasActiveScheduleBatches) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      loadScheduleBatches();
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [connected, hasActiveScheduleBatches]);
+
+  const scheduleAlerts = scheduleBatches
+    .filter((batch) => !dismissedScheduleBatchIds.includes(batch.id))
+    .map(buildScheduleBatchAlert);
+
+  const dismissScheduleAlert = (batchId) => {
+    setDismissedScheduleBatchIds((current) => [...new Set([...current, batchId])]);
+  };
+
+  const viewScheduleDetails = () => {
+    setHistoryVisible(true);
+  };
 
   const visibleDrafts = drafts.filter((item) => {
     if (filterSource && item.source_platform !== filterSource) {
@@ -383,8 +454,28 @@ function DraftsContent({ searchQuery }) {
       toast.success(res.data?.message ?? "Listing(s) scheduled.");
       setScheduleTargets([]);
       loadDrafts();
+      loadScheduleBatches();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to schedule listing(s).");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const confirmScheduleRandom = async (schedules) => {
+    if (!schedules.length) {
+      return;
+    }
+
+    setScheduling(true);
+    try {
+      const res = await scheduleProducts({ schedules });
+      toast.success(res.data?.message ?? "Listings scheduled at staggered times.");
+      setScheduleTargets([]);
+      loadDrafts();
+      loadScheduleBatches();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to schedule listings.");
     } finally {
       setScheduling(false);
     }
@@ -404,6 +495,7 @@ function DraftsContent({ searchQuery }) {
       toast.success(res.data?.message ?? "Schedule removed.");
       setScheduleTargets([]);
       loadDrafts();
+      loadScheduleBatches();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to remove schedule.");
     } finally {
@@ -491,6 +583,32 @@ function DraftsContent({ searchQuery }) {
           settings={accountSettings}
           className="drafts-ship-from-notice"
         />
+      ) : null}
+
+      {scheduleAlerts.length ? (
+        <div className="products-alerts">
+          {scheduleAlerts.map((alert) => (
+            <div className="products-alert" key={alert.id}>
+              <div className="products-alert__copy">
+                <span className={`products-alert__dot products-alert__dot--${alert.tone === "danger" ? "danger" : "warning"}`} />
+                <span>{alert.message}</span>
+              </div>
+              <div className="products-alert__actions">
+                <button type="button" className="products-alert__link" onClick={viewScheduleDetails}>
+                  View details
+                </button>
+                <button
+                  type="button"
+                  className="products-alert__dismiss"
+                  aria-label="Dismiss alert"
+                  onClick={() => dismissScheduleAlert(alert.batchId)}
+                >
+                  <LuX />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       <div className="drafts-toolbar">
@@ -741,6 +859,7 @@ function DraftsContent({ searchQuery }) {
         saving={scheduling}
         onClose={() => setScheduleTargets([])}
         onSchedule={confirmSchedule}
+        onScheduleRandom={confirmScheduleRandom}
         onClearSchedule={clearSchedule}
       />
 

@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { LuCalendar, LuClock3, LuLoader, LuX } from "react-icons/lu";
+import { LuCalendar, LuClock3, LuLoader, LuShuffle, LuX } from "react-icons/lu";
 import { getListingImageUrl } from "./helpers";
 
 function pad(value) {
   return String(value).padStart(2, "0");
+}
+
+function toDateInputValue(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function defaultScheduleValues(existingAt) {
@@ -13,7 +17,7 @@ function defaultScheduleValues(existingAt) {
   }
 
   return {
-    date: `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`,
+    date: toDateInputValue(base),
     time: `${pad(base.getHours())}:${pad(base.getMinutes())}`,
   };
 }
@@ -42,20 +46,72 @@ function formatScheduledPreview(date, time) {
   });
 }
 
+function formatTimeOnly(ms) {
+  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * Spreads `count` timestamps across [startMs, endMs) with an organic, non-uniform
+ * gap (AutoDS-style "random hours" queue) while guaranteeing at least `minGapMs`
+ * between consecutive picks whenever the window allows it.
+ */
+function buildRandomTimes(startMs, endMs, count, minGapMs) {
+  if (count <= 0 || endMs <= startMs) {
+    return [];
+  }
+
+  const totalWindow = endMs - startMs;
+  const slotWidth = totalWindow / count;
+  const gap = Math.min(minGapMs, slotWidth);
+
+  const times = [];
+  for (let i = 0; i < count; i += 1) {
+    const slotStart = startMs + i * slotWidth;
+    const slotEnd = slotStart + slotWidth;
+    let t = slotStart + Math.random() * (slotEnd - slotStart);
+
+    if (i > 0 && t - times[i - 1] < gap) {
+      t = times[i - 1] + gap;
+    }
+
+    t = Math.min(t, endMs - 1);
+    times.push(Math.round(t / 60000) * 60000);
+  }
+
+  return times;
+}
+
+function defaultRandomWindow() {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  return {
+    date: toDateInputValue(tomorrow),
+    fromTime: "09:00",
+    toTime: "21:00",
+    minGap: 15,
+  };
+}
+
 function ScheduleListingModal({
   open,
   drafts = [],
   saving = false,
   onClose,
   onSchedule,
+  onScheduleRandom,
   onClearSchedule,
 }) {
   const existingSchedule = drafts.find((draft) => draft.scheduled_at)?.scheduled_at ?? null;
+  const [mode, setMode] = useState("single");
   const [{ date, time }, setSchedule] = useState(() => defaultScheduleValues(existingSchedule));
+  const [randomWindow, setRandomWindow] = useState(defaultRandomWindow);
+  const [shuffleSeed, setShuffleSeed] = useState(0);
 
   useEffect(() => {
     if (open) {
       setSchedule(defaultScheduleValues(existingSchedule));
+      setRandomWindow(defaultRandomWindow());
+      setMode("single");
+      setShuffleSeed(0);
     }
   }, [open, existingSchedule]);
 
@@ -67,8 +123,24 @@ function ScheduleListingModal({
 
   const minDate = useMemo(() => {
     const now = new Date();
-    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    return toDateInputValue(now);
   }, [open]);
+
+  const randomTimes = useMemo(() => {
+    const startMs = buildScheduledIso(randomWindow.date, randomWindow.fromTime)
+      ? new Date(`${randomWindow.date}T${randomWindow.fromTime}:00`).getTime()
+      : NaN;
+    const endMs = buildScheduledIso(randomWindow.date, randomWindow.toTime)
+      ? new Date(`${randomWindow.date}T${randomWindow.toTime}:00`).getTime()
+      : NaN;
+
+    if (Number.isNaN(startMs) || Number.isNaN(endMs) || mode !== "random") {
+      return [];
+    }
+
+    return buildRandomTimes(startMs, endMs, drafts.length, Math.max(1, Number(randomWindow.minGap) || 0) * 60000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, randomWindow, drafts.length, shuffleSeed]);
 
   if (!open) {
     return null;
@@ -76,8 +148,21 @@ function ScheduleListingModal({
 
   const count = drafts.length;
   const title = count === 1 ? "Schedule Listing" : `Schedule ${count} Listings`;
+  const canRandom = count > 1 && typeof onScheduleRandom === "function";
 
   const handleSubmit = () => {
+    if (mode === "random") {
+      if (randomTimes.length !== count || randomTimes.some((t) => t <= Date.now())) {
+        return;
+      }
+      const schedules = drafts.map((draft, index) => ({
+        id: draft.id,
+        scheduled_at: new Date(randomTimes[index]).toISOString(),
+      }));
+      onScheduleRandom(schedules);
+      return;
+    }
+
     const iso = buildScheduledIso(date, time);
     if (!iso) {
       return;
@@ -94,6 +179,12 @@ function ScheduleListingModal({
     const iso = buildScheduledIso(date, time);
     return !iso || new Date(iso).getTime() <= Date.now();
   })();
+
+  const randomWindowInvalid = mode === "random" && (
+    randomTimes.length !== count
+    || randomTimes.some((t) => t <= Date.now())
+    || randomWindow.toTime <= randomWindow.fromTime
+  );
 
   return (
     <div className="schedule-modal-layer" role="presentation">
@@ -141,44 +232,162 @@ function ScheduleListingModal({
           </div>
         ) : null}
 
-        <div className="schedule-modal__fields">
-          <label className="schedule-modal__field">
-            <span>Date</span>
-            <div className="schedule-modal__input-wrap">
-              <LuCalendar aria-hidden="true" />
-              <input
-                type="date"
-                value={date}
-                min={minDate}
-                onChange={(event) => setSchedule((current) => ({ ...current, date: event.target.value }))}
-              />
-            </div>
-          </label>
-
-          <label className="schedule-modal__field">
-            <span>Time</span>
-            <div className="schedule-modal__input-wrap">
-              <LuClock3 aria-hidden="true" />
-              <input
-                type="time"
-                value={time}
-                onChange={(event) => setSchedule((current) => ({ ...current, time: event.target.value }))}
-              />
-            </div>
-          </label>
-        </div>
-
-        <div className="schedule-modal__meta">
-          <strong>{preview || "Select a valid date and time"}</strong>
-          <span>Timezone: {timezone}</span>
-        </div>
-
-        {isPast ? (
-          <p className="schedule-modal__error">Scheduled time must be in the future.</p>
+        {canRandom ? (
+          <div className="schedule-modal__tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "single"}
+              className={`schedule-modal__tab ${mode === "single" ? "schedule-modal__tab--active" : ""}`}
+              onClick={() => setMode("single")}
+            >
+              Pick a Time
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "random"}
+              className={`schedule-modal__tab ${mode === "random" ? "schedule-modal__tab--active" : ""}`}
+              onClick={() => setMode("random")}
+            >
+              <LuShuffle aria-hidden="true" />
+              <span>Random Hours</span>
+            </button>
+          </div>
         ) : null}
 
+        {mode === "single" ? (
+          <>
+            <div className="schedule-modal__fields">
+              <label className="schedule-modal__field">
+                <span>Date</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuCalendar aria-hidden="true" />
+                  <input
+                    type="date"
+                    value={date}
+                    min={minDate}
+                    onChange={(event) => setSchedule((current) => ({ ...current, date: event.target.value }))}
+                  />
+                </div>
+              </label>
+
+              <label className="schedule-modal__field">
+                <span>Time</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuClock3 aria-hidden="true" />
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(event) => setSchedule((current) => ({ ...current, time: event.target.value }))}
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="schedule-modal__meta">
+              <strong>{preview || "Select a valid date and time"}</strong>
+              <span>Timezone: {timezone}</span>
+            </div>
+
+            {isPast ? (
+              <p className="schedule-modal__error">Scheduled time must be in the future.</p>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div className="schedule-modal__fields">
+              <label className="schedule-modal__field">
+                <span>Date</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuCalendar aria-hidden="true" />
+                  <input
+                    type="date"
+                    value={randomWindow.date}
+                    min={minDate}
+                    onChange={(event) => setRandomWindow((current) => ({ ...current, date: event.target.value }))}
+                  />
+                </div>
+              </label>
+
+              <label className="schedule-modal__field">
+                <span>From</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuClock3 aria-hidden="true" />
+                  <input
+                    type="time"
+                    value={randomWindow.fromTime}
+                    onChange={(event) => setRandomWindow((current) => ({ ...current, fromTime: event.target.value }))}
+                  />
+                </div>
+              </label>
+
+              <label className="schedule-modal__field">
+                <span>To</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuClock3 aria-hidden="true" />
+                  <input
+                    type="time"
+                    value={randomWindow.toTime}
+                    onChange={(event) => setRandomWindow((current) => ({ ...current, toTime: event.target.value }))}
+                  />
+                </div>
+              </label>
+
+              <label className="schedule-modal__field">
+                <span>Min. gap (minutes)</span>
+                <div className="schedule-modal__input-wrap">
+                  <input
+                    type="number"
+                    min="1"
+                    max="240"
+                    value={randomWindow.minGap}
+                    onChange={(event) => setRandomWindow((current) => ({ ...current, minGap: event.target.value }))}
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="schedule-modal__random-head">
+              <span>{count} listings will be spread across this window, in random order.</span>
+              <button
+                type="button"
+                className="schedule-modal__shuffle-btn"
+                onClick={() => setShuffleSeed((seed) => seed + 1)}
+              >
+                <LuShuffle />
+                <span>Shuffle times</span>
+              </button>
+            </div>
+
+            <ul className="schedule-modal__queue">
+              {drafts.map((draft, index) => (
+                <li key={draft.id}>
+                  <span className="schedule-modal__queue-index">{index + 1}</span>
+                  <span className="schedule-modal__queue-title">{draft.title}</span>
+                  <span className="schedule-modal__queue-time">
+                    {randomTimes[index] ? formatTimeOnly(randomTimes[index]) : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="schedule-modal__meta">
+              <span>Timezone: {timezone}</span>
+            </div>
+
+            {randomWindowInvalid ? (
+              <p className="schedule-modal__error">
+                {randomWindow.toTime <= randomWindow.fromTime
+                  ? "\"To\" time must be after \"From\" time."
+                  : "The scheduled window must be in the future."}
+              </p>
+            ) : null}
+          </>
+        )}
+
         <div className="schedule-modal__actions">
-          {existingSchedule ? (
+          {existingSchedule && mode === "single" ? (
             <button
               type="button"
               className="schedule-modal__btn schedule-modal__btn--ghost"
@@ -197,7 +406,7 @@ function ScheduleListingModal({
             type="button"
             className="schedule-modal__btn schedule-modal__btn--primary"
             onClick={handleSubmit}
-            disabled={saving || isPast}
+            disabled={saving || (mode === "single" ? isPast : randomWindowInvalid)}
           >
             {saving ? (
               <>
@@ -205,7 +414,7 @@ function ScheduleListingModal({
                 <span>Scheduling…</span>
               </>
             ) : (
-              <span>{count === 1 ? "Schedule Listing" : "Schedule Listings"}</span>
+              <span>{count === 1 ? "Schedule Listing" : `Schedule ${count} Listings`}</span>
             )}
           </button>
         </div>

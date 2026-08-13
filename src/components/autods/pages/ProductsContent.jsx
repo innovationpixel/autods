@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
   LuTriangleAlert,
@@ -55,7 +56,7 @@ import ProductItemIdCell from "../ProductItemIdCell";
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
-  const symbol = currency === "AUD" || currency === "A$" ? "A$" : currency === "GBP" ? "£" : "$";
+  const symbol = currency === "GBP" ? "£" : "$";
   return `${symbol}${amount.toFixed(2)}`;
 }
 
@@ -127,6 +128,7 @@ function mapListingRow(item) {
 
 function ProductsContent({ searchQuery }) {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const connected = useSelector(selectEbayConnected);
   const connections = useSelector(selectEbayConnections);
   const listings = useSelector(selectEbayListings);
@@ -509,6 +511,34 @@ function ProductsContent({ searchQuery }) {
     setEditorTab("general");
     setOpenMenuId("");
   };
+
+  // Deep link from Orders' "Edit Listing" action (?item=<ebay_item_id>): make sure the
+  // fetch isn't status-filtered out, then open the matching row's editor once it loads.
+  useEffect(() => {
+    if (searchParams.get("item")) {
+      setFilterStatus("All");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const itemParam = searchParams.get("item");
+    if (!itemParam || !rows.length) {
+      return;
+    }
+
+    const match = rows.find((row) => String(row.itemSell) === String(itemParam));
+    if (match) {
+      openProductEditor(match);
+    } else {
+      toast.warn("Listing not found in Products — it may have been synced from a different store.");
+    }
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("item");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
 
   const closeProductEditor = () => {
     if (editorSaving) {

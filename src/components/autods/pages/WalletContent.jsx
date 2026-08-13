@@ -214,6 +214,13 @@ function WalletContent() {
             <strong>{summary?.pending_deposits ?? 0}</strong>
           </div>
         </article>
+        <article className="wallet-hub__stat">
+          <span className="wallet-hub__stat-icon wallet-hub__stat-icon--deposit"><LuWallet /></span>
+          <div>
+            <span className="wallet-hub__stat-label">Processing wallet</span>
+            <strong>{formatMoney(summary?.processing_wallet_balance ?? 0, currency)}</strong>
+          </div>
+        </article>
       </div>
 
       <div className="wallet-hub__layout">

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost } from "../../../services/OrderService";
+import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost, updateOrderFulfillment } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -33,6 +33,13 @@ import QuickEditModal from "../QuickEditModal";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import { orderStatusOptions } from "../constants";
+import CalculationColumnManager from "../CalculationColumnManager";
+import {
+  getVisibleCalculationTableMinWidth,
+  loadVisibleCalculationColumnIds,
+  resolveVisibleCalculationColumns,
+  saveVisibleCalculationColumnIds,
+} from "../calculationColumns";
 import {
   DEFAULT_DATE_PRESET,
   ORDER_DATE_PRESETS,
@@ -57,6 +64,24 @@ const summaryCards = [
   { key: "roi", label: "Total ROI", tone: "amber", icon: LuChartLine },
 ];
 
+const editableFieldMeta = {
+  cost: {
+    title: "Edit Cost",
+    description: "The AliExpress (or other supplier) cost for this order.",
+    label: "Cost",
+  },
+  prep: {
+    title: "Edit Prep Cost",
+    description: "The prep/handling cost for this order.",
+    label: "Prep Cost",
+  },
+  shipping: {
+    title: "Edit Shipping Cost",
+    description: "The shipping cost for this order.",
+    label: "Shipping Cost",
+  },
+};
+
 function CalculationsContent({ searchQuery = "" }) {
   const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const tableScrollRef = useRef(null);
@@ -72,9 +97,10 @@ function CalculationsContent({ searchQuery = "" }) {
     spreadsheet_url: "",
     last_synced_at: null,
   });
-  const [editingCostId, setEditingCostId] = useState("");
-  const [costDraft, setCostDraft] = useState("");
-  const [savingCostId, setSavingCostId] = useState("");
+  const [editingField, setEditingField] = useState(null);
+  const [fieldDraft, setFieldDraft] = useState("");
+  const [savingField, setSavingField] = useState(null);
+  const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleCalculationColumnIds);
 
   const [showFilters, setShowFilters] = useState(false);
   const [showOnlyActive, setShowOnlyActive] = useState(defaultFilters.showOnlyActive);
@@ -197,49 +223,92 @@ function CalculationsContent({ searchQuery = "" }) {
     }
   };
 
-  const handleStartCostEdit = (row) => {
-    setEditingCostId(row.id);
-    setCostDraft(row.cost ? String(row.cost) : "");
+  const handleStartFieldEdit = (row, field) => {
+    setEditingField({ id: row.id, field });
+    setFieldDraft(row[field] ? String(row[field]) : "");
   };
 
-  const handleCancelCostEdit = () => {
-    setEditingCostId("");
-    setCostDraft("");
+  const handleCancelFieldEdit = () => {
+    setEditingField(null);
+    setFieldDraft("");
   };
 
-  const handleSaveCost = async (row) => {
-    const parsed = Number.parseFloat(costDraft);
-
-    if (costDraft.trim() !== "" && (!Number.isFinite(parsed) || parsed < 0)) {
-      toast.warn("Enter a valid cost amount.");
+  const handleSaveField = async () => {
+    if (!editingField) {
       return;
     }
 
-    const cost = costDraft.trim() === "" ? null : Number(parsed.toFixed(2));
+    const { id, field } = editingField;
+    const meta = editableFieldMeta[field];
+    const parsed = Number.parseFloat(fieldDraft);
 
-    setSavingCostId(row.id);
-    try {
-      const res = await updateOrderCost(row.id, { cost });
-      const updatedBuyPrice = res.data?.order?.buy_price ?? cost;
-
-      setOrders((current) =>
-        current.map((order) =>
-          String(order.id) === row.id ? { ...order, buy_price: updatedBuyPrice, profit: null } : order,
-        ),
-      );
-      toast.success("Cost updated.");
-      setEditingCostId("");
-      setCostDraft("");
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to update cost."));
-    } finally {
-      setSavingCostId("");
+    if (fieldDraft.trim() !== "" && (!Number.isFinite(parsed) || parsed < 0)) {
+      toast.warn(`Enter a valid ${meta.label.toLowerCase()} amount.`);
+      return;
     }
+
+    const isEmpty = fieldDraft.trim() === "";
+
+    setSavingField({ id, field });
+    try {
+      if (field === "cost") {
+        const cost = isEmpty ? null : Number(parsed.toFixed(2));
+        const res = await updateOrderCost(id, { cost });
+        const updatedBuyPrice = res.data?.order?.buy_price ?? cost;
+
+        setOrders((current) =>
+          current.map((order) =>
+            String(order.id) === id ? { ...order, buy_price: updatedBuyPrice, profit: null } : order,
+          ),
+        );
+      } else {
+        const amount = isEmpty ? 0 : Number(parsed.toFixed(2));
+        const payload = field === "prep" ? { prep_cost: amount } : { shipping_cost: amount };
+        const res = await updateOrderFulfillment(id, payload);
+        const updatedOrder = res.data?.order ?? {};
+
+        setOrders((current) =>
+          current.map((order) =>
+            String(order.id) === id
+              ? {
+                  ...order,
+                  prep_cost: field === "prep" ? updatedOrder.prep_cost ?? amount : order.prep_cost,
+                  shipping_cost: field === "shipping" ? updatedOrder.shipping_cost ?? amount : order.shipping_cost,
+                  profit: null,
+                }
+              : order,
+          ),
+        );
+      }
+
+      toast.success(`${meta.label} updated.`);
+      setEditingField(null);
+      setFieldDraft("");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, `Failed to update ${meta.label.toLowerCase()}.`));
+    } finally {
+      setSavingField(null);
+    }
+  };
+
+  const handleVisibleColumnsChange = (nextIds) => {
+    setVisibleColumnIds(nextIds);
+    saveVisibleCalculationColumnIds(nextIds);
   };
 
   const calculationRows = useMemo(
     () => orders.map((order) => mapApiOrderToCalculationRow(order)),
     [orders],
+  );
+
+  const visibleColumns = useMemo(
+    () => resolveVisibleCalculationColumns(visibleColumnIds),
+    [visibleColumnIds],
+  );
+
+  const tableMinWidth = useMemo(
+    () => getVisibleCalculationTableMinWidth(visibleColumnIds),
+    [visibleColumnIds],
   );
 
   const storeOptions = useMemo(() => {
@@ -428,6 +497,134 @@ function CalculationsContent({ searchQuery = "" }) {
     return formatCalculationAmount(totals[key]);
   };
 
+  const getCalculationCellClassName = (columnId) => {
+    switch (columnId) {
+      case "orderId":
+        return "calculations-table__order-id";
+      case "date":
+        return "orders-table__date";
+      case "ebayStatus":
+        return "orders-table__status-cell";
+      case "address":
+        return "calculations-table__address";
+      case "cost":
+        return "calculations-table__money calculations-table__money--cost";
+      case "profit":
+        return "calculations-table__money calculations-table__money--profit";
+      case "roi":
+        return "calculations-table__money calculations-table__money--roi";
+      case "aliexpressOrderId":
+        return "calculations-table__mono";
+      case "qty":
+      case "tax":
+      case "afterTaxEbay":
+      case "prep":
+      case "shipping":
+      case "earn":
+        return "calculations-table__money";
+      default:
+        return "";
+    }
+  };
+
+  const renderTotalsCellValue = (columnId) => {
+    switch (columnId) {
+      case "qty":
+        return pageTotals.qty;
+      case "cost":
+      case "tax":
+      case "afterTaxEbay":
+      case "prep":
+      case "shipping":
+      case "earn":
+      case "profit":
+        return formatCalculationAmount(pageTotals[columnId]);
+      case "roi":
+        return formatCalculationRoi(pageTotals.roi);
+      default:
+        return null;
+    }
+  };
+
+  const renderCalculationCell = (row, columnId, StatusIcon) => {
+    switch (columnId) {
+      case "itemTracking":
+        return (
+          <div className="calculations-item-tracking">
+            <div className="calculations-item-tracking__row">
+              <span className="calculations-item-tracking__label">Item</span>
+              {row.itemSellUrl ? (
+                <a
+                  href={row.itemSellUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="products-item-id-link"
+                >
+                  <strong>{row.itemSell}</strong>
+                </a>
+              ) : (
+                <strong>{row.itemSell}</strong>
+              )}
+            </div>
+            <div className="calculations-item-tracking__row">
+              <span className="calculations-item-tracking__label">Tracking</span>
+              <strong>{row.trackingNumber}</strong>
+            </div>
+          </div>
+        );
+      case "name":
+        return (
+          <div className="orders-product calculations-product">
+            <div className="orders-product__thumb">
+              <img src={row.image} alt={row.title} />
+            </div>
+            <div className="orders-product__copy calculations-product__copy">
+              <h3>{row.title}</h3>
+              <p className="calculations-product__description">{row.description}</p>
+            </div>
+          </div>
+        );
+      case "date":
+        return formatDisplayDate(row.date);
+      case "ebayStatus":
+        return (
+          <span
+            className={`orders-status-badge orders-status-badge--${row.ebayStatusClass} calculations-status-badge`}
+          >
+            <span className="orders-status-badge__left">
+              <StatusIcon />
+              <span>{row.ebayStatus}</span>
+            </span>
+          </span>
+        );
+      case "cost":
+      case "prep":
+      case "shipping": {
+        const titles = { cost: "Edit cost", prep: "Edit prep cost", shipping: "Edit shipping cost" };
+        return (
+          <button
+            type="button"
+            className="products-tracking-btn"
+            onClick={() => handleStartFieldEdit(row, columnId)}
+            title={titles[columnId]}
+          >
+            <span>{formatCalculationAmount(row[columnId])}</span>
+            <LuPencil className="products-tracking-btn__icon" />
+          </button>
+        );
+      }
+      case "tax":
+      case "afterTaxEbay":
+      case "earn":
+      case "profit":
+        return formatCalculationAmount(row[columnId]);
+      case "roi":
+        return formatCalculationRoi(row.roi);
+      default:
+        return row[columnId] ?? "—";
+    }
+  };
+
   return (
     <section className="calculations-page-content">
       <section className="calculations-summary card-wrapper">
@@ -474,6 +671,13 @@ function CalculationsContent({ searchQuery = "" }) {
               ))}
             </div>
           ) : null}
+        </div>
+
+        <div className="orders-toolbar__actions orders-toolbar__actions--search">
+          <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh calculations grid">
+            <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
+          </button>
+          <CalculationColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
         </div>
       </div>
 
@@ -659,18 +863,20 @@ function CalculationsContent({ searchQuery = "" }) {
       />
 
       <QuickEditModal
-        open={Boolean(editingCostId)}
-        title="Edit Cost"
-        description="The AliExpress (or other supplier) cost for this order."
-        label="Cost"
+        open={Boolean(editingField)}
+        title={editingField ? editableFieldMeta[editingField.field].title : ""}
+        description={editingField ? editableFieldMeta[editingField.field].description : ""}
+        label={editingField ? editableFieldMeta[editingField.field].label : ""}
         type="number"
         min="0"
         step="0.01"
-        value={costDraft}
-        onChange={setCostDraft}
-        onSave={() => handleSaveCost(calculationRows.find((row) => row.id === editingCostId))}
-        onClose={handleCancelCostEdit}
-        saving={savingCostId === editingCostId}
+        value={fieldDraft}
+        onChange={setFieldDraft}
+        onSave={handleSaveField}
+        onClose={handleCancelFieldEdit}
+        saving={Boolean(
+          savingField && editingField && savingField.id === editingField.id && savingField.field === editingField.field,
+        )}
         placeholder="0.00"
       />
 
@@ -679,10 +885,10 @@ function CalculationsContent({ searchQuery = "" }) {
           <strong>{filteredRows.length} orders</strong>
 
           <div className="calculations-table-toolbar__actions">
-            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
+            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Scroll table to end">
               <LuMenu />
             </button>
-            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Return to start">
+            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Scroll table to start">
               <LuExternalLink />
             </button>
           </div>
@@ -690,52 +896,28 @@ function CalculationsContent({ searchQuery = "" }) {
 
         <div className="orders-table-shell">
           <div className="orders-table-scroll calculations-table-scroll" ref={tableScrollRef}>
-            <table className="orders-table calculations-table">
+            <table className="orders-table calculations-table" style={{ minWidth: tableMinWidth }}>
               <thead>
                 <tr className="calculations-table__totals-row">
-                  <td>Totals (page)</td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td></td>
-                  <td className="calculations-table__money">{pageTotals.qty}</td>
-                  <td></td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.cost)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.tax)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.afterTaxEbay)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.prep)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.shipping)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.earn)}</td>
-                  <td className="calculations-table__money">{formatCalculationAmount(pageTotals.profit)}</td>
-                  <td className="calculations-table__money">{formatCalculationRoi(pageTotals.roi)}</td>
-                  <td></td>
-                  <td></td>
+                  {visibleColumns.map((column, index) => (
+                    <td key={column.id} className={getCalculationCellClassName(column.id)}>
+                      {index === 0 ? "Totals (page)" : renderTotalsCellValue(column.id)}
+                    </td>
+                  ))}
                 </tr>
                 <tr>
-                  <th>Order Id</th>
-                  <th>eBay Item / Tracking</th>
-                  <th>Name</th>
-                  <th>Date</th>
-                  <th>eBay Status</th>
-                  <th>QTY</th>
-                  <th>Address</th>
-                  <th>Cost</th>
-                  <th>Tax</th>
-                  <th>After Tax eBay</th>
-                  <th>Prep</th>
-                  <th>Shipping</th>
-                  <th>Earn</th>
-                  <th>Profit</th>
-                  <th>ROI</th>
-                  <th>AliExpress Order ID</th>
-                  <th>AliExpress Status</th>
+                  {visibleColumns.map((column) => (
+                    <th key={column.id} style={{ minWidth: column.minWidth, width: column.minWidth }}>
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
 
               <tbody>
                 {ordersLoading ? (
                   <tr>
-                    <td className="orders-table__empty" colSpan={17}>
+                    <td className="orders-table__empty" colSpan={visibleColumns.length}>
                       <LuRefreshCcw className="spin-icon" />
                       <span>Loading orders…</span>
                     </td>
@@ -746,92 +928,21 @@ function CalculationsContent({ searchQuery = "" }) {
 
                     return (
                       <tr className="orders-table__row" key={row.id}>
-                        <td className="calculations-table__order-id">{row.orderId}</td>
-
-                        <td>
-                          <div className="calculations-item-tracking">
-                            <div className="calculations-item-tracking__row">
-                              <span className="calculations-item-tracking__label">Item</span>
-                              {row.itemSellUrl ? (
-                                <a
-                                  href={row.itemSellUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="products-item-id-link"
-                                >
-                                  <strong>{row.itemSell}</strong>
-                                </a>
-                              ) : (
-                                <strong>{row.itemSell}</strong>
-                              )}
-                            </div>
-                            <div className="calculations-item-tracking__row">
-                              <span className="calculations-item-tracking__label">Tracking</span>
-                              <strong>{row.trackingNumber}</strong>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td>
-                          <div className="orders-product calculations-product">
-                            <div className="orders-product__thumb">
-                              <img src={row.image} alt={row.title} />
-                            </div>
-                            <div className="orders-product__copy calculations-product__copy">
-                              <h3>{row.title}</h3>
-                              <p className="calculations-product__description">{row.description}</p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="orders-table__date">{formatDisplayDate(row.date)}</td>
-
-                        <td className="orders-table__status-cell">
-                          <span
-                            className={`orders-status-badge orders-status-badge--${row.ebayStatusClass} calculations-status-badge`}
+                        {visibleColumns.map((column) => (
+                          <td
+                            key={column.id}
+                            className={getCalculationCellClassName(column.id)}
+                            style={{ minWidth: column.minWidth, width: column.minWidth }}
                           >
-                            <span className="orders-status-badge__left">
-                              <StatusIcon />
-                              <span>{row.ebayStatus}</span>
-                            </span>
-                          </span>
-                        </td>
-
-                        <td className="calculations-table__money">{row.qty}</td>
-
-                        <td className="calculations-table__address">{row.address}</td>
-
-                        <td className="calculations-table__money calculations-table__money--cost">
-                          <button
-                            type="button"
-                            className="products-tracking-btn"
-                            onClick={() => handleStartCostEdit(row)}
-                            title="Edit cost"
-                          >
-                            <span>{formatCalculationAmount(row.cost)}</span>
-                            <LuPencil className="products-tracking-btn__icon" />
-                          </button>
-                        </td>
-                        <td className="calculations-table__money">{formatCalculationAmount(row.tax)}</td>
-                        <td className="calculations-table__money">{formatCalculationAmount(row.afterTaxEbay)}</td>
-                        <td className="calculations-table__money">{formatCalculationAmount(row.prep)}</td>
-                        <td className="calculations-table__money">{formatCalculationAmount(row.shipping)}</td>
-                        <td className="calculations-table__money">{formatCalculationAmount(row.earn)}</td>
-                        <td className="calculations-table__money calculations-table__money--profit">
-                          {formatCalculationAmount(row.profit)}
-                        </td>
-                        <td className="calculations-table__money calculations-table__money--roi">
-                          {formatCalculationRoi(row.roi)}
-                        </td>
-
-                        <td className="calculations-table__mono">{row.aliexpressOrderId}</td>
-                        <td>{row.aliexpressStatus}</td>
+                            {renderCalculationCell(row, column.id, StatusIcon)}
+                          </td>
+                        ))}
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td className="orders-table__empty" colSpan={17}>
+                    <td className="orders-table__empty" colSpan={visibleColumns.length}>
                       No calculation rows match your search.
                     </td>
                   </tr>

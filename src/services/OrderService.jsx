@@ -18,14 +18,23 @@ export const updateOrderCost = (id, payload) =>
 export const updateOrderFulfillment = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/fulfillment`, payload);
 
-export const placeAliExpressOrder = (id) =>
-    axiosInstance.post(`/orders/${id}/place-aliexpress-order`);
+export const placeAliExpressOrder = (id, payload = {}) =>
+    axiosInstance.post(`/orders/${id}/place-aliexpress-order`, payload);
 
 export const updateOrderTracking = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/tracking`, payload);
 
 export const pushOrderTracking = (id) =>
     axiosInstance.post(`/orders/${id}/push-tracking`);
+
+export const refundOrder = (id, payload) =>
+    axiosInstance.post(`/orders/${id}/refund`, payload);
+
+export const cancelOrder = (id, payload = {}) =>
+    axiosInstance.post(`/orders/${id}/cancel`, payload);
+
+export const archiveOrder = (id, archived) =>
+    axiosInstance.patch(`/orders/${id}/archive`, { archived });
 
 export const getOrdersGoogleSheetStatus = () =>
     axiosInstance.get('/orders/google-sheet');

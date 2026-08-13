@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "../../../utils/toast";
-import { getOrders, pushOrderTracking, syncOrders, updateOrderFulfillment, updateOrderSource, updateOrderTracking, updateOrderStatus as updateOrderStatusApi } from "../../../services/OrderService";
 import {
+  getOrders,
+  pushOrderTracking,
+  syncOrders,
+  updateOrderFulfillment,
+  updateOrderSource,
+  updateOrderTracking,
+  updateOrderStatus as updateOrderStatusApi,
+  refundOrder,
+  cancelOrder,
+  archiveOrder,
+} from "../../../services/OrderService";
+import {
+  LuArchive,
+  LuArchiveRestore,
   LuBadgeCheck,
   LuBolt,
   LuChevronDown,
@@ -9,8 +23,10 @@ import {
   LuChevronRight,
   LuClipboardList,
   LuClock3,
+  LuDownload,
   LuExternalLink,
   LuInbox,
+  LuLoader,
   LuMenu,
   LuPencil,
   LuPlus,
@@ -29,13 +45,25 @@ import {
   resolveVisibleOrderColumns,
   saveVisibleColumnIds,
 } from "../orderColumns";
-import { buildEbayListingProductUrl, buildSourceProductUrl, detectTrackingCarrier, formatDisplayDate, getEbayOrderDetailUrl, normalizeTrackingCarrier } from "../helpers";
+import {
+  buildEbayListingProductUrl,
+  buildOrdersCsv,
+  buildSourceProductUrl,
+  detectTrackingCarrier,
+  downloadTextFile,
+  formatDisplayDate,
+  getEbayOrderDetailUrl,
+  normalizeTrackingCarrier,
+} from "../helpers";
+import { openPrintableDocument } from "../printDocuments";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
 import ProductItemIdCell from "../ProductItemIdCell";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
 import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
+import ConfirmModal from "../ConfirmModal";
+import RefundOrderModal from "../RefundOrderModal";
 import {
   DEFAULT_DATE_PRESET,
   ORDER_DATE_PRESETS,
@@ -252,6 +280,7 @@ function mapApiOrder(order) {
 }
 
 function OrdersContent({ searchQuery }) {
+  const navigate = useNavigate();
   const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -288,6 +317,13 @@ function OrdersContent({ searchQuery }) {
   const [editingFulfillment, setEditingFulfillment] = useState(null);
   const [fulfillmentDraft, setFulfillmentDraft] = useState("");
   const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivingId, setArchivingId] = useState("");
+  const [refundTarget, setRefundTarget] = useState(null);
+  const [refundSaving, setRefundSaving] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [invoiceInfoOpen, setInvoiceInfoOpen] = useState(false);
   const tableScrollRef = useRef(null);
 
   const visibleColumns = useMemo(
@@ -329,6 +365,16 @@ function OrdersContent({ searchQuery }) {
     return ["All Stores", ...Array.from(stores).sort((left, right) => left.localeCompare(right))];
   }, [orders]);
 
+  const boltActions = useMemo(
+    () =>
+      orderRowBoltActions.map((item) =>
+        item.id === "archive-order"
+          ? { ...item, label: showArchived ? "Unarchive Order" : "Archive Order" }
+          : item,
+      ),
+    [showArchived],
+  );
+
   const loadOrders = async () => {
     setOrdersLoading(true);
     try {
@@ -339,6 +385,7 @@ function OrdersContent({ searchQuery }) {
         hide_canceled: showOnlyActive ? 1 : 0,
         sort: sortDirection,
         limit: 500,
+        archived: showArchived ? 1 : 0,
       };
 
       if (fromDate) {
@@ -361,7 +408,7 @@ function OrdersContent({ searchQuery }) {
 
   useEffect(() => {
     loadOrders();
-  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection]);
+  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection, showArchived]);
 
   const handleSyncOrders = async () => {
     setSyncing(true);
@@ -813,21 +860,102 @@ function OrdersContent({ searchQuery }) {
     setOpenRowBoltId("");
   };
 
-  const handleOrderAction = (orderId, action, label) => {
-    const order = orders.find((row) => String(row.id) === String(orderId));
-    const orderLabel = order?.orderId ?? orderId;
+  const handleEditListing = (order) => {
+    if (order.itemSell && order.itemSell !== "—") {
+      navigate(`/products?item=${encodeURIComponent(order.itemSell)}`);
+    } else {
+      toast.warn("This order has no linked eBay item ID to edit.");
+    }
+  };
 
-    if (action === "add-tracking") {
-      if (order) {
-        startEditTracking(order);
-      } else {
-        toast.error("Order not found.");
-      }
+  const handleArchiveOrder = async (order, archived) => {
+    setArchivingId(order.id);
+    try {
+      await archiveOrder(order.id, archived);
+      toast.success(archived ? "Order archived." : "Order unarchived.");
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update order."));
+    } finally {
+      setArchivingId("");
+    }
+  };
+
+  const confirmRefund = async ({ amount, reason, comment }) => {
+    if (!refundTarget) return;
+
+    setRefundSaving(true);
+    try {
+      const res = await refundOrder(refundTarget.id, { amount, reason, comment });
+      toast.success(res.data?.message ?? "Refund issued.");
+      setRefundTarget(null);
+      loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Refund failed."));
+    } finally {
+      setRefundSaving(false);
+    }
+  };
+
+  const confirmCancelOrder = async () => {
+    if (!cancelTarget) return;
+
+    setCancelSaving(true);
+    try {
+      const res = await cancelOrder(cancelTarget.id, {});
+      toast.success(res.data?.message ?? "Order canceled.");
+      setCancelTarget(null);
+      loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Cancel failed."));
+    } finally {
+      setCancelSaving(false);
+    }
+  };
+
+  const handleOrderAction = (orderId, action) => {
+    const order = orders.find((row) => String(row.id) === String(orderId));
+
+    if (!order) {
+      toast.error("Order not found.");
       closeRowActionMenus();
       return;
     }
 
-    toast.info(`${label} for order ${orderLabel} — coming soon.`);
+    switch (action) {
+      case "add-tracking":
+        startEditTracking(order);
+        break;
+      case "edit-listing":
+        handleEditListing(order);
+        break;
+      case "send-ebay-invoice":
+        setInvoiceInfoOpen(true);
+        break;
+      case "issue-refund":
+        setRefundTarget(order);
+        break;
+      case "cancel-order":
+        setCancelTarget(order);
+        break;
+      case "archive-order":
+        handleArchiveOrder(order, !showArchived);
+        break;
+      case "generate-invoice":
+        openPrintableDocument("invoice", order);
+        break;
+      case "generate-packing-slip":
+        openPrintableDocument("packing-slip", order);
+        break;
+      case "generate-pick-list":
+        openPrintableDocument("pick-list", order);
+        break;
+      case "generate-barcode":
+        openPrintableDocument("barcode", order);
+        break;
+      default:
+        toast.info(`${action} is not available.`);
+    }
 
     closeRowActionMenus();
   };
@@ -1043,7 +1171,11 @@ function OrdersContent({ searchQuery }) {
       case "invoice":
       case "packingSlip":
         return (
-          <button type="button" className="orders-details__link" onClick={() => toast.info(`${columnId} printing is coming soon.`)}>
+          <button
+            type="button"
+            className="orders-details__link"
+            onClick={() => openPrintableDocument(columnId === "invoice" ? "invoice" : "packing-slip", order)}
+          >
             Print
           </button>
         );
@@ -1053,6 +1185,46 @@ function OrdersContent({ searchQuery }) {
   };
 
   const hasSelection = selectedIds.length > 0;
+  const selectedOrders = orders.filter((order) => selectedIds.includes(order.id));
+
+  const handleBulkMarkShipped = async () => {
+    if (!selectedOrders.length) return;
+
+    setOpenBulkMenu(false);
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const order of selectedOrders) {
+      try {
+        await updateOrderStatusApi(order.id, "Shipped");
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    if (succeeded) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} marked as shipped.`);
+    if (failed) toast.error(`${failed} order${failed === 1 ? "" : "s"} could not be updated.`);
+    loadOrders();
+  };
+
+  const handleBulkPrint = (docType) => {
+    if (!selectedOrders.length) return;
+    openPrintableDocument(docType, selectedOrders);
+    setOpenPrintMenu(false);
+  };
+
+  const handleDownloadCsv = () => {
+    if (!filteredOrders.length) {
+      toast.warn("No orders to export.");
+      return;
+    }
+
+    const csv = buildOrdersCsv(filteredOrders);
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadTextFile(`orders-${stamp}.csv`, csv);
+    toast.success(`Exported ${filteredOrders.length} order${filteredOrders.length === 1 ? "" : "s"}.`);
+  };
 
   return (
     <section className="orders-page-content">
@@ -1087,7 +1259,7 @@ function OrdersContent({ searchQuery }) {
             </button>
             {openBulkMenu && hasSelection ? (
               <div className="orders-toolbar-dropdown__menu">
-                <button type="button" onClick={() => toast.info("Mark as shipped — coming soon.")}>Mark as shipped</button>
+                <button type="button" onClick={handleBulkMarkShipped}>Mark as shipped</button>
                 <button
                   type="button"
                   onClick={() => {
@@ -1120,12 +1292,30 @@ function OrdersContent({ searchQuery }) {
             </button>
             {openPrintMenu && hasSelection ? (
               <div className="orders-toolbar-dropdown__menu">
-                <button type="button" onClick={() => toast.info("Invoice print — coming soon.")}>Invoice</button>
-                <button type="button" onClick={() => toast.info("Packing slip print — coming soon.")}>Packing Slip</button>
-                <button type="button" onClick={() => toast.info("Pick list print — coming soon.")}>Pick List</button>
+                <button type="button" onClick={() => handleBulkPrint("invoice")}>Invoice</button>
+                <button type="button" onClick={() => handleBulkPrint("packing-slip")}>Packing Slip</button>
+                <button type="button" onClick={() => handleBulkPrint("pick-list")}>Pick List</button>
+                <button type="button" onClick={() => handleBulkPrint("barcode")}>Barcode</button>
               </div>
             ) : null}
           </div>
+
+          <button type="button" className="orders-toolbar-action" onClick={handleDownloadCsv}>
+            <LuDownload />
+            <span>Download</span>
+          </button>
+
+          <button
+            type="button"
+            className={`orders-toolbar-action ${showArchived ? "orders-toolbar-action--active" : ""}`}
+            onClick={() => {
+              setShowArchived((current) => !current);
+              setSelectedIds([]);
+            }}
+          >
+            {showArchived ? <LuArchiveRestore /> : <LuArchive />}
+            <span>{showArchived ? "Viewing Archived" : "Archived"}</span>
+          </button>
 
           <button type="button" className="orders-toolbar-action orders-toolbar-action--primary" disabled>
             <LuPlus />
@@ -1394,11 +1584,12 @@ function OrdersContent({ searchQuery }) {
                               aria-label="Order actions"
                               aria-expanded={openRowBoltId === order.id}
                               onClick={() => toggleRowBoltMenu(order.id)}
+                              disabled={archivingId === order.id}
                             >
-                              <LuBolt />
+                              {archivingId === order.id ? <LuLoader className="spin-icon" /> : <LuBolt />}
                             </button>
                             {openRowBoltId === order.id
-                              ? renderRowActionMenu(order.id, orderRowBoltActions, "orders-actions-menu--wide")
+                              ? renderRowActionMenu(order.id, boltActions, "orders-actions-menu--wide")
                               : null}
                           </div>
                         </div>
@@ -1493,6 +1684,35 @@ function OrdersContent({ searchQuery }) {
         placeholder={
           editingFulfillment?.columnId === "prepCost" || editingFulfillment?.columnId === "shippingCost" ? "0.00" : "—"
         }
+      />
+
+      <RefundOrderModal
+        open={Boolean(refundTarget)}
+        order={refundTarget}
+        onConfirm={confirmRefund}
+        onClose={() => setRefundTarget(null)}
+        saving={refundSaving}
+      />
+
+      <ConfirmModal
+        open={Boolean(cancelTarget)}
+        title={`Cancel order ${cancelTarget?.orderId ?? ""}?`}
+        description="This refunds the buyer in full via eBay's live order API and marks the order Canceled. This cannot be undone from here."
+        confirmLabel="Cancel Order"
+        danger
+        saving={cancelSaving}
+        onConfirm={confirmCancelOrder}
+        onClose={() => setCancelTarget(null)}
+      />
+
+      <ConfirmModal
+        open={invoiceInfoOpen}
+        title="Send eBay Invoice"
+        description="Orders synced here are already paid at eBay checkout, so there's no unpaid invoice to send. This action only applies to unpaid combined-invoice orders, which don't apply to synced Fulfillment orders."
+        confirmLabel="Got it"
+        danger={false}
+        onConfirm={() => setInvoiceInfoOpen(false)}
+        onClose={() => setInvoiceInfoOpen(false)}
       />
     </section>
   );

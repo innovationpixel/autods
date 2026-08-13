@@ -14,19 +14,27 @@ function isProcessingStatus(status) {
 }
 
 function actionLabel(action) {
-  return action === "publish" ? "Publish" : "Draft";
+  if (action === "publish") return "Publish";
+  if (action === "schedule") return "Schedule";
+  return "Draft";
 }
 
 function buildHistoryRows(payload) {
   const rows = [];
 
   for (const batch of payload?.batches ?? []) {
+    const isSchedule = batch.action === "schedule";
+
     rows.push({
       id: `batch-${batch.id}`,
       kind: "batch",
       date: batch.created_at,
-      title: `Bulk import (${batch.total} item${batch.total === 1 ? "" : "s"})`,
-      detail: `${batch.completed} succeeded · ${batch.failed} failed · ${actionLabel(batch.action)} · ${batch.warehouse_country ?? "CN"}`,
+      title: isSchedule
+        ? `Scheduled publish (${batch.total} item${batch.total === 1 ? "" : "s"})`
+        : `Bulk import (${batch.total} item${batch.total === 1 ? "" : "s"})`,
+      detail: isSchedule
+        ? `${batch.completed} completed · ${batch.failed} failed · Schedule`
+        : `${batch.completed} succeeded · ${batch.failed} failed · ${actionLabel(batch.action)} · ${batch.warehouse_country ?? "CN"}`,
       status: batch.status,
       source: batch.source_type === "csv" ? "CSV" : "URLs",
     });

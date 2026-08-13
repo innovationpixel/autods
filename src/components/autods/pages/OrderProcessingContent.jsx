@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { LuCheck, LuClipboardList, LuLoader, LuPackageCheck, LuPencil, LuRefreshCcw, LuZap } from "react-icons/lu";
+import {
+  LuArrowRightLeft,
+  LuCheck,
+  LuClipboardList,
+  LuLoader,
+  LuPackageCheck,
+  LuPencil,
+  LuRefreshCcw,
+  LuUserRound,
+  LuZap,
+} from "react-icons/lu";
 import { toast } from "../../../utils/toast";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import {
@@ -9,15 +19,23 @@ import {
   updateOrderCost,
   updateOrderFulfillment,
   updateOrderSource,
-  updateOrderStatus,
 } from "../../../services/OrderService";
-import { getWalletSummary } from "../../../services/WalletService";
+import { getWalletSummary, transferToProcessingWallet } from "../../../services/WalletService";
+import { getBuyerAccounts } from "../../../services/BuyerAccountService";
 import { buildSourceProductUrl, formatDisplayDate, normalizeListingSourceInput } from "../helpers";
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
+
+const PROCESSING_TABS = [
+  { key: "new", label: "New Orders" },
+  { key: "processed", label: "Processed (Paid)" },
+  { key: "shipped", label: "Shipped" },
+  { key: "completed", label: "Completed" },
+  { key: "cancelled", label: "Cancelled" },
+];
 
 function formatMoney(value, currency = "USD") {
   if (value === null || value === undefined || value === "") {
@@ -70,6 +88,8 @@ function mapProcessingOrder(order) {
     buyPrice: order.buy_price != null ? Number(order.buy_price) : null,
     aliexpressOrderId: order.aliexpress_order_id ?? "",
     aliexpressOrderStatus: order.aliexpress_order_status ?? "",
+    processingStatus: order.processing_status ?? "new",
+    processingMethod: order.processing_method ?? "",
   };
 }
 
@@ -77,9 +97,17 @@ function OrderProcessingContent() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [markingId, setMarkingId] = useState("");
-  const [placingId, setPlacingId] = useState("");
+  const [processingId, setProcessingId] = useState("");
   const [wallet, setWallet] = useState(null);
+
+  const [activeTab, setActiveTab] = useState("new");
+  const [processingMethod, setProcessingMethod] = useState("autods");
+  const [buyerAccounts, setBuyerAccounts] = useState([]);
+  const [selectedBuyerAccountId, setSelectedBuyerAccountId] = useState("");
+
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferAmountDraft, setTransferAmountDraft] = useState("");
+  const [transferring, setTransferring] = useState(false);
 
   const [editingSourceId, setEditingSourceId] = useState("");
   const [sourceDraft, setSourceDraft] = useState("");
@@ -98,10 +126,10 @@ function OrderProcessingContent() {
     aliexpressOrderStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
   };
 
-  const loadPendingOrders = async () => {
+  const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await getOrders({ status: "Pending", sort: "asc", limit: 100 });
+      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
       setOrders((res.data?.data ?? []).map(mapProcessingOrder));
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to load orders."));
@@ -120,10 +148,32 @@ function OrderProcessingContent() {
     }
   };
 
+  const loadBuyerAccounts = async () => {
+    try {
+      const res = await getBuyerAccounts();
+      const accounts = (res.data?.accounts ?? []).filter((account) => account.is_active);
+      setBuyerAccounts(accounts);
+      setSelectedBuyerAccountId((current) => {
+        if (current && accounts.some((account) => String(account.id) === String(current))) {
+          return current;
+        }
+        const primary = accounts.find((account) => account.is_primary) ?? accounts[0];
+        return primary ? String(primary.id) : "";
+      });
+    } catch {
+      setBuyerAccounts([]);
+    }
+  };
+
   useEffect(() => {
-    loadPendingOrders();
     loadWallet();
+    loadBuyerAccounts();
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const totalValue = useMemo(
     () => orders.reduce((sum, order) => sum + (Number.isFinite(order.sellPrice) ? order.sellPrice : 0), 0),
@@ -135,7 +185,7 @@ function OrderProcessingContent() {
     try {
       const res = await syncOrders();
       toast.success(res.data?.message ?? "Orders synced.");
-      await loadPendingOrders();
+      await loadOrders();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {
@@ -166,7 +216,7 @@ function OrderProcessingContent() {
       toast.success(res.data?.message ?? "Source link updated.");
       setEditingSourceId("");
       setSourceDraft("");
-      await loadPendingOrders();
+      await loadOrders();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not update source link."));
     } finally {
@@ -197,7 +247,7 @@ function OrderProcessingContent() {
       toast.success("Cost updated.");
       setEditingCostId("");
       setCostDraft("");
-      await loadPendingOrders();
+      await loadOrders();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to update cost."));
     } finally {
@@ -223,7 +273,7 @@ function OrderProcessingContent() {
       toast.success(`${fieldMeta.label} updated.`);
       setEditingFulfillment(null);
       setFulfillmentDraft("");
-      await loadPendingOrders();
+      await loadOrders();
     } catch (err) {
       toast.error(getApiErrorMessage(err, `Could not update ${fieldMeta.label.toLowerCase()}.`));
     } finally {
@@ -231,30 +281,48 @@ function OrderProcessingContent() {
     }
   };
 
-  const handlePlaceOrder = async (order) => {
-    setPlacingId(order.id);
+  const handleProcessOrder = async (order) => {
+    if (processingMethod === "buyer" && !selectedBuyerAccountId) {
+      toast.warn("Connect and select a buyer account in Settings → Buyer Accounts first.");
+      return;
+    }
+
+    setProcessingId(order.id);
     try {
-      const res = await placeAliExpressOrder(order.id);
-      toast.success(res.data?.message ?? "Order placed on AliExpress.");
+      const res = await placeAliExpressOrder(order.id, {
+        processing_method: processingMethod,
+        buyer_account_id: processingMethod === "buyer" ? Number(selectedBuyerAccountId) : undefined,
+      });
+      toast.success(res.data?.message ?? "Order processed.");
       setOrders((current) => current.filter((item) => item.id !== order.id));
-      loadWallet();
+      if (processingMethod === "autods") {
+        loadWallet();
+      }
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Could not place the order on AliExpress."));
+      toast.error(getApiErrorMessage(err, "Could not process this order."));
     } finally {
-      setPlacingId("");
+      setProcessingId("");
     }
   };
 
-  const markAsOrdered = async (order) => {
-    setMarkingId(order.id);
+  const handleTransferFunds = async () => {
+    const parsed = Number.parseFloat(transferAmountDraft);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.warn("Enter a valid transfer amount.");
+      return;
+    }
+
+    setTransferring(true);
     try {
-      await updateOrderStatus(order.id, "Ordered");
-      toast.success(`Order ${order.ebayOrderId} marked as ordered.`);
-      setOrders((current) => current.filter((item) => item.id !== order.id));
+      const res = await transferToProcessingWallet(Number(parsed.toFixed(2)));
+      toast.success(res.data?.message ?? "Funds transferred to your processing wallet.");
+      setWallet(res.data?.summary ?? wallet);
+      setTransferModalOpen(false);
+      setTransferAmountDraft("");
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Could not update order status."));
+      toast.error(getApiErrorMessage(err, "Transfer failed."));
     } finally {
-      setMarkingId("");
+      setTransferring(false);
     }
   };
 
@@ -272,16 +340,16 @@ function OrderProcessingContent() {
                 <LuPackageCheck />
                 Order processing
               </span>
-              <h2 className="order-processing-hero__title">Process Pending Orders</h2>
+              <h2 className="order-processing-hero__title">Process Orders</h2>
               <p className="order-processing-hero__subtitle">
-                Add an AliExpress source and click "Place on AliExpress" to auto-purchase and ship straight to the buyer — charged to your wallet.
+                Choose how to process orders, then click "Process the order" to auto-purchase and ship straight to the buyer.
               </p>
             </div>
 
             <div className="order-processing-hero__spotlight">
               <span>Waiting to be processed</span>
               <strong>{orders.length}</strong>
-              <em>{formatMoney(totalValue)} in pending order value</em>
+              <em>{formatMoney(totalValue)} in order value</em>
             </div>
           </header>
 
@@ -296,19 +364,81 @@ function OrderProcessingContent() {
               </span>
             </button>
 
-            {wallet ? (
+            <div className="order-processing-method-toggle" role="group" aria-label="Processing method">
+              <button
+                type="button"
+                className={`order-processing-method-toggle__btn ${processingMethod === "autods" ? "order-processing-method-toggle__btn--active" : ""}`}
+                onClick={() => setProcessingMethod("autods")}
+              >
+                <LuZap />
+                <span>Auto DS</span>
+              </button>
+              <button
+                type="button"
+                className={`order-processing-method-toggle__btn ${processingMethod === "buyer" ? "order-processing-method-toggle__btn--active" : ""}`}
+                onClick={() => setProcessingMethod("buyer")}
+              >
+                <LuUserRound />
+                <span>Buyer</span>
+              </button>
+            </div>
+
+            {processingMethod === "buyer" ? (
+              buyerAccounts.length ? (
+                <select
+                  className="order-processing-buyer-select"
+                  value={selectedBuyerAccountId}
+                  onChange={(event) => setSelectedBuyerAccountId(event.target.value)}
+                  aria-label="Buyer account"
+                >
+                  {buyerAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.nickname || account.ae_user_nick || `Buyer account #${account.id}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="order-processing-buyer-hint">
+                  Connect a buyer account in Settings → Buyer Accounts
+                </span>
+              )
+            ) : null}
+
+            {processingMethod === "autods" && wallet ? (
               <div className="order-processing-wallet-chip">
-                <span>Wallet balance</span>
-                <strong>{formatMoney(wallet.balance, wallet.currency)}</strong>
+                <span>Processing wallet</span>
+                <strong>{formatMoney(wallet.processing_wallet_balance, wallet.currency)}</strong>
+                <button
+                  type="button"
+                  className="order-processing-wallet-chip__transfer"
+                  onClick={() => setTransferModalOpen(true)}
+                  title="Transfer funds from your main wallet"
+                >
+                  <LuArrowRightLeft />
+                  <span>Transfer funds</span>
+                </button>
               </div>
             ) : null}
           </div>
         </div>
       </section>
 
+      <nav className="drafts-tabs" aria-label="Order processing sections">
+        {PROCESSING_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`drafts-tab ${activeTab === tab.key ? "drafts-tab--active" : ""}`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
       <section className="calculations-table-panel card-wrapper">
         <div className="calculations-table-toolbar">
-          <strong>{orders.length} orders to process</strong>
+          <strong>{orders.length} orders</strong>
         </div>
 
         <div className="orders-table-shell">
@@ -412,32 +542,26 @@ function OrderProcessingContent() {
                       </td>
                       <td>
                         <div className="order-processing-actions">
-                          {(order.sourcePlatform === "aliexpress" || order.sourcePlatform === "appmarketplace") && order.hasSource ? (
-                            <button
-                              type="button"
-                              className="order-processing-mark-btn order-processing-mark-btn--primary"
-                              onClick={() => handlePlaceOrder(order)}
-                              disabled={placingId === order.id || markingId === order.id}
-                              title="Automatically purchase this item on AliExpress and ship it to the buyer"
-                            >
-                              {placingId === order.id ? <LuLoader className="spin-icon" /> : <LuZap />}
-                              <span>{placingId === order.id ? "Placing…" : "Place on AliExpress"}</span>
-                            </button>
-                          ) : null}
-
                           <button
                             type="button"
-                            className="order-processing-mark-btn"
-                            onClick={() => markAsOrdered(order)}
-                            disabled={markingId === order.id || placingId === order.id || !order.hasSource || order.buyPrice == null}
+                            className="order-processing-mark-btn order-processing-mark-btn--primary"
+                            onClick={() => handleProcessOrder(order)}
+                            disabled={
+                              processingId === order.id ||
+                              !order.hasSource ||
+                              Boolean(order.aliexpressOrderId) ||
+                              (processingMethod === "buyer" && !selectedBuyerAccountId)
+                            }
                             title={
-                              !order.hasSource || order.buyPrice == null
-                                ? "Add a source link and cost before marking as ordered"
-                                : "Mark this order as ordered manually"
+                              !order.hasSource
+                                ? "Add a source link before processing"
+                                : order.aliexpressOrderId
+                                  ? "Already placed on AliExpress"
+                                  : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
                             }
                           >
-                            {markingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                            <span>Mark Ordered</span>
+                            {processingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                            <span>{processingId === order.id ? "Processing…" : "Process the order"}</span>
                           </button>
                         </div>
                       </td>
@@ -447,7 +571,7 @@ function OrderProcessingContent() {
                   <tr>
                     <td className="orders-table__empty" colSpan={9}>
                       <LuClipboardList />
-                      <span>No orders waiting to be processed.</span>
+                      <span>No orders in this tab.</span>
                     </td>
                   </tr>
                 )}
@@ -496,6 +620,22 @@ function OrderProcessingContent() {
         onClose={() => setEditingFulfillment(null)}
         saving={Boolean(savingFulfillmentKey)}
         placeholder="—"
+      />
+
+      <QuickEditModal
+        open={transferModalOpen}
+        title="Transfer to Processing Wallet"
+        description="Move funds from your main wallet into your dedicated processing wallet used for Auto DS purchases."
+        label="Amount"
+        type="number"
+        min="0.01"
+        step="0.01"
+        value={transferAmountDraft}
+        onChange={setTransferAmountDraft}
+        onSave={handleTransferFunds}
+        onClose={() => setTransferModalOpen(false)}
+        saving={transferring}
+        placeholder="0.00"
       />
     </section>
   );

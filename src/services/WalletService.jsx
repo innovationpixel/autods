@@ -20,3 +20,6 @@ export const depositWalletPayPal = (amount) =>
 
 export const confirmWalletDeposit = (payload) =>
     axiosInstance.post('/wallet/deposit/confirm', payload);
+
+export const transferToProcessingWallet = (amount) =>
+    axiosInstance.post('/wallet/transfer-to-processing', { amount });

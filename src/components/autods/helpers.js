@@ -171,7 +171,7 @@ export function getMarketplaceProductImages(item) {
 }
 
 export function formatCalculationAmount(value) {
-  return `A$${Number(value).toFixed(2)}`;
+  return `$${Number(value).toFixed(2)}`;
 }
 
 export function formatCalculationRoi(value) {
@@ -481,7 +481,10 @@ export function mapApiOrderToCalculationRow(order) {
 
   const earn = Number(order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0);
   const cost = order.buy_price != null ? Number(order.buy_price) : 0;
-  const shipping = Number(delivery.shippingCost?.value ?? delivery.amount?.value ?? 0);
+  const shipping =
+    order.shipping_cost != null
+      ? Number(order.shipping_cost)
+      : Number(delivery.shippingCost?.value ?? delivery.amount?.value ?? 0);
   const profit =
     order.profit != null ? Number(order.profit) : Number((earn - cost - shipping).toFixed(2));
   const roi = cost > 0 ? Number(((profit / cost) * 100).toFixed(1)) : 0;
@@ -619,4 +622,52 @@ export function rewriteProductTitle(title) {
     .trim()
     .replace(/(^\w)/, (match) => match.toUpperCase())
     .concat(" | AI Optimized");
+}
+
+const ORDERS_CSV_COLUMNS = [
+  { key: "orderId", label: "Order ID" },
+  { key: "title", label: "Item" },
+  { key: "sku", label: "SKU" },
+  { key: "buyerName", label: "Buyer" },
+  { key: "username", label: "Buyer Username" },
+  { key: "email", label: "Buyer Email" },
+  { key: "date", label: "Order Date" },
+  { key: "status", label: "Status" },
+  { key: "total", label: "Total" },
+  { key: "totalQuantity", label: "Qty" },
+  { key: "trackingNumber", label: "Tracking Number" },
+  { key: "carrier", label: "Carrier" },
+  { key: "shippingAddress", label: "Shipping Address" },
+  { key: "itemBuy", label: "Source Item ID" },
+  { key: "itemSell", label: "eBay Item ID" },
+  { key: "aliexpressOrderId", label: "AliExpress Order ID" },
+  { key: "aliexpressStatus", label: "AliExpress Status" },
+];
+
+function escapeCsvValue(value) {
+  const str = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+/** Builds a CSV string (with header row) from order rows shaped like mapApiOrder()'s output. */
+export function buildOrdersCsv(rows) {
+  const header = ORDERS_CSV_COLUMNS.map((col) => escapeCsvValue(col.label)).join(",");
+  const lines = rows.map((row) =>
+    ORDERS_CSV_COLUMNS.map((col) => escapeCsvValue(row[col.key])).join(","),
+  );
+
+  return [header, ...lines].join("\r\n");
+}
+
+/** Triggers a browser download of the given text content as a file. */
+export function downloadTextFile(filename, content, mimeType = "text/csv;charset=utf-8;") {
+  const blob = new Blob(["﻿", content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
