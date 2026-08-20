@@ -81,13 +81,16 @@ function buildRandomTimes(startMs, endMs, count, minGapMs) {
   return times;
 }
 
+// Random Hours only asks the user for a date — the spread window and minimum
+// gap between listings are fixed so the flow stays a single click.
+const RANDOM_FROM_TIME = "09:00";
+const RANDOM_TO_TIME = "21:00";
+const RANDOM_MIN_GAP_MINUTES = 15;
+
 function defaultRandomWindow() {
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
   return {
     date: toDateInputValue(tomorrow),
-    fromTime: "09:00",
-    toTime: "21:00",
-    minGap: 15,
   };
 }
 
@@ -127,18 +130,18 @@ function ScheduleListingModal({
   }, [open]);
 
   const randomTimes = useMemo(() => {
-    const startMs = buildScheduledIso(randomWindow.date, randomWindow.fromTime)
-      ? new Date(`${randomWindow.date}T${randomWindow.fromTime}:00`).getTime()
+    const startMs = buildScheduledIso(randomWindow.date, RANDOM_FROM_TIME)
+      ? new Date(`${randomWindow.date}T${RANDOM_FROM_TIME}:00`).getTime()
       : NaN;
-    const endMs = buildScheduledIso(randomWindow.date, randomWindow.toTime)
-      ? new Date(`${randomWindow.date}T${randomWindow.toTime}:00`).getTime()
+    const endMs = buildScheduledIso(randomWindow.date, RANDOM_TO_TIME)
+      ? new Date(`${randomWindow.date}T${RANDOM_TO_TIME}:00`).getTime()
       : NaN;
 
     if (Number.isNaN(startMs) || Number.isNaN(endMs) || mode !== "random") {
       return [];
     }
 
-    return buildRandomTimes(startMs, endMs, drafts.length, Math.max(1, Number(randomWindow.minGap) || 0) * 60000);
+    return buildRandomTimes(startMs, endMs, drafts.length, RANDOM_MIN_GAP_MINUTES * 60000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, randomWindow, drafts.length, shuffleSeed]);
 
@@ -183,7 +186,6 @@ function ScheduleListingModal({
   const randomWindowInvalid = mode === "random" && (
     randomTimes.length !== count
     || randomTimes.some((t) => t <= Date.now())
-    || randomWindow.toTime <= randomWindow.fromTime
   );
 
   return (
@@ -309,44 +311,12 @@ function ScheduleListingModal({
                   />
                 </div>
               </label>
-
-              <label className="schedule-modal__field">
-                <span>From</span>
-                <div className="schedule-modal__input-wrap">
-                  <LuClock3 aria-hidden="true" />
-                  <input
-                    type="time"
-                    value={randomWindow.fromTime}
-                    onChange={(event) => setRandomWindow((current) => ({ ...current, fromTime: event.target.value }))}
-                  />
-                </div>
-              </label>
-
-              <label className="schedule-modal__field">
-                <span>To</span>
-                <div className="schedule-modal__input-wrap">
-                  <LuClock3 aria-hidden="true" />
-                  <input
-                    type="time"
-                    value={randomWindow.toTime}
-                    onChange={(event) => setRandomWindow((current) => ({ ...current, toTime: event.target.value }))}
-                  />
-                </div>
-              </label>
-
-              <label className="schedule-modal__field">
-                <span>Min. gap (minutes)</span>
-                <div className="schedule-modal__input-wrap">
-                  <input
-                    type="number"
-                    min="1"
-                    max="240"
-                    value={randomWindow.minGap}
-                    onChange={(event) => setRandomWindow((current) => ({ ...current, minGap: event.target.value }))}
-                  />
-                </div>
-              </label>
             </div>
+
+            <p className="schedule-modal__hint">
+              Each listing gets a random time between {formatTimeOnly(new Date(`${randomWindow.date}T${RANDOM_FROM_TIME}:00`).getTime())}
+              {" "}and {formatTimeOnly(new Date(`${randomWindow.date}T${RANDOM_TO_TIME}:00`).getTime())}, at least {RANDOM_MIN_GAP_MINUTES} minutes apart.
+            </p>
 
             <div className="schedule-modal__random-head">
               <span>{count} listings will be spread across this window, in random order.</span>
@@ -378,9 +348,7 @@ function ScheduleListingModal({
 
             {randomWindowInvalid ? (
               <p className="schedule-modal__error">
-                {randomWindow.toTime <= randomWindow.fromTime
-                  ? "\"To\" time must be after \"From\" time."
-                  : "The scheduled window must be in the future."}
+                The scheduled window must be in the future.
               </p>
             ) : null}
           </>

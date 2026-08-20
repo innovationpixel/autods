@@ -29,7 +29,6 @@ import {
   LuLoader,
   LuMenu,
   LuPencil,
-  LuPlus,
   LuPrinter,
   LuRefreshCcw,
   LuSlidersHorizontal,
@@ -188,7 +187,7 @@ function mapApiOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: order.listing_image_url ?? firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? PLACEHOLDER_IMAGE,
     color: variationText || "—",
     pickStatus: raw.pickStatus ?? "—",
     itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
@@ -1228,10 +1227,6 @@ function OrdersContent({ searchQuery }) {
 
   return (
     <section className="orders-page-content">
-      <div className="orders-page-header">
-        <h2 className="orders-page-header__title">All Orders</h2>
-      </div>
-
       <div className="orders-toolbar orders-toolbar--primary">
         <div className="orders-toolbar__left">
           <button
@@ -1315,11 +1310,6 @@ function OrdersContent({ searchQuery }) {
           >
             {showArchived ? <LuArchiveRestore /> : <LuArchive />}
             <span>{showArchived ? "Viewing Archived" : "Archived"}</span>
-          </button>
-
-          <button type="button" className="orders-toolbar-action orders-toolbar-action--primary" disabled>
-            <LuPlus />
-            <span>Create Manual Order</span>
           </button>
 
           {activeFilterChips.length ? (

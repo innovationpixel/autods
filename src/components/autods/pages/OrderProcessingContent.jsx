@@ -71,7 +71,7 @@ function mapProcessingOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? PLACEHOLDER_IMAGE,
     ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
     orderDate: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     buyerName: shipTo.fullName ?? buyer.buyerRegistrationAddress?.fullName ?? order.buyer_name ?? "—",

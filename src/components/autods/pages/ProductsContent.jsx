@@ -763,9 +763,6 @@ function ProductsContent({ searchQuery }) {
   if (!connected) {
     return (
       <section className="products-page-content">
-        <div className="products-heading">
-          <h2 className="products-heading__title">Products</h2>
-        </div>
         <div className="products-not-connected card-wrapper">
           <LuLink size={32} style={{ opacity: 0.4 }} />
           <h3>No eBay account connected</h3>
@@ -779,13 +776,6 @@ function ProductsContent({ searchQuery }) {
 
   return (
     <section className="products-page-content">
-      <div className="products-heading">
-        <h2 className="products-heading__title">
-          Products ({totalCount})
-          {loading ? <LuLoader size={14} className="spin-icon" style={{ marginLeft: 8 }} /> : null}
-        </h2>
-      </div>
-
       {alerts.length ? (
         <div className="products-alerts card-wrapper">
           {alerts.map((alert) => (

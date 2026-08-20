@@ -33,7 +33,8 @@ function AdminTrendingProductsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [previews, setPreviews] = useState([]);
+  const [multiUrls, setMultiUrls] = useState("");
   const [resolving, setResolving] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -64,7 +65,8 @@ function AdminTrendingProductsPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
-    setPreview(null);
+    setMultiUrls("");
+    setPreviews([]);
     setModalOpen(true);
   };
 
@@ -77,7 +79,7 @@ function AdminTrendingProductsPage() {
       sort_order: product.sort_order ?? 0,
       is_active: product.is_active ?? true,
     });
-    setPreview({
+    setPreviews([{
       title: product.title,
       image_url: product.image_url,
       price: product.price,
@@ -86,7 +88,7 @@ function AdminTrendingProductsPage() {
       listing_url: product.listing_url,
       aliexpress_product_id: product.aliexpress_product_id,
       aliexpress_url: product.aliexpress_url,
-    });
+    }]);
     setModalOpen(true);
   };
 
@@ -99,53 +101,117 @@ function AdminTrendingProductsPage() {
     setResolving(true);
     try {
       const res = await resolveAliExpressProduct(form.url_or_id.trim(), form.country);
-      setPreview(res.data?.product ?? null);
+      setPreviews(res.data?.product ? [res.data.product] : []);
       toast.success("Product fetched from AliExpress.");
     } catch (err) {
-      setPreview(null);
+      setPreviews([]);
       toast.error(err.response?.data?.error ?? "Could not fetch that product.");
     } finally {
       setResolving(false);
     }
   };
 
-  const saveProduct = async () => {
-    if (!preview) {
-      toast.warn("Fetch the AliExpress product before saving.");
+  const fetchMultiPreview = async () => {
+    const links = [...new Set(multiUrls.split("\n").map((line) => line.trim()).filter(Boolean))];
+    if (!links.length) {
+      toast.warn("Paste at least one AliExpress product link or ID.");
       return;
     }
+
+    setResolving(true);
+    const resolved = [];
+    let failed = 0;
+
+    for (const link of links) {
+      try {
+        const res = await resolveAliExpressProduct(link, form.country);
+        if (res.data?.product) {
+          resolved.push(res.data.product);
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    setPreviews(resolved);
+    setResolving(false);
+
+    if (resolved.length) {
+      toast.success(`Fetched ${resolved.length} product${resolved.length > 1 ? "s" : ""} from AliExpress.${failed ? ` ${failed} failed.` : ""}`);
+    } else {
+      toast.error("Could not fetch any of those products.");
+    }
+  };
+
+  const removePreview = (index) => {
+    setPreviews(previews.filter((_, i) => i !== index));
+  };
+
+  const saveProduct = async () => {
     if (!form.country) {
       toast.warn("Select a target country.");
       return;
     }
 
-    setSaving(true);
-    const payload = {
-      ...preview,
-      category_id: form.category_id ? Number(form.category_id) : null,
-      country: form.country,
-      sort_order: Number(form.sort_order) || 0,
-      is_active: form.is_active,
-    };
-
-    try {
-      if (editingId) {
-        await updateAdminTrendingProduct(editingId, payload);
-        toast.success("Trending product updated.");
-      } else {
-        await createAdminTrendingProduct(payload);
-        toast.success("Trending product added.");
+    if (editingId) {
+      if (!previews[0]) {
+        toast.warn("Fetch the AliExpress product before saving.");
+        return;
       }
+
+      setSaving(true);
+      try {
+        await updateAdminTrendingProduct(editingId, {
+          ...previews[0],
+          category_id: form.category_id ? Number(form.category_id) : null,
+          country: form.country,
+          sort_order: Number(form.sort_order) || 0,
+          is_active: form.is_active,
+        });
+        toast.success("Trending product updated.");
+        setModalOpen(false);
+        loadProducts();
+      } catch (err) {
+        const message = err.response?.data?.message
+          ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
+          ?? err.response?.data?.error
+          ?? "Save failed.";
+        toast.error(message);
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    if (!previews.length) {
+      toast.warn("Fetch at least one product before saving.");
+      return;
+    }
+
+    setSaving(true);
+    const baseSortOrder = Number(form.sort_order) || 0;
+    const results = await Promise.allSettled(
+      previews.map((product, index) => createAdminTrendingProduct({
+        ...product,
+        category_id: form.category_id ? Number(form.category_id) : null,
+        country: form.country,
+        sort_order: baseSortOrder + index,
+        is_active: form.is_active,
+      })),
+    );
+    setSaving(false);
+
+    const succeeded = results.filter((r) => r.status === "fulfilled").length;
+    const failed = results.length - succeeded;
+
+    if (succeeded) {
+      toast.success(`Added ${succeeded} trending product${succeeded > 1 ? "s" : ""}.${failed ? ` ${failed} failed.` : ""}`);
       setModalOpen(false);
       loadProducts();
-    } catch (err) {
-      const message = err.response?.data?.message
-        ?? Object.values(err.response?.data?.errors ?? {})[0]?.[0]
-        ?? err.response?.data?.error
-        ?? "Save failed.";
-      toast.error(message);
-    } finally {
-      setSaving(false);
+    } else {
+      toast.error("Failed to add the product(s).");
     }
   };
 
@@ -247,32 +313,56 @@ function AdminTrendingProductsPage() {
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
           <div className="orders-modal__card admin-modal">
-            <h3>{editingId ? "Edit Trending Product" : "Add Trending Product"}</h3>
+            <h3>{editingId ? "Edit Trending Product" : "Add Trending Products"}</h3>
 
             <div className="admin-modal__grid">
               <label className="marketplace-settings__field admin-modal__full">
-                <span>AliExpress product link or ID</span>
+                <span>{editingId ? "AliExpress product link or ID" : "AliExpress product links or IDs (one per line)"}</span>
                 <div className="admin-curated-page__resolve-row">
-                  <input
-                    className="marketplace-settings__control"
-                    value={form.url_or_id}
-                    onChange={(e) => setForm({ ...form, url_or_id: e.target.value })}
-                    placeholder="https://www.aliexpress.com/item/1005001234567890.html"
-                  />
-                  <button type="button" className="admin-page__btn admin-page__btn--ghost" disabled={resolving} onClick={fetchPreview}>
+                  {editingId ? (
+                    <input
+                      className="marketplace-settings__control"
+                      value={form.url_or_id}
+                      onChange={(e) => setForm({ ...form, url_or_id: e.target.value })}
+                      placeholder="https://www.aliexpress.com/item/1005001234567890.html"
+                    />
+                  ) : (
+                    <textarea
+                      className="marketplace-settings__control"
+                      rows={4}
+                      value={multiUrls}
+                      onChange={(e) => setMultiUrls(e.target.value)}
+                      placeholder={"https://www.aliexpress.com/item/1005001234567890.html\nhttps://www.aliexpress.com/item/1005009876543210.html"}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="admin-page__btn admin-page__btn--ghost"
+                    disabled={resolving}
+                    onClick={editingId ? fetchPreview : fetchMultiPreview}
+                  >
                     {resolving ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
                     <span>Fetch</span>
                   </button>
                 </div>
               </label>
 
-              {preview ? (
-                <div className="admin-curated-page__preview admin-modal__full">
-                  {preview.image_url ? <img src={preview.image_url} alt={preview.title} referrerPolicy="no-referrer" /> : null}
-                  <div>
-                    <strong>{preview.title}</strong>
-                    <span>{preview.currency} {Number(preview.price).toFixed(2)}{preview.seller ? ` · ${preview.seller}` : ""}</span>
-                  </div>
+              {previews.length ? (
+                <div className="admin-curated-page__preview-list admin-modal__full">
+                  {previews.map((product, index) => (
+                    <div className="admin-curated-page__preview" key={product.aliexpress_product_id ?? index}>
+                      {product.image_url ? <img src={product.image_url} alt={product.title} referrerPolicy="no-referrer" /> : null}
+                      <div>
+                        <strong>{product.title}</strong>
+                        <span>{product.currency} {Number(product.price).toFixed(2)}{product.seller ? ` · ${product.seller}` : ""}</span>
+                      </div>
+                      {!editingId ? (
+                        <button type="button" className="orders-icon-btn" aria-label="Remove product" onClick={() => removePreview(index)}>
+                          <LuTrash2 />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
                 </div>
               ) : null}
 
@@ -308,8 +398,12 @@ function AdminTrendingProductsPage() {
 
             <div className="admin-modal__footer">
               <button type="button" className="admin-page__btn admin-page__btn--ghost" onClick={() => setModalOpen(false)}>Cancel</button>
-              <button type="button" className="admin-page__btn admin-page__btn--primary" disabled={saving || !preview} onClick={saveProduct}>
-                {saving ? "Saving…" : "Save Product"}
+              <button type="button" className="admin-page__btn admin-page__btn--primary" disabled={saving || !previews.length} onClick={saveProduct}>
+                {saving
+                  ? "Saving…"
+                  : !editingId && previews.length > 1
+                    ? `Add ${previews.length} Products`
+                    : "Save Product"}
               </button>
             </div>
           </div>

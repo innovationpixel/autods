@@ -49,7 +49,6 @@ function DashboardContent({ searchQuery }) {
     <section className="dashboard-page-content dashboard-page-content--3ds">
       <header className="dashboard-hero">
         <div>
-          <h1 className="dashboard-hero__title">Dashboard</h1>
           <p className="dashboard-hero__subtitle">
             View your account statistics and activate the tools you need to run your eBay business.
           </p>
