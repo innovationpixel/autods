@@ -32,6 +32,7 @@ import {
   LuPrinter,
   LuRefreshCcw,
   LuSlidersHorizontal,
+  LuTriangleAlert,
   LuTruck,
   LuX,
 } from "react-icons/lu";
@@ -48,17 +49,18 @@ import {
   buildEbayListingProductUrl,
   buildOrdersCsv,
   buildSourceProductUrl,
-  detectTrackingCarrier,
   downloadTextFile,
   formatDisplayDate,
   getEbayOrderDetailUrl,
   normalizeTrackingCarrier,
+  platformLabel,
 } from "../helpers";
 import { openPrintableDocument } from "../printDocuments";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
 import ProductItemIdCell from "../ProductItemIdCell";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
+import BulkTrackingModal from "../BulkTrackingModal";
 import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
 import ConfirmModal from "../ConfirmModal";
@@ -73,6 +75,12 @@ import {
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
+
+const PRINT_COLUMN_DOC_TYPES = {
+  invoice: "invoice",
+  packingSlip: "packing-slip",
+  shippingLabel: "shipping-label",
+};
 
 function formatMoney(value, currency = "USD") {
   if (value === null || value === undefined || value === "") {
@@ -106,19 +114,6 @@ function normalizeTrackingValue(value) {
   }
 
   return trimmed;
-}
-
-function platformLabel(platform) {
-  if (!platform) return "—";
-  const map = {
-    appmarketplace: "APP",
-    aliexpress: "AE",
-    amazon: "AMZ",
-    walmart: "WMT",
-    etsy: "ETSY",
-    ebay: "eBay",
-  };
-  return map[platform] ?? platform.slice(0, 3).toUpperCase();
 }
 
 function mapApiOrder(order) {
@@ -176,13 +171,21 @@ function mapApiOrder(order) {
   const itemBuy = sourceProductId ?? "—";
   const itemBuyUrl = buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl);
   const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
+  const shipByDate = raw.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate ?? null;
+  const isFulfilled = String(raw.orderFulfillmentStatus ?? "").toUpperCase() === "FULFILLED";
+  const shipByOverdue = Boolean(
+    shipByDate &&
+      !isFulfilled &&
+      order.status !== "Canceled" &&
+      new Date(shipByDate) < new Date(new Date().toDateString()),
+  );
   const trackingValue =
     normalizeTrackingValue(order.tracking_number) || normalizeTrackingValue(shippingStep.shipmentTrackingNumber);
+  // Only a carrier eBay/the seller actually confirmed — never the guessed carrier
+  // from detectTrackingCarrier() (its patterns are broad and false-positive to
+  // "USPS" often enough that it shouldn't be shown or pushed to eBay as fact).
   const carrierRaw =
-    normalizeTrackingCarrier(order.carrier) ||
-    normalizeTrackingCarrier(shippingStep.shippingCarrierCode) ||
-    detectTrackingCarrier(trackingValue) ||
-    "";
+    normalizeTrackingCarrier(order.carrier) || normalizeTrackingCarrier(shippingStep.shippingCarrierCode) || "";
 
   return {
     id: String(order.id),
@@ -241,13 +244,15 @@ function mapApiOrder(order) {
       shipTo.contactAddress?.postalCode ?? shipTo.postalCode,
       shipTo.contactAddress?.countryCode ?? shipTo.countryCode,
     ]),
-    shipBy: raw.lineItems?.[0]?.lineItemFulfillmentInstructions?.shipByDate?.slice(0, 10) ?? "—",
+    shipBy: shipByDate ? shipByDate.slice(0, 10) : "—",
+    shipByOverdue,
     shippingDate: raw.fulfillmentHrefs?.length ? String(raw.lastModifiedDate ?? "").slice(0, 10) || "Shipped" : "—",
     estDeliveryDate: order.estimated_arrival ?? raw.maxEstimatedDeliveryDate?.slice(0, 10) ?? "—",
     notes: order.internal_notes ?? "—",
     ebaySellerNotes: order.ebay_seller_notes ?? "—",
     invoice: "Print",
     packingSlip: "Print",
+    shippingLabel: "Print",
     feedback: order.feedback_status ?? "—",
     record: raw.salesRecordReference ?? String(order.id ?? "—"),
     taxRef: raw.taxReference ?? "—",
@@ -313,6 +318,8 @@ function OrdersContent({ searchQuery }) {
   const [carrierDraft, setCarrierDraft] = useState("");
   const [savingTrackingId, setSavingTrackingId] = useState("");
   const [pushingTrackingId, setPushingTrackingId] = useState("");
+  const [bulkTrackingOrders, setBulkTrackingOrders] = useState(null);
+  const [bulkTrackingSaving, setBulkTrackingSaving] = useState(false);
   const [editingFulfillment, setEditingFulfillment] = useState(null);
   const [fulfillmentDraft, setFulfillmentDraft] = useState("");
   const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
@@ -501,7 +508,7 @@ function OrdersContent({ searchQuery }) {
   const startEditTracking = (order) => {
     setEditingTrackingId(order.id);
     setTrackingDraft(order.trackingNumberRaw ?? "");
-    setCarrierDraft(order.carrierRaw || detectTrackingCarrier(order.trackingNumberRaw) || "");
+    setCarrierDraft(order.carrierRaw || "");
   };
 
   const cancelEditTracking = () => {
@@ -512,10 +519,6 @@ function OrdersContent({ searchQuery }) {
 
   const handleTrackingDraftChange = (value) => {
     setTrackingDraft(value);
-    const detected = detectTrackingCarrier(value);
-    if (detected) {
-      setCarrierDraft(detected);
-    }
   };
 
   const saveTrackingNumber = async (order) => {
@@ -537,11 +540,54 @@ function OrdersContent({ searchQuery }) {
     }
   };
 
+  const closeBulkTracking = () => {
+    setBulkTrackingOrders(null);
+    setBulkTrackingSaving(false);
+  };
+
+  const saveBulkTrackingOne = async (order, payload) => {
+    setBulkTrackingSaving(order.id);
+    try {
+      await updateOrderTracking(order.id, payload);
+      toast.success(`Tracking saved for ${order.orderId}.`);
+      loadOrders();
+      return true;
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, `Could not save tracking for ${order.orderId}.`));
+      return false;
+    } finally {
+      setBulkTrackingSaving(false);
+    }
+  };
+
+  const saveBulkTrackingAll = async (rows, markSaved) => {
+    if (!rows.length) return;
+
+    setBulkTrackingSaving("all");
+    const savedIds = [];
+    let failed = 0;
+
+    for (const { order, payload } of rows) {
+      try {
+        await updateOrderTracking(order.id, payload);
+        savedIds.push(order.id);
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setBulkTrackingSaving(false);
+    markSaved(savedIds);
+
+    if (savedIds.length) toast.success(`Tracking saved for ${savedIds.length} order${savedIds.length === 1 ? "" : "s"}.`);
+    if (failed) toast.error(`${failed} order${failed === 1 ? "" : "s"} could not be updated.`);
+    if (savedIds.length) loadOrders();
+  };
+
   const pushTrackingToEbay = async (order) => {
     const isEditing = editingTrackingId === order.id;
     const tracking = (isEditing ? trackingDraft : order.trackingNumberRaw).trim();
-    const carrier =
-      normalizeTrackingCarrier(isEditing ? carrierDraft : order.carrierRaw) || detectTrackingCarrier(tracking);
+    const carrier = normalizeTrackingCarrier(isEditing ? carrierDraft : order.carrierRaw);
 
     if (!tracking) {
       toast.error("Enter a tracking number first.");
@@ -549,7 +595,7 @@ function OrdersContent({ searchQuery }) {
     }
 
     if (!carrier) {
-      toast.error("Select or detect a carrier first.");
+      toast.error("Select a carrier before pushing to eBay.");
       return;
     }
 
@@ -952,6 +998,9 @@ function OrdersContent({ searchQuery }) {
       case "generate-barcode":
         openPrintableDocument("barcode", order);
         break;
+      case "generate-shipping-label":
+        openPrintableDocument("shipping-label", order);
+        break;
       default:
         toast.info(`${action} is not available.`);
     }
@@ -1091,10 +1140,21 @@ function OrdersContent({ searchQuery }) {
             ) : null}
           </div>
         );
+      case "shipBy":
+        if (!order.shipBy || order.shipBy === "—") {
+          return "—";
+        }
+        return order.shipByOverdue ? (
+          <span className="orders-table__ship-by orders-table__ship-by--overdue">
+            <LuTriangleAlert />
+            <span>Overdue · {formatDisplayDate(order.shipBy)}</span>
+          </span>
+        ) : (
+          formatDisplayDate(order.shipBy)
+        );
       case "orderDate":
       case "paidDate":
       case "refundDate":
-      case "shipBy":
       case "shippingDate":
       case "estDeliveryDate":
         return order[columnId] && order[columnId] !== "—" ? formatDisplayDate(order[columnId]) : "—";
@@ -1169,11 +1229,12 @@ function OrdersContent({ searchQuery }) {
         return renderFulfillmentCell(order, columnId);
       case "invoice":
       case "packingSlip":
+      case "shippingLabel":
         return (
           <button
             type="button"
             className="orders-details__link"
-            onClick={() => openPrintableDocument(columnId === "invoice" ? "invoice" : "packing-slip", order)}
+            onClick={() => openPrintableDocument(PRINT_COLUMN_DOC_TYPES[columnId], order)}
           >
             Print
           </button>
@@ -1258,11 +1319,8 @@ function OrdersContent({ searchQuery }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const order = orders.find((row) => selectedIds.includes(row.id));
-                    if (order) {
-                      startEditTracking(order);
-                      setOpenBulkMenu(false);
-                    }
+                    setBulkTrackingOrders(selectedOrders);
+                    setOpenBulkMenu(false);
                   }}
                 >
                   Add tracking
@@ -1291,6 +1349,7 @@ function OrdersContent({ searchQuery }) {
                 <button type="button" onClick={() => handleBulkPrint("packing-slip")}>Packing Slip</button>
                 <button type="button" onClick={() => handleBulkPrint("pick-list")}>Pick List</button>
                 <button type="button" onClick={() => handleBulkPrint("barcode")}>Barcode</button>
+                <button type="button" onClick={() => handleBulkPrint("shipping-label")}>Shipping Label</button>
               </div>
             ) : null}
           </div>
@@ -1645,6 +1704,15 @@ function OrdersContent({ searchQuery }) {
         saving={Boolean(editingBuySourceOrder) && savingBuySourceId === editingBuySourceOrder.id}
         onClose={cancelEditBuySource}
         onSave={saveBuySource}
+      />
+
+      <BulkTrackingModal
+        open={Boolean(bulkTrackingOrders)}
+        orders={bulkTrackingOrders ?? []}
+        saving={bulkTrackingSaving}
+        onClose={closeBulkTracking}
+        onSaveOne={saveBulkTrackingOne}
+        onSaveAll={saveBulkTrackingAll}
       />
 
       <QuickEditModal

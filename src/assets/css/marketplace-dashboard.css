@@ -2337,6 +2337,83 @@
   width: min(480px, calc(100vw - 32px));
 }
 
+.bulk-tracking-modal {
+  width: min(680px, calc(100vw - 32px));
+}
+
+.bulk-tracking-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bulk-tracking-modal__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 140px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #eceef3;
+  border-radius: 8px;
+}
+
+.bulk-tracking-modal__row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bulk-tracking-modal__row-info strong {
+  font-size: 12px;
+  color: #2a2933;
+}
+
+.bulk-tracking-modal__row-info span {
+  font-size: 11px;
+  color: #8b8b99;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-tracking-modal__input,
+.bulk-tracking-modal__select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #dfe3ed;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.bulk-tracking-modal__save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dfe3ed;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #6e6d76;
+  cursor: pointer;
+}
+
+.bulk-tracking-modal__save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bulk-tracking-modal__save--done {
+  border-color: #16a34a;
+  background: #ecfdf3;
+  color: #16a34a;
+}
+
 .order-source-modal__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 140px;
@@ -7266,6 +7343,19 @@
 .orders-table__buyer-cell span {
   color: #8b8b99;
   font-size: 11px;
+}
+
+.orders-table__ship-by--overdue {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #dc2626;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.orders-table__ship-by--overdue svg {
+  flex-shrink: 0;
 }
 
 .order-processing-mark-btn {
@@ -15218,6 +15308,12 @@
   font-weight: 600;
 }
 
+.order-processing-buyer-hint--error {
+  border-color: rgba(220, 38, 38, 0.32);
+  background: rgba(220, 38, 38, 0.08);
+  color: #b91c1c;
+}
+
 .order-processing-actions {
   display: flex;
   flex-direction: column;
@@ -15346,6 +15442,38 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.order-processing-bulk-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #4f4e57;
+}
+
+.order-processing-bulk-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  background: var(--primary-color);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.order-processing-bulk-bar__btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(244, 169, 68, 0.32);
+}
+
+.order-processing-bulk-bar__btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .calculations-table {
@@ -17681,6 +17809,66 @@
   cursor: not-allowed;
 }
 
+.wallet-hub__wire-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px dashed #eceef3;
+  border-radius: 10px;
+  background: #fbfbfc;
+}
+
+.wallet-hub__wire-form-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6e6d76;
+}
+
+.wallet-hub__wire-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #dfe3ed;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 13px;
+  color: #5d5c65;
+  cursor: pointer;
+}
+
+.wallet-hub__wire-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.wallet-hub__wire-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6e6d76;
+}
+
+.wallet-hub__wire-note textarea {
+  padding: 8px 10px;
+  border: 1px solid #dfe3ed;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  color: #33323d;
+  resize: vertical;
+}
+
 .wallet-hub__trust {
   display: flex;
   flex-wrap: wrap;
@@ -17831,7 +18019,8 @@
   color: #b87418;
 }
 
-.wallet-hub__status--failed {
+.wallet-hub__status--failed,
+.wallet-hub__status--rejected {
   background: #fff1f1;
   color: #c53030;
 }
@@ -18606,6 +18795,69 @@
   color: #6b7280;
 }
 
+.admin-badge--danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-wallet-deposits__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.admin-wallet-deposits__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-wallet-deposits__screenshot {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #f4f5f9;
+}
+
+.admin-wallet-deposits__screenshot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #111827;
+}
+
+.admin-wallet-deposits__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+}
+
+.admin-wallet-deposits__amount {
+  font-size: 20px;
+  font-weight: 800;
+  color: #2a2933;
+}
+
+.admin-wallet-deposits__note {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.admin-wallet-deposits__date {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.admin-wallet-deposits__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .admin-badge--admin {
   background: #ede9fe;
   color: #5b21b6;
@@ -18640,6 +18892,74 @@
   text-align: center;
   padding: 32px 16px !important;
   color: #6b7280;
+}
+
+.admin-table__sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.admin-table__sort-btn:hover {
+  color: #33323d;
+}
+
+.admin-table__sort-icon--idle {
+  opacity: 0.4;
+}
+
+.admin-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.admin-filters-bar__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6e6d76;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.authenticated-image__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 120px;
+  background: #f4f5f9;
+  border-radius: 8px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.admin-filters-bar__field select,
+.admin-filters-bar__field input {
+  min-width: 140px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #dfe3ed;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #33323d;
 }
 
 .admin-modal {

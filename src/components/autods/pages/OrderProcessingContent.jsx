@@ -22,15 +22,22 @@ import {
 } from "../../../services/OrderService";
 import { getWalletSummary, transferToProcessingWallet } from "../../../services/WalletService";
 import { getBuyerAccounts } from "../../../services/BuyerAccountService";
-import { buildSourceProductUrl, formatDisplayDate, normalizeListingSourceInput } from "../helpers";
+import {
+  buildSourceProductUrl,
+  formatDisplayDate,
+  getEbayOrderDetailUrl,
+  normalizeTrackingCarrier,
+} from "../helpers";
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
+import OrderSourceModal from "../OrderSourceModal";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
+  { key: "pending", label: "Pending" },
   { key: "processed", label: "Processed (Paid)" },
   { key: "shipped", label: "Shipped" },
   { key: "completed", label: "Completed" },
@@ -54,6 +61,10 @@ function formatMoney(value, currency = "USD") {
   }
 }
 
+function joinAddress(parts) {
+  return parts.filter(Boolean).join(", ") || "—";
+}
+
 function mapProcessingOrder(order) {
   const raw = order.raw_data ?? {};
   const lineItems = raw.lineItems ?? [];
@@ -73,23 +84,37 @@ function mapProcessingOrder(order) {
     title: order.item_title ?? firstItem.title ?? "Order item",
     image: firstItem.image?.imageUrl ?? order.listing_image_url ?? PLACEHOLDER_IMAGE,
     ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
+    orderDetailUrl: getEbayOrderDetailUrl(order.ebay_order_id ?? raw.orderId, order.connection?.site_id),
+    siteId: order.connection?.site_id ?? null,
     orderDate: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     buyerName: shipTo.fullName ?? buyer.buyerRegistrationAddress?.fullName ?? order.buyer_name ?? "—",
-    location: [shipTo.contactAddress?.city ?? shipTo.city, shipTo.contactAddress?.countryCode ?? shipTo.countryCode]
-      .filter(Boolean)
-      .join(", ") || "—",
+    shippingAddress: joinAddress([
+      shipTo.contactAddress?.addressLine1 ?? shipTo.addressLine1,
+      shipTo.contactAddress?.addressLine2 ?? shipTo.addressLine2,
+      shipTo.contactAddress?.city ?? shipTo.city,
+      shipTo.contactAddress?.stateOrProvince ?? shipTo.stateOrProvince,
+      shipTo.contactAddress?.postalCode ?? shipTo.postalCode,
+      shipTo.contactAddress?.countryCode ?? shipTo.countryCode,
+    ]),
+    buyerPhone: shipTo.primaryPhone?.phoneNumber ?? buyer.primaryPhone?.phoneNumber ?? "—",
     sellPrice: Number(sellPrice) || 0,
     currency,
     itemBuy: sourceProductId ?? "—",
     itemBuyUrl: buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl),
     sourceUrl,
     sourcePlatform,
+    sourceSkuId: order.source_sku_id ?? null,
     hasSource: Boolean(sourceProductId || sourceUrl),
     buyPrice: order.buy_price != null ? Number(order.buy_price) : null,
     aliexpressOrderId: order.aliexpress_order_id ?? "",
     aliexpressOrderStatus: order.aliexpress_order_status ?? "",
     processingStatus: order.processing_status ?? "new",
     processingMethod: order.processing_method ?? "",
+    trackingNumber: order.tracking_number ?? fulfillment.shippingStep?.shipmentTrackingNumber ?? "",
+    carrier:
+      normalizeTrackingCarrier(order.carrier) ||
+      normalizeTrackingCarrier(fulfillment.shippingStep?.shippingCarrierCode) ||
+      "",
   };
 }
 
@@ -103,14 +128,17 @@ function OrderProcessingContent() {
   const [activeTab, setActiveTab] = useState("new");
   const [processingMethod, setProcessingMethod] = useState("autods");
   const [buyerAccounts, setBuyerAccounts] = useState([]);
+  const [buyerAccountsError, setBuyerAccountsError] = useState("");
   const [selectedBuyerAccountId, setSelectedBuyerAccountId] = useState("");
+
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [transferAmountDraft, setTransferAmountDraft] = useState("");
   const [transferring, setTransferring] = useState(false);
 
-  const [editingSourceId, setEditingSourceId] = useState("");
-  const [sourceDraft, setSourceDraft] = useState("");
+  const [editingSourceOrder, setEditingSourceOrder] = useState(null);
   const [savingSourceId, setSavingSourceId] = useState("");
 
   const [editingCostId, setEditingCostId] = useState("");
@@ -130,7 +158,9 @@ function OrderProcessingContent() {
     setLoading(true);
     try {
       const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
-      setOrders((res.data?.data ?? []).map(mapProcessingOrder));
+      const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
+      setOrders(mapped.filter((order) => order.sourcePlatform === "aliexpress"));
+      setSelectedIds([]);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to load orders."));
       setOrders([]);
@@ -153,15 +183,13 @@ function OrderProcessingContent() {
       const res = await getBuyerAccounts();
       const accounts = (res.data?.accounts ?? []).filter((account) => account.is_active);
       setBuyerAccounts(accounts);
-      setSelectedBuyerAccountId((current) => {
-        if (current && accounts.some((account) => String(account.id) === String(current))) {
-          return current;
-        }
-        const primary = accounts.find((account) => account.is_primary) ?? accounts[0];
-        return primary ? String(primary.id) : "";
-      });
-    } catch {
+      setBuyerAccountsError("");
+      setSelectedBuyerAccountId((current) =>
+        current && accounts.some((account) => String(account.id) === current) ? current : "",
+      );
+    } catch (err) {
       setBuyerAccounts([]);
+      setBuyerAccountsError(getApiErrorMessage(err, "Could not load buyer accounts."));
     }
   };
 
@@ -180,6 +208,18 @@ function OrderProcessingContent() {
     [orders],
   );
 
+  // A buyer account tagged for the order's own eBay marketplace is preferred;
+  // an untagged account (no marketplaces assigned) is used as a fallback for
+  // any marketplace with no dedicated account — mirrors the backend's
+  // BuyerAccount::resolveForMarketplace() resolution order. An explicit manual
+  // selection always overrides this (the backend honors buyer_account_id when set).
+  const hasBuyerAccountForSite = (siteId) => {
+    if (selectedBuyerAccountId) {
+      return true;
+    }
+    return buyerAccounts.some((account) => !account.site_ids?.length || account.site_ids.includes(siteId));
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -194,28 +234,24 @@ function OrderProcessingContent() {
   };
 
   const startEditSource = (order) => {
-    setEditingSourceId(order.id);
-    setSourceDraft(order.sourceUrl ?? (order.itemBuy !== "—" ? order.itemBuy : ""));
+    setEditingSourceOrder(order);
   };
 
-  const saveSource = async () => {
-    const order = orders.find((item) => item.id === editingSourceId);
-    const trimmed = sourceDraft.trim();
-    if (!order || !trimmed) {
-      toast.error("Enter a source link or item ID.");
+  const cancelEditSource = () => {
+    setEditingSourceOrder(null);
+  };
+
+  const saveSource = async (payload) => {
+    const order = editingSourceOrder;
+    if (!order) {
       return;
     }
 
     setSavingSourceId(order.id);
     try {
-      const source = normalizeListingSourceInput(trimmed, order.sourcePlatform);
-      const res = await updateOrderSource(order.id, {
-        source_input: source.source_input,
-        source_platform: source.source_platform,
-      });
+      const res = await updateOrderSource(order.id, payload);
       toast.success(res.data?.message ?? "Source link updated.");
-      setEditingSourceId("");
-      setSourceDraft("");
+      cancelEditSource();
       await loadOrders();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not update source link."));
@@ -282,8 +318,8 @@ function OrderProcessingContent() {
   };
 
   const handleProcessOrder = async (order) => {
-    if (processingMethod === "buyer" && !selectedBuyerAccountId) {
-      toast.warn("Connect and select a buyer account in Settings → Buyer Accounts first.");
+    if (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)) {
+      toast.warn("Connect or tag a buyer account for this order's marketplace in Settings → Buyer Accounts first.");
       return;
     }
 
@@ -291,17 +327,89 @@ function OrderProcessingContent() {
     try {
       const res = await placeAliExpressOrder(order.id, {
         processing_method: processingMethod,
-        buyer_account_id: processingMethod === "buyer" ? Number(selectedBuyerAccountId) : undefined,
+        buyer_account_id:
+          processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
       });
       toast.success(res.data?.message ?? "Order processed.");
       setOrders((current) => current.filter((item) => item.id !== order.id));
+      setSelectedIds((current) => current.filter((id) => id !== order.id));
       if (processingMethod === "autods") {
         loadWallet();
       }
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Could not process this order."));
+      toast.error(getApiErrorMessage(err, "Could not process this order."), { autoClose: 8000 });
     } finally {
       setProcessingId("");
+    }
+  };
+
+  const allSelected = orders.length > 0 && orders.every((order) => selectedIds.includes(order.id));
+
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? [] : orders.map((order) => order.id));
+  };
+
+  const toggleSelectOrder = (id) => {
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
+  };
+
+  const handleBulkProcess = async () => {
+    const selected = orders.filter((order) => selectedIds.includes(order.id) && order.hasSource && !order.aliexpressOrderId);
+
+    if (!selected.length) {
+      toast.warn("Select orders with a source link that haven't been processed yet.");
+      return;
+    }
+
+    const eligible =
+      processingMethod === "buyer" ? selected.filter((order) => hasBuyerAccountForSite(order.siteId)) : selected;
+    const skippedForBuyerAccount = selected.length - eligible.length;
+
+    if (!eligible.length) {
+      toast.warn("None of the selected orders have a buyer account tagged for their marketplace. Tag one in Settings → Buyer Accounts.");
+      return;
+    }
+
+    setBulkProcessing(true);
+    let succeeded = 0;
+    let failed = 0;
+    const failureMessages = new Set();
+
+    for (const order of eligible) {
+      setProcessingId(order.id);
+      try {
+        await placeAliExpressOrder(order.id, {
+          processing_method: processingMethod,
+          buyer_account_id:
+            processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
+        });
+        succeeded += 1;
+      } catch (err) {
+        failed += 1;
+        failureMessages.add(getApiErrorMessage(err, "Could not process this order."));
+      }
+    }
+
+    setProcessingId("");
+    setBulkProcessing(false);
+    setSelectedIds([]);
+
+    if (succeeded) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} processed.`);
+    if (failed) {
+      const reasons = Array.from(failureMessages).slice(0, 2).join(" · ");
+      toast.error(`${failed} order${failed === 1 ? "" : "s"} could not be processed: ${reasons}`, { autoClose: 8000 });
+    }
+    if (skippedForBuyerAccount) {
+      toast.warn(
+        `${skippedForBuyerAccount} order${skippedForBuyerAccount === 1 ? "" : "s"} skipped — no buyer account tagged for their marketplace.`,
+      );
+    }
+
+    if (succeeded) {
+      await loadOrders();
+      if (processingMethod === "autods") {
+        loadWallet();
+      }
     }
   };
 
@@ -384,19 +492,32 @@ function OrderProcessingContent() {
             </div>
 
             {processingMethod === "buyer" ? (
-              buyerAccounts.length ? (
-                <select
-                  className="order-processing-buyer-select"
-                  value={selectedBuyerAccountId}
-                  onChange={(event) => setSelectedBuyerAccountId(event.target.value)}
-                  aria-label="Buyer account"
-                >
-                  {buyerAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.nickname || account.ae_user_nick || `Buyer account #${account.id}`}
-                    </option>
-                  ))}
-                </select>
+              buyerAccountsError ? (
+                <span className="order-processing-buyer-hint order-processing-buyer-hint--error">
+                  Could not load buyer accounts: {buyerAccountsError}
+                </span>
+              ) : buyerAccounts.length ? (
+                <>
+                  <select
+                    className="order-processing-buyer-select"
+                    value={selectedBuyerAccountId}
+                    onChange={(event) => setSelectedBuyerAccountId(event.target.value)}
+                    aria-label="Buyer account"
+                  >
+                    <option value="">Auto (match order's marketplace)</option>
+                    {buyerAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.nickname || account.ae_user_nick || `Buyer account #${account.id}`}
+                        {account.site_ids?.length ? ` (${account.site_ids.map((id) => id.replace("EBAY_", "")).join(", ")})` : " (any marketplace)"}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedBuyerAccountId ? (
+                    <span className="order-processing-buyer-hint">
+                      Each order auto-uses the buyer account tagged for its own eBay marketplace
+                    </span>
+                  ) : null}
+                </>
               ) : (
                 <span className="order-processing-buyer-hint">
                   Connect a buyer account in Settings → Buyer Accounts
@@ -439,6 +560,20 @@ function OrderProcessingContent() {
       <section className="calculations-table-panel card-wrapper">
         <div className="calculations-table-toolbar">
           <strong>{orders.length} orders</strong>
+          {selectedIds.length ? (
+            <div className="order-processing-bulk-bar">
+              <span>{selectedIds.length} selected</span>
+              <button
+                type="button"
+                className="order-processing-bulk-bar__btn"
+                onClick={handleBulkProcess}
+                disabled={bulkProcessing}
+              >
+                {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="orders-table-shell">
@@ -446,6 +581,9 @@ function OrderProcessingContent() {
             <table className="orders-table calculations-table">
               <thead>
                 <tr>
+                  <th className="orders-table__checkbox-col">
+                    <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all orders" />
+                  </th>
                   <th>Order</th>
                   <th>Date</th>
                   <th>Buyer</th>
@@ -454,6 +592,7 @@ function OrderProcessingContent() {
                   <th>Cost</th>
                   <th>AliExpress Order ID</th>
                   <th>AliExpress Status</th>
+                  <th>Tracking</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -461,7 +600,7 @@ function OrderProcessingContent() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td className="orders-table__empty" colSpan={9}>
+                    <td className="orders-table__empty" colSpan={11}>
                       <LuRefreshCcw className="spin-icon" />
                       <span>Loading orders…</span>
                     </td>
@@ -469,6 +608,14 @@ function OrderProcessingContent() {
                 ) : orders.length ? (
                   orders.map((order) => (
                     <tr className="orders-table__row" key={order.id}>
+                      <td className="orders-table__checkbox-col">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(order.id)}
+                          onChange={() => toggleSelectOrder(order.id)}
+                          aria-label={`Select order ${order.ebayOrderId}`}
+                        />
+                      </td>
                       <td>
                         <div className="orders-product calculations-product">
                           <div className="orders-product__thumb">
@@ -476,7 +623,20 @@ function OrderProcessingContent() {
                           </div>
                           <div className="orders-product__copy calculations-product__copy">
                             <h3>{order.title}</h3>
-                            <p className="calculations-product__description">{order.ebayOrderId}</p>
+                            <p className="calculations-product__description">
+                              {order.orderDetailUrl ? (
+                                <a
+                                  href={order.orderDetailUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="orders-order-id-link"
+                                >
+                                  {order.ebayOrderId}
+                                </a>
+                              ) : (
+                                order.ebayOrderId
+                              )}
+                            </p>
                           </div>
                         </div>
                       </td>
@@ -484,7 +644,8 @@ function OrderProcessingContent() {
                       <td>
                         <div className="orders-table__buyer-cell">
                           <strong>{order.buyerName}</strong>
-                          <span>{order.location}</span>
+                          <span>{order.shippingAddress}</span>
+                          {order.buyerPhone !== "—" ? <span>{order.buyerPhone}</span> : null}
                         </div>
                       </td>
                       <td className="calculations-table__money">{formatMoney(order.sellPrice, order.currency)}</td>
@@ -541,6 +702,18 @@ function OrderProcessingContent() {
                         </button>
                       </td>
                       <td>
+                        {order.trackingNumber ? (
+                          <div className="orders-tracking-display">
+                            <span className="orders-tracking-display__copy">
+                              <span className="orders-table__mono">{order.trackingNumber}</span>
+                              {order.carrier ? <span className="orders-table__carrier">{order.carrier}</span> : null}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="products-tracking-btn__placeholder">—</span>
+                        )}
+                      </td>
+                      <td>
                         <div className="order-processing-actions">
                           <button
                             type="button"
@@ -550,14 +723,16 @@ function OrderProcessingContent() {
                               processingId === order.id ||
                               !order.hasSource ||
                               Boolean(order.aliexpressOrderId) ||
-                              (processingMethod === "buyer" && !selectedBuyerAccountId)
+                              (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId))
                             }
                             title={
                               !order.hasSource
                                 ? "Add a source link before processing"
                                 : order.aliexpressOrderId
                                   ? "Already placed on AliExpress"
-                                  : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
+                                  : processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)
+                                    ? "No buyer account is tagged for this order's marketplace — tag one in Settings → Buyer Accounts"
+                                    : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
                             }
                           >
                             {processingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
@@ -569,7 +744,7 @@ function OrderProcessingContent() {
                   ))
                 ) : (
                   <tr>
-                    <td className="orders-table__empty" colSpan={9}>
+                    <td className="orders-table__empty" colSpan={11}>
                       <LuClipboardList />
                       <span>No orders in this tab.</span>
                     </td>
@@ -581,17 +756,12 @@ function OrderProcessingContent() {
         </div>
       </section>
 
-      <QuickEditModal
-        open={Boolean(editingSourceId)}
-        title="Edit Source Link"
-        description="Paste the AliExpress URL or item ID this order should be fulfilled from."
-        label="Source link or item ID"
-        value={sourceDraft}
-        onChange={setSourceDraft}
+      <OrderSourceModal
+        open={Boolean(editingSourceOrder)}
+        order={editingSourceOrder}
+        saving={Boolean(editingSourceOrder) && savingSourceId === editingSourceOrder.id}
+        onClose={cancelEditSource}
         onSave={saveSource}
-        onClose={() => setEditingSourceId("")}
-        saving={Boolean(savingSourceId)}
-        placeholder="https://www.aliexpress.com/item/... or item ID"
       />
 
       <QuickEditModal

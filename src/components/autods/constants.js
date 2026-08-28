@@ -561,6 +561,9 @@ export const MARKETPLACE_COUNTRIES = [
 export const ADMIN_MODULES = [
   { key: "dashboard", label: "Dashboard" },
   { key: "clients", label: "Clients" },
+  { key: "listings", label: "All Listings" },
+  { key: "orders", label: "All Orders" },
+  { key: "wallet_deposits", label: "Wire Transfer Deposits" },
   { key: "plans", label: "Plans" },
   { key: "categories", label: "Categories" },
   { key: "trending_products", label: "Trending Products" },
@@ -575,6 +578,7 @@ export const orderRowPrintActions = [
   { id: "generate-packing-slip", label: "Generate Packing Slip" },
   { id: "generate-pick-list", label: "Generate Pick List" },
   { id: "generate-barcode", label: "Generate Barcode" },
+  { id: "generate-shipping-label", label: "Print Shipping Label" },
 ];
 
 /** 3Dsellers row Actions column — bolt dropdown */
@@ -589,6 +593,7 @@ export const orderRowBoltActions = [
   { id: "cancel-order", label: "Cancel order" },
   { id: "generate-invoice", label: "Generate Invoice" },
   { id: "generate-barcode", label: "Generate Barcode" },
+  { id: "generate-shipping-label", label: "Print Shipping Label" },
 ];
 
 export const profileMenuItems = [

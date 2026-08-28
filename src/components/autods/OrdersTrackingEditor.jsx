@@ -17,9 +17,9 @@ export default function OrdersTrackingEditor({
   onPushToEbay,
 }) {
   const detectedCarrier = detectTrackingCarrier(trackingDraft);
-  const resolvedCarrier = carrierDraft || detectedCarrier || order.carrierRaw || "";
+  const resolvedCarrier = carrierDraft || order.carrierRaw || "";
   const canPush = Boolean(order.trackingNumberRaw?.trim() && resolvedCarrier);
-  const carrierLabel = order.carrierRaw || detectTrackingCarrier(order.trackingNumberRaw) || "";
+  const carrierLabel = order.carrierRaw || "";
 
   useEffect(() => {
     if (!isEditing) {

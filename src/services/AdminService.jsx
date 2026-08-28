@@ -18,6 +18,24 @@ export const updateAdminUser = (id, data) =>
 export const deleteAdminUser = (id) =>
     axiosInstance.delete(`/admin/users/${id}`);
 
+export const getAdminListings = (params = {}) =>
+    axiosInstance.get('/admin/listings', { params });
+
+export const getAdminOrders = (params = {}) =>
+    axiosInstance.get('/admin/orders', { params });
+
+export const getAdminWalletDeposits = (params = {}) =>
+    axiosInstance.get('/admin/wallet-deposits', { params });
+
+export const getAdminWalletDepositScreenshot = (id) =>
+    axiosInstance.get(`/admin/wallet-deposits/${id}/screenshot`, { responseType: 'blob' });
+
+export const approveAdminWalletDeposit = (id) =>
+    axiosInstance.post(`/admin/wallet-deposits/${id}/approve`);
+
+export const rejectAdminWalletDeposit = (id, reason) =>
+    axiosInstance.post(`/admin/wallet-deposits/${id}/reject`, { reason });
+
 export const getAdminAliExpressStatus = () =>
     axiosInstance.get('/admin/aliexpress/status');
 

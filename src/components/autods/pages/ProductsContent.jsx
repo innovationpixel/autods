@@ -21,7 +21,7 @@ import {
   LuTrash2,
   LuX,
 } from "react-icons/lu";
-import { buildEbayListingProductUrl, buildPaginationItems, buildSourceProductUrl, formatDisplayDate, getListingImageUrl, normalizeListingSourceInput } from "../helpers";
+import { buildEbayListingProductUrl, buildPaginationItems, buildSourceProductUrl, formatDisplayDate, getListingImageUrl } from "../helpers";
 import {
   selectEbayConnected,
   selectEbayConnections,
@@ -39,6 +39,7 @@ import { bulkDeleteProducts, deleteProduct, getImportHistory, publishProduct, sy
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
 import ProductEditorModal from "../ProductEditorModal";
 import QuickEditModal from "../QuickEditModal";
+import OrderSourceModal from "../OrderSourceModal";
 import ConfirmModal from "../ConfirmModal";
 import { buildDraftFormState, serializeDraftFormForApi } from "../../../utils/draftEditorState";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
@@ -121,6 +122,9 @@ function mapListingRow(item) {
     itemBuyUrl,
     itemSellUrl,
     asin,
+    sourceUrl: item.source_url ?? null,
+    sourcePlatform: item.source_platform ?? "aliexpress",
+    sourceSkuId: item.source_sku_id ?? null,
     dws: item.days_without_sale ?? "—",
     warning: item.import_status === "failed" || available === 0,
   };
@@ -152,8 +156,7 @@ function ProductsContent({ searchQuery }) {
   const [editingStockId, setEditingStockId] = useState("");
   const [stockDraft, setStockDraft] = useState("");
   const [savingStockId, setSavingStockId] = useState("");
-  const [editingBuySourceId, setEditingBuySourceId] = useState("");
-  const [buySourceDraft, setBuySourceDraft] = useState("");
+  const [editingBuySourceItem, setEditingBuySourceItem] = useState(null);
   const [savingBuySourceId, setSavingBuySourceId] = useState("");
   const [editingSellIdId, setEditingSellIdId] = useState("");
   const [sellIdDraft, setSellIdDraft] = useState("");
@@ -247,32 +250,23 @@ function ProductsContent({ searchQuery }) {
   };
 
   const startEditBuySource = (item) => {
-    setEditingBuySourceId(item.id);
-    setBuySourceDraft(item.source_url ?? (item.itemBuy !== "—" ? item.itemBuy : ""));
+    setEditingBuySourceItem(item);
     setOpenMenuId("");
   };
 
   const cancelEditBuySource = () => {
-    setEditingBuySourceId("");
-    setBuySourceDraft("");
+    setEditingBuySourceItem(null);
   };
 
-  const saveBuySource = async (item) => {
-    const trimmed = buySourceDraft.trim();
-    if (!trimmed) {
-      toast.error("Enter a source link or item ID.");
+  const saveBuySource = async (payload) => {
+    const item = editingBuySourceItem;
+    if (!item) {
       return;
     }
 
     setSavingBuySourceId(item.id);
     try {
-      const source = normalizeListingSourceInput(trimmed, item.source_platform);
-      const res = await updateProduct(item.id, {
-        source_input: source.source_input,
-        source_url: source.source_url,
-        source_product_id: source.source_product_id,
-        source_platform: source.source_platform,
-      });
+      const res = await updateProduct(item.id, payload);
       toast.success(res.data?.message ?? "Source link updated.");
       cancelEditBuySource();
       loadListings();
@@ -1136,17 +1130,12 @@ function ProductsContent({ searchQuery }) {
         onClose={closeProductEditor}
       />
 
-      <QuickEditModal
-        open={Boolean(editingBuySourceId)}
-        title="Edit Source Link"
-        description="Paste the AliExpress (or other supplier) URL or item ID this product was sourced from."
-        label="Source link or item ID"
-        value={buySourceDraft}
-        onChange={setBuySourceDraft}
-        onSave={() => saveBuySource(rows.find((row) => row.id === editingBuySourceId))}
+      <OrderSourceModal
+        open={Boolean(editingBuySourceItem)}
+        order={editingBuySourceItem}
+        saving={Boolean(editingBuySourceItem) && savingBuySourceId === editingBuySourceItem.id}
         onClose={cancelEditBuySource}
-        saving={savingBuySourceId === editingBuySourceId}
-        placeholder="https://www.aliexpress.com/item/... or item ID"
+        onSave={saveBuySource}
       />
 
       <QuickEditModal

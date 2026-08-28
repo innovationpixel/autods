@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost, updateOrderFulfillment } from "../../../services/OrderService";
+import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost, updateOrderFulfillment, updateOrderSource } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -25,11 +25,14 @@ import {
   formatCalculationRoi,
   formatDisplayDate,
   mapApiOrderToCalculationRow,
+  platformLabel,
   summarizeCalculations,
 } from "../helpers";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import InviteSheetMembersModal from "../InviteSheetMembersModal";
 import QuickEditModal from "../QuickEditModal";
+import OrderSourceModal from "../OrderSourceModal";
+import ProductItemIdCell from "../ProductItemIdCell";
 import PageFilterPanel from "../PageFilterPanel";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import { orderStatusOptions } from "../constants";
@@ -100,6 +103,8 @@ function CalculationsContent({ searchQuery = "" }) {
   const [editingField, setEditingField] = useState(null);
   const [fieldDraft, setFieldDraft] = useState("");
   const [savingField, setSavingField] = useState(null);
+  const [editingBuySourceOrder, setEditingBuySourceOrder] = useState(null);
+  const [savingBuySourceId, setSavingBuySourceId] = useState("");
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleCalculationColumnIds);
 
   const [showFilters, setShowFilters] = useState(false);
@@ -294,6 +299,36 @@ function CalculationsContent({ searchQuery = "" }) {
   const handleVisibleColumnsChange = (nextIds) => {
     setVisibleColumnIds(nextIds);
     saveVisibleCalculationColumnIds(nextIds);
+  };
+
+  const startEditBuySource = (row) => {
+    setEditingBuySourceOrder(row);
+  };
+
+  const cancelEditBuySource = () => {
+    setEditingBuySourceOrder(null);
+  };
+
+  const saveBuySource = async (payload) => {
+    const row = editingBuySourceOrder;
+    if (!row) {
+      return;
+    }
+
+    setSavingBuySourceId(row.id);
+    try {
+      const res = await updateOrderSource(row.id, payload);
+      const updatedOrder = res.data?.order ?? {};
+      setOrders((current) =>
+        current.map((order) => (String(order.id) === row.id ? { ...order, ...updatedOrder } : order)),
+      );
+      toast.success(res.data?.message ?? "Source link updated.");
+      setEditingBuySourceOrder(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update source link."));
+    } finally {
+      setSavingBuySourceId("");
+    }
   };
 
   const calculationRows = useMemo(
@@ -548,6 +583,39 @@ function CalculationsContent({ searchQuery = "" }) {
 
   const renderCalculationCell = (row, columnId, StatusIcon) => {
     switch (columnId) {
+      case "itemId":
+        return (
+          <div className="orders-paired-values">
+            <div>
+              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__platform">{platformLabel(row.sourcePlatform)}</span>
+              <div className="products-source-cell">
+                {row.hasSource ? (
+                  <ProductItemIdCell itemId={row.itemBuy} url={row.itemBuyUrl} />
+                ) : (
+                  <span className="products-source-btn__placeholder">Add source</span>
+                )}
+                <button
+                  type="button"
+                  className="products-source-cell__edit"
+                  onClick={() => startEditBuySource(row)}
+                  title="Edit source link"
+                  aria-label="Edit source link"
+                >
+                  <LuPencil />
+                </button>
+              </div>
+              {row.sourceVariationText ? (
+                <span className="orders-source-cell__variation">{row.sourceVariationText}</span>
+              ) : null}
+            </div>
+            <div>
+              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__platform">eBay</span>
+              <ProductItemIdCell itemId={row.itemSell} sku={row.sku} url={row.itemSellUrl} />
+            </div>
+          </div>
+        );
       case "itemTracking":
         return (
           <div className="calculations-item-tracking">
@@ -878,6 +946,14 @@ function CalculationsContent({ searchQuery = "" }) {
           savingField && editingField && savingField.id === editingField.id && savingField.field === editingField.field,
         )}
         placeholder="0.00"
+      />
+
+      <OrderSourceModal
+        open={Boolean(editingBuySourceOrder)}
+        order={editingBuySourceOrder}
+        saving={Boolean(editingBuySourceOrder) && savingBuySourceId === editingBuySourceOrder.id}
+        onClose={cancelEditBuySource}
+        onSave={saveBuySource}
       />
 
       <section className="calculations-table-panel card-wrapper">

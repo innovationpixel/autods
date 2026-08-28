@@ -46,8 +46,13 @@ function formatScheduledPreview(date, time) {
   });
 }
 
-function formatTimeOnly(ms) {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+function formatDayTime(ms) {
+  return new Date(ms).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /**
@@ -81,16 +86,62 @@ function buildRandomTimes(startMs, endMs, count, minGapMs) {
   return times;
 }
 
-// Random Hours only asks the user for a date — the spread window and minimum
-// gap between listings are fixed so the flow stays a single click.
+function enumerateDays(fromDate, toDate) {
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+    return [];
+  }
+
+  const days = [];
+  for (let cursor = start; cursor <= end; cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000)) {
+    days.push(toDateInputValue(cursor));
+  }
+  return days;
+}
+
+/**
+ * Spreads `count` listings across every day from fromDate to toDate (inclusive),
+ * each day still confined to the daily RANDOM_FROM_TIME–RANDOM_TO_TIME window so
+ * nothing publishes overnight — listings are divided evenly across the days, then
+ * randomized within each day the same way a single-day spread already works.
+ */
+function buildRandomTimesAcrossDays(days, count) {
+  if (!days.length || count <= 0) {
+    return [];
+  }
+
+  const perDay = Math.ceil(count / days.length);
+  const times = [];
+  let remaining = count;
+
+  days.forEach((day, index) => {
+    if (remaining <= 0) {
+      return;
+    }
+
+    const dayCount = index === days.length - 1 ? remaining : Math.min(perDay, remaining);
+    remaining -= dayCount;
+
+    const startMs = new Date(`${day}T${RANDOM_FROM_TIME}:00`).getTime();
+    const endMs = new Date(`${day}T${RANDOM_TO_TIME}:00`).getTime();
+    times.push(...buildRandomTimes(startMs, endMs, dayCount, RANDOM_MIN_GAP_MINUTES * 60000));
+  });
+
+  return times.sort((a, b) => a - b);
+}
+
+// Random Hours asks for a date range — the daily spread window and minimum gap
+// between listings are fixed so the flow stays quick.
 const RANDOM_FROM_TIME = "09:00";
 const RANDOM_TO_TIME = "21:00";
 const RANDOM_MIN_GAP_MINUTES = 15;
 
 function defaultRandomWindow() {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tomorrow = toDateInputValue(new Date(Date.now() + 24 * 60 * 60 * 1000));
   return {
-    date: toDateInputValue(tomorrow),
+    fromDate: tomorrow,
+    toDate: tomorrow,
   };
 }
 
@@ -129,21 +180,19 @@ function ScheduleListingModal({
     return toDateInputValue(now);
   }, [open]);
 
-  const randomTimes = useMemo(() => {
-    const startMs = buildScheduledIso(randomWindow.date, RANDOM_FROM_TIME)
-      ? new Date(`${randomWindow.date}T${RANDOM_FROM_TIME}:00`).getTime()
-      : NaN;
-    const endMs = buildScheduledIso(randomWindow.date, RANDOM_TO_TIME)
-      ? new Date(`${randomWindow.date}T${RANDOM_TO_TIME}:00`).getTime()
-      : NaN;
+  const randomDays = useMemo(
+    () => enumerateDays(randomWindow.fromDate, randomWindow.toDate),
+    [randomWindow],
+  );
 
-    if (Number.isNaN(startMs) || Number.isNaN(endMs) || mode !== "random") {
+  const randomTimes = useMemo(() => {
+    if (mode !== "random" || !randomDays.length) {
       return [];
     }
 
-    return buildRandomTimes(startMs, endMs, drafts.length, RANDOM_MIN_GAP_MINUTES * 60000);
+    return buildRandomTimesAcrossDays(randomDays, drafts.length);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, randomWindow, drafts.length, shuffleSeed]);
+  }, [mode, randomDays, drafts.length, shuffleSeed]);
 
   if (!open) {
     return null;
@@ -300,26 +349,46 @@ function ScheduleListingModal({
           <>
             <div className="schedule-modal__fields">
               <label className="schedule-modal__field">
-                <span>Date</span>
+                <span>From date</span>
                 <div className="schedule-modal__input-wrap">
                   <LuCalendar aria-hidden="true" />
                   <input
                     type="date"
-                    value={randomWindow.date}
+                    value={randomWindow.fromDate}
                     min={minDate}
-                    onChange={(event) => setRandomWindow((current) => ({ ...current, date: event.target.value }))}
+                    onChange={(event) =>
+                      setRandomWindow((current) => {
+                        const fromDate = event.target.value;
+                        const toDate = current.toDate < fromDate ? fromDate : current.toDate;
+                        return { fromDate, toDate };
+                      })
+                    }
+                  />
+                </div>
+              </label>
+
+              <label className="schedule-modal__field">
+                <span>To date</span>
+                <div className="schedule-modal__input-wrap">
+                  <LuCalendar aria-hidden="true" />
+                  <input
+                    type="date"
+                    value={randomWindow.toDate}
+                    min={randomWindow.fromDate || minDate}
+                    onChange={(event) => setRandomWindow((current) => ({ ...current, toDate: event.target.value }))}
                   />
                 </div>
               </label>
             </div>
 
             <p className="schedule-modal__hint">
-              Each listing gets a random time between {formatTimeOnly(new Date(`${randomWindow.date}T${RANDOM_FROM_TIME}:00`).getTime())}
-              {" "}and {formatTimeOnly(new Date(`${randomWindow.date}T${RANDOM_TO_TIME}:00`).getTime())}, at least {RANDOM_MIN_GAP_MINUTES} minutes apart.
+              Each listing gets a random time between {RANDOM_FROM_TIME} and {RANDOM_TO_TIME} on one of the{" "}
+              {randomDays.length || 0} day{randomDays.length === 1 ? "" : "s"} in this range, at least{" "}
+              {RANDOM_MIN_GAP_MINUTES} minutes apart from others on the same day.
             </p>
 
             <div className="schedule-modal__random-head">
-              <span>{count} listings will be spread across this window, in random order.</span>
+              <span>{count} listings will be spread across this range, in random order.</span>
               <button
                 type="button"
                 className="schedule-modal__shuffle-btn"
@@ -336,7 +405,7 @@ function ScheduleListingModal({
                   <span className="schedule-modal__queue-index">{index + 1}</span>
                   <span className="schedule-modal__queue-title">{draft.title}</span>
                   <span className="schedule-modal__queue-time">
-                    {randomTimes[index] ? formatTimeOnly(randomTimes[index]) : "—"}
+                    {randomTimes[index] ? formatDayTime(randomTimes[index]) : "—"}
                   </span>
                 </li>
               ))}
@@ -348,7 +417,7 @@ function ScheduleListingModal({
 
             {randomWindowInvalid ? (
               <p className="schedule-modal__error">
-                The scheduled window must be in the future.
+                The scheduled range must be in the future.
               </p>
             ) : null}
           </>

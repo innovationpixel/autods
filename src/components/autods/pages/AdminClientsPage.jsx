@@ -12,6 +12,7 @@ import {
   getAdminUsers,
   updateAdminUser,
 } from "../../../services/AdminService";
+import AdminSortableHeader from "../AdminSortableHeader";
 
 const emptyClientForm = {
   name: "",
@@ -55,6 +56,10 @@ function AdminClientsPage() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [plans, setPlans] = useState([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [planFilter, setPlanFilter] = useState("");
+  const [sort, setSort] = useState("created_at");
+  const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -77,6 +82,10 @@ function AdminClientsPage() {
       per_page: 15,
       search: search.trim() || undefined,
       role: "client",
+      is_active: statusFilter || undefined,
+      plan_id: planFilter || undefined,
+      sort,
+      sort_dir: sortDir,
     })
       .then((res) => {
         setClients(res.data?.data ?? []);
@@ -88,7 +97,13 @@ function AdminClientsPage() {
       })
       .catch(() => toast.error("Failed to load clients."))
       .finally(() => setLoading(false));
-  }, [page, search]);
+  }, [page, search, statusFilter, planFilter, sort, sortDir]);
+
+  const handleSort = (key, dir) => {
+    setSort(key);
+    setSortDir(dir);
+    setPage(1);
+  };
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -205,7 +220,7 @@ function AdminClientsPage() {
         </button>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
         <label className="admin-clients-page__search">
           <LuSearch />
           <input
@@ -216,7 +231,27 @@ function AdminClientsPage() {
             onChange={(event) => { setSearch(event.target.value); setPage(1); }}
           />
         </label>
-        <span className="admin-clients-page__count">{meta.total} clients</span>
+
+        <label className="admin-filters-bar__field">
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Disabled</option>
+          </select>
+        </label>
+
+        <label className="admin-filters-bar__field">
+          <span>Plan</span>
+          <select value={planFilter} onChange={(event) => { setPlanFilter(event.target.value); setPage(1); }}>
+            <option value="">All plans</option>
+            {plans.map((plan) => (
+              <option key={plan.id} value={plan.id}>{plan.title}</option>
+            ))}
+          </select>
+        </label>
+
+        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} clients</span>
       </div>
 
       {loading ? (
@@ -229,12 +264,12 @@ function AdminClientsPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Client</th>
+                <AdminSortableHeader label="Client" sortKey="name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th>Plan</th>
-                <th>Wallet</th>
-                <th>Activity</th>
+                <AdminSortableHeader label="Wallet" sortKey="wallet_balance" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Activity" sortKey="orders_count" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th>Status</th>
-                <th>Joined</th>
+                <AdminSortableHeader label="Joined" sortKey="created_at" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th aria-label="Actions" />
               </tr>
             </thead>

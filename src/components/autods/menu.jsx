@@ -49,6 +49,9 @@ export const sidebarGroups = [
 export const adminSidebarItems = [
   { label: "Dashboard", page: "admin", icon: LuGauge, marker: "#c4b5fd" },
   { label: "Clients", page: "admin/clients", icon: LuUsers, marker: "#93c5fd" },
+  { label: "All Listings", page: "admin/listings", icon: LuPackage2, marker: "#9ad2c0" },
+  { label: "All Orders", page: "admin/orders", icon: LuClipboardList, marker: "#f1b45c" },
+  { label: "Wire Transfer Deposits", page: "admin/wallet-deposits", icon: LuWalletCards, marker: "#93c5fd" },
   { label: "Plans", page: "admin/plans", icon: LuBadgeCheck, marker: "#f6c6c4" },
   { label: "Categories", page: "admin/categories", icon: LuLayers, marker: "#a5d8ff" },
   { label: "Trending Products", page: "admin/trending-products", icon: LuChartLine, marker: "#ffd8a8" },
@@ -62,6 +65,9 @@ export const adminSidebarItems = [
 export const adminPageModuleMap = {
   "admin": null,
   "admin/clients": "clients",
+  "admin/listings": "listings",
+  "admin/orders": "orders",
+  "admin/wallet-deposits": "wallet_deposits",
   "admin/plans": "plans",
   "admin/categories": "categories",
   "admin/trending-products": "trending_products",
@@ -77,6 +83,9 @@ export const adminPageModuleMap = {
 export const adminPages = [
   "admin",
   "admin/clients",
+  "admin/listings",
+  "admin/orders",
+  "admin/wallet-deposits",
   "admin/plans",
   "admin/categories",
   "admin/trending-products",

@@ -2,6 +2,7 @@ export const CALCULATION_COLUMN_STORAGE_KEY = "autods_calculations_visible_colum
 
 const COLUMN_MIN_WIDTHS = {
   orderId: 140,
+  itemId: 220,
   itemTracking: 190,
   name: 260,
   date: 110,
@@ -22,6 +23,7 @@ const COLUMN_MIN_WIDTHS = {
 
 export const calculationTableColumns = [
   { id: "orderId", label: "Order Id", defaultVisible: true, manage: true },
+  { id: "itemId", label: "Item ID (Buy/Sell/SKU)", defaultVisible: true, manage: true },
   { id: "itemTracking", label: "eBay Item / Tracking", defaultVisible: true, manage: true },
   { id: "name", label: "Name", defaultVisible: true, manage: true },
   { id: "date", label: "Date", defaultVisible: true, manage: true },
@@ -37,7 +39,7 @@ export const calculationTableColumns = [
   { id: "profit", label: "Profit", defaultVisible: true, manage: true },
   { id: "roi", label: "ROI", defaultVisible: true, manage: true },
   { id: "aliexpressOrderId", label: "AliExpress Order ID", defaultVisible: true, manage: true },
-  { id: "aliexpressStatus", label: "AliExpress Status", defaultVisible: true, manage: true },
+  { id: "aliexpressStatus", label: "Source Status", defaultVisible: true, manage: true },
 ].map((column) => ({
   ...column,
   minWidth: COLUMN_MIN_WIDTHS[column.id] ?? 120,

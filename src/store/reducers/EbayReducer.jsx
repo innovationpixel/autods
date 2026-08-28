@@ -3,6 +3,7 @@ export const EBAY_STATUS_SUCCESS  = 'EBAY_STATUS_SUCCESS';
 export const EBAY_STATUS_FAILURE  = 'EBAY_STATUS_FAILURE';
 export const EBAY_DISCONNECT      = 'EBAY_DISCONNECT';
 export const EBAY_SET_PRIMARY     = 'EBAY_SET_PRIMARY';
+export const EBAY_UPDATE_CONNECTION = 'EBAY_UPDATE_CONNECTION';
 
 export const EBAY_LISTINGS_REQUEST = 'EBAY_LISTINGS_REQUEST';
 export const EBAY_LISTINGS_SUCCESS = 'EBAY_LISTINGS_SUCCESS';
@@ -79,6 +80,14 @@ export function EbayReducer(state = initialState, action) {
                     ...c,
                     is_primary: c.id === action.payload,
                 })),
+            };
+
+        case EBAY_UPDATE_CONNECTION:
+            return {
+                ...state,
+                connections: state.connections.map((c) =>
+                    c.id === action.payload?.id ? { ...c, ...action.payload } : c,
+                ),
             };
 
         // ─── Listings ───────────────────────────────────────────────────────────

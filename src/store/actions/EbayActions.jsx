@@ -2,6 +2,7 @@ import {
     getEbayStatus,
     disconnectEbayConnection,
     setEbayPrimary,
+    setEbayConnectionMarketplace,
     syncEbayListings,
     getEbayListings,
     getEbayDrafts,
@@ -10,7 +11,7 @@ import {
 
 import {
     EBAY_STATUS_REQUEST, EBAY_STATUS_SUCCESS, EBAY_STATUS_FAILURE,
-    EBAY_DISCONNECT, EBAY_SET_PRIMARY,
+    EBAY_DISCONNECT, EBAY_SET_PRIMARY, EBAY_UPDATE_CONNECTION,
     EBAY_LISTINGS_REQUEST, EBAY_LISTINGS_SUCCESS, EBAY_LISTINGS_FAILURE,
     EBAY_SYNC_REQUEST, EBAY_SYNC_SUCCESS, EBAY_SYNC_FAILURE,
     EBAY_DRAFTS_REQUEST, EBAY_DRAFTS_SUCCESS, EBAY_DRAFTS_FAILURE,
@@ -85,6 +86,15 @@ export const setEbayPrimaryAction = (id) => (dispatch) => {
             toast.success('Primary eBay account updated.');
         })
         .catch(() => toast.error('Failed to update primary account.'));
+};
+
+export const setEbayConnectionMarketplaceAction = (id, siteId) => (dispatch) => {
+    return setEbayConnectionMarketplace(id, siteId)
+        .then((res) => {
+            dispatch({ type: EBAY_UPDATE_CONNECTION, payload: res.data?.connection });
+            toast.success('Marketplace updated.');
+        })
+        .catch((err) => toast.error(err.response?.data?.error ?? 'Failed to update marketplace.'));
 };
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────

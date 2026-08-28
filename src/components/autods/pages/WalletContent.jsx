@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   LuArrowDownLeft,
   LuArrowUpRight,
+  LuBanknote,
   LuCheck,
   LuCreditCard,
   LuHistory,
@@ -11,6 +12,7 @@ import {
   LuSettings,
   LuShield,
   LuSparkles,
+  LuUpload,
   LuWallet,
 } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
@@ -20,6 +22,7 @@ import {
   confirmWalletDeposit,
   depositWalletPayPal,
   depositWalletStripe,
+  depositWalletWireTransfer,
   getWalletSummary,
   getWalletTransactions,
 } from "../../../services/WalletService";
@@ -55,6 +58,10 @@ function WalletContent() {
   const [checkoutId, setCheckoutId] = useState(null);
   const [selectedAmount, setSelectedAmount] = useState(loadBalanceAmounts[1] ?? 50);
   const [customAmount, setCustomAmount] = useState("");
+  const [showWireForm, setShowWireForm] = useState(false);
+  const [wireScreenshot, setWireScreenshot] = useState(null);
+  const [wireNote, setWireNote] = useState("");
+  const [wireSubmitting, setWireSubmitting] = useState(false);
 
   const currency = summary?.currency ?? "USD";
   const depositAmount = useMemo(() => {
@@ -160,6 +167,32 @@ function WalletContent() {
       toast.error(err.response?.data?.error ?? "Checkout failed.");
     } finally {
       setCheckoutId(null);
+    }
+  };
+
+  const handleWireTransferSubmit = async () => {
+    if (depositAmount < 5 || depositAmount > 10000) {
+      toast.warn("Enter an amount between $5 and $10,000.");
+      return;
+    }
+
+    if (!wireScreenshot) {
+      toast.warn("Upload a screenshot of your payment first.");
+      return;
+    }
+
+    setWireSubmitting(true);
+    try {
+      const res = await depositWalletWireTransfer(depositAmount, wireScreenshot, wireNote.trim() || undefined);
+      toast.success(res.data?.message ?? "Wire transfer submitted for review.");
+      setShowWireForm(false);
+      setWireScreenshot(null);
+      setWireNote("");
+      await loadWallet();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to submit wire transfer.");
+    } finally {
+      setWireSubmitting(false);
     }
   };
 
@@ -298,7 +331,54 @@ function WalletContent() {
               <span>{checkoutId === `paypal-${depositAmount}` ? "Redirecting…" : "Pay with PayPal"}</span>
               {!checkoutId || checkoutId !== `paypal-${depositAmount}` ? <LuArrowUpRight /> : null}
             </button>
+            <button
+              type="button"
+              className="wallet-hub__btn wallet-hub__btn--ghost"
+              onClick={() => setShowWireForm((current) => !current)}
+            >
+              <LuBanknote />
+              <span>Wire Transfer</span>
+            </button>
           </div>
+
+          {showWireForm ? (
+            <div className="wallet-hub__wire-form">
+              <p className="wallet-hub__wire-form-hint">
+                Send {formatMoney(depositAmount, currency)} via bank wire, then upload a screenshot of the payment
+                confirmation. A super admin will review it and credit your wallet once approved.
+              </p>
+
+              <label className="wallet-hub__wire-upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setWireScreenshot(event.target.files?.[0] ?? null)}
+                />
+                <LuUpload />
+                <span>{wireScreenshot ? wireScreenshot.name : "Upload payment screenshot"}</span>
+              </label>
+
+              <label className="wallet-hub__wire-note">
+                <span>Note (optional)</span>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Reference number, sender bank"
+                  value={wireNote}
+                  onChange={(event) => setWireNote(event.target.value)}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="wallet-hub__btn wallet-hub__btn--primary"
+                disabled={wireSubmitting}
+                onClick={handleWireTransferSubmit}
+              >
+                {wireSubmitting ? <LuLoader className="spin-icon" /> : <LuUpload />}
+                <span>{wireSubmitting ? "Submitting…" : "Submit for review"}</span>
+              </button>
+            </div>
+          ) : null}
 
           <div className="wallet-hub__trust">
             <span><LuShield /> Secure checkout</span>

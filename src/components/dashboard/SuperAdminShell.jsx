@@ -16,6 +16,9 @@ import { adminPageModuleMap, adminPages, adminSidebarItems } from "../autods/men
 import SidebarLink from "../autods/SidebarLink";
 import AdminDashboardPage from "../autods/pages/AdminDashboardPage";
 import AdminClientsPage from "../autods/pages/AdminClientsPage";
+import AdminListingsPage from "../autods/pages/AdminListingsPage";
+import AdminOrdersPage from "../autods/pages/AdminOrdersPage";
+import AdminWalletDepositsPage from "../autods/pages/AdminWalletDepositsPage";
 import AdminPlansPage from "../autods/pages/AdminPlansPage";
 import AdminCategoriesPage from "../autods/pages/AdminCategoriesPage";
 import AdminTrendingProductsPage from "../autods/pages/AdminTrendingProductsPage";
@@ -93,6 +96,9 @@ function SuperAdminShell() {
   const pageTitles = {
     admin: "Dashboard",
     "admin/clients": "Clients",
+    "admin/listings": "All Listings",
+    "admin/orders": "All Orders",
+    "admin/wallet-deposits": "Wire Transfer Deposits",
     "admin/plans": "Plans",
     "admin/categories": "Categories",
     "admin/trending-products": "Trending Products",
@@ -107,6 +113,9 @@ function SuperAdminShell() {
   const pageHandlers = {
     admin: () => setActivePage("admin"),
     "admin/clients": () => setActivePage("admin/clients"),
+    "admin/listings": () => setActivePage("admin/listings"),
+    "admin/orders": () => setActivePage("admin/orders"),
+    "admin/wallet-deposits": () => setActivePage("admin/wallet-deposits"),
     "admin/plans": () => setActivePage("admin/plans"),
     "admin/categories": () => setActivePage("admin/categories"),
     "admin/trending-products": () => setActivePage("admin/trending-products"),
@@ -251,6 +260,12 @@ function SuperAdminShell() {
           <main className="dashboard-container marketplace-content-wrapper">
             {activePage === "admin/clients" ? (
               <AdminClientsPage />
+            ) : activePage === "admin/listings" ? (
+              <AdminListingsPage />
+            ) : activePage === "admin/orders" ? (
+              <AdminOrdersPage />
+            ) : activePage === "admin/wallet-deposits" ? (
+              <AdminWalletDepositsPage />
             ) : activePage === "admin/plans" ? (
               <AdminPlansPage />
             ) : activePage === "admin/categories" ? (

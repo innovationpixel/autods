@@ -5,9 +5,9 @@ export const getEbayStatus = () =>
     axiosInstance.get('/ebay/status');
 
 // Get eBay OAuth authorization URL
-export const getEbayAuthUrl = () =>
+export const getEbayAuthUrl = (siteId) =>
     axiosInstance.get('/ebay/auth-url', {
-        params: { return_origin: window.location.origin },
+        params: { return_origin: window.location.origin, site_id: siteId || undefined },
     });
 
 // RuName / callback setup info for eBay Developer Portal
@@ -25,6 +25,10 @@ export const disconnectEbayConnection = (id) =>
 // Set a connection as primary
 export const setEbayPrimary = (id) =>
     axiosInstance.patch(`/ebay/connections/${id}/primary`);
+
+// Set which eBay marketplace (site) a connection sells on
+export const setEbayConnectionMarketplace = (id, siteId) =>
+    axiosInstance.patch(`/ebay/connections/${id}/marketplace`, { site_id: siteId });
 
 // Sync listings for a specific connection
 export const syncEbayListings = (id) =>

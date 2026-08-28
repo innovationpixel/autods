@@ -31,7 +31,8 @@ import {
   LuExternalLink,
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
-import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
+import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction, setEbayConnectionMarketplaceAction } from "../../store/actions/EbayActions";
+import { EBAY_MARKETPLACES } from "../autods/ConnectEbayModal";
 import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
@@ -863,6 +864,8 @@ export default function MarketplaceSettingsPage() {
 
   const setPrimaryEbay = (id) => dispatch(setEbayPrimaryAction(id));
 
+  const updateEbayMarketplace = (id, siteId) => dispatch(setEbayConnectionMarketplaceAction(id, siteId));
+
   const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
 
   const loadBuyerAccounts = () => {
@@ -918,6 +921,23 @@ export default function MarketplaceSettingsPage() {
       loadBuyerAccounts();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Could not update buyer account.");
+    } finally {
+      setSavingBuyerAccountId("");
+    }
+  };
+
+  const toggleBuyerAccountMarketplace = async (account, siteId) => {
+    const current = account.site_ids ?? [];
+    const next = current.includes(siteId)
+      ? current.filter((id) => id !== siteId)
+      : [...current, siteId];
+
+    setSavingBuyerAccountId(account.id);
+    try {
+      await updateBuyerAccount(account.id, { site_ids: next });
+      loadBuyerAccounts();
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Could not update marketplaces.");
     } finally {
       setSavingBuyerAccountId("");
     }
@@ -1098,7 +1118,19 @@ export default function MarketplaceSettingsPage() {
                     </span>
                   </div>
                   <p className="marketplace-settings__ebay-sub">
-                    Site: {conn.site_id ?? "EBAY_US"}&nbsp;·&nbsp;
+                    Marketplace:&nbsp;
+                    <select
+                      value={conn.site_id ?? "EBAY_US"}
+                      onChange={(event) => updateEbayMarketplace(conn.id, event.target.value)}
+                      style={{ fontSize: 12, fontWeight: 600, border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 4px" }}
+                    >
+                      {EBAY_MARKETPLACES.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    &nbsp;·&nbsp;
                     Connected: {conn.connected_at ? new Date(conn.connected_at).toLocaleDateString() : "—"}
                     {conn.granted_scope_count ? (
                       <>&nbsp;·&nbsp;Scopes: {conn.granted_scope_count}</>
@@ -2157,7 +2189,7 @@ export default function MarketplaceSettingsPage() {
           <div>
             <h3 style={{ margin: 0 }}>Buyer Accounts</h3>
             <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
-              Connect your own AliExpress account(s) to use as the "Buyer" processing method in Order Processing — orders are billed directly by AliExpress to that account instead of your AutoDS processing wallet.
+              Connect your own AliExpress account(s) to use as the "Buyer" processing method in Order Processing — orders are billed directly by AliExpress to that account instead of your AutoDS processing wallet. Tag each account with the eBay marketplace(s) it should handle — an order automatically uses the buyer account tagged for its own marketplace. An untagged account is used as a fallback for any marketplace with no dedicated account.
             </p>
           </div>
           <button
@@ -2221,6 +2253,36 @@ export default function MarketplaceSettingsPage() {
                   &nbsp;·&nbsp;
                   Connected: {account.connected_at ? new Date(account.connected_at).toLocaleDateString() : "—"}
                 </p>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8 }}>
+                  <span style={{ fontSize: 12, color: "#6b7280" }}>Marketplaces:</span>
+                  {EBAY_MARKETPLACES.map((option) => {
+                    const tagged = (account.site_ids ?? []).includes(option.value);
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => toggleBuyerAccountMarketplace(account, option.value)}
+                        disabled={savingBuyerAccountId === account.id}
+                        title={option.label}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          borderRadius: 999,
+                          padding: "2px 9px",
+                          border: tagged ? "1px solid #065f46" : "1px solid #e5e7eb",
+                          background: tagged ? "#065f46" : "#f9fafb",
+                          color: tagged ? "#fff" : "#6b7280",
+                          cursor: savingBuyerAccountId === account.id ? "wait" : "pointer",
+                        }}
+                      >
+                        {option.value.replace("EBAY_", "")}
+                      </button>
+                    );
+                  })}
+                  {(account.site_ids ?? []).length === 0 ? (
+                    <span style={{ fontSize: 11, color: "#9ca3af" }}>(any marketplace — used as fallback)</span>
+                  ) : null}
+                </div>
               </div>
 
               <div className="marketplace-settings__ebay-actions">

@@ -43,6 +43,7 @@ const DOC_TITLES = {
   "packing-slip": "Packing Slip",
   "pick-list": "Pick List",
   barcode: "Barcode",
+  "shipping-label": "Shipping Label",
 };
 
 const BASE_STYLES = `
@@ -62,6 +63,10 @@ const BASE_STYLES = `
   .totals div { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
   .totals .grand { font-weight: 700; border-top: 1px solid #1f2937; margin-top: 6px; padding-top: 8px; font-size: 15px; }
   .barcode-block { text-align: center; margin: 60px 0; }
+  .shipping-label { border: 2px solid #1f2937; border-radius: 8px; padding: 20px; max-width: 420px; }
+  .shipping-label__header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px dashed #9ca3af; padding-bottom: 10px; margin-bottom: 16px; }
+  .shipping-label__header strong { font-size: 16px; text-transform: uppercase; }
+  .shipping-label__header span { font-size: 12px; color: #6b7280; }
   .print-toolbar { text-align: center; margin-bottom: 24px; }
   .print-toolbar button { padding: 10px 20px; font-size: 14px; font-weight: 700; border: 0; border-radius: 8px; background: #f4a944; color: #fff; cursor: pointer; }
   @media print { .print-toolbar { display: none; } }
@@ -157,6 +162,40 @@ function pickListSection(orders) {
     </section>`;
 }
 
+function shippingLabelSection(order) {
+  const code = order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : order.orderId;
+
+  return `
+    <section class="doc shipping-label">
+      <div class="shipping-label__header">
+        <strong>${escapeHtml(order.carrier || "Standard Shipping")}</strong>
+        <span>${escapeHtml(order.shippingService || "")}</span>
+      </div>
+      <div class="row">
+        <div class="box">
+          <strong>Ship from</strong>
+          <span>${escapeHtml(order.storeName || "—")}</span>
+        </div>
+        <div class="box">
+          <strong>Ship to</strong>
+          <span>${escapeHtml(order.buyerName || "—")}</span><br />
+          <span>${escapeHtml(order.shippingAddress || "—")}</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="box">
+          <strong>Order</strong>
+          <span>${escapeHtml(order.orderId)}</span>
+        </div>
+        <div class="box">
+          <strong>Item</strong>
+          <span>${escapeHtml(order.title)}${order.totalQuantity > 1 ? ` &times; ${escapeHtml(order.totalQuantity)}` : ""}</span>
+        </div>
+      </div>
+      <div class="barcode-block">${buildBarcodeSvg(code)}</div>
+    </section>`;
+}
+
 function barcodeSection(order) {
   const code = order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : order.orderId;
 
@@ -168,12 +207,19 @@ function barcodeSection(order) {
     </section>`;
 }
 
+const SECTION_BUILDERS = {
+  invoice: invoiceSection,
+  barcode: barcodeSection,
+  "shipping-label": shippingLabelSection,
+  "packing-slip": packingSlipSection,
+};
+
 /**
- * Opens a real, printable document (invoice / packing-slip / pick-list / barcode)
- * in a new browser tab. Uses window.print() (browser's native print-to-PDF) —
- * no PDF library dependency.
+ * Opens a real, printable document (invoice / packing-slip / pick-list / barcode /
+ * shipping-label) in a new browser tab. Uses window.print() (browser's native
+ * print-to-PDF) — no PDF library dependency.
  *
- * @param {"invoice"|"packing-slip"|"pick-list"|"barcode"} docType
+ * @param {"invoice"|"packing-slip"|"pick-list"|"barcode"|"shipping-label"} docType
  * @param {Array<object>} orders — one or more rows shaped like mapApiOrder()'s output
  */
 export function openPrintableDocument(docType, orders) {
@@ -186,8 +232,7 @@ export function openPrintableDocument(docType, orders) {
   if (docType === "pick-list") {
     body = pickListSection(list);
   } else {
-    const sectionBuilder =
-      docType === "invoice" ? invoiceSection : docType === "barcode" ? barcodeSection : packingSlipSection;
+    const sectionBuilder = SECTION_BUILDERS[docType] ?? packingSlipSection;
     body = list.map(sectionBuilder).join("");
   }
 

@@ -1,7 +1,7 @@
 import { LuChevronDown, LuLoader, LuX } from "react-icons/lu";
 import EbayOAuthSetupBanner from "./EbayOAuthSetupBanner";
 
-const EBAY_MARKETPLACES = [
+export const EBAY_MARKETPLACES = [
   { value: "EBAY_US", label: "United States — ebay.com" },
   { value: "EBAY_GB", label: "United Kingdom — ebay.co.uk" },
   { value: "EBAY_AU", label: "Australia — ebay.com.au" },

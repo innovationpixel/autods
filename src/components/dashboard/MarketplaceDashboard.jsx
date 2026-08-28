@@ -64,7 +64,7 @@ import CustomerSupportContent from "./CustomerSupportPage";
 import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
 import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, importSuppliers } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
-import { buildItem, parsePriceValue, getSectionCategory } from '../autods/helpers';
+import { buildItem, parsePriceValue, getSectionCategory, getDailySeed, mapAliItemToCard } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
 import ConnectEbayModal from '../autods/ConnectEbayModal';
@@ -91,6 +91,7 @@ import {
   parseEbayConnectionId,
 } from '../../utils/ebayStore';
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
+import { searchAliExpress } from '../../services/AliExpressService';
 import { logoutAction } from '../../store/actions/AuthActions';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
@@ -710,11 +711,14 @@ const MarketplaceDashboard = () => {
   const [openMenus, setOpenMenus] = useState({
     Marketplace: true,
   });
+  const [dailyBestSellers, setDailyBestSellers] = useState([]);
+  const [dailyNewArrivals, setDailyNewArrivals] = useState([]);
   const profileMenuRef = useRef(null);
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
   const balanceMenuRef = useRef(null);
   const aliSearchTimer = useRef(null);
+  const dailySectionsFetchedRef = useRef(false);
 
   useEffect(() => {
     const closeHeaderPopovers = (event) => {
@@ -878,7 +882,7 @@ const MarketplaceDashboard = () => {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
 
-      const res = await getEbayAuthUrl();
+      const res = await getEbayAuthUrl(ebaySiteId);
       const tab = openOAuthTab(res.data.url);
 
       if (!tab) {
@@ -964,6 +968,56 @@ const MarketplaceDashboard = () => {
     setAliPage(1);
   }, [activeCategory, activeSubfilter, selectedPill, sortBy, priceRange, shipsTo, currency, keywordSearch]);
 
+  // "Best Sellers" / "New Arrivals" — real AliExpress products, picked by a seed
+  // derived from today's date so every visitor sees the same set all day, and it
+  // rotates to a different real page/category tomorrow (AliExpress's own recommend
+  // feed has no "newest" sort, so New Arrivals rotates through categories instead
+  // of a true listing-date sort).
+  useEffect(() => {
+    if (activePage !== "marketplace") return;
+    if (!aliPlatformReady || aliCredentialsMissing || aliPlatformUnavailable) return;
+    if (dailySectionsFetchedRef.current) return;
+    dailySectionsFetchedRef.current = true;
+
+    const categoryIds = Object.values(ALIEXPRESS_CATEGORY_MAP);
+    const bestSellersSeed = getDailySeed("best-sellers");
+    const newArrivalsSeed = getDailySeed("new-arrivals");
+    const newArrivalsCategory = categoryIds[newArrivalsSeed % categoryIds.length];
+
+    Promise.all([
+      searchAliExpress({
+        sort: "volumeDesc",
+        limit: 12,
+        page_no: 1 + (bestSellersSeed % 5),
+        ships_to: shipsTo,
+        currency,
+      }),
+      searchAliExpress({
+        category_id: newArrivalsCategory,
+        sort: "volumeDesc",
+        limit: 12,
+        page_no: 1 + (newArrivalsSeed % 3),
+        ships_to: shipsTo,
+        currency,
+      }),
+    ])
+      .then(([bestRes, newRes]) => {
+        setDailyBestSellers(
+          (bestRes.data?.items ?? []).map((item) =>
+            mapAliItemToCard(item, { shipsTo, currency, shippingTag: "Best Sellers" }),
+          ),
+        );
+        setDailyNewArrivals(
+          (newRes.data?.items ?? []).map((item) =>
+            mapAliItemToCard(item, { shipsTo, currency, shippingTag: "New Arrivals" }),
+          ),
+        );
+      })
+      .catch(() => {
+        dailySectionsFetchedRef.current = false;
+      });
+  }, [activePage, aliPlatformReady, aliCredentialsMissing, aliPlatformUnavailable, shipsTo, currency]);
+
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
   const isDarkTheme = profileTheme === "dark";
@@ -1010,6 +1064,20 @@ const MarketplaceDashboard = () => {
     [finderSelections],
   );
 
+  const dailyMarketplaceSections = useMemo(
+    () =>
+      marketplaceSections.map((section) => {
+        if (section.key === "best-sellers" && dailyBestSellers.length) {
+          return { ...section, items: dailyBestSellers };
+        }
+        if (section.key === "new-arrivals" && dailyNewArrivals.length) {
+          return { ...section, items: dailyNewArrivals };
+        }
+        return section;
+      }),
+    [dailyBestSellers, dailyNewArrivals],
+  );
+
   const filteredMarketplace = useMemo(() => {
     const query = `${searchAnything} ${keywordSearch}`.trim().toLowerCase();
 
@@ -1032,7 +1100,7 @@ const MarketplaceDashboard = () => {
       }
 
       if (supplier !== "Select Supplier") {
-        if (!item.vendor.toLowerCase().includes(supplier.toLowerCase())) {
+        if (!String(item.vendor ?? "").toLowerCase().includes(supplier.toLowerCase())) {
           return false;
         }
       }
@@ -1086,7 +1154,7 @@ const MarketplaceDashboard = () => {
       return nextItems;
     };
 
-    const sections = marketplaceSections
+    const sections = dailyMarketplaceSections
       .map((section) => ({
         ...section,
         items: sortItems(section.items.filter(matchesFilters)),
@@ -1095,7 +1163,7 @@ const MarketplaceDashboard = () => {
 
     const uniqueProducts = new Map();
 
-    marketplaceSections.forEach((section) => {
+    dailyMarketplaceSections.forEach((section) => {
       section.items.forEach((item) => {
         if (matchesFilters(item)) {
           uniqueProducts.set(item.id, item);
@@ -1111,6 +1179,7 @@ const MarketplaceDashboard = () => {
     activeCategory,
     activeSubfilter,
     currency,
+    dailyMarketplaceSections,
     keywordSearch,
     priceRange,
     searchAnything,
@@ -1635,7 +1704,7 @@ const MarketplaceDashboard = () => {
           <div className="marketplace-sidebar__store-copy">
             <button type="button" className="marketplace-sidebar__store-name" onClick={openStoreSwitcherModal}>
               <span className="marketplace-sidebar__store-platform-label">{activeSidebarStore.platformLabel}</span>
-              <span className="marketplace-sidebar__store-site">{activeSidebarStore.siteDisplay}</span>
+              <span className="marketplace-sidebar__store-site">{activeSidebarStore.sidebarName}</span>
             </button>
           </div>
           <button type="button" className="marketplace-sidebar__edit-btn" aria-label="Edit store" onClick={openStoreSwitcherModal}>

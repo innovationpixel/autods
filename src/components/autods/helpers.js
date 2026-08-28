@@ -15,6 +15,43 @@ export function parsePriceValue(price) {
   return match ? Number(match[1]) : 0;
 }
 
+/**
+ * Deterministic per-day integer — same value all day (UTC calendar date) for
+ * every visitor, then changes the next day. Used to pick which page/category
+ * "Best Sellers" and "New Arrivals" pull from, so the marketplace's daily picks
+ * rotate like AliExpress's own homepage does without needing a cron job.
+ */
+export function getDailySeed(salt = "") {
+  const day = new Date().toISOString().slice(0, 10);
+  const str = day + salt;
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+export function mapAliItemToCard(item, extra = {}) {
+  return {
+    id: item.id,
+    vendor: item.seller || null,
+    shopUrl: item.shop_url || null,
+    title: item.title,
+    price: `$${Number(item.price ?? 0).toFixed(2)}`,
+    shipping:
+      item.sold_count > 0
+        ? `${Number(item.sold_count).toLocaleString()} sold`
+        : "Ships internationally",
+    shippingDays: 10,
+    image_url: item.image_url,
+    images: item.images,
+    shippingTag: "AliExpress",
+    listingUrl: item.listing_url,
+    marketplace: "aliexpress",
+    ...extra,
+  };
+}
+
 const categoryLabels = categoryFilters
   .filter((category) => category.key !== "all")
   .map((category) => category.label);
@@ -226,6 +263,19 @@ export function buildSourceProductUrl(platform, productId, sourceUrl) {
     default:
       return url || null;
   }
+}
+
+export function platformLabel(platform) {
+  if (!platform) return "—";
+  const map = {
+    appmarketplace: "APP",
+    aliexpress: "AE",
+    amazon: "AMZ",
+    walmart: "WMT",
+    etsy: "ETSY",
+    ebay: "eBay",
+  };
+  return map[platform] ?? platform.slice(0, 3).toUpperCase();
 }
 
 export function buildEbayListingProductUrl(listing) {
@@ -479,18 +529,29 @@ export function mapApiOrderToCalculationRow(order) {
   const ebayStatus = getEbayOrderStatusMeta(raw);
   const shippingStep = raw.fulfillmentStartInstructions?.[0]?.shippingStep ?? {};
 
+  const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
+  const sourcePlatform = order.source_platform ?? "aliexpress";
+  const sourceUrl = order.source_url ?? null;
+  const sourceVariation = Array.isArray(order.source_variation) ? order.source_variation : null;
+  const sourceVariationText = sourceVariation?.length
+    ? sourceVariation.map((entry) => [entry.name, entry.value].filter(Boolean).join(": ")).join(", ")
+    : "";
+
   const earn = Number(order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0);
   const cost = order.buy_price != null ? Number(order.buy_price) : 0;
   const shipping =
     order.shipping_cost != null
       ? Number(order.shipping_cost)
       : Number(delivery.shippingCost?.value ?? delivery.amount?.value ?? 0);
-  const profit =
-    order.profit != null ? Number(order.profit) : Number((earn - cost - shipping).toFixed(2));
-  const roi = cost > 0 ? Number(((profit / cost) * 100).toFixed(1)) : 0;
-  const tax = Number(order.tax_amount ?? 0);
+  // Tax collected by eBay is never actually kept by the seller, so it comes off
+  // earnings before cost/shipping/prep the same way it would on a real payout —
+  // everything downstream (After Tax eBay, Profit, ROI) is derived from it.
+  const tax = Number(order.tax_amount ?? pricing.tax?.value ?? 0);
   const afterTaxEbay = Number((earn - tax).toFixed(2));
   const prep = Number(order.prep_cost ?? 0);
+  const profit =
+    order.profit != null ? Number(order.profit) : Number((afterTaxEbay - cost - shipping - prep).toFixed(2));
+  const roi = cost > 0 ? Number(((profit / cost) * 100).toFixed(1)) : 0;
   const qty = Math.max(
     lineItems.reduce((sum, item) => sum + Number(item.quantity ?? 1), 0),
     1,
@@ -522,7 +583,7 @@ export function mapApiOrderToCalculationRow(order) {
     id: String(order.id),
     orderId: order.ebay_order_id ?? raw.orderId ?? String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: order.listing_image_url ?? firstItem.image?.imageUrl ?? CALCULATION_PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? CALCULATION_PLACEHOLDER_IMAGE,
     description: variationText || order.item_title || firstItem.title || "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     ebayStatus: ebayStatus.label,
@@ -537,6 +598,14 @@ export function mapApiOrderToCalculationRow(order) {
     roi,
     itemSell: order.item_sell_id ?? "—",
     itemSellUrl,
+    itemBuy: sourceProductId ?? "—",
+    itemBuyUrl: buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl),
+    sourceUrl,
+    sourcePlatform,
+    sourceSkuId: order.source_sku_id ?? null,
+    sourceVariationText,
+    hasSource: Boolean(sourceProductId || sourceUrl),
+    sku: firstItem.sku ?? "—",
     trackingNumber: trackingNumber || "—",
     qty,
     address: buildCalculationAddress(raw),

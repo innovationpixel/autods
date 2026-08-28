@@ -1,27 +1,7 @@
 import { LuChevronLeft, LuChevronRight, LuLoader, LuSlidersHorizontal, LuStore } from "react-icons/lu";
 import CarouselSection from "../CarouselSection";
 import ProductCard from "../ProductCard";
-import { buildPaginationItems } from "../helpers";
-
-function mapAliItemToCard(item) {
-  return {
-    id: item.id,
-    vendor: item.seller || null,
-    shopUrl: item.shop_url || null,
-    title: item.title,
-    price: `$${Number(item.price ?? 0).toFixed(2)}`,
-    shipping:
-      item.sold_count > 0
-        ? `${Number(item.sold_count).toLocaleString()} sold`
-        : "Ships internationally",
-    shippingDays: 10,
-    image_url: item.image_url,
-    images: item.images,
-    shippingTag: "AliExpress",
-    listingUrl: item.listing_url,
-    marketplace: "aliexpress",
-  };
-}
+import { buildPaginationItems, mapAliItemToCard } from "../helpers";
 
 function MarketplaceSections({
   aliLoading = false,
