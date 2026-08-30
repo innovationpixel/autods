@@ -81,6 +81,7 @@ import WalletContent from '../autods/pages/WalletContent';
 import OrderProcessingContent from '../autods/pages/OrderProcessingContent';
 import CalculationsContent from '../autods/pages/CalculationsContent';
 import NotFoundContent from '../autods/pages/NotFoundContent';
+import AiVideoGenerationContent from '../autods/pages/AiVideoGenerationContent';
 import { fetchEbayStatus, disconnectEbayAction, fetchEbayDrafts, fetchEbayListings } from '../../store/actions/EbayActions';
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbayListingsMeta, selectEbayDraftsMeta } from '../../store/selectors/EbaySelectors';
 import { selectUser } from '../../store/selectors/AuthSelectors';
@@ -1303,6 +1304,11 @@ const MarketplaceDashboard = () => {
     setSearchAnything("");
   };
 
+  const openAiVideoGenerationPage = () => {
+    setActivePage("ai-video-generation");
+    setSearchAnything("");
+  };
+
   const handleProfileMenuItem = (label) => {
     if (label === "Support Center") {
       openSupportCenterPage();
@@ -1786,6 +1792,7 @@ const MarketplaceDashboard = () => {
                         products: openProductsPage,
                         drafts: openDraftsPage,
                         wallet: openWalletPage,
+                        "ai-video-generation": openAiVideoGenerationPage,
                         "customer-support": openCustomerSupportPage,
                         settings: openSettingsPage,
                       };
@@ -2646,6 +2653,8 @@ const MarketplaceDashboard = () => {
               <HelpCenterContent />
             ) : activePage === "wallet" ? (
               <WalletContent />
+            ) : activePage === "ai-video-generation" ? (
+              <AiVideoGenerationContent />
             ) : activePage === "settings" ? (
               <MarketplaceSettingsPage />
             ) : activePage === "plans" ? (

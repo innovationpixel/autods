@@ -18098,6 +18098,336 @@
   }
 }
 
+/* ── AI Studio (image / video generation) ─────────────────────────────────── */
+
+.ai-gen-hub {
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 22, 62, 0.05);
+}
+
+.ai-gen-hub__hero {
+  padding: 24px 26px;
+  border: 1px solid #eceef3;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fff8ef 0%, #ffffff 48%, #fff4e0 100%);
+}
+
+.ai-gen-hub__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff4df;
+  color: #c1720f;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-gen-hub__hero-copy h1 {
+  margin: 0 0 8px;
+  color: #3f3e47;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ai-gen-hub__hero-copy p {
+  margin: 0;
+  max-width: 560px;
+  color: #73727b;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.ai-gen-hub__tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid #eceef3;
+  border-radius: 12px;
+  background: #fbfbfc;
+  width: fit-content;
+}
+
+.ai-gen-hub__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #6e6d76;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-gen-hub__tab--active {
+  background: #ffffff;
+  color: #c1720f;
+  box-shadow: 0 4px 10px rgba(226, 156, 65, 0.18);
+}
+
+.ai-gen-hub__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ai-gen-hub__card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid #eceef3;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 20px;
+}
+
+.ai-gen-hub__field {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-gen-hub__field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(160px, 0.6fr);
+  gap: 16px;
+}
+
+.ai-gen-hub__field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6e6d76;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ai-gen-hub__field textarea,
+.ai-gen-hub__field select {
+  padding: 10px 12px;
+  border: 1px solid #dfe3ed;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  color: #33323d;
+  background: #ffffff;
+  resize: vertical;
+}
+
+.ai-gen-hub__field textarea:focus,
+.ai-gen-hub__field select:focus {
+  outline: none;
+  border-color: #f0c990;
+}
+
+.ai-gen-hub__upload {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.ai-gen-hub__upload-drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 120px;
+  border: 1px dashed #f0cd98;
+  border-radius: 10px;
+  background: #fff9f0;
+  color: #c1720f;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.ai-gen-hub__upload-drop svg {
+  font-size: 20px;
+}
+
+.ai-gen-hub__upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ai-gen-hub__upload-preview {
+  position: relative;
+  height: 160px;
+  border: 1px solid #eceef3;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ai-gen-hub__upload-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ai-gen-hub__upload-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(20, 19, 26, 0.55);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.ai-gen-hub__ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: 8px;
+}
+
+.ai-gen-hub__ratio-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border: 1px solid #eceef3;
+  border-radius: 8px;
+  background: #fbfbfc;
+  color: #5d5c65;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-gen-hub__ratio-chip--active {
+  border-color: #c1720f;
+  background: #fff4df;
+  color: #c1720f;
+}
+
+.ai-gen-hub__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ai-gen-hub__btn--primary {
+  background: linear-gradient(135deg, #ebb058, #e29c41);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(226, 156, 65, 0.22);
+}
+
+.ai-gen-hub__btn--ghost {
+  border: 1px solid #eceef3;
+  background: #fbfbfc;
+  color: #5d5c65;
+}
+
+.ai-gen-hub__btn:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.ai-gen-hub__result {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #eceef3;
+  border-radius: 12px;
+  background: #fbfbfc;
+  padding: 20px;
+  min-height: 320px;
+}
+
+.ai-gen-hub__result-media {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-gen-hub__result-media img,
+.ai-gen-hub__result-media video {
+  width: 100%;
+  max-height: 420px;
+  border-radius: 10px;
+  background: #14131a;
+  object-fit: contain;
+}
+
+.ai-gen-hub__result-loading,
+.ai-gen-hub__empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  flex: 1;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.ai-gen-hub__result-loading svg,
+.ai-gen-hub__empty svg {
+  font-size: 28px;
+  color: #c5c4cc;
+}
+
+.ai-gen-hub__empty strong {
+  color: #4f4e57;
+  font-size: 15px;
+}
+
+.ai-gen-hub__result-loading span,
+.ai-gen-hub__empty span {
+  color: #8b8a93;
+  font-size: 13px;
+}
+
+@media (max-width: 1100px) {
+  .ai-gen-hub__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-gen-hub__field-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .ai-gen-hub {
+    padding: 16px;
+  }
+
+  .ai-gen-hub__hero {
+    padding: 20px;
+  }
+}
+
 /* ── Settings → Templates ─────────────────────────────────────────────────── */
 
 .templates-settings {
