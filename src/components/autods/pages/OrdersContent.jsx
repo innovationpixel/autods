@@ -1292,6 +1292,16 @@ function OrdersContent({ searchQuery }) {
         <div className="orders-toolbar__left">
           <button
             type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            onClick={handleSyncOrders}
+            disabled={syncing}
+          >
+            <LuRefreshCcw className={syncing ? "spin-icon" : ""} />
+            <span>{syncing ? "Syncing…" : "Sync Orders"}</span>
+          </button>
+
+          <button
+            type="button"
             className={`orders-filter-toggle ${showFilters ? "orders-filter-toggle--active" : ""}`}
             onClick={() => setShowFilters((current) => !current)}
           >
@@ -1388,15 +1398,6 @@ function OrdersContent({ searchQuery }) {
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
           <OrderColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
-        </div>
-      </div>
-
-      <div className="orders-toolbar orders-toolbar--secondary">
-        <div className="orders-toolbar__actions">
-          <button type="button" className="dashboard-secondary-btn dashboard-secondary-btn--orders" onClick={handleSyncOrders} disabled={syncing}>
-            <LuRefreshCcw />
-            <span>{syncing ? "Syncing…" : "Sync from eBay"}</span>
-          </button>
         </div>
       </div>
 

@@ -19,7 +19,10 @@ export default function OrdersTrackingEditor({
   const detectedCarrier = detectTrackingCarrier(trackingDraft);
   const resolvedCarrier = carrierDraft || order.carrierRaw || "";
   const canPush = Boolean(order.trackingNumberRaw?.trim() && resolvedCarrier);
-  const carrierLabel = order.carrierRaw || "";
+  // Only show a carrier once there's an actual tracking number to go with it —
+  // eBay's shippingCarrierCode can be populated (an "expected" shipping service)
+  // before anything has really shipped, which isn't a fact worth displaying yet.
+  const carrierLabel = order.trackingNumberRaw && order.carrierRaw ? order.carrierRaw : "";
 
   useEffect(() => {
     if (!isEditing) {

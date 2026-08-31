@@ -1556,7 +1556,7 @@ const MarketplaceDashboard = () => {
 
     setStoreSwitcherMenuId("");
     setRenamingStoreId(storeId);
-    setStoreRenameValue(nextStore.name);
+    setStoreRenameValue(nextStore.sidebarName);
   };
 
   const saveStoreRename = (storeId) => {
@@ -1571,7 +1571,7 @@ const MarketplaceDashboard = () => {
       [storeId]: {
         ...current[storeId],
         name: nextName,
-        sidebarName: storeId === sidebarStoreId ? nextName : current[storeId]?.sidebarName,
+        sidebarName: nextName,
       },
     }));
     setRenamingStoreId("");
@@ -2365,11 +2365,11 @@ const MarketplaceDashboard = () => {
                           ) : (
                             <>
                               <div className="store-switcher-modal__title-row">
-                                <strong>{store.name}</strong>
+                                <strong>{store.sidebarName}</strong>
                                 {store.isPrimary ? (
                                   <span style={{ fontSize: 10, fontWeight: 700, color: '#065f46', marginLeft: 6 }}>PRIMARY</span>
                                 ) : null}
-                                <button type="button" aria-label={`Rename ${store.name}`} onClick={() => beginStoreRename(store.id)}>
+                                <button type="button" aria-label={`Rename ${store.sidebarName}`} onClick={() => beginStoreRename(store.id)}>
                                   <LuPencil />
                                 </button>
                                 <span>{store.country}</span>
@@ -2397,7 +2397,7 @@ const MarketplaceDashboard = () => {
                           <button
                             type="button"
                             className="store-switcher-modal__menu-btn"
-                            aria-label={`Open actions for ${store.name}`}
+                            aria-label={`Open actions for ${store.sidebarName}`}
                             onClick={() => setStoreSwitcherMenuId((current) => (current === store.id ? "" : store.id))}
                           >
                             <LuEllipsisVertical />
