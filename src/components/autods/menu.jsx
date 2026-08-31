@@ -12,6 +12,7 @@ import {
   LuShieldCheck,
   LuStore,
   LuUsers,
+  LuVideo,
   LuWalletCards,
 } from "react-icons/lu";
 
@@ -38,6 +39,7 @@ export const sidebarGroups = [
     { label: "Products", page: "products", icon: LuPackage2, marker: "#9ad2c0" },
     { label: "Drafts", page: "drafts", icon: LuFilePenLine },
     { label: "Wallet", page: "wallet", icon: LuWalletCards },
+    { label: "AI Video Generation", page: "ai-video-generation", icon: LuVideo, marker: "#c7b8f5" },
     { label: "Customer Support", page: "customer-support", icon: LuHeadphones },
     { label: "Settings", page: "settings", icon: LuSettings2 },
   ],
