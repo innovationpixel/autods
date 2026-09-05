@@ -14,6 +14,7 @@ import {
   LuPencil,
   LuRefreshCcw,
   LuSlidersHorizontal,
+  LuStore,
   LuTruck,
   LuUserPlus,
   LuWalletCards,
@@ -643,9 +644,15 @@ function CalculationsContent({ searchQuery = "" }) {
       case "name":
         return (
           <div className="orders-product calculations-product">
-            <div className="orders-product__thumb">
-              <img src={row.image} alt={row.title} />
-            </div>
+            {row.image ? (
+              <div className="orders-product__thumb">
+                <img src={row.image} alt={row.title} referrerPolicy="no-referrer" />
+              </div>
+            ) : (
+              <div className="orders-product__thumb orders-product__thumb--empty">
+                <LuStore />
+              </div>
+            )}
             <div className="orders-product__copy calculations-product__copy">
               <h3>{row.title}</h3>
               <p className="calculations-product__description">{row.description}</p>

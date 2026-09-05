@@ -618,6 +618,25 @@ const ALIEXPRESS_CATEGORY_MAP = {
   "Automotive & Motorcycle":    "34",
 };
 
+// Maps each static category row's section key to its real AliExpress category ID,
+// so the default marketplace view can replace that row's hardcoded sample items
+// with real fetched products the same way Best Sellers/New Arrivals already do.
+const CATEGORY_SECTION_IDS = {
+  outdoors:                ALIEXPRESS_CATEGORY_MAP["Outdoors"],
+  "toys-hobbies":           ALIEXPRESS_CATEGORY_MAP["Toys & Hobbies"],
+  "home-garden":            ALIEXPRESS_CATEGORY_MAP["Home & Garden"],
+  "electronics-gadgets":    ALIEXPRESS_CATEGORY_MAP["Electronics & Gadgets"],
+  "clothing-shoes-jewelry": ALIEXPRESS_CATEGORY_MAP["Clothing, Shoes & Jewelry"],
+  "beauty-personal-care":   ALIEXPRESS_CATEGORY_MAP["Beauty & Personal Care"],
+  "automotive-motorcycle":  ALIEXPRESS_CATEGORY_MAP["Automotive & Motorcycle"],
+  "sports-fitness":         ALIEXPRESS_CATEGORY_MAP["Sports & Fitness"],
+};
+
+// How many real products to pull per category row on the default (no-search)
+// marketplace view — kept small since each row is just a preview carousel, not
+// a full results grid.
+const DEFAULT_SECTION_ITEM_LIMIT = 8;
+
 const ALIEXPRESS_SORT_MAP = {
   "By Relevance":     "volumeDesc",
   "Newest":           "volumeDesc",
@@ -714,6 +733,7 @@ const MarketplaceDashboard = () => {
   });
   const [dailyBestSellers, setDailyBestSellers] = useState([]);
   const [dailyNewArrivals, setDailyNewArrivals] = useState([]);
+  const [dailyCategoryItems, setDailyCategoryItems] = useState({});
   const profileMenuRef = useRef(null);
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
@@ -984,11 +1004,12 @@ const MarketplaceDashboard = () => {
     const bestSellersSeed = getDailySeed("best-sellers");
     const newArrivalsSeed = getDailySeed("new-arrivals");
     const newArrivalsCategory = categoryIds[newArrivalsSeed % categoryIds.length];
+    const categorySectionEntries = Object.entries(CATEGORY_SECTION_IDS);
 
     Promise.all([
       searchAliExpress({
         sort: "volumeDesc",
-        limit: 12,
+        limit: DEFAULT_SECTION_ITEM_LIMIT,
         page_no: 1 + (bestSellersSeed % 5),
         ships_to: shipsTo,
         currency,
@@ -996,13 +1017,23 @@ const MarketplaceDashboard = () => {
       searchAliExpress({
         category_id: newArrivalsCategory,
         sort: "volumeDesc",
-        limit: 12,
+        limit: DEFAULT_SECTION_ITEM_LIMIT,
         page_no: 1 + (newArrivalsSeed % 3),
         ships_to: shipsTo,
         currency,
       }),
+      ...categorySectionEntries.map(([sectionKey, categoryId]) =>
+        searchAliExpress({
+          category_id: categoryId,
+          sort: "volumeDesc",
+          limit: DEFAULT_SECTION_ITEM_LIMIT,
+          page_no: 1 + (getDailySeed(sectionKey) % 5),
+          ships_to: shipsTo,
+          currency,
+        }),
+      ),
     ])
-      .then(([bestRes, newRes]) => {
+      .then(([bestRes, newRes, ...categoryResults]) => {
         setDailyBestSellers(
           (bestRes.data?.items ?? []).map((item) =>
             mapAliItemToCard(item, { shipsTo, currency, shippingTag: "Best Sellers" }),
@@ -1013,9 +1044,18 @@ const MarketplaceDashboard = () => {
             mapAliItemToCard(item, { shipsTo, currency, shippingTag: "New Arrivals" }),
           ),
         );
+
+        const nextCategoryItems = {};
+        categorySectionEntries.forEach(([sectionKey], index) => {
+          nextCategoryItems[sectionKey] = (categoryResults[index]?.data?.items ?? []).map((item) =>
+            mapAliItemToCard(item, { shipsTo, currency }),
+          );
+        });
+        setDailyCategoryItems(nextCategoryItems);
       })
-      .catch(() => {
+      .catch((err) => {
         dailySectionsFetchedRef.current = false;
+        console.error("Failed to load daily marketplace category picks:", err);
       });
   }, [activePage, aliPlatformReady, aliCredentialsMissing, aliPlatformUnavailable, shipsTo, currency]);
 
@@ -1074,9 +1114,12 @@ const MarketplaceDashboard = () => {
         if (section.key === "new-arrivals" && dailyNewArrivals.length) {
           return { ...section, items: dailyNewArrivals };
         }
+        if (dailyCategoryItems[section.key]?.length) {
+          return { ...section, items: dailyCategoryItems[section.key] };
+        }
         return section;
       }),
-    [dailyBestSellers, dailyNewArrivals],
+    [dailyBestSellers, dailyNewArrivals, dailyCategoryItems],
   );
 
   const filteredMarketplace = useMemo(() => {

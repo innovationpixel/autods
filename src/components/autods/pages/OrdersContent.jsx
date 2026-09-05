@@ -32,6 +32,7 @@ import {
   LuPrinter,
   LuRefreshCcw,
   LuSlidersHorizontal,
+  LuStore,
   LuTriangleAlert,
   LuTruck,
   LuX,
@@ -72,9 +73,6 @@ import {
   getDateRangeForPreset,
   getDefaultOrderFilters,
 } from "../orderFilters";
-
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
 
 const PRINT_COLUMN_DOC_TYPES = {
   invoice: "invoice",
@@ -190,7 +188,7 @@ function mapApiOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
     color: variationText || "—",
     pickStatus: raw.pickStatus ?? "—",
     itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
@@ -1069,9 +1067,15 @@ function OrdersContent({ searchQuery }) {
       case "name":
         return (
           <div className="orders-product">
-            <div className="orders-product__thumb">
-              <img src={order.image} alt={order.title} />
-            </div>
+            {order.image ? (
+              <div className="orders-product__thumb">
+                <img src={order.image} alt={order.title} referrerPolicy="no-referrer" />
+              </div>
+            ) : (
+              <div className="orders-product__thumb orders-product__thumb--empty">
+                <LuStore />
+              </div>
+            )}
             <div className="orders-product__copy">
               <h3>{order.title}</h3>
               <p>{order.color}</p>

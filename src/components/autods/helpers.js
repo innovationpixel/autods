@@ -491,9 +491,6 @@ export function getEbayOrderStatusMeta(raw = {}) {
   };
 }
 
-const CALCULATION_PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
-
 function normalizeCalculationTracking(value) {
   const trimmed = String(value ?? "").trim();
   if (!trimmed || /^https?:\/\//i.test(trimmed)) {
@@ -583,7 +580,7 @@ export function mapApiOrderToCalculationRow(order) {
     id: String(order.id),
     orderId: order.ebay_order_id ?? raw.orderId ?? String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? CALCULATION_PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
     description: variationText || order.item_title || firstItem.title || "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     ebayStatus: ebayStatus.label,

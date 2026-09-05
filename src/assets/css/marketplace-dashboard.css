@@ -7305,6 +7305,11 @@
   object-fit: cover;
 }
 
+.orders-product__thumb--empty {
+  color: #b6b5bd;
+  font-size: 18px;
+}
+
 .orders-product__copy h3 {
   display: -webkit-box;
   margin: 0 0 6px;
@@ -7627,7 +7632,7 @@
   bottom: calc(100% + 6px);
   right: 0;
   left: auto;
-  z-index: 12;
+  z-index: 9999;
   max-height: min(320px, 50vh);
   overflow: auto;
 }

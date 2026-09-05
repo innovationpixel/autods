@@ -7,6 +7,7 @@ import {
   LuPackageCheck,
   LuPencil,
   LuRefreshCcw,
+  LuStore,
   LuUserRound,
   LuZap,
 } from "react-icons/lu";
@@ -31,9 +32,6 @@ import {
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
-
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=120&q=80";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
@@ -82,7 +80,7 @@ function mapProcessingOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? PLACEHOLDER_IMAGE,
+    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
     ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
     orderDetailUrl: getEbayOrderDetailUrl(order.ebay_order_id ?? raw.orderId, order.connection?.site_id),
     siteId: order.connection?.site_id ?? null,
@@ -618,9 +616,15 @@ function OrderProcessingContent() {
                       </td>
                       <td>
                         <div className="orders-product calculations-product">
-                          <div className="orders-product__thumb">
-                            <img src={order.image} alt={order.title} />
-                          </div>
+                          {order.image ? (
+                            <div className="orders-product__thumb">
+                              <img src={order.image} alt={order.title} referrerPolicy="no-referrer" />
+                            </div>
+                          ) : (
+                            <div className="orders-product__thumb orders-product__thumb--empty">
+                              <LuStore />
+                            </div>
+                          )}
                           <div className="orders-product__copy calculations-product__copy">
                             <h3>{order.title}</h3>
                             <p className="calculations-product__description">
