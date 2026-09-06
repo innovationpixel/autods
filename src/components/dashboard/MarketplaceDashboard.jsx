@@ -600,11 +600,16 @@ const generatedCategorySections = categoryRowBlueprints.map((section) => ({
   ),
 }));
 
+// Every section here starts with no items — the fabricated sample products that
+// used to live in catalogSections/generatedCategorySections are never shown.
+// dailyMarketplaceSections below fills each section's real items in from
+// AliExpress once the daily fetch resolves; until then, a section with no items
+// yet is hidden rather than falling back to fake products (see sectionsLoading).
 const marketplaceSections = [
   ...catalogSections.filter((section) => section.key !== "outdoors"),
   ...catalogSections.filter((section) => section.key === "outdoors"),
   ...generatedCategorySections,
-];
+].map((section) => ({ ...section, items: [] }));
 const ALIEXPRESS_CATEGORY_MAP = {
   "Toys & Hobbies":             "1511",
   "Home & Garden":              "13",
@@ -734,6 +739,7 @@ const MarketplaceDashboard = () => {
   const [dailyBestSellers, setDailyBestSellers] = useState([]);
   const [dailyNewArrivals, setDailyNewArrivals] = useState([]);
   const [dailyCategoryItems, setDailyCategoryItems] = useState({});
+  const [dailySectionsLoading, setDailySectionsLoading] = useState(true);
   const profileMenuRef = useRef(null);
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
@@ -996,9 +1002,13 @@ const MarketplaceDashboard = () => {
   // of a true listing-date sort).
   useEffect(() => {
     if (activePage !== "marketplace") return;
-    if (!aliPlatformReady || aliCredentialsMissing || aliPlatformUnavailable) return;
+    if (!aliPlatformReady || aliCredentialsMissing || aliPlatformUnavailable) {
+      setDailySectionsLoading(false);
+      return;
+    }
     if (dailySectionsFetchedRef.current) return;
     dailySectionsFetchedRef.current = true;
+    setDailySectionsLoading(true);
 
     const categoryIds = Object.values(ALIEXPRESS_CATEGORY_MAP);
     const bestSellersSeed = getDailySeed("best-sellers");
@@ -1056,7 +1066,8 @@ const MarketplaceDashboard = () => {
       .catch((err) => {
         dailySectionsFetchedRef.current = false;
         console.error("Failed to load daily marketplace category picks:", err);
-      });
+      })
+      .finally(() => setDailySectionsLoading(false));
   }, [activePage, aliPlatformReady, aliCredentialsMissing, aliPlatformUnavailable, shipsTo, currency]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
@@ -2861,6 +2872,7 @@ const MarketplaceDashboard = () => {
                       expandedProductsTitle={expandedProductsTitle}
                       visibleProducts={visibleProducts}
                       visibleSections={visibleSections}
+                      sectionsLoading={dailySectionsLoading}
                       keywordSearch={keywordSearch}
                       onSeeMore={openProductsView}
                       onResetView={resetMarketplaceView}

@@ -18,6 +18,7 @@ function MarketplaceSections({
   expandedProductsTitle = "",
   visibleProducts = [],
   visibleSections = [],
+  sectionsLoading = false,
   keywordSearch = "",
   onSeeMore,
   onResetView,
@@ -196,6 +197,11 @@ function MarketplaceSections({
             importingId={importingId}
           />
         ))
+      ) : sectionsLoading ? (
+        <div className="marketplace-products__empty">
+          <LuLoader className="spin-icon" style={{ fontSize: 28 }} />
+          <p>Loading marketplace products…</p>
+        </div>
       ) : (
         <div className="marketplace-products__empty">
           <LuSlidersHorizontal />
