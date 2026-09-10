@@ -450,6 +450,65 @@ export function normalizeTrackingCarrier(value) {
   return aliases[upper] ?? trimmed;
 }
 
+export function formatTrackingDisplay(rawTracking) {
+  const trimmed = String(rawTracking ?? "").trim();
+  if (!trimmed) {
+    return { trackingNumber: "", url: null };
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsedUrl = new URL(trimmed);
+      // Check query params for common tracking keys
+      for (const param of ["tracknum", "tracknumbers", "tracking_number", "trackingnumber", "nums", "tlabels", "id", "trackId"]) {
+        const val = parsedUrl.searchParams.get(param);
+        if (val && val.trim()) {
+          return { trackingNumber: val.trim(), url: trimmed };
+        }
+      }
+      // Check last path segment
+      const segments = parsedUrl.pathname.split("/").filter(Boolean);
+      const last = segments[segments.length - 1];
+      if (last && /^[A-Za-z0-9_-]{4,}$/.test(last)) {
+        return { trackingNumber: last, url: trimmed };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return { trackingNumber: trimmed, url: null };
+}
+
+export function buildCarrierTrackingUrl(trackingNumber, carrier) {
+  const tracking = String(trackingNumber ?? "").trim();
+  if (!tracking) return null;
+
+  const normalizedCarrier = normalizeTrackingCarrier(carrier) || detectTrackingCarrier(tracking) || "";
+  const upper = normalizedCarrier.toUpperCase();
+
+  if (upper === "UPS") {
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(tracking)}`;
+  }
+  if (upper === "USPS") {
+    return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(tracking)}`;
+  }
+  if (upper === "FEDEX" || upper === "FEDEXSMARTPOST") {
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(tracking)}`;
+  }
+  if (upper === "DHL") {
+    return `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(tracking)}`;
+  }
+  if (upper === "ONTRAC") {
+    return `https://www.ontrac.com/tracking/?number=${encodeURIComponent(tracking)}`;
+  }
+  if (upper === "LASERSHIP") {
+    return `https://www.lasership.com/track/${encodeURIComponent(tracking)}`;
+  }
+
+  return `https://www.google.com/search?q=${encodeURIComponent(`${normalizedCarrier || ""} ${tracking}`.trim())}`;
+}
+
 function titleCaseEbayStatus(value) {
   if (!value) {
     return "—";

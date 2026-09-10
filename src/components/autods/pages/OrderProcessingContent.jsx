@@ -26,8 +26,10 @@ import {
 import { getWalletSummary, transferToProcessingWallet } from "../../../services/WalletService";
 import { getBuyerAccounts } from "../../../services/BuyerAccountService";
 import {
+  buildCarrierTrackingUrl,
   buildSourceProductUrl,
   formatDisplayDate,
+  formatTrackingDisplay,
   getEbayOrderDetailUrl,
   normalizeTrackingCarrier,
 } from "../helpers";
@@ -110,11 +112,21 @@ function mapProcessingOrder(order) {
     aliexpressOrderStatus: order.aliexpress_order_status ?? "",
     processingStatus: order.processing_status ?? "new",
     processingMethod: order.processing_method ?? "",
-    trackingNumber: order.tracking_number ?? fulfillment.shippingStep?.shipmentTrackingNumber ?? "",
-    carrier:
-      normalizeTrackingCarrier(order.carrier) ||
-      normalizeTrackingCarrier(fulfillment.shippingStep?.shippingCarrierCode) ||
-      "",
+    ...(() => {
+      const rawTracking = order.tracking_number ?? fulfillment.shippingStep?.shipmentTrackingNumber ?? "";
+      const parsed = formatTrackingDisplay(rawTracking);
+      const carrier =
+        normalizeTrackingCarrier(order.carrier) ||
+        normalizeTrackingCarrier(fulfillment.shippingStep?.shippingCarrierCode) ||
+        "";
+      const trackingUrl = parsed.url || (parsed.trackingNumber ? buildCarrierTrackingUrl(parsed.trackingNumber, carrier) : null);
+
+      return {
+        trackingNumber: parsed.trackingNumber,
+        trackingUrl,
+        carrier,
+      };
+    })(),
   };
 }
 
@@ -449,6 +461,35 @@ function OrderProcessingContent() {
     }
   };
 
+  const handleBulkMarkProcessed = async () => {
+    const selected = orders.filter((order) => selectedIds.includes(order.id));
+    if (!selected.length) return;
+
+    setBulkProcessing(true);
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const order of selected) {
+      try {
+        await updateOrderProcessingStatus(order.id, "processed");
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+
+    setBulkProcessing(false);
+    setSelectedIds([]);
+
+    if (succeeded) {
+      toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} marked as processed.`);
+      await loadOrders();
+    }
+    if (failed) {
+      toast.error(`Could not mark ${failed} order${failed === 1 ? "" : "s"}.`);
+    }
+  };
+
   const handleTransferFunds = async () => {
     const parsed = Number.parseFloat(transferAmountDraft);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -669,6 +710,19 @@ function OrderProcessingContent() {
                 {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
                 <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
               </button>
+              {activeTab === "new" || activeTab === "pending" ? (
+                <button
+                  type="button"
+                  className="order-processing-bulk-bar__btn"
+                  style={{ background: "#475569" }}
+                  onClick={handleBulkMarkProcessed}
+                  disabled={bulkProcessing}
+                  title="Mark all selected orders as processed without calling AliExpress API"
+                >
+                  <LuCheck />
+                  <span>Mark Processed</span>
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -819,7 +873,20 @@ function OrderProcessingContent() {
                         {order.trackingNumber ? (
                           <div className="orders-tracking-display">
                             <span className="orders-tracking-display__copy">
-                              <span className="orders-table__mono">{order.trackingNumber}</span>
+                              {order.trackingUrl ? (
+                                <a
+                                  href={order.trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="orders-order-id-link orders-table__mono"
+                                  title={`Track package: ${order.trackingNumber}`}
+                                  style={{ textDecoration: "underline" }}
+                                >
+                                  {order.trackingNumber}
+                                </a>
+                              ) : (
+                                <span className="orders-table__mono">{order.trackingNumber}</span>
+                              )}
                               {order.carrier ? <span className="orders-table__carrier">{order.carrier}</span> : null}
                             </span>
                           </div>

@@ -51,6 +51,7 @@ import {
   buildSourceProductUrl,
   downloadTextFile,
   formatDisplayDate,
+  formatTrackingDisplay,
   getEbayOrderDetailUrl,
   normalizeTrackingCarrier,
   platformLabel,
@@ -105,12 +106,7 @@ function joinAddress(parts) {
 }
 
 function normalizeTrackingValue(value) {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed || /^https?:\/\//i.test(trimmed)) {
-    return "";
-  }
-
-  return trimmed;
+  return formatTrackingDisplay(value).trackingNumber;
 }
 
 function mapApiOrder(order) {
