@@ -2735,12 +2735,34 @@
   box-shadow: 0 0 0 3px rgba(237, 163, 67, 0.14);
 }
 
-.bulk-edit-modal__percent {
+.bulk-edit-modal__row--no-check {
+  grid-template-columns: 140px minmax(0, 1fr);
+  cursor: default;
+}
+
+.bulk-edit-modal__percent,
+.bulk-edit-modal__money {
   position: relative;
+  width: 100%;
 }
 
 .bulk-edit-modal__percent input {
   padding-right: 26px;
+}
+
+.bulk-edit-modal__money input {
+  padding-left: 24px;
+}
+
+.bulk-edit-modal__money-prefix {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  transform: translateY(-50%);
+  color: #8b8a93;
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .bulk-edit-modal__percent-suffix {
