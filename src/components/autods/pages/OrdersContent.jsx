@@ -27,7 +27,6 @@ import {
   LuExternalLink,
   LuInbox,
   LuLoader,
-  LuMenu,
   LuPencil,
   LuPrinter,
   LuRefreshCcw,
@@ -188,7 +187,7 @@ function mapApiOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
+    image: order.image_url ?? order.listing_image_url ?? firstItem.image?.imageUrl ?? null,
     color: variationText || "—",
     pickStatus: raw.pickStatus ?? "—",
     itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
@@ -877,17 +876,22 @@ function OrdersContent({ searchQuery }) {
     }
   };
 
-  const scrollTable = (position) => {
+  const scrollTable = (direction) => {
     const element = tableScrollRef.current;
 
     if (!element) {
       return;
     }
 
-    element.scrollTo({
-      left: position === "end" ? element.scrollWidth : 0,
-      behavior: "smooth",
-    });
+    if (direction === "start") {
+      element.scrollTo({ left: 0, behavior: "smooth" });
+    } else if (direction === "end") {
+      element.scrollTo({ left: element.scrollWidth, behavior: "smooth" });
+    } else if (direction === "left" || direction === -1) {
+      element.scrollBy({ left: -360, behavior: "smooth" });
+    } else {
+      element.scrollBy({ left: 360, behavior: "smooth" });
+    }
   };
 
   const statusMeta = {
@@ -1069,7 +1073,18 @@ function OrdersContent({ searchQuery }) {
           <div className="orders-product">
             {order.image ? (
               <div className="orders-product__thumb">
-                <img src={order.image} alt={order.title} referrerPolicy="no-referrer" />
+                <img
+                  src={order.image}
+                  alt={order.title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.classList.add("orders-product__thumb--empty");
+                    }
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             ) : (
               <div className="orders-product__thumb orders-product__thumb--empty">
@@ -1544,11 +1559,11 @@ function OrdersContent({ searchQuery }) {
         </label>
 
         <div className="orders-summary-row__actions">
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
-            <LuMenu />
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("left")} aria-label="Scroll grid left" title="Scroll left">
+            <LuChevronLeft />
           </button>
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Return to start">
-            <LuExternalLink />
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("right")} aria-label="Scroll grid right" title="Scroll right">
+            <LuChevronRight />
           </button>
         </div>
       </div>
@@ -1665,7 +1680,14 @@ function OrdersContent({ searchQuery }) {
 
         <div className="orders-table-footer">
           <div className="orders-pagination">
-            <button type="button" className="orders-pagination__arrow" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+            <button
+              type="button"
+              className="orders-pagination__arrow"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage <= 1}
+              aria-label="Previous page"
+              title="Previous page"
+            >
               <LuChevronLeft />
             </button>
 
@@ -1684,6 +1706,9 @@ function OrdersContent({ searchQuery }) {
               type="button"
               className="orders-pagination__arrow"
               onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={currentPage >= totalPages}
+              aria-label="Next page"
+              title="Next page"
             >
               <LuChevronRight />
             </button>

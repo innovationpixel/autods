@@ -10,7 +10,6 @@ import {
   LuClock3,
   LuExternalLink,
   LuFileSpreadsheet,
-  LuMenu,
   LuPencil,
   LuRefreshCcw,
   LuSlidersHorizontal,
@@ -512,17 +511,22 @@ function CalculationsContent({ searchQuery = "" }) {
     orderIdFilter.trim() !== "" ||
     storeFilter !== defaultFilters.storeFilter;
 
-  const scrollTable = (position) => {
+  const scrollTable = (direction) => {
     const element = tableScrollRef.current;
 
     if (!element) {
       return;
     }
 
-    element.scrollTo({
-      left: position === "end" ? element.scrollWidth : 0,
-      behavior: "smooth",
-    });
+    if (direction === "start") {
+      element.scrollTo({ left: 0, behavior: "smooth" });
+    } else if (direction === "end") {
+      element.scrollTo({ left: element.scrollWidth, behavior: "smooth" });
+    } else if (direction === "left" || direction === -1) {
+      element.scrollBy({ left: -360, behavior: "smooth" });
+    } else {
+      element.scrollBy({ left: 360, behavior: "smooth" });
+    }
   };
 
   const formatSummaryValue = (key) => {
@@ -646,7 +650,18 @@ function CalculationsContent({ searchQuery = "" }) {
           <div className="orders-product calculations-product">
             {row.image ? (
               <div className="orders-product__thumb">
-                <img src={row.image} alt={row.title} referrerPolicy="no-referrer" />
+                <img
+                  src={row.image}
+                  alt={row.title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.classList.add("orders-product__thumb--empty");
+                    }
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             ) : (
               <div className="orders-product__thumb orders-product__thumb--empty">
@@ -968,11 +983,11 @@ function CalculationsContent({ searchQuery = "" }) {
           <strong>{filteredRows.length} orders</strong>
 
           <div className="calculations-table-toolbar__actions">
-            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Scroll table to end">
-              <LuMenu />
+            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("left")} aria-label="Scroll grid left" title="Scroll left">
+              <LuChevronLeft />
             </button>
-            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Scroll table to start">
-              <LuExternalLink />
+            <button type="button" className="orders-icon-btn" onClick={() => scrollTable("right")} aria-label="Scroll grid right" title="Scroll right">
+              <LuChevronRight />
             </button>
           </div>
         </div>

@@ -103,16 +103,26 @@ function ProductCard({ item, onImport, importing = false }) {
             <button
               type="button"
               className="marketplace-product-card__gallery-btn marketplace-product-card__gallery-btn--prev"
-              onClick={() => changeImage(-1)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                changeImage(-1);
+              }}
               aria-label="Previous product image"
+              title="Previous image"
             >
               <LuChevronLeft />
             </button>
             <button
               type="button"
               className="marketplace-product-card__gallery-btn marketplace-product-card__gallery-btn--next"
-              onClick={() => changeImage(1)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                changeImage(1);
+              }}
               aria-label="Next product image"
+              title="Next image"
             >
               <LuChevronRight />
             </button>

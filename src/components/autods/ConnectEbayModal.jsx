@@ -58,7 +58,7 @@ function ConnectEbayModal({
         <EbayOAuthSetupBanner onContinue={onConnect} />
 
         <label className="connect-ebay-modal__field">
-          <span className="connect-ebay-modal__label">eBay marketplace</span>
+          <span className="connect-ebay-modal__label">eBay marketplace (Country)</span>
           <div className="connect-ebay-modal__select-wrap">
             <select
               value={siteId}
@@ -73,6 +73,9 @@ function ConnectEbayModal({
             </select>
             <LuChevronDown />
           </div>
+          <span style={{ fontSize: 12, color: "#6b7280", marginTop: 4, display: "block" }}>
+            Select your eBay store's country before connecting. This cannot be changed once connected.
+          </span>
         </label>
 
         <button
@@ -87,7 +90,7 @@ function ConnectEbayModal({
               <span>Opening eBay…</span>
             </>
           ) : (
-            <span>Finish</span>
+            <span>Authorize on eBay</span>
           )}
         </button>
 

@@ -18,6 +18,9 @@ export const updateOrderCost = (id, payload) =>
 export const updateOrderFulfillment = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/fulfillment`, payload);
 
+export const updateOrderProcessingStatus = (id, processing_status) =>
+    axiosInstance.patch(`/orders/${id}/processing-status`, { processing_status });
+
 export const placeAliExpressOrder = (id, payload = {}) =>
     axiosInstance.post(`/orders/${id}/place-aliexpress-order`, payload);
 

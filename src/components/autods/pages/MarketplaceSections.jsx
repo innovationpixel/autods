@@ -1,5 +1,4 @@
 import { LuChevronLeft, LuChevronRight, LuLoader, LuSlidersHorizontal, LuStore } from "react-icons/lu";
-import CarouselSection from "../CarouselSection";
 import ProductCard from "../ProductCard";
 import { buildPaginationItems, mapAliItemToCard } from "../helpers";
 
@@ -16,18 +15,14 @@ function MarketplaceSections({
   aliTotalPages = 1,
   onAliPageChange,
   expandedProductsTitle = "",
-  visibleProducts = [],
-  visibleSections = [],
-  sectionsLoading = false,
+  activeCategory = "All Categories",
   keywordSearch = "",
-  onSeeMore,
   onResetView,
   onImport,
   importingId,
 }) {
   const hasKeywordSearch = Boolean(keywordSearch.trim());
   const aliCards = aliItems.map(mapAliItemToCard);
-  const hasLiveData = aliPlatformReady && !aliCredentialsMissing && !aliPlatformUnavailable;
 
   const renderPagination = () => {
     if (aliTotalPages <= 1) {
@@ -78,137 +73,95 @@ function MarketplaceSections({
     );
   };
 
-  if (hasKeywordSearch && aliConnectionLoading) {
+  // Connection check state
+  if (aliConnectionLoading && !aliCards.length) {
     return (
       <div className="marketplace-products__empty">
         <LuLoader className="spin-icon" style={{ fontSize: 28 }} />
-        <p>Checking AliExpress availability…</p>
+        <p>Connecting to AliExpress in real-time…</p>
       </div>
     );
   }
 
-  if (hasKeywordSearch && aliPlatformUnavailable) {
+  // Not connected notices
+  if (aliPlatformUnavailable) {
     return (
-      <div className="marketplace-products__empty">
-        <LuStore style={{ fontSize: 28 }} />
-        <p>
-          Platform AliExpress is not connected yet. Ask your super admin to connect it from Admin → Settings.
-        </p>
+      <div className="marketplace-inline-notice">
+        <LuStore />
+        <div className="marketplace-inline-notice__copy">
+          <strong>Platform AliExpress Not Connected</strong>
+          <p>AliExpress is connected once by your super admin for all users. Ask them to connect it from Admin → Settings.</p>
+        </div>
       </div>
     );
   }
 
-  if (aliLoading && hasKeywordSearch) {
+  if (aliCredentialsMissing || !aliCredentialsConfigured) {
     return (
-      <div className="marketplace-products__empty">
-        <LuLoader className="spin-icon" style={{ fontSize: 28 }} />
-        <p>Searching marketplace…</p>
+      <div className="marketplace-inline-notice marketplace-inline-notice--info">
+        <LuStore />
+        <p>AliExpress API credentials are not configured on the server. Please add them in the server configuration.</p>
       </div>
     );
   }
 
-  if (expandedProductsTitle) {
-    const items = hasLiveData ? aliCards : visibleProducts;
-
-    return (
-      <section className="marketplace-expanded-products">
-        <div className="marketplace-expanded-products__head">
-          <h2 className="marketplace-section__title">
-            {expandedProductsTitle}
-            {hasLiveData && aliLoading ? <LuLoader className="spin-icon" style={{ marginLeft: 8 }} /> : null}
-          </h2>
-          <button type="button" className="marketplace-section__see-more" onClick={onResetView}>
-            Back to all categories
-          </button>
-        </div>
-        {items.length ? (
-          <>
-            <div className="marketplace-expanded-products__grid">
-              {items.map((item) => (
-                <ProductCard item={item} key={item.id} onImport={onImport} importing={importingId === item.id} />
-              ))}
-            </div>
-            {hasLiveData ? renderPagination() : null}
-          </>
-        ) : (
-          <div className="marketplace-products__empty">
-            <LuSlidersHorizontal />
-            <p>No products match the current filters.</p>
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  if (hasKeywordSearch && aliCards.length) {
-    return (
-      <section className="marketplace-expanded-products">
-        <div className="marketplace-expanded-products__head">
-          <h2 className="marketplace-section__title">
-            Search results — {aliCards.length} product{aliCards.length !== 1 ? "s" : ""} for &ldquo;
-            {keywordSearch.trim()}&rdquo;
-          </h2>
-          <button type="button" className="marketplace-section__see-more" onClick={onResetView}>
-            Back to all categories
-          </button>
-        </div>
-        <div className="marketplace-expanded-products__grid">
-          {aliCards.map((item) => (
-            <ProductCard item={item} key={item.id} onImport={onImport} importing={importingId === item.id} />
-          ))}
-        </div>
-        {renderPagination()}
-      </section>
-    );
+  // Determine section heading
+  let sectionTitle = "Real-Time AliExpress Products";
+  if (hasKeywordSearch) {
+    sectionTitle = `Search results for "${keywordSearch.trim()}"`;
+  } else if (expandedProductsTitle) {
+    sectionTitle = expandedProductsTitle;
+  } else if (activeCategory && activeCategory !== "All Categories") {
+    sectionTitle = activeCategory;
   }
 
   return (
-    <>
-      {aliCredentialsMissing || !aliCredentialsConfigured ? (
-        <div className="marketplace-inline-notice marketplace-inline-notice--info">
-          <LuStore />
-          <p>AliExpress API credentials are not configured on the server.</p>
-        </div>
-      ) : null}
-
-      {aliPlatformUnavailable ? (
-        <div className="marketplace-inline-notice">
-          <LuStore />
-          <div className="marketplace-inline-notice__copy">
-            <strong>Platform AliExpress not available</strong>
-            <p>AliExpress is connected once by your super admin for all users. Ask them to connect it from Admin → Settings.</p>
-          </div>
-        </div>
-      ) : null}
-
-      {aliError && !aliPlatformUnavailable ? (
+    <section className="marketplace-expanded-products">
+      {aliError && (
         <div className="marketplace-inline-notice marketplace-inline-notice--error">
           <p>{aliError}</p>
         </div>
-      ) : null}
+      )}
 
-      {visibleSections.length ? (
-        visibleSections.map((section) => (
-          <CarouselSection
-            key={section.key}
-            onSeeMore={onSeeMore}
-            section={section}
-            onImport={onImport}
-            importingId={importingId}
-          />
-        ))
-      ) : sectionsLoading ? (
+      <div className="marketplace-expanded-products__head">
+        <h2 className="marketplace-section__title">
+          {sectionTitle}
+          {aliCards.length ? ` (${aliCards.length})` : ""}
+          {aliLoading ? <LuLoader className="spin-icon" style={{ marginLeft: 8 }} /> : null}
+        </h2>
+        {(hasKeywordSearch || expandedProductsTitle || (activeCategory && activeCategory !== "All Categories")) && (
+          <button type="button" className="marketplace-section__see-more" onClick={onResetView}>
+            Back to all categories
+          </button>
+        )}
+      </div>
+
+      {aliLoading && !aliCards.length ? (
         <div className="marketplace-products__empty">
           <LuLoader className="spin-icon" style={{ fontSize: 28 }} />
-          <p>Loading marketplace products…</p>
+          <p>Loading real-time products from AliExpress…</p>
         </div>
+      ) : aliCards.length ? (
+        <>
+          <div className="marketplace-expanded-products__grid">
+            {aliCards.map((item) => (
+              <ProductCard
+                item={item}
+                key={item.id}
+                onImport={onImport}
+                importing={importingId === item.id}
+              />
+            ))}
+          </div>
+          {renderPagination()}
+        </>
       ) : (
         <div className="marketplace-products__empty">
           <LuSlidersHorizontal />
-          <p>No products match the current filters.</p>
+          <p>No products found from AliExpress matching the current filters.</p>
         </div>
       )}
-    </>
+    </section>
   );
 }
 

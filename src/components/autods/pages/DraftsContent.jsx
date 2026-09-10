@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector, useStore } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
+  LuCircleAlert,
+  LuArrowLeft,
+  LuCheck,
   LuChevronRight,
   LuClock3,
   LuEllipsisVertical,
   LuExternalLink,
+  LuEye,
   LuInbox,
   LuLink,
   LuLoader,
@@ -15,6 +19,7 @@ import {
   LuRefreshCcw,
   LuSlidersHorizontal,
   LuTrash2,
+  LuUpload,
   LuX,
 } from "react-icons/lu";
 import DraftEditorPanel from "../DraftEditorPanel";
@@ -78,7 +83,11 @@ function buildScheduleBatchAlert(batch) {
   };
 }
 
-function DraftsContent({ searchQuery }) {
+function DraftsContent({
+  searchQuery,
+  importBatchProgress: propBatchProgress,
+  onDismissImportBatch: propDismissBatch,
+}) {
   const dispatch = useDispatch();
   const store = useStore();
   const navigate = useNavigate();
@@ -110,6 +119,106 @@ function DraftsContent({ searchQuery }) {
   const [publishingIds, setPublishingIds] = useState([]);
   const [scheduleBatches, setScheduleBatches] = useState([]);
   const [dismissedScheduleBatchIds, setDismissedScheduleBatchIds] = useState([]);
+
+  const [activeImportBatch, setActiveImportBatch] = useState(() => {
+    if (propBatchProgress) return propBatchProgress;
+    try {
+      const saved = localStorage.getItem("autods_active_import_batch");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [showFailuresModal, setShowFailuresModal] = useState(false);
+
+  useEffect(() => {
+    if (propBatchProgress) {
+      setActiveImportBatch(propBatchProgress);
+    }
+  }, [propBatchProgress]);
+
+  useEffect(() => {
+    const handleBatchUpdate = (event) => {
+      if (event.detail) {
+        setActiveImportBatch(event.detail);
+      }
+    };
+    const handleBatchDismiss = () => {
+      setActiveImportBatch(null);
+    };
+    const handleRefreshDrafts = () => {
+      loadDrafts();
+    };
+
+    window.addEventListener("autods_import_batch_update", handleBatchUpdate);
+    window.addEventListener("autods_import_batch_dismiss", handleBatchDismiss);
+    window.addEventListener("autods_refresh_drafts", handleRefreshDrafts);
+
+    return () => {
+      window.removeEventListener("autods_import_batch_update", handleBatchUpdate);
+      window.removeEventListener("autods_import_batch_dismiss", handleBatchDismiss);
+      window.removeEventListener("autods_refresh_drafts", handleRefreshDrafts);
+    };
+  }, []);
+
+  const handleDismissActiveBatch = () => {
+    setActiveImportBatch(null);
+    try {
+      localStorage.removeItem("autods_active_import_batch");
+    } catch {}
+    if (typeof propDismissBatch === "function") {
+      propDismissBatch();
+    }
+  };
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editParam = searchParams.get("edit");
+  const [editingDraftId, setEditingDraftId] = useState(editParam || null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  useEffect(() => {
+    const p = searchParams.get("edit");
+    setEditingDraftId(p || null);
+  }, [searchParams]);
+
+  const handleOpenEditPage = (item) => {
+    setEditingDraftId(String(item.id));
+    setSearchParams({ edit: String(item.id) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleBackToDrafts = () => {
+    setEditingDraftId(null);
+    setSearchParams({});
+  };
+
+  const handleSaveSingle = async (item) => {
+    setIsSavingDraft(true);
+    try {
+      await saveDraft(item);
+      toast.success("Draft saved successfully.");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not save draft."));
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handlePublishSingle = async (item) => {
+    if (!(await ensureShipFromReady())) return;
+    setPublishingIds((cur) => [...cur, item.id]);
+    try {
+      await saveDraftIfDirty(item);
+      await publishProduct(item.id);
+      toast.success("Draft published successfully.");
+      await loadDrafts();
+      handleBackToDrafts();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not publish draft."));
+    } finally {
+      setPublishingIds((cur) => cur.filter((x) => x !== item.id));
+    }
+  };
 
   const ensureShipFromReady = async () => {
     let settings = accountSettings;
@@ -504,6 +613,10 @@ function DraftsContent({ searchQuery }) {
   };
 
   const handleDraftMenu = async (id, action) => {
+    if (action === "edit") {
+      const item = drafts.find((d) => d.id === id);
+      if (item) handleOpenEditPage(item);
+    }
     if (action === "delete") {
       setDeleteConfirm({ type: "single", id });
     }
@@ -551,6 +664,132 @@ function DraftsContent({ searchQuery }) {
     );
   }
 
+  if (editingDraftId) {
+    const editingItem = drafts.find((draft) => String(draft.id) === String(editingDraftId));
+
+    if (loading && !editingItem) {
+      return (
+        <section className="drafts-page-content">
+          <div className="draft-edit-view card-wrapper" style={{ minHeight: 320, display: "grid", placeItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#666", fontSize: 14 }}>
+              <LuLoader className="spin-icon" />
+              <span>Loading draft product details…</span>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    if (!editingItem) {
+      return (
+        <section className="drafts-page-content">
+          <div className="draft-edit-view card-wrapper" style={{ padding: "40px 24px", textAlign: "center" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: "#222" }}>Draft Not Found</h3>
+            <p style={{ color: "#666", fontSize: 14, marginBottom: 20 }}>
+              The draft #{editingDraftId} could not be found. It may have been published or deleted.
+            </p>
+            <button
+              type="button"
+              className="draft-edit-view__back-btn"
+              onClick={handleBackToDrafts}
+              style={{ margin: "0 auto" }}
+            >
+              <LuArrowLeft />
+              <span>Back to Drafts</span>
+            </button>
+          </div>
+        </section>
+      );
+    }
+
+    const form = getEditForm(editingItem);
+    const hasError = editingItem.import_status === "failed";
+    const statusLabel = hasError ? "Failed" : editingItem.status === "draft" ? "Draft" : editingItem.status ?? "Draft";
+    const isPublishing = publishingIds.includes(editingItem.id);
+
+    return (
+      <section className="drafts-page-content">
+        <div className="draft-edit-view card-wrapper">
+          <div className="draft-edit-view__top-bar">
+            <div className="draft-edit-view__top-left">
+              <button
+                type="button"
+                className="draft-edit-view__back-btn"
+                onClick={handleBackToDrafts}
+              >
+                <LuArrowLeft />
+                <span>Back to Drafts</span>
+              </button>
+
+              <div className="draft-edit-view__breadcrumbs">
+                <span
+                  className="draft-edit-view__breadcrumb-link"
+                  onClick={handleBackToDrafts}
+                >
+                  Drafts
+                </span>
+                <span className="draft-edit-view__breadcrumb-sep">/</span>
+                <span className="draft-edit-view__breadcrumb-current">
+                  Edit Product #{editingItem.id}
+                </span>
+              </div>
+
+              <div className="draft-edit-view__badge-group">
+                <span className={`drafts-row__status-badge ${hasError ? "drafts-row__status-badge--failed" : ""}`}>
+                  {statusLabel}
+                </span>
+                {editingItem.source_platform ? (
+                  <span className="draft-edit-view__platform-badge">
+                    {editingItem.source_platform}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="draft-edit-view__top-actions">
+              <button
+                type="button"
+                className="draft-edit-view__btn draft-edit-view__btn--cancel"
+                onClick={handleBackToDrafts}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="draft-edit-view__btn draft-edit-view__btn--save"
+                onClick={() => handleSaveSingle(editingItem)}
+                disabled={isSavingDraft}
+              >
+                {isSavingDraft ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                <span>Save</span>
+              </button>
+              <button
+                type="button"
+                className="draft-edit-view__btn draft-edit-view__btn--publish"
+                onClick={() => handlePublishSingle(editingItem)}
+                disabled={isPublishing}
+              >
+                {isPublishing ? <LuLoader className="spin-icon" /> : <LuUpload />}
+                <span>Save & Publish</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="draft-edit-view__body">
+            <DraftEditorPanel
+              item={editingItem}
+              form={form}
+              activeTab={editorTabs[editingItem.id] ?? "general"}
+              onTabChange={(tabId) => setEditorTabs((cur) => ({ ...cur, [editingItem.id]: tabId }))}
+              onChange={(nextForm) => setEditForm(editingItem.id, editingItem, nextForm)}
+              onSave={() => handleSaveSingle(editingItem)}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const emptyMessage =
     activeTab === "scheduled"
       ? "No scheduled uploads yet."
@@ -560,6 +799,144 @@ function DraftsContent({ searchQuery }) {
 
   return (
     <section className="drafts-page-content">
+      {activeImportBatch && Number(activeImportBatch.total) > 0 ? (
+        <div
+          className={`draft-import-banner ${
+            activeImportBatch.status === "processing"
+              ? "draft-import-banner--processing"
+              : activeImportBatch.failed > 0
+              ? "draft-import-banner--completed-with-errors"
+              : "draft-import-banner--completed"
+          }`}
+          onClick={
+            activeImportBatch.status !== "processing" && activeImportBatch.failed > 0
+              ? () => setShowFailuresModal(true)
+              : undefined
+          }
+          style={{
+            cursor:
+              activeImportBatch.status !== "processing" && activeImportBatch.failed > 0
+                ? "pointer"
+                : "default",
+          }}
+        >
+          <div className="draft-import-banner__left">
+            <div className="draft-import-banner__icon-wrap">
+              {activeImportBatch.status === "processing" ? (
+                <LuLoader className="spin-icon draft-import-banner__spinner" />
+              ) : activeImportBatch.failed > 0 ? (
+                <LuCircleAlert className="draft-import-banner__icon draft-import-banner__icon--warning" />
+              ) : (
+                <LuCheck className="draft-import-banner__icon draft-import-banner__icon--success" />
+              )}
+            </div>
+            <div className="draft-import-banner__info">
+              <div className="draft-import-banner__title">
+                {activeImportBatch.status === "processing"
+                  ? `Importing ${activeImportBatch.total} products in background...`
+                  : activeImportBatch.failed > 0
+                  ? `${activeImportBatch.completed} successfully imported and ${activeImportBatch.failed} failed.`
+                  : `All ${activeImportBatch.completed} products successfully imported to drafts!`}
+              </div>
+              <div className="draft-import-banner__subtitle">
+                {activeImportBatch.status === "processing" ? (
+                  <>
+                    <span>
+                      {Number(activeImportBatch.completed || 0) + Number(activeImportBatch.failed || 0)} of{" "}
+                      {activeImportBatch.total} processed
+                    </span>
+                    {Number(activeImportBatch.completed || 0) > 0 ? (
+                      <span className="draft-import-banner__pill draft-import-banner__pill--success">
+                        {activeImportBatch.completed} imported
+                      </span>
+                    ) : null}
+                    {Number(activeImportBatch.failed || 0) > 0 ? (
+                      <span className="draft-import-banner__pill draft-import-banner__pill--danger">
+                        {activeImportBatch.failed} failed
+                      </span>
+                    ) : null}
+                  </>
+                ) : activeImportBatch.failed > 0 ? (
+                  <span>Click to view why the {activeImportBatch.failed} failed.</span>
+                ) : (
+                  <span>Ready for review, editing, and publishing.</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="draft-import-banner__right">
+            {activeImportBatch.status === "processing" ? (
+              <div className="draft-import-banner__progress-wrap">
+                <div className="draft-import-banner__progress-bar">
+                  <div
+                    className="draft-import-banner__progress-fill draft-import-banner__progress-fill--success"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (Number(activeImportBatch.completed || 0) /
+                            Math.max(1, Number(activeImportBatch.total || 1))) *
+                            100
+                        )
+                      )}%`,
+                    }}
+                  />
+                  <div
+                    className="draft-import-banner__progress-fill draft-import-banner__progress-fill--danger"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (Number(activeImportBatch.failed || 0) /
+                            Math.max(1, Number(activeImportBatch.total || 1))) *
+                            100
+                        )
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <span className="draft-import-banner__percent">
+                  {Math.min(
+                    100,
+                    Math.round(
+                      ((Number(activeImportBatch.completed || 0) + Number(activeImportBatch.failed || 0)) /
+                        Math.max(1, Number(activeImportBatch.total || 1))) *
+                        100
+                    )
+                  )}
+                  %
+                </span>
+              </div>
+            ) : (
+              <div
+                className="draft-import-banner__actions"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {activeImportBatch.failed > 0 ? (
+                  <button
+                    type="button"
+                    className="draft-import-banner__view-failures-btn"
+                    onClick={() => setShowFailuresModal(true)}
+                  >
+                    <LuEye />
+                    <span>View why {activeImportBatch.failed} failed</span>
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="draft-import-banner__close-btn"
+                  aria-label="Dismiss banner"
+                  onClick={handleDismissActiveBatch}
+                >
+                  <LuX />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       <nav className="drafts-tabs" aria-label="Upload sections">
         {[
           ["drafts", `Drafts (${draftsCount})`],
@@ -757,7 +1134,11 @@ function DraftsContent({ searchQuery }) {
                   </div>
 
                   <div className="drafts-row__body">
-                    <h3>
+                    <h3
+                      onClick={() => handleOpenEditPage(item)}
+                      style={{ cursor: "pointer" }}
+                      title="Click to edit product"
+                    >
                       {hasError ? <span className="drafts-row__error">!</span> : null}
                       <span>{item.title}</span>
                     </h3>
@@ -789,13 +1170,26 @@ function DraftsContent({ searchQuery }) {
                         <strong>!</strong>
                         <span>
                           {item.import_error ??
-                            "This draft could not be imported. Open the editor below, fix the details, and click Save."}
+                            "This draft could not be imported. Click Edit to review and fix details, then click Save."}
                         </span>
                       </div>
                     ) : null}
                   </div>
 
                   <div className="drafts-row__actions">
+                    <button
+                      type="button"
+                      className="drafts-row__edit-btn"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenEditPage(item);
+                      }}
+                      title="Edit Product"
+                      aria-label={`Edit ${item.title}`}
+                    >
+                      <LuPencil />
+                      <span>Edit</span>
+                    </button>
                     {item.source_url ? (
                       <a
                         href={item.source_url}
@@ -818,6 +1212,10 @@ function DraftsContent({ searchQuery }) {
                       </button>
                       {openMenuId === item.id ? (
                         <div className="drafts-row__menu">
+                          <button type="button" onClick={() => { setOpenMenuId(""); handleOpenEditPage(item); }}>
+                            <LuPencil />
+                            <span>Edit Product</span>
+                          </button>
                           <button type="button" onClick={() => handleDraftMenu(item.id, "schedule")}>
                             <LuClock3 />
                             <span>Schedule Listing</span>
@@ -880,6 +1278,84 @@ function DraftsContent({ searchQuery }) {
         onConfirm={confirmDelete}
         onClose={() => setDeleteConfirm(null)}
       />
+
+      {showFailuresModal && activeImportBatch ? (
+        <div className="import-failures-modal-layer" role="presentation">
+          <button
+            type="button"
+            className="import-failures-modal-layer__backdrop"
+            aria-label="Close failures dialog"
+            onClick={() => setShowFailuresModal(false)}
+          />
+          <section
+            className="import-failures-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Failed import details"
+          >
+            <button
+              type="button"
+              className="import-failures-modal__close"
+              aria-label="Close failures dialog"
+              onClick={() => setShowFailuresModal(false)}
+            >
+              <LuX />
+            </button>
+
+            <div className="import-failures-modal__head">
+              <div className="import-failures-modal__icon">
+                <LuCircleAlert />
+              </div>
+              <div>
+                <h2>Failed Imports ({activeImportBatch.failed})</h2>
+                <p>
+                  The following {activeImportBatch.failed} product{activeImportBatch.failed === 1 ? "" : "s"} could not be imported to drafts:
+                </p>
+              </div>
+            </div>
+
+            <div className="import-failures-modal__list">
+              {activeImportBatch.failures && activeImportBatch.failures.length > 0 ? (
+                activeImportBatch.failures.map((f, idx) => (
+                  <div className="import-failures-modal__item" key={idx}>
+                    <div className="import-failures-modal__item-header">
+                      <span className="import-failures-modal__item-num">#{idx + 1}</span>
+                      <span className="import-failures-modal__item-target" title={f.item}>
+                        {f.item}
+                      </span>
+                    </div>
+                    <div className="import-failures-modal__item-reason">
+                      <strong>Failure reason:</strong>
+                      <span>{f.reason || "Product unavailable or details could not be retrieved."}</span>
+                    </div>
+                    {f.time ? (
+                      <div className="import-failures-modal__item-time">
+                        {new Date(f.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                      </div>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <div className="import-failures-modal__empty">
+                  <p>
+                    {activeImportBatch.failed} product{activeImportBatch.failed === 1 ? "" : "s"} failed during import due to supplier validation or unavailability (e.g. invalid supplier URL/ID or out of stock).
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="import-failures-modal__footer">
+              <button
+                type="button"
+                className="import-failures-modal__btn"
+                onClick={() => setShowFailuresModal(false)}
+              >
+                Close
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

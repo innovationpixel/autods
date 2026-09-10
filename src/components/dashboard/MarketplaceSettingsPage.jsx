@@ -31,8 +31,8 @@ import {
   LuExternalLink,
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
-import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction, setEbayConnectionMarketplaceAction } from "../../store/actions/EbayActions";
-import { EBAY_MARKETPLACES } from "../autods/ConnectEbayModal";
+import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
+import ConnectEbayModal, { EBAY_MARKETPLACES } from "../autods/ConnectEbayModal";
 import { updateProfileAction } from "../../store/actions/AuthActions";
 import { getEbayAuthUrl, completeEbayOAuth } from "../../services/EbayService";
 import { parseEbayOAuthUrl } from "../../utils/ebayOAuth";
@@ -611,6 +611,7 @@ export default function MarketplaceSettingsPage() {
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "store") return "Store Settings";
     if (tab === "supplier") return "Supplier Settings";
+    if (tab === "buyer-accounts" || tab === "buyer" || tab === "buyer_accounts") return "Buyer Accounts";
     if (tab === "billing") return "Account & Billing";
     if (tab === "templates") return "Templates";
     if (tab === "plans") return "Plans & Add-ons";
@@ -627,6 +628,8 @@ export default function MarketplaceSettingsPage() {
       setActivePrimaryTab("Store Settings");
     } else if (tab === "supplier") {
       setActivePrimaryTab("Supplier Settings");
+    } else if (tab === "buyer-accounts" || tab === "buyer" || tab === "buyer_accounts") {
+      setActivePrimaryTab("Buyer Accounts");
     } else if (tab === "billing") {
       setActivePrimaryTab("Account & Billing");
     } else if (tab === "templates") {
@@ -648,6 +651,8 @@ export default function MarketplaceSettingsPage() {
   const [editingMessageId, setEditingMessageId] = useState("");
   const [messageDraft, setMessageDraft] = useState("");
   const [saveNotice, setSaveNotice] = useState("");
+  const [connectEbayModalOpen, setConnectEbayModalOpen] = useState(false);
+  const [ebaySiteId, setEbaySiteId] = useState("EBAY_US");
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [ebayCompleting, setEbayCompleting] = useState(false);
   const [ebayPasteUrl, setEbayPasteUrl] = useState("");
@@ -791,6 +796,7 @@ export default function MarketplaceSettingsPage() {
   useEffect(() => {
     const params = new URLSearchParams(search);
     const ebay = params.get("ebay");
+    const aliexpress = params.get("aliexpress");
     const reason = params.get("reason");
 
     if (ebay === "connected") {
@@ -798,14 +804,42 @@ export default function MarketplaceSettingsPage() {
     } else if (ebay === "error") {
       toast.error(`eBay connection failed: ${reason ?? "Unknown error"}`);
     }
+
+    if (aliexpress === "connected") {
+      loadBuyerAccounts();
+      toast.success("AliExpress account connected successfully!");
+    } else if (aliexpress === "error") {
+      toast.error(`AliExpress connection failed: ${reason ?? "Unknown error"}`);
+    }
   }, [search, dispatch]);
 
-  const startEbayOAuthFlow = async () => {
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === "OAUTH_CALLBACK" && event.data?.platform === "aliexpress") {
+        setBuyerAccountConnecting(false);
+        loadBuyerAccounts();
+      }
+    };
+    const handleStorage = (event) => {
+      if (event.key === "autods_oauth_result") {
+        setBuyerAccountConnecting(false);
+        loadBuyerAccounts();
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const startEbayOAuthFlow = async (chosenSiteId = ebaySiteId) => {
     try {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
 
-      const res = await getEbayAuthUrl();
+      const res = await getEbayAuthUrl(chosenSiteId);
       const tab = openOAuthTab(res.data.url);
       oauthTabRef.current = tab;
 
@@ -822,6 +856,7 @@ export default function MarketplaceSettingsPage() {
 
       watchOAuthTab(tab, () => {
         setEbayConnecting(false);
+        setConnectEbayModalOpen(false);
         dispatch(fetchEbayStatus());
       });
     } catch (err) {
@@ -832,7 +867,7 @@ export default function MarketplaceSettingsPage() {
     }
   };
 
-  const connectEbay = () => startEbayOAuthFlow();
+  const connectEbay = () => setConnectEbayModalOpen(true);
 
   const finishEbayFromPastedUrl = async () => {
     const parsed = parseEbayOAuthUrl(ebayPasteUrl);
@@ -846,7 +881,7 @@ export default function MarketplaceSettingsPage() {
 
     setEbayCompleting(true);
     try {
-      await completeEbayOAuth({ callback_url: ebayPasteUrl.trim() });
+      await completeEbayOAuth({ callback_url: ebayPasteUrl.trim(), site_id: ebaySiteId });
       setEbayPasteUrl("");
       toast.success("eBay account connected successfully!");
       dispatch(fetchEbayStatus());
@@ -863,8 +898,6 @@ export default function MarketplaceSettingsPage() {
   };
 
   const setPrimaryEbay = (id) => dispatch(setEbayPrimaryAction(id));
-
-  const updateEbayMarketplace = (id, siteId) => dispatch(setEbayConnectionMarketplaceAction(id, siteId));
 
   const syncNow = (connectionId) => dispatch(syncEbayListingsAction(connectionId));
 
@@ -1119,17 +1152,9 @@ export default function MarketplaceSettingsPage() {
                   </div>
                   <p className="marketplace-settings__ebay-sub">
                     Marketplace:&nbsp;
-                    <select
-                      value={conn.site_id ?? "EBAY_US"}
-                      onChange={(event) => updateEbayMarketplace(conn.id, event.target.value)}
-                      style={{ fontSize: 12, fontWeight: 600, border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 4px" }}
-                    >
-                      {EBAY_MARKETPLACES.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>
+                      {EBAY_MARKETPLACES.find((option) => option.value === (conn.site_id ?? "EBAY_US"))?.label ?? (conn.site_id ?? "United States — ebay.com")}
+                    </span>
                     &nbsp;·&nbsp;
                     Connected: {conn.connected_at ? new Date(conn.connected_at).toLocaleDateString() : "—"}
                     {conn.granted_scope_count ? (
@@ -1167,7 +1192,7 @@ export default function MarketplaceSettingsPage() {
                     <button
                       type="button"
                       className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
-                      onClick={startEbayOAuthFlow}
+                      onClick={() => startEbayOAuthFlow(conn.site_id ?? "EBAY_US")}
                     >
                       <LuLink />
                       <span>Reconnect</span>
@@ -3170,6 +3195,15 @@ export default function MarketplaceSettingsPage() {
           </div>
         </div>
       ) : null}
+
+      <ConnectEbayModal
+        open={connectEbayModalOpen}
+        onClose={() => setConnectEbayModalOpen(false)}
+        onConnect={() => startEbayOAuthFlow(ebaySiteId)}
+        connecting={ebayConnecting}
+        siteId={ebaySiteId}
+        onSiteChange={setEbaySiteId}
+      />
     </section>
   );
 }

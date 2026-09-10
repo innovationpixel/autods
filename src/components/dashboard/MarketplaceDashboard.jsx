@@ -64,7 +64,7 @@ import CustomerSupportContent from "./CustomerSupportPage";
 import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
 import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, importSuppliers } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
-import { buildItem, parsePriceValue, getSectionCategory, getDailySeed, mapAliItemToCard } from '../autods/helpers';
+import { mapAliItemToCard } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
 import ConnectEbayModal from '../autods/ConnectEbayModal';
@@ -92,7 +92,6 @@ import {
   parseEbayConnectionId,
 } from '../../utils/ebayStore';
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
-import { searchAliExpress } from '../../services/AliExpressService';
 import { logoutAction } from '../../store/actions/AuthActions';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
@@ -123,493 +122,6 @@ import {
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
 import { toast } from '../../utils/toast';
-const catalogSections = [
-  {
-    key: "outdoors",
-    title: "Outdoors",
-    items: [
-      buildItem({
-        id: "outdoor-1",
-        vendor: "FChiX",
-        title: "VIGLT Camping Shower Bag Portable Camping Shower Bag for Camp Shower Trips",
-        price: "$19.99",
-        shipping: "3 Business Days",
-        shippingDays: 3,
-        category: "Outdoors",
-        subCategory: "Camping",
-        shipsFrom: "United States",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?auto=format&fit=crop&w=1200&q=80",
-        shippingTag: "Fast Shipping",
-      }),
-      buildItem({
-        id: "outdoor-2",
-        vendor: "Surplus World Inc.",
-        title: "Rothco 2685 5-in-1 Multi-Purpose Tool for Camping and Hiking",
-        price: "$23.99",
-        shipping: "3 Business Days",
-        shippingDays: 3,
-        category: "Outdoors",
-        subCategory: "Climbing & Hiking",
-        shipsFrom: "United States",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80",
-        shippingTag: "Fast Shipping",
-      }),
-      buildItem({
-        id: "outdoor-3",
-        vendor: "Shop103181382 Store",
-        title: "LED Sensor Headlamp Camping Search Light Head Flashlight Rechargeable Powerful Headlight",
-        price: "$4.82-9.38",
-        shipping: "7 Business Days",
-        shippingDays: 7,
-        category: "Outdoors",
-        subCategory: "Camping",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "outdoor-4",
-        vendor: "CJ",
-        title: "USB Rechargeable LED Bicycle Headlight Bike Head Light Cycling Rear Front Lamp",
-        price: "$11.03",
-        shipping: "5 Business Days",
-        shippingDays: 5,
-        category: "Outdoors",
-        subCategory: "Cycling",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "outdoor-5",
-        vendor: "Outdoor Pro",
-        title: "Lightweight Waterproof Camping Tent for Weekend Trips and Hiking Camps",
-        price: "$44.90",
-        shipping: "6 Business Days",
-        shippingDays: 6,
-        category: "Outdoors",
-        subCategory: "Camping",
-        shipsFrom: "Germany",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1504851149312-7a075b496cc7?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "outdoor-6",
-        vendor: "FitCore",
-        title: "Compact Trekking Poles Pair for Climbing Hiking Trails and Outdoor Travel",
-        price: "$28.75",
-        shipping: "4 Business Days",
-        shippingDays: 4,
-        category: "Outdoors",
-        subCategory: "Climbing & Hiking",
-        shipsFrom: "United States",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1551632811-561732d1e306?auto=format&fit=crop&w=1200&q=80",
-      }),
-    ],
-  },
-  {
-    key: "best-sellers",
-    title: "Best Sellers",
-    items: [
-      buildItem({
-        id: "best-1",
-        vendor: "Amazon",
-        title:
-          "Yuntec Dog Car Seat Cover, Back Seat Cover for Dogs Pet Car Seat Protector Waterproof Bench",
-        price: "$26.98",
-        shipping: "2 Business Days",
-        shippingDays: 2,
-        category: "Pets",
-        shipsFrom: "United States",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80",
-        gallery: [
-          "https://images.unsplash.com/photo-1517849845537-4d257902454a?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1537151625747-768eb6cf92b2?auto=format&fit=crop&w=1200&q=80",
-        ],
-        shippingTag: "Fast Shipping",
-      }),
-      buildItem({
-        id: "best-2",
-        vendor: "Funky Junque Funky Junque",
-        title:
-          "Funky Junque Kids Beanie Toddler Girls Boys Ribbed Knit Children's Winter Hat Skully Cap",
-        price: "$14.93-31.99",
-        shipping: "2-7 Business Days",
-        shippingDays: 5,
-        category: "Clothing, Shoes & Jewelry",
-        shipsFrom: "China",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "best-3",
-        vendor: "JoymozeDirect",
-        title:
-          "Joymoze Leisure Backpack for Girls Teenage School Backpack Women Backpack Purse Cat",
-        price: "$29.99",
-        shipping: "2-3 Business Days",
-        shippingDays: 3,
-        category: "Clothing, Shoes & Jewelry",
-        shipsFrom: "China",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1523398002811-999ca8dec234?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "best-4",
-        vendor: "FINDCOZY DIRECT",
-        title:
-          "FINDCOZY Extra Large Toiletry Bag with Hanging Hook, Travel Makeup Case for Women, Cosmetic Organizer",
-        price: "$20.99-25.99",
-        shipping: "2 Business Days",
-        shippingDays: 2,
-        category: "Beauty & Personal Care",
-        shipsFrom: "Germany",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80",
-        shippingTag: "Fast Shipping",
-      }),
-      buildItem({
-        id: "best-5",
-        vendor: "Amazon",
-        title: "Foldable Storage Organizer with Zipper Compartments for Daily Travel Essentials",
-        price: "$24.50",
-        shipping: "3 Business Days",
-        shippingDays: 3,
-        category: "Home & Garden",
-        shipsFrom: "United States",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=1200&q=80",
-      }),
-    ],
-  },
-  {
-    key: "new-arrivals",
-    title: "New Arrivals",
-    items: [
-      buildItem({
-        id: "new-1",
-        vendor: "BeautyLadyNailArt Store",
-        title: "BORN PRETTY 10ml Milky Jelly White Gel Nail Polish UV LED Builder Gel",
-        price: "$4.80",
-        shipping: "11 Business Days",
-        shippingDays: 11,
-        category: "Beauty & Personal Care",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1200&q=80",
-        gallery: [
-          "https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1522337660859-02fbefca4702?auto=format&fit=crop&w=1200&q=80",
-        ],
-      }),
-      buildItem({
-        id: "new-2",
-        vendor: "VENALISA & CANNI Official Store",
-        title:
-          "Venalisa Factory Supplier Diamond Sticky Gel Super Texture Transparent Clear Color Diamond Glue",
-        price: "$2.52-4.56",
-        shipping: "11 Business Days",
-        shippingDays: 11,
-        category: "Beauty & Personal Care",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1522337660859-02fbefca4702?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "new-3",
-        vendor: "VENALISA & CANNI Official Store",
-        title:
-          "CANNI Gel Nail Polish TPO FREE Fantastic Adhesion Consistency Ultra Gorgeous Color Set",
-        price: "$5.81-6.32",
-        shipping: "11 Business Days",
-        shippingDays: 11,
-        category: "Beauty & Personal Care",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "new-4",
-        vendor: "VENALISA & CANNI Official Store",
-        title:
-          "CANNI Gel Nail Polish Blood Red Clear Jelly Red Gorgeous Color HEMA FREE Soak Off UV LED",
-        price: "$6.60",
-        shipping: "11 Business Days",
-        shippingDays: 11,
-        category: "Beauty & Personal Care",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80",
-        gallery: [
-          "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1200&q=80",
-        ],
-      }),
-      buildItem({
-        id: "new-5",
-        vendor: "BeautyLadyNailArt Store",
-        title: "Glossy Nude Jelly Gel Polish Set with Soft White Tips for Salon Finish Nails",
-        price: "$5.20",
-        shipping: "9 Business Days",
-        shippingDays: 9,
-        category: "Beauty & Personal Care",
-        shipsFrom: "China",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=1200&q=80",
-        shippingTag: "Fast Shipping",
-      }),
-    ],
-  },
-  {
-    key: "toys-hobbies",
-    title: "Toys & Hobbies",
-    items: [
-      buildItem({
-        id: "toy-1",
-        vendor: "PlayKids World",
-        title: "Challenge Falling Sticks Game with Adjustable Levels for Quick Family Reaction Play",
-        price: "$18.95",
-        shipping: "6 Business Days",
-        shippingDays: 6,
-        category: "Toys & Hobbies",
-        shipsFrom: "United States",
-        priceRange: "$0 - $25",
-        image:
-          "https://images.unsplash.com/photo-1516627145497-ae6968895b75?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "toy-2",
-        vendor: "Happy Hopper",
-        title: "Ocean Activity Jumper for Babies with Rotating Toys and Musical Play Tray",
-        price: "$67.99",
-        shipping: "5 Business Days",
-        shippingDays: 5,
-        category: "Toys & Hobbies",
-        shipsFrom: "United States",
-        priceRange: "$50 - $100",
-        image:
-          "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&fit=crop&w=1200&q=80",
-        shippingTag: "Fast Shipping",
-      }),
-      buildItem({
-        id: "toy-3",
-        vendor: "Battle Joy",
-        title: "RC Bumper Rival Cars Set with Rechargeable Controllers for Indoor Play Battles",
-        price: "$39.99",
-        shipping: "7 Business Days",
-        shippingDays: 7,
-        category: "Toys & Hobbies",
-        shipsFrom: "China",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1558060370-d644479cb6f7?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "toy-4",
-        vendor: "PlayKids World",
-        title: "Collectible Trading Card Box Set with Booster Packs and Premium Display Finish",
-        price: "$31.25",
-        shipping: "8 Business Days",
-        shippingDays: 8,
-        category: "Toys & Hobbies",
-        shipsFrom: "Germany",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1610890716171-6b1bb98ffd09?auto=format&fit=crop&w=1200&q=80",
-      }),
-      buildItem({
-        id: "toy-5",
-        vendor: "Battle Joy",
-        title: "Remote Control Racing Car with LED Drift Wheels and Rechargeable Battery Pack",
-        price: "$29.80",
-        shipping: "6 Business Days",
-        shippingDays: 6,
-        category: "Toys & Hobbies",
-        shipsFrom: "China",
-        priceRange: "$25 - $50",
-        image:
-          "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=1200&q=80",
-      }),
-    ],
-  },
-];
-
-const categoryRowBlueprints = [
-  {
-    key: "home-garden",
-    title: "Home & Garden",
-    category: "Home & Garden",
-    subCategory: "Decor",
-    vendors: ["Garden Base", "Amazon", "FINDCOZY DIRECT"],
-    images: [
-      "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Modern Indoor Planter Stand for Living Room and Patio Decor",
-      "Foldable Storage Basket for Home Garden Tools and Daily Organization",
-      "Solar Garden Lantern Outdoor Waterproof Decorative Warm Light",
-    ],
-  },
-  {
-    key: "electronics-gadgets",
-    title: "Electronics & Gadgets",
-    category: "Electronics & Gadgets",
-    subCategory: "Chargers",
-    vendors: ["Gadget Zone", "CJ", "Amazon"],
-    images: [
-      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Portable Bluetooth Speaker with FM Radio and Retro Handle",
-      "Fast Wireless Charger Stand for Phone Desk Nightstand Setup",
-      "Mini Power Bank Compact Daily Carry USB Charging Backup",
-    ],
-  },
-  {
-    key: "clothing-shoes-jewelry",
-    title: "Clothing, Shoes & Jewelry",
-    category: "Clothing, Shoes & Jewelry",
-    subCategory: "Clothing",
-    vendors: ["Fashion Store", "Funky Junque", "Target"],
-    images: [
-      "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Soft Knit Alltag Pullover Top Casual Color Block Sweater",
-      "Toddler Boys and Girls Boat Shoes Kids Canvas Sneakers",
-      "Lightweight Hoodie Travel Comfort Daily Wear Street Outfit",
-    ],
-  },
-  {
-    key: "beauty-personal-care",
-    title: "Beauty & Personal Care",
-    category: "Beauty & Personal Care",
-    subCategory: "Nails",
-    vendors: ["Beauty Plus", "BeautyLadyNailArt Store", "Shindel Shindel"],
-    images: [
-      "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1519014816548-bf5fe059798b?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Grey Hair Restoring Solid Shampoo Bar Bamboo Charcoal Treatment",
-      "Edge Control Kit for Women's Hair Strong Hold Smoother Gel",
-      "Spa Headbands Makeup Headbands Colorful Bow Hair Bands",
-    ],
-  },
-  {
-    key: "automotive-motorcycle",
-    title: "Automotive & Motorcycle",
-    category: "Automotive & Motorcycle",
-    subCategory: "Car Accessories",
-    vendors: ["Auto Gear", "Motor World", "CJ"],
-    images: [
-      "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Car Key Remote Shell Cover Protective Case with Signal Reminder",
-      "Leather Keychain Car Key Holder Durable Stitching Accessory",
-      "Dashboard Cleaning Gel Dust Detailer for Car Interior Vents",
-    ],
-  },
-  {
-    key: "sports-fitness",
-    title: "Sports & Fitness",
-    category: "Sports & Fitness",
-    subCategory: "Fitness",
-    vendors: ["FitCore", "Outdoor Pro", "Target"],
-    images: [
-      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Resistance Bands Set for Daily Home Workouts and Training",
-      "Yoga Mat Non Slip Fitness Pilates Stretching Exercise Pad",
-      "Adjustable Jump Rope for Cardio Sessions and Speed Training",
-    ],
-  },
-  {
-    key: "other-category",
-    title: "Other Category",
-    category: "Other Category",
-    subCategory: "General",
-    vendors: ["Tool House", "Walmart", "AliExpress"],
-    images: [
-      "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&w=1200&q=80",
-      "https://images.unsplash.com/photo-1607082349566-187342175e2f?auto=format&fit=crop&w=1200&q=80",
-    ],
-    titles: [
-      "Multipurpose Storage Basket for Home Office Utility Organization",
-      "Foldable Utility Box for Garage Supplies and Easy Carry",
-      "Compact Desktop Organizer Holder for Daily Workspace Setup",
-    ],
-  },
-];
-
-const generatedCategorySections = categoryRowBlueprints.map((section) => ({
-  key: section.key,
-  title: section.title,
-  items: Array.from({ length: 6 }, (_, index) =>
-    buildItem({
-      id: `${section.key}-${index + 1}`,
-      vendor: section.vendors[index % section.vendors.length],
-      title: `${section.titles[index % section.titles.length]} ${index + 1}`,
-      price: `$${(8.95 + index * 4.78).toFixed(2)}`,
-      shipping: `${(index % 6) + 2} Business Days`,
-      shippingDays: (index % 6) + 2,
-      category: section.category,
-      subCategory: section.subCategory,
-      shipsFrom: index % 2 === 0 ? "United States" : "China",
-      priceRange: index < 4 ? "$0 - $25" : "$25 - $50",
-      image: section.images[index % section.images.length],
-      shippingTag: index % 3 === 0 ? "Fast Shipping" : "Best Sellers",
-    }),
-  ),
-}));
-
-// Every section here starts with no items — the fabricated sample products that
-// used to live in catalogSections/generatedCategorySections are never shown.
-// dailyMarketplaceSections below fills each section's real items in from
-// AliExpress once the daily fetch resolves; until then, a section with no items
-// yet is hidden rather than falling back to fake products (see sectionsLoading).
-const marketplaceSections = [
-  ...catalogSections.filter((section) => section.key !== "outdoors"),
-  ...catalogSections.filter((section) => section.key === "outdoors"),
-  ...generatedCategorySections,
-].map((section) => ({ ...section, items: [] }));
 const ALIEXPRESS_CATEGORY_MAP = {
   "Toys & Hobbies":             "1511",
   "Home & Garden":              "13",
@@ -622,25 +134,6 @@ const ALIEXPRESS_CATEGORY_MAP = {
   "Beauty & Personal Care":     "66",
   "Automotive & Motorcycle":    "34",
 };
-
-// Maps each static category row's section key to its real AliExpress category ID,
-// so the default marketplace view can replace that row's hardcoded sample items
-// with real fetched products the same way Best Sellers/New Arrivals already do.
-const CATEGORY_SECTION_IDS = {
-  outdoors:                ALIEXPRESS_CATEGORY_MAP["Outdoors"],
-  "toys-hobbies":           ALIEXPRESS_CATEGORY_MAP["Toys & Hobbies"],
-  "home-garden":            ALIEXPRESS_CATEGORY_MAP["Home & Garden"],
-  "electronics-gadgets":    ALIEXPRESS_CATEGORY_MAP["Electronics & Gadgets"],
-  "clothing-shoes-jewelry": ALIEXPRESS_CATEGORY_MAP["Clothing, Shoes & Jewelry"],
-  "beauty-personal-care":   ALIEXPRESS_CATEGORY_MAP["Beauty & Personal Care"],
-  "automotive-motorcycle":  ALIEXPRESS_CATEGORY_MAP["Automotive & Motorcycle"],
-  "sports-fitness":         ALIEXPRESS_CATEGORY_MAP["Sports & Fitness"],
-};
-
-// How many real products to pull per category row on the default (no-search)
-// marketplace view — kept small since each row is just a preview carousel, not
-// a full results grid.
-const DEFAULT_SECTION_ITEM_LIMIT = 8;
 
 const ALIEXPRESS_SORT_MAP = {
   "By Relevance":     "volumeDesc",
@@ -736,16 +229,11 @@ const MarketplaceDashboard = () => {
   const [openMenus, setOpenMenus] = useState({
     Marketplace: true,
   });
-  const [dailyBestSellers, setDailyBestSellers] = useState([]);
-  const [dailyNewArrivals, setDailyNewArrivals] = useState([]);
-  const [dailyCategoryItems, setDailyCategoryItems] = useState({});
-  const [dailySectionsLoading, setDailySectionsLoading] = useState(true);
   const profileMenuRef = useRef(null);
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
   const balanceMenuRef = useRef(null);
   const aliSearchTimer = useRef(null);
-  const dailySectionsFetchedRef = useRef(false);
 
   useEffect(() => {
     const closeHeaderPopovers = (event) => {
@@ -796,6 +284,27 @@ const MarketplaceDashboard = () => {
   useEffect(() => {
     setSidebarMobileOpen(false);
   }, [activePage]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("autods_active_import_batch");
+      if (saved) {
+        const batch = JSON.parse(saved);
+        if (batch && (batch.id || batch.batch_id)) {
+          setImportBatchProgress(batch);
+          if (batch.status === "processing") {
+            pollImportBatch(batch.id || batch.batch_id);
+          }
+        }
+      }
+    } catch {}
+
+    const handleDismiss = () => {
+      setImportBatchProgress(null);
+    };
+    window.addEventListener("autods_import_batch_dismiss", handleDismiss);
+    return () => window.removeEventListener("autods_import_batch_dismiss", handleDismiss);
+  }, []);
 
   useEffect(() => {
     const notificationsAvailable = headerNotifications.length > 0;
@@ -931,7 +440,10 @@ const MarketplaceDashboard = () => {
     }
   };
 
-  const connectEbay = () => startEbayOAuthFlow();
+  const connectEbay = () => {
+    setStoreSwitcherOpen(false);
+    setConnectEbayModalOpen(true);
+  };
 
   // AliExpress browse — uses the platform account connected by super admin
   useEffect(() => {
@@ -995,81 +507,6 @@ const MarketplaceDashboard = () => {
     setAliPage(1);
   }, [activeCategory, activeSubfilter, selectedPill, sortBy, priceRange, shipsTo, currency, keywordSearch]);
 
-  // "Best Sellers" / "New Arrivals" — real AliExpress products, picked by a seed
-  // derived from today's date so every visitor sees the same set all day, and it
-  // rotates to a different real page/category tomorrow (AliExpress's own recommend
-  // feed has no "newest" sort, so New Arrivals rotates through categories instead
-  // of a true listing-date sort).
-  useEffect(() => {
-    if (activePage !== "marketplace") return;
-    if (!aliPlatformReady || aliCredentialsMissing || aliPlatformUnavailable) {
-      setDailySectionsLoading(false);
-      return;
-    }
-    if (dailySectionsFetchedRef.current) return;
-    dailySectionsFetchedRef.current = true;
-    setDailySectionsLoading(true);
-
-    const categoryIds = Object.values(ALIEXPRESS_CATEGORY_MAP);
-    const bestSellersSeed = getDailySeed("best-sellers");
-    const newArrivalsSeed = getDailySeed("new-arrivals");
-    const newArrivalsCategory = categoryIds[newArrivalsSeed % categoryIds.length];
-    const categorySectionEntries = Object.entries(CATEGORY_SECTION_IDS);
-
-    Promise.all([
-      searchAliExpress({
-        sort: "volumeDesc",
-        limit: DEFAULT_SECTION_ITEM_LIMIT,
-        page_no: 1 + (bestSellersSeed % 5),
-        ships_to: shipsTo,
-        currency,
-      }),
-      searchAliExpress({
-        category_id: newArrivalsCategory,
-        sort: "volumeDesc",
-        limit: DEFAULT_SECTION_ITEM_LIMIT,
-        page_no: 1 + (newArrivalsSeed % 3),
-        ships_to: shipsTo,
-        currency,
-      }),
-      ...categorySectionEntries.map(([sectionKey, categoryId]) =>
-        searchAliExpress({
-          category_id: categoryId,
-          sort: "volumeDesc",
-          limit: DEFAULT_SECTION_ITEM_LIMIT,
-          page_no: 1 + (getDailySeed(sectionKey) % 5),
-          ships_to: shipsTo,
-          currency,
-        }),
-      ),
-    ])
-      .then(([bestRes, newRes, ...categoryResults]) => {
-        setDailyBestSellers(
-          (bestRes.data?.items ?? []).map((item) =>
-            mapAliItemToCard(item, { shipsTo, currency, shippingTag: "Best Sellers" }),
-          ),
-        );
-        setDailyNewArrivals(
-          (newRes.data?.items ?? []).map((item) =>
-            mapAliItemToCard(item, { shipsTo, currency, shippingTag: "New Arrivals" }),
-          ),
-        );
-
-        const nextCategoryItems = {};
-        categorySectionEntries.forEach(([sectionKey], index) => {
-          nextCategoryItems[sectionKey] = (categoryResults[index]?.data?.items ?? []).map((item) =>
-            mapAliItemToCard(item, { shipsTo, currency }),
-          );
-        });
-        setDailyCategoryItems(nextCategoryItems);
-      })
-      .catch((err) => {
-        dailySectionsFetchedRef.current = false;
-        console.error("Failed to load daily marketplace category picks:", err);
-      })
-      .finally(() => setDailySectionsLoading(false));
-  }, [activePage, aliPlatformReady, aliCredentialsMissing, aliPlatformUnavailable, shipsTo, currency]);
-
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
   const isDarkTheme = profileTheme === "dark";
@@ -1116,135 +553,6 @@ const MarketplaceDashboard = () => {
     [finderSelections],
   );
 
-  const dailyMarketplaceSections = useMemo(
-    () =>
-      marketplaceSections.map((section) => {
-        if (section.key === "best-sellers" && dailyBestSellers.length) {
-          return { ...section, items: dailyBestSellers };
-        }
-        if (section.key === "new-arrivals" && dailyNewArrivals.length) {
-          return { ...section, items: dailyNewArrivals };
-        }
-        if (dailyCategoryItems[section.key]?.length) {
-          return { ...section, items: dailyCategoryItems[section.key] };
-        }
-        return section;
-      }),
-    [dailyBestSellers, dailyNewArrivals, dailyCategoryItems],
-  );
-
-  const filteredMarketplace = useMemo(() => {
-    const query = `${searchAnything} ${keywordSearch}`.trim().toLowerCase();
-
-    const matchesFilters = (item) => {
-      if (query) {
-        const searchable = [
-          item.vendor,
-          item.title,
-          item.category,
-          item.subCategory,
-          item.shipsFrom,
-          item.price,
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        if (!searchable.includes(query)) {
-          return false;
-        }
-      }
-
-      if (supplier !== "Select Supplier") {
-        if (!String(item.vendor ?? "").toLowerCase().includes(supplier.toLowerCase())) {
-          return false;
-        }
-      }
-
-      if (activeCategory !== "All Categories" && item.category !== activeCategory) {
-        return false;
-      }
-
-      if (activeSubfilter && item.subCategory !== activeSubfilter) {
-        return false;
-      }
-
-      if (shipsTo && item.shipsTo !== shipsTo) {
-        return false;
-      }
-
-      if (currency && item.currency !== currency) {
-        return false;
-      }
-
-      if (shipsFrom !== "Select Ships From" && item.shipsFrom !== shipsFrom) {
-        return false;
-      }
-
-      if (priceRange !== "Select Price Range" && item.priceRange !== priceRange) {
-        return false;
-      }
-
-      if (selectedPill && item.shippingTag !== selectedPill) {
-        return false;
-      }
-
-      return true;
-    };
-
-    const sortItems = (items) => {
-      const nextItems = [...items];
-
-      if (sortBy === "Newest") {
-        nextItems.sort((a, b) => String(b.id).localeCompare(String(a.id)));
-      }
-
-      if (sortBy === "Fastest Shipping") {
-        nextItems.sort((a, b) => a.shippingDays - b.shippingDays);
-      }
-
-      if (sortBy === "Lowest Price") {
-        nextItems.sort((a, b) => parsePriceValue(a.price) - parsePriceValue(b.price));
-      }
-
-      return nextItems;
-    };
-
-    const sections = dailyMarketplaceSections
-      .map((section) => ({
-        ...section,
-        items: sortItems(section.items.filter(matchesFilters)),
-      }))
-      .filter((section) => section.items.length > 0);
-
-    const uniqueProducts = new Map();
-
-    dailyMarketplaceSections.forEach((section) => {
-      section.items.forEach((item) => {
-        if (matchesFilters(item)) {
-          uniqueProducts.set(item.id, item);
-        }
-      });
-    });
-
-    return {
-      products: sortItems([...uniqueProducts.values()]),
-      sections,
-    };
-  }, [
-    activeCategory,
-    activeSubfilter,
-    currency,
-    dailyMarketplaceSections,
-    keywordSearch,
-    priceRange,
-    searchAnything,
-    selectedPill,
-    shipsFrom,
-    shipsTo,
-    sortBy,
-    supplier,
-  ]);
-
   const filteredPodProducts = useMemo(() => {
     const query = searchAnything.trim().toLowerCase();
 
@@ -1260,19 +568,6 @@ const MarketplaceDashboard = () => {
       return [item.title, item.price, item.category].join(" ").toLowerCase().includes(query);
     });
   }, [activePodCategory, searchAnything]);
-
-  const visibleSections = filteredMarketplace.sections;
-  const visibleProducts = filteredMarketplace.products;
-
-  const openProductsView = (section) => {
-    const sectionCategory = getSectionCategory(section);
-
-    setActiveCategory(sectionCategory);
-    setActiveSubfilter("");
-    setExpandedProductsTitle(sectionCategory === "All Categories" ? section.title : sectionCategory);
-
-    setSelectedPill(section.key === "best-sellers" ? "Best Sellers" : "");
-  };
 
   const selectCategory = (category) => {
     const nextCategory = category.key === "all" ? "All Categories" : category.label;
@@ -1472,22 +767,60 @@ const MarketplaceDashboard = () => {
   };
 
   const pollImportBatch = (batchId) => {
+    if (window._autodsImportBatchInterval) {
+      clearInterval(window._autodsImportBatchInterval);
+    }
+
     const interval = setInterval(async () => {
       try {
         const res = await getImportBatch(batchId);
         const batch = res.data;
-        setImportBatchProgress(batch);
-        if (batch.status === "completed" || batch.status === "failed") {
+        const total = Number(batch.total ?? 0);
+        const completed = Number(batch.completed ?? 0);
+        const failed = Number(batch.failed ?? 0);
+        const isDone =
+          batch.status === "completed" ||
+          batch.status === "failed" ||
+          (total > 0 && completed + failed >= total);
+
+        const updatedBatch = {
+          ...batch,
+          id: batch.id || batchId,
+          batch_id: batch.id || batchId,
+          total,
+          completed,
+          failed,
+          status: isDone
+            ? (batch.status === "failed" || (failed === total && total > 0) ? "failed" : "completed")
+            : "processing",
+          failures: Array.isArray(batch.failures) ? batch.failures : [],
+        };
+
+        setImportBatchProgress(updatedBatch);
+        try {
+          localStorage.setItem("autods_active_import_batch", JSON.stringify(updatedBatch));
+        } catch {}
+
+        window.dispatchEvent(new CustomEvent("autods_import_batch_update", { detail: updatedBatch }));
+
+        if (isDone) {
           clearInterval(interval);
+          window._autodsImportBatchInterval = null;
           setImportSubmitting(false);
           refreshProductData();
-          toast.success(`Import finished: ${batch.completed} succeeded, ${batch.failed} failed.`);
+          window.dispatchEvent(new CustomEvent("autods_refresh_drafts"));
+        } else if (completed > 0) {
+          refreshProductData();
+          window.dispatchEvent(new CustomEvent("autods_refresh_drafts"));
         }
       } catch {
         clearInterval(interval);
+        window._autodsImportBatchInterval = null;
         setImportSubmitting(false);
       }
     }, 1500);
+
+    window._autodsImportBatchInterval = interval;
   };
 
   const handleSingleImport = async (action) => {
@@ -1554,9 +887,29 @@ const MarketplaceDashboard = () => {
 
       const batchId = res.data?.batch_id;
       if (batchId) {
-        setImportBatchProgress({ total: res.data.total, completed: 0, failed: 0, status: "processing" });
+        const total = Number(res.data.total ?? 0);
+        const initialBatch = {
+          id: batchId,
+          batch_id: batchId,
+          total,
+          completed: 0,
+          failed: 0,
+          status: "processing",
+          failures: [],
+        };
+        setImportBatchProgress(initialBatch);
+        try {
+          localStorage.setItem("autods_active_import_batch", JSON.stringify(initialBatch));
+        } catch {}
+
+        // Immediately close modal and redirect to Drafts
+        setAddProductModalOpen(false);
+        setImportSubmitting(false);
+        setActivePage("drafts");
+        navigate("/drafts");
+
+        toast.info(`Importing ${total} products in background...`);
         pollImportBatch(batchId);
-        toast.info("Bulk import started.");
       }
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Bulk import failed.");
@@ -2700,7 +2053,17 @@ const MarketplaceDashboard = () => {
             ) : activePage === "products" ? (
               <ProductsContent searchQuery={searchAnything} />
             ) : activePage === "drafts" ? (
-              <DraftsContent searchQuery={searchAnything} />
+              <DraftsContent
+                searchQuery={searchAnything}
+                importBatchProgress={importBatchProgress}
+                onDismissImportBatch={() => {
+                  setImportBatchProgress(null);
+                  try {
+                    localStorage.removeItem("autods_active_import_batch");
+                  } catch {}
+                  window.dispatchEvent(new CustomEvent("autods_import_batch_dismiss"));
+                }}
+              />
             ) : activePage === "customer-support" ? (
               <CustomerSupportContent searchQuery={searchAnything} />
             ) : activePage === "support-center" ? (
@@ -2870,11 +2233,8 @@ const MarketplaceDashboard = () => {
                       aliTotalPages={aliTotalPages}
                       onAliPageChange={setAliPage}
                       expandedProductsTitle={expandedProductsTitle}
-                      visibleProducts={visibleProducts}
-                      visibleSections={visibleSections}
-                      sectionsLoading={dailySectionsLoading}
+                      activeCategory={activeCategory}
                       keywordSearch={keywordSearch}
-                      onSeeMore={openProductsView}
                       onResetView={resetMarketplaceView}
                       onImport={handleMarketplaceCardImport}
                       importingId={importingCardId}

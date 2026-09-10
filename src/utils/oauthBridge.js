@@ -42,7 +42,7 @@ export function consumeOAuthResult(maxAgeMs = 120000) {
 
 /** Open OAuth provider in a new browser tab (not a popup). */
 export function openOAuthTab(url) {
-    return window.open(url, '_blank', 'noopener,noreferrer');
+    return window.open(url, '_blank');
 }
 
 /** @deprecated Use openOAuthTab */

@@ -77,14 +77,18 @@ function DraftEditorPanel({
     }
 
     const current = normalizeVariantPricing(variant, form.monitoring);
-    const partial = { [field]: value };
+    const numVal = value === "" ? "" : Number(value);
+    const partial = { [field]: numVal };
 
     if (field === "buyPrice") {
-      partial.listingPrice = Number(value) + Number(current.profit);
+      const buy = typeof numVal === "number" ? numVal : 0;
+      partial.listingPrice = Math.round((buy + Number(current.profit || 0)) * 100) / 100;
     } else if (field === "listingPrice") {
-      partial.profit = Number(value) - Number(current.buyPrice);
+      const list = typeof numVal === "number" ? numVal : 0;
+      partial.profit = Math.round((list - Number(current.buyPrice || 0)) * 100) / 100;
     } else if (field === "profit") {
-      partial.listingPrice = Number(current.buyPrice) + Number(value);
+      const prof = typeof numVal === "number" ? numVal : 0;
+      partial.listingPrice = Math.round((Number(current.buyPrice || 0) + prof) * 100) / 100;
     }
 
     updateVariant(variantId, partial);
@@ -121,11 +125,33 @@ function DraftEditorPanel({
     setEditingVariantId(next.id);
   };
 
-  const applyBulkVariantEdit = (changes) => {
+  const selectedVariants = form.variants.filter((v) => v.selected !== false);
+  const selectedVariantCount = selectedVariants.length;
+  const isSelectionFiltered = selectedVariantCount > 0 && selectedVariantCount < form.variants.length;
+  const bulkEditTargetCount = isSelectionFiltered ? selectedVariantCount : form.variants.length;
+
+  const toggleSelectAllVariants = (checked) => {
     patch({
-      variants: form.variants.map((variant) =>
-        normalizeVariantPricing(applyBulkEditToVariant(normalizeVariantPricing(variant, form.monitoring), changes)),
-      ),
+      variants: form.variants.map((variant) => ({
+        ...variant,
+        selected: checked,
+      })),
+    });
+  };
+
+  const applyBulkVariantEdit = (changes) => {
+    const applyToSelectedOnly = selectedVariantCount > 0 && selectedVariantCount < form.variants.length;
+
+    patch({
+      variants: form.variants.map((variant) => {
+        if (applyToSelectedOnly && variant.selected === false) {
+          return variant;
+        }
+        return normalizeVariantPricing(
+          applyBulkEditToVariant(normalizeVariantPricing(variant, form.monitoring), changes),
+          form.monitoring,
+        );
+      }),
     });
     setBulkEditingVariants(false);
   };
@@ -398,16 +424,38 @@ function DraftEditorPanel({
             {activeTab === "variants" ? (
               <div className="draft-editor__variants">
                 <div className="draft-editor__variants-head">
-                  <strong>{form.variants.length} variant{form.variants.length !== 1 ? "s" : ""}</strong>
+                  <div className="draft-editor__variants-head-left">
+                    <strong>{form.variants.length} variant{form.variants.length !== 1 ? "s" : ""}</strong>
+                    {form.variants.length > 0 ? (
+                      <label className="draft-editor__variants-select-all">
+                        <input
+                          type="checkbox"
+                          checked={selectedVariantCount === form.variants.length && form.variants.length > 0}
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate = selectedVariantCount > 0 && selectedVariantCount < form.variants.length;
+                            }
+                          }}
+                          onChange={(e) => toggleSelectAllVariants(e.target.checked)}
+                        />
+                        <span>
+                          {selectedVariantCount === form.variants.length
+                            ? "All selected"
+                            : `${selectedVariantCount} of ${form.variants.length} selected`}
+                        </span>
+                      </label>
+                    ) : null}
+                  </div>
                   <div className="draft-editor__variants-head-actions">
                     <button
                       type="button"
                       className="draft-editor__bulk-edit-btn"
                       onClick={() => setBulkEditingVariants(true)}
                       disabled={!form.variants.length}
+                      title={isSelectionFiltered ? `Bulk edit ${selectedVariantCount} selected variants` : "Bulk edit all variants"}
                     >
                       <LuPencil />
-                      <span>Bulk edit</span>
+                      <span>{isSelectionFiltered ? `Bulk edit (${selectedVariantCount})` : "Bulk edit"}</span>
                     </button>
                     <button type="button" onClick={addVariant}>
                       <LuPlus />
@@ -435,12 +483,25 @@ function DraftEditorPanel({
                           />
                         </label>
                         {variant.image ? (
-                          <img src={variant.image} alt={variant.label} referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="drafts-row__thumb">
-                            <LuImage />
-                          </div>
-                        )}
+                          <img
+                            src={variant.image}
+                            alt={variant.label}
+                            referrerPolicy="no-referrer"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallback = e.currentTarget.parentElement?.querySelector(".drafts-row__thumb");
+                              if (fallback) {
+                                fallback.style.display = "inline-flex";
+                              }
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="drafts-row__thumb"
+                          style={{ display: variant.image ? "none" : "inline-flex" }}
+                        >
+                          <LuImage />
+                        </div>
                         <div className="draft-editor__variant-body">
                           {isEditing ? (
                             <div className="draft-editor__variant-edit-grid">
@@ -750,7 +811,9 @@ function DraftEditorPanel({
 
       <BulkEditVariantsModal
         open={bulkEditingVariants}
-        variantCount={form.variants.length}
+        variantCount={bulkEditTargetCount}
+        isSelectionOnly={isSelectionFiltered}
+        totalCount={form.variants.length}
         onClose={() => setBulkEditingVariants(false)}
         onApply={applyBulkVariantEdit}
       />

@@ -12,7 +12,6 @@ import {
   LuInbox,
   LuLink,
   LuLoader,
-  LuMenu,
   LuPencil,
   LuPackage,
   LuRefreshCcw,
@@ -582,10 +581,18 @@ function ProductsContent({ searchQuery }) {
     }
   };
 
-  const scrollTable = (position) => {
+  const scrollTable = (direction) => {
     const el = tableScrollRef.current;
     if (!el) return;
-    el.scrollTo({ left: position === "end" ? el.scrollWidth : 0, behavior: "smooth" });
+    if (direction === "start") {
+      el.scrollTo({ left: 0, behavior: "smooth" });
+    } else if (direction === "end") {
+      el.scrollTo({ left: el.scrollWidth, behavior: "smooth" });
+    } else if (direction === "left" || direction === -1) {
+      el.scrollBy({ left: -360, behavior: "smooth" });
+    } else {
+      el.scrollBy({ left: 360, behavior: "smooth" });
+    }
   };
 
   const renderProductColumnHeader = (column) => {
@@ -908,11 +915,11 @@ function ProductsContent({ searchQuery }) {
             View History
           </button>
           <ProductColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("end")} aria-label="Show more columns">
-            <LuMenu />
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("left")} aria-label="Scroll grid left" title="Scroll left">
+            <LuChevronLeft />
           </button>
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("start")} aria-label="Return table start">
-            <LuExternalLink />
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("right")} aria-label="Scroll grid right" title="Scroll right">
+            <LuChevronRight />
           </button>
         </div>
       </div>

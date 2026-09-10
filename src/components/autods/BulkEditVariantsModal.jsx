@@ -14,7 +14,14 @@ const INITIAL_STATE = {
 
 function BulkFieldRow({ enabled, onToggle, label, children }) {
   return (
-    <div className={`bulk-edit-modal__row ${enabled ? "bulk-edit-modal__row--active" : ""}`}>
+    <div
+      className={`bulk-edit-modal__row ${enabled ? "bulk-edit-modal__row--active" : ""}`}
+      onClick={(e) => {
+        if (!enabled && e.target.tagName !== "INPUT" && e.target.tagName !== "BUTTON") {
+          onToggle(true);
+        }
+      }}
+    >
       <input
         type="checkbox"
         className="bulk-edit-modal__row-check"
@@ -22,13 +29,26 @@ function BulkFieldRow({ enabled, onToggle, label, children }) {
         onChange={(event) => onToggle(event.target.checked)}
         aria-label={`Update ${label}`}
       />
-      <span className="bulk-edit-modal__row-label">{label}</span>
+      <span
+        className="bulk-edit-modal__row-label"
+        style={{ cursor: "pointer" }}
+        onClick={() => onToggle(!enabled)}
+      >
+        {label}
+      </span>
       <div className="bulk-edit-modal__row-control">{children}</div>
     </div>
   );
 }
 
-function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
+function BulkEditVariantsModal({
+  open,
+  variantCount = 0,
+  isSelectionOnly = false,
+  totalCount = null,
+  onClose,
+  onApply,
+}) {
   const [fields, setFields] = useState(INITIAL_STATE);
 
   useEffect(() => {
@@ -44,10 +64,18 @@ function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
   const hasSelection =
     fields.buyPriceEnabled || fields.listPriceEnabled || fields.profitEnabled || fields.quantityEnabled;
 
+  const hasEmptySelectedField =
+    (fields.buyPriceEnabled && (fields.buyPrice === "" || isNaN(Number(fields.buyPrice)) || Number(fields.buyPrice) < 0)) ||
+    (fields.listPriceEnabled && (fields.listPrice === "" || isNaN(Number(fields.listPrice)) || Number(fields.listPrice) < 0)) ||
+    (fields.profitEnabled && (fields.profit === "" || isNaN(Number(fields.profit)))) ||
+    (fields.quantityEnabled && (fields.quantity === "" || isNaN(Number(fields.quantity)) || Number(fields.quantity) < 1));
+
+  const canApply = hasSelection && !hasEmptySelectedField;
+
   const patch = (partial) => setFields((current) => ({ ...current, ...partial }));
 
   const handleApply = () => {
-    if (!hasSelection) {
+    if (!canApply) {
       return;
     }
     onApply(fields);
@@ -57,6 +85,10 @@ function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
     setFields(INITIAL_STATE);
     onClose();
   };
+
+  const targetDescription = isSelectionOnly
+    ? `${variantCount} selected variant${variantCount === 1 ? "" : "s"}${totalCount ? ` (out of ${totalCount})` : ""}`
+    : `${variantCount} variant${variantCount === 1 ? "" : "s"}`;
 
   return (
     <div className="bulk-edit-modal-layer" role="presentation">
@@ -79,7 +111,7 @@ function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
           <div>
             <h2>Bulk Edit Variants</h2>
             <p>
-              Update {variantCount} variant{variantCount === 1 ? "" : "s"}. Check the fields you want to change, then apply.
+              Update {targetDescription}. Check the fields you want to change, then apply.
             </p>
           </div>
         </div>
@@ -149,6 +181,10 @@ function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
 
         {!hasSelection ? (
           <p className="bulk-edit-modal__hint">Select at least one field to update.</p>
+        ) : hasEmptySelectedField ? (
+          <p className="bulk-edit-modal__hint" style={{ color: "#e05252" }}>
+            Please enter a valid value for each selected field before applying.
+          </p>
         ) : null}
 
         <div className="bulk-edit-modal__actions">
@@ -159,9 +195,9 @@ function BulkEditVariantsModal({ open, variantCount = 0, onClose, onApply }) {
             type="button"
             className="bulk-edit-modal__btn bulk-edit-modal__btn--primary"
             onClick={handleApply}
-            disabled={!hasSelection}
+            disabled={!canApply}
           >
-            <span>Apply to {variantCount} variant{variantCount === 1 ? "" : "s"}</span>
+            <span>Apply to {isSelectionOnly ? `${variantCount} selected` : variantCount} variant{variantCount === 1 ? "" : "s"}</span>
           </button>
         </div>
       </section>

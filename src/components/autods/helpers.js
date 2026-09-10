@@ -580,7 +580,7 @@ export function mapApiOrderToCalculationRow(order) {
     id: String(order.id),
     orderId: order.ebay_order_id ?? raw.orderId ?? String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
+    image: order.image_url ?? order.listing_image_url ?? firstItem.image?.imageUrl ?? null,
     description: variationText || order.item_title || firstItem.title || "—",
     date: typeof order.order_date === "string" ? order.order_date.slice(0, 10) : order.order_date,
     ebayStatus: ebayStatus.label,

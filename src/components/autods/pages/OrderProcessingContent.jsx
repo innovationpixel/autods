@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   LuArrowRightLeft,
   LuCheck,
@@ -19,6 +20,7 @@ import {
   syncOrders,
   updateOrderCost,
   updateOrderFulfillment,
+  updateOrderProcessingStatus,
   updateOrderSource,
 } from "../../../services/OrderService";
 import { getWalletSummary, transferToProcessingWallet } from "../../../services/WalletService";
@@ -80,7 +82,7 @@ function mapProcessingOrder(order) {
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
-    image: firstItem.image?.imageUrl ?? order.listing_image_url ?? null,
+    image: order.image_url ?? order.listing_image_url ?? firstItem.image?.imageUrl ?? null,
     ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
     orderDetailUrl: getEbayOrderDetailUrl(order.ebay_order_id ?? raw.orderId, order.connection?.site_id),
     siteId: order.connection?.site_id ?? null,
@@ -117,6 +119,7 @@ function mapProcessingOrder(order) {
 }
 
 function OrderProcessingContent() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -194,6 +197,12 @@ function OrderProcessingContent() {
   useEffect(() => {
     loadWallet();
     loadBuyerAccounts();
+
+    const handleFocus = () => {
+      loadBuyerAccounts();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, []);
 
   useEffect(() => {
@@ -336,6 +345,35 @@ function OrderProcessingContent() {
       }
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not process this order."), { autoClose: 8000 });
+    } finally {
+      setProcessingId("");
+    }
+  };
+
+  const handleMarkProcessed = async (order) => {
+    setProcessingId(order.id);
+    try {
+      await updateOrderProcessingStatus(order.id, "processed");
+      toast.success("Order marked as processed.");
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      setSelectedIds((current) => current.filter((id) => id !== order.id));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not mark order as processed."));
+    } finally {
+      setProcessingId("");
+    }
+  };
+
+  const handleUpdateProcessingStatus = async (order, targetStatus) => {
+    if (!targetStatus || targetStatus === order.processingStatus) return;
+    setProcessingId(order.id);
+    try {
+      await updateOrderProcessingStatus(order.id, targetStatus);
+      toast.success(`Order moved to ${PROCESSING_TABS.find((t) => t.key === targetStatus)?.label ?? targetStatus}.`);
+      setOrders((current) => current.filter((item) => item.id !== order.id));
+      setSelectedIds((current) => current.filter((id) => id !== order.id));
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update processing status."));
     } finally {
       setProcessingId("");
     }
@@ -491,11 +529,28 @@ function OrderProcessingContent() {
 
             {processingMethod === "buyer" ? (
               buyerAccountsError ? (
-                <span className="order-processing-buyer-hint order-processing-buyer-hint--error">
-                  Could not load buyer accounts: {buyerAccountsError}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span className="order-processing-buyer-hint order-processing-buyer-hint--error">
+                    Could not load buyer accounts: {buyerAccountsError}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadBuyerAccounts}
+                    title="Retry loading buyer accounts"
+                    style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, padding: 0 }}
+                  >
+                    <LuRefreshCcw /> Retry
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/settings?tab=buyer-accounts")}
+                    style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", fontSize: 12, textDecoration: "underline", padding: 0 }}
+                  >
+                    Settings → Buyer Accounts
+                  </button>
+                </div>
               ) : buyerAccounts.length ? (
-                <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <select
                     className="order-processing-buyer-select"
                     value={selectedBuyerAccountId}
@@ -510,16 +565,60 @@ function OrderProcessingContent() {
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/settings?tab=buyer-accounts")}
+                    title="Manage AliExpress buyer accounts and marketplace tags in Settings"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      background: "#f3f4f6",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 6,
+                      padding: "4px 9px",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: "#374151",
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <LuStore />
+                    <span>Manage Accounts ({buyerAccounts.length})</span>
+                  </button>
                   {!selectedBuyerAccountId ? (
                     <span className="order-processing-buyer-hint">
                       Each order auto-uses the buyer account tagged for its own eBay marketplace
                     </span>
                   ) : null}
-                </>
+                </div>
               ) : (
-                <span className="order-processing-buyer-hint">
-                  Connect a buyer account in Settings → Buyer Accounts
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span className="order-processing-buyer-hint" style={{ color: "#d97706", fontWeight: 500 }}>
+                    No AliExpress buyer accounts connected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/settings?tab=buyer-accounts")}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: "#065f46",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "5px 12px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <LuUserRound />
+                    <span>Connect Buyer Account in Settings →</span>
+                  </button>
+                </div>
               )
             ) : null}
 
@@ -618,7 +717,18 @@ function OrderProcessingContent() {
                         <div className="orders-product calculations-product">
                           {order.image ? (
                             <div className="orders-product__thumb">
-                              <img src={order.image} alt={order.title} referrerPolicy="no-referrer" />
+                              <img
+                                src={order.image}
+                                alt={order.title}
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  const parent = e.currentTarget.parentElement;
+                                  if (parent) {
+                                    parent.classList.add("orders-product__thumb--empty");
+                                  }
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
                             </div>
                           ) : (
                             <div className="orders-product__thumb orders-product__thumb--empty">
@@ -719,29 +829,77 @@ function OrderProcessingContent() {
                       </td>
                       <td>
                         <div className="order-processing-actions">
-                          <button
-                            type="button"
-                            className="order-processing-mark-btn order-processing-mark-btn--primary"
-                            onClick={() => handleProcessOrder(order)}
-                            disabled={
-                              processingId === order.id ||
-                              !order.hasSource ||
-                              Boolean(order.aliexpressOrderId) ||
-                              (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId))
-                            }
-                            title={
-                              !order.hasSource
-                                ? "Add a source link before processing"
-                                : order.aliexpressOrderId
-                                  ? "Already placed on AliExpress"
-                                  : processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)
-                                    ? "No buyer account is tagged for this order's marketplace — tag one in Settings → Buyer Accounts"
-                                    : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
-                            }
-                          >
-                            {processingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                            <span>{processingId === order.id ? "Processing…" : "Process the order"}</span>
-                          </button>
+                          {activeTab === "new" || activeTab === "pending" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="order-processing-mark-btn order-processing-mark-btn--primary"
+                                onClick={() => handleProcessOrder(order)}
+                                disabled={
+                                  processingId === order.id ||
+                                  !order.hasSource ||
+                                  Boolean(order.aliexpressOrderId) ||
+                                  (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId))
+                                }
+                                title={
+                                  !order.hasSource
+                                    ? "Add a source link before processing"
+                                    : order.aliexpressOrderId
+                                      ? "Already placed on AliExpress"
+                                      : processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)
+                                        ? "No buyer account is tagged for this order's marketplace — tag one in Settings → Buyer Accounts"
+                                        : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
+                                }
+                              >
+                                {processingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                                <span>{processingId === order.id ? "Processing…" : "Process order"}</span>
+                              </button>
+                              {processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigate("/settings?tab=buyer-accounts")}
+                                  style={{
+                                    marginTop: 4,
+                                    background: "none",
+                                    border: "none",
+                                    color: "#d97706",
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    cursor: "pointer",
+                                    padding: 0,
+                                    textDecoration: "underline",
+                                    display: "block",
+                                  }}
+                                  title="Tag a buyer account for this marketplace in Settings → Buyer Accounts"
+                                >
+                                  Tag Buyer Account →
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="order-processing-mark-btn order-processing-mark-btn--secondary"
+                                onClick={() => handleMarkProcessed(order)}
+                                disabled={processingId === order.id}
+                                title="Manually mark this order as processed (paid) without calling AliExpress API"
+                              >
+                                <span>Mark Processed</span>
+                              </button>
+                            </>
+                          ) : (
+                            <select
+                              className="order-processing-status-select"
+                              value={order.processingStatus}
+                              disabled={processingId === order.id}
+                              onChange={(e) => handleUpdateProcessingStatus(order, e.target.value)}
+                              title="Move this order to another tab"
+                            >
+                              {PROCESSING_TABS.map((tab) => (
+                                <option key={tab.key} value={tab.key}>
+                                  {tab.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       </td>
                     </tr>
