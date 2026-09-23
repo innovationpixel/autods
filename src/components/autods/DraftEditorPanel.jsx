@@ -814,6 +814,8 @@ function DraftEditorPanel({
         variantCount={bulkEditTargetCount}
         isSelectionOnly={isSelectionFiltered}
         totalCount={form.variants.length}
+        targetVariants={isSelectionFiltered ? selectedVariants : form.variants}
+        defaultFeesPercent={item.raw_source_data?.pricing?.fees_percent ?? form.monitoring?.feesPercent ?? 0}
         onClose={() => setBulkEditingVariants(false)}
         onApply={applyBulkVariantEdit}
       />

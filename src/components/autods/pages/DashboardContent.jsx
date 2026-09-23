@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 import {
   LuCalendarDays,
@@ -8,7 +9,6 @@ import {
   LuCircleCheck,
   LuHeart,
   LuMail,
-  LuPackage,
   LuRefreshCw,
   LuShoppingCart,
   LuTag,
@@ -20,6 +20,12 @@ import {
 } from "react-icons/lu";
 
 import { dashboardMetricCards } from "../constants";
+import { selectUser } from "../../../store/selectors/AuthSelectors";
+import { getDashboardSummary } from "../../../services/DashboardService";
+
+const PLACEHOLDER_IMAGE =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#eef0f4"/></svg>');
 
 const dateFilterOptions = [
   {
@@ -96,149 +102,40 @@ function DateFilterDropdown({ value, onChange, small = false }) {
   );
 }
 
-const dashboardPeriodData = {
-  today: {
-    profit: "$94.10",
-    revenue: "$286.40",
-    orders: "12",
-    listings: "892",
-    views: "842",
+function formatMoney(value) {
+  const amount = Number(value ?? 0);
+  return `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-    profitGrowth: "8%",
-    revenueGrowth: "6%",
-    ordersGrowth: "4%",
-    listingsGrowth: "2%",
-    viewsGrowth: "9%",
-  },
+function formatNumber(value) {
+  return Number(value ?? 0).toLocaleString();
+}
 
-  15: {
-    profit: "$1,275.40",
-    revenue: "$4,215.60",
-    orders: "156",
-    listings: "892",
-    views: "12,840",
+function formatGrowth(value) {
+  const growth = Number(value ?? 0);
+  return `${growth > 0 ? "+" : ""}${growth}%`;
+}
 
-    profitGrowth: "18%",
-    revenueGrowth: "16%",
-    ordersGrowth: "13%",
-    listingsGrowth: "7%",
-    viewsGrowth: "21%",
-  },
+function timeAgo(iso) {
+  if (!iso) return "";
 
-  30: {
-    profit: "$2,436.80",
-    revenue: "$8,642.00",
-    orders: "320",
-    listings: "892",
-    views: "24,580",
+  const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (diffSec < 60) return "Just now";
 
-    profitGrowth: "28%",
-    revenueGrowth: "24%",
-    ordersGrowth: "18%",
-    listingsGrowth: "11%",
-    viewsGrowth: "31%",
-  },
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
 
-  year: {
-    profit: "$26,400.00",
-    revenue: "$94,820.00",
-    orders: "4,286",
-    listings: "892",
-    views: "284,520",
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
 
-    profitGrowth: "34%",
-    revenueGrowth: "29%",
-    ordersGrowth: "24%",
-    listingsGrowth: "15%",
-    viewsGrowth: "38%",
-  },
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+}
+
+const ACTIVITY_ICONS = {
+  order: LuShoppingCart,
+  listing: LuTag,
 };
-
-
-const salesPeriodData = {
-  today: {
-    sales: "$286.40",
-    cost: "$192.30",
-    profit: "$94.10",
-
-    salesGrowth: "6%",
-    costGrowth: "4%",
-    profitGrowth: "8%",
-
-    labels: ["9 AM", "11 AM", "1 PM", "3 PM", "5 PM", "7 PM", "9 PM", "Now"],
-
-    sales: [25, 42, 38, 58, 72, 64, 88, 100],
-    cost: [18, 31, 28, 42, 51, 48, 64, 72],
-    profit: [8, 14, 12, 18, 25, 20, 31, 38],
-  },
-
-  15: {
-    sales: "$4,215.60",
-    cost: "$2,940.20",
-    profit: "$1,275.40",
-
-    salesGrowth: "16%",
-    costGrowth: "12%",
-    profitGrowth: "18%",
-
-    labels: [
-      "Sep 2",
-      "Sep 4",
-      "Sep 6",
-      "Sep 8",
-      "Sep 10",
-      "Sep 12",
-      "Sep 14",
-      "Sep 16",
-    ],
-
-    sales: [28, 42, 35, 58, 50, 69, 78, 92],
-    cost: [22, 32, 29, 42, 39, 51, 58, 68],
-    profit: [10, 18, 13, 25, 21, 32, 40, 52],
-  },
-
-  30: {
-    sales: "$8,642.00",
-    cost: "$6,205.20",
-    profit: "$2,436.80",
-
-    salesGrowth: "24%",
-    costGrowth: "17%",
-    profitGrowth: "28%",
-
-    labels: [
-      "Aug 18",
-      "Aug 22",
-      "Aug 26",
-      "Aug 30",
-      "Sep 3",
-      "Sep 7",
-      "Sep 11",
-      "Sep 16",
-    ],
-
-    sales: [32, 46, 39, 57, 53, 67, 79, 94],
-    cost: [24, 34, 31, 43, 41, 52, 62, 72],
-    profit: [11, 18, 14, 24, 21, 31, 39, 51],
-  },
-
-  year: {
-    sales: "$94,820.00",
-    cost: "$68,420.00",
-    profit: "$26,400.00",
-
-    salesGrowth: "29%",
-    costGrowth: "23%",
-    profitGrowth: "34%",
-
-    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"],
-
-    sales: [25, 31, 38, 42, 49, 57, 64, 76, 88],
-    cost: [20, 25, 30, 34, 39, 45, 51, 59, 68],
-    profit: [7, 10, 14, 18, 22, 27, 32, 41, 50],
-  },
-};
-
 
 function createPolylinePoints(values) {
   if (!values?.length) return "";
@@ -263,12 +160,23 @@ function createPolylinePoints(values) {
     .join(" ");
 }
 
+const EMPTY_CHART = { labels: [], sales: [], cost: [], profit: [] };
+const EMPTY_KPIS = {
+  profit: { value: 0, growth: 0 },
+  revenue: { value: 0, growth: 0 },
+  cost: { value: 0, growth: 0 },
+  orders: { value: 0, growth: 0 },
+  listings: { value: 0, growth: 0 },
+  views: { value: 0, growth: 0 },
+};
+
 /* =========================================================
    COMPONENT
    ========================================================= */
 
 function DashboardContent({ searchQuery }) {
   const navigate = useNavigate();
+  const user = useSelector(selectUser);
 
   /* =======================================================
      FILTER STATE
@@ -281,19 +189,61 @@ function DashboardContent({ searchQuery }) {
   const [salesDateFilter, setSalesDateFilter] = useState("30");
 
   /* =======================================================
-     CURRENT DATA
+     REAL DATA
      ======================================================= */
 
-  const currentDashboardData = dashboardPeriodData[dateFilter];
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
 
-  const currentSalesData = salesPeriodData[salesDateFilter];
+  const [salesSummary, setSalesSummary] = useState(null);
+  const [salesLoading, setSalesLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setSummaryLoading(true);
+
+    getDashboardSummary(dateFilter)
+      .then((res) => {
+        if (active) setSummary(res.data);
+      })
+      .catch(() => {
+        if (active) setSummary(null);
+      })
+      .finally(() => {
+        if (active) setSummaryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [dateFilter]);
+
+  useEffect(() => {
+    let active = true;
+    setSalesLoading(true);
+
+    getDashboardSummary(salesDateFilter)
+      .then((res) => {
+        if (active) setSalesSummary(res.data);
+      })
+      .catch(() => {
+        if (active) setSalesSummary(null);
+      })
+      .finally(() => {
+        if (active) setSalesLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [salesDateFilter]);
+
+  const kpis = summary?.kpis ?? EMPTY_KPIS;
+  const salesChart = salesSummary?.sales_chart ?? EMPTY_CHART;
+  const salesKpis = salesSummary?.kpis ?? EMPTY_KPIS;
 
   const selectedDashboardFilter = dateFilterOptions.find(
     (item) => item.value === dateFilter,
-  );
-
-  const selectedSalesFilter = dateFilterOptions.find(
-    (item) => item.value === salesDateFilter,
   );
 
   /* =======================================================
@@ -329,11 +279,11 @@ function DashboardContent({ searchQuery }) {
      ======================================================= */
 
   const kpiValues = [
-    currentDashboardData.profit,
-    currentDashboardData.revenue,
-    currentDashboardData.orders,
-    currentDashboardData.listings,
-    currentDashboardData.views,
+    formatMoney(kpis.profit.value),
+    formatMoney(kpis.revenue.value),
+    formatNumber(kpis.orders.value),
+    formatNumber(kpis.listings.value),
+    formatNumber(kpis.views.value),
   ];
 
   const kpiLabels = [
@@ -344,168 +294,84 @@ function DashboardContent({ searchQuery }) {
     "Views",
   ];
 
-  const kpiPercentages = [
-    currentDashboardData.profitGrowth,
-    currentDashboardData.revenueGrowth,
-    currentDashboardData.ordersGrowth,
-    currentDashboardData.listingsGrowth,
-    currentDashboardData.viewsGrowth,
+  const kpiGrowths = [
+    kpis.profit.growth,
+    kpis.revenue.growth,
+    kpis.orders.growth,
+    kpis.listings.growth,
+    kpis.views.growth,
   ];
+
+  const kpiPercentages = kpiGrowths.map(formatGrowth);
 
   /* =======================================================
      CHART POINTS
      ======================================================= */
 
   const salesPoints = useMemo(
-    () => createPolylinePoints(currentSalesData.sales),
-    [currentSalesData],
+    () => createPolylinePoints(salesChart.sales),
+    [salesChart],
   );
 
   const costPoints = useMemo(
-    () => createPolylinePoints(currentSalesData.cost),
-    [currentSalesData],
+    () => createPolylinePoints(salesChart.cost),
+    [salesChart],
   );
 
   const profitPoints = useMemo(
-    () => createPolylinePoints(currentSalesData.profit),
-    [currentSalesData],
+    () => createPolylinePoints(salesChart.profit),
+    [salesChart],
   );
+
+  const chartMax = Math.max(1, ...salesChart.sales, ...salesChart.cost, ...salesChart.profit);
 
   /* =======================================================
      ORDERS
      ======================================================= */
 
-  const orders = [
-    {
-      id: "#12-11835",
-      product: "Wireless Headphones",
-      buyer: "j.smith",
-      amount: "$32.99",
-      status: "Processing",
-      date: "Sep 14",
-      image:
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=100&q=80",
-    },
-    {
-      id: "#12-11834",
-      product: "Smart Watch",
-      buyer: "a.johnson",
-      amount: "$45.50",
-      status: "Shipped",
-      date: "Sep 14",
-      image:
-        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=100&q=80",
-    },
-    {
-      id: "#12-11833",
-      product: "Phone Case",
-      buyer: "m.brown",
-      amount: "$18.20",
-      status: "Delivered",
-      date: "Sep 13",
-      image:
-        "https://images.unsplash.com/photo-1603313011100-3e07f16a0f2e?w=100&q=80",
-    },
-    {
-      id: "#12-11832",
-      product: "Bluetooth Speaker",
-      buyer: "s.davis",
-      amount: "$36.99",
-      status: "Processing",
-      date: "Sep 13",
-      image:
-        "https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?w=100&q=80",
-    },
-    {
-      id: "#12-11831",
-      product: "Laptop Stand",
-      buyer: "r.wilson",
-      amount: "$28.20",
-      status: "Shipped",
-      date: "Sep 12",
-      image:
-        "https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=100&q=80",
-    },
-  ];
+  const orders = summary?.recent_orders ?? [];
 
   /* =======================================================
      TOP PRODUCTS
      ======================================================= */
 
-  const topProducts = [
-    {
-      name: "Wireless Headphones",
-      sold: "1,234 sold",
-      price: "$32.99",
-      width: "88%",
-      image: orders[0].image,
-    },
-    {
-      name: "Smart Watch",
-      sold: "980 sold",
-      price: "$45.50",
-      width: "68%",
-      image: orders[1].image,
-    },
-    {
-      name: "Bluetooth Speaker",
-      sold: "875 sold",
-      price: "$36.99",
-      width: "60%",
-      image: orders[3].image,
-    },
-    {
-      name: "Laptop Stand",
-      sold: "642 sold",
-      price: "$28.20",
-      width: "48%",
-      image: orders[4].image,
-    },
-    {
-      name: "Phone Case",
-      sold: "590 sold",
-      price: "$18.20",
-      width: "40%",
-      image: orders[2].image,
-    },
-  ];
+  const rawTopProducts = summary?.top_products ?? [];
+  const maxSold = Math.max(1, ...rawTopProducts.map((product) => product.sold));
+  const topProducts = rawTopProducts.map((product) => ({
+    name: product.title,
+    sold: `${formatNumber(product.sold)} sold`,
+    price: formatMoney(product.revenue),
+    width: `${Math.round((product.sold / maxSold) * 100)}%`,
+    image: product.image || PLACEHOLDER_IMAGE,
+  }));
 
   /* =======================================================
      ACTIVITIES
      ======================================================= */
 
-  const activities = [
-    {
-      icon: LuShoppingCart,
-      title: "New order received",
-      text: "#12-11835",
-      time: "5 minutes ago",
-    },
-    {
-      icon: LuTag,
-      title: "Listing updated",
-      text: "Wireless Headphones",
-      time: "12 minutes ago",
-    },
-    {
-      icon: LuTag,
-      title: "Price changed",
-      text: "Smart Watch",
-      time: "25 minutes ago",
-    },
-    {
-      icon: LuPackage,
-      title: "Order shipped",
-      text: "#12-11834",
-      time: "1 hour ago",
-    },
-    {
-      icon: LuMail,
-      title: "New message",
-      text: "From eBay buyer",
-      time: "2 hours ago",
-    },
+  const activities = (summary?.recent_activity ?? []).map((activity) => ({
+    icon: ACTIVITY_ICONS[activity.type] ?? LuTag,
+    title: activity.title,
+    text: activity.text,
+    time: timeAgo(activity.time),
+  }));
+
+  /* =======================================================
+     STORE PERFORMANCE
+     ======================================================= */
+
+  const store = summary?.store ?? {};
+  const storeRows = [
+    ["Account Status", store.account_status ?? "—", LuGavel],
+    ["Marketplace", store.marketplace ?? "—", LuShoppingCart],
+    ["eBay Username", store.username ?? "—", LuUser],
+    ["Total Listings", formatNumber(store.total_listings), LuTag],
+    ["Active Listings", formatNumber(store.active_listings), LuHeart],
+    ["Total Orders", formatNumber(store.total_orders), LuMail],
+    ["Member Since", store.member_since ?? "—", LuCalendarDays],
   ];
+
+  const firstName = (user?.name ?? "").trim().split(/\s+/)[0] || "there";
 
   /* =======================================================
      RETURN
@@ -520,7 +386,7 @@ function DashboardContent({ searchQuery }) {
       <header className="ebay-dashboard__header">
         <div className="ebay-dashboard__welcome">
           <h1>
-            Good to see you again, Muzammil! <span>👋</span>
+            Good to see you again, {firstName}! <span>👋</span>
           </h1>
 
           <p>Here's your eBay business performance at a glance.</p>
@@ -557,7 +423,7 @@ function DashboardContent({ searchQuery }) {
 
                 <span className="ebay-kpi-card__trend">
                   <LuTrendingUp />
-                  {kpiPercentages[index]}
+                  {summaryLoading ? "…" : kpiPercentages[index]}
                 </span>
               </div>
 
@@ -566,11 +432,11 @@ function DashboardContent({ searchQuery }) {
               </div>
 
               <div className="ebay-kpi-card__value">
-                {kpiValues[index] || item.value}
+                {summaryLoading ? "…" : kpiValues[index] || item.value}
               </div>
 
               <span className="ebay-kpi-card__period">
-                ↑ {kpiPercentages[index]} {selectedDashboardFilter?.comparison}
+                {summaryLoading ? "" : `${kpiGrowths[index] >= 0 ? "↑" : "↓"} ${kpiPercentages[index]} ${selectedDashboardFilter?.comparison ?? ""}`}
               </span>
             </article>
           );
@@ -642,25 +508,25 @@ function DashboardContent({ searchQuery }) {
             <div>
               <span>Total Sales</span>
 
-              <strong>{currentSalesData.sales}</strong>
+              <strong>{salesLoading ? "…" : formatMoney(salesKpis.revenue.value)}</strong>
 
-              <small>↑ {currentSalesData.salesGrowth}</small>
+              <small>{salesLoading ? "" : `${salesKpis.revenue.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.revenue.growth)}`}</small>
             </div>
 
             <div>
               <span>Total Cost</span>
 
-              <strong>{currentSalesData.cost}</strong>
+              <strong>{salesLoading ? "…" : formatMoney(salesKpis.cost.value)}</strong>
 
-              <small>↑ {currentSalesData.costGrowth}</small>
+              <small>{salesLoading ? "" : `${salesKpis.cost.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.cost.growth)}`}</small>
             </div>
 
             <div>
               <span>Total Profit</span>
 
-              <strong>{currentSalesData.profit}</strong>
+              <strong>{salesLoading ? "…" : formatMoney(salesKpis.profit.value)}</strong>
 
-              <small>↑ {currentSalesData.profitGrowth}</small>
+              <small>{salesLoading ? "" : `${salesKpis.profit.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.profit.growth)}`}</small>
             </div>
           </div>
 
@@ -668,12 +534,12 @@ function DashboardContent({ searchQuery }) {
 
           <div className="ebay-chart">
             <div className="ebay-chart__y">
-              <span>$2.5K</span>
-              <span>$2K</span>
-              <span>$1.5K</span>
-              <span>$1K</span>
-              <span>$500</span>
-              <span>0</span>
+              <span>{formatMoney(chartMax)}</span>
+              <span>{formatMoney(chartMax * 0.75)}</span>
+              <span>{formatMoney(chartMax * 0.5)}</span>
+              <span>{formatMoney(chartMax * 0.25)}</span>
+              <span>{formatMoney(chartMax * 0.1)}</span>
+              <span>$0</span>
             </div>
 
             <div className="ebay-chart__area">
@@ -733,7 +599,7 @@ function DashboardContent({ searchQuery }) {
               {/* X AXIS */}
 
               <div className="ebay-chart__dates">
-                {currentSalesData.labels.map((label, index) => (
+                {salesChart.labels.map((label, index) => (
                   <span key={`${label}-${index}`}>{label}</span>
                 ))}
               </div>
@@ -772,21 +638,13 @@ function DashboardContent({ searchQuery }) {
               <h2>eBay Store Performance</h2>
             </div>
 
-            <button type="button" className="ebay-view-all">
+            <button type="button" className="ebay-view-all" onClick={() => openPage("settings")}>
               View All
             </button>
           </div>
 
           <div className="ebay-status-list">
-            {[
-              ["Account Status", "Healthy", LuGavel],
-              ["Selling Limits", "Good", LuShoppingCart],
-              ["Policy Compliance", "100%", LuMail],
-              ["Feedback Score", "99.8%", LuHeart],
-              ["Positive Feedback", "1,842 (99.8%)", LuTag],
-              ["Account Type", "Business", LuUser],
-              ["Member Since", "Jan 12, 2023", LuCalendarDays],
-            ].map(([label, value, Icon]) => (
+            {storeRows.map(([label, value, Icon]) => (
               <div className="ebay-status-row" key={label}>
                 <div className="ebay-status-row__label">
                   <span>
@@ -828,7 +686,7 @@ function DashboardContent({ searchQuery }) {
               <h2>Recent eBay Orders</h2>
             </div>
 
-            <button type="button" className="ebay-view-all">
+            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>
               View All
             </button>
           </div>
@@ -844,33 +702,39 @@ function DashboardContent({ searchQuery }) {
               <span />
             </div>
 
-            {orders.map((order) => (
-              <div className="ebay-order-row" key={order.id}>
-                <span className="ebay-order-id">{order.id}</span>
-
-                <div className="ebay-order-product">
-                  <img src={order.image} alt={order.product} />
-
-                  <span>{order.product}</span>
-                </div>
-
-                <span>{order.buyer}</span>
-
-                <strong>{order.amount}</strong>
-
-                <span
-                  className={`ebay-order-status ebay-order-status--${order.status.toLowerCase()}`}
-                >
-                  {order.status}
-                </span>
-
-                <span>{order.date}</span>
-
-                <button type="button" className="ebay-more-button">
-                  •••
-                </button>
+            {orders.length === 0 ? (
+              <div className="ebay-orders-table__empty" style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
+                {summaryLoading ? "Loading orders…" : "No orders yet."}
               </div>
-            ))}
+            ) : (
+              orders.map((order) => (
+                <div className="ebay-order-row" key={order.id}>
+                  <span className="ebay-order-id">{order.orderId ? `#${order.orderId}` : `#${order.id}`}</span>
+
+                  <div className="ebay-order-product">
+                    <img src={order.image || PLACEHOLDER_IMAGE} alt={order.product} />
+
+                    <span>{order.product}</span>
+                  </div>
+
+                  <span>{order.buyer}</span>
+
+                  <strong>{formatMoney(order.amount)}</strong>
+
+                  <span
+                    className={`ebay-order-status ebay-order-status--${(order.status || "pending").toLowerCase()}`}
+                  >
+                    {order.status}
+                  </span>
+
+                  <span>{order.date}</span>
+
+                  <button type="button" className="ebay-more-button">
+                    •••
+                  </button>
+                </div>
+              ))
+            )}
           </div>
         </article>
 
@@ -888,35 +752,41 @@ function DashboardContent({ searchQuery }) {
               <h2>Top Selling Products</h2>
             </div>
 
-            <button type="button" className="ebay-view-all">
+            <button type="button" className="ebay-view-all" onClick={() => openPage("products")}>
               View All
             </button>
           </div>
 
           <div className="ebay-products-list">
-            {topProducts.map((product, index) => (
-              <div className="ebay-product-row" key={product.name}>
-                <span className="ebay-product-rank">{index + 1}</span>
-
-                <img src={product.image} alt={product.name} />
-
-                <div className="ebay-product-info">
-                  <strong>{product.name}</strong>
-
-                  <span>{product.sold}</span>
-                </div>
-
-                <div className="ebay-product-bar">
-                  <i
-                    style={{
-                      width: product.width,
-                    }}
-                  />
-                </div>
-
-                <strong className="ebay-product-price">{product.price}</strong>
+            {topProducts.length === 0 ? (
+              <div style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
+                {summaryLoading ? "Loading products…" : "No sales in this period yet."}
               </div>
-            ))}
+            ) : (
+              topProducts.map((product, index) => (
+                <div className="ebay-product-row" key={`${product.name}-${index}`}>
+                  <span className="ebay-product-rank">{index + 1}</span>
+
+                  <img src={product.image} alt={product.name} />
+
+                  <div className="ebay-product-info">
+                    <strong>{product.name}</strong>
+
+                    <span>{product.sold}</span>
+                  </div>
+
+                  <div className="ebay-product-bar">
+                    <i
+                      style={{
+                        width: product.width,
+                      }}
+                    />
+                  </div>
+
+                  <strong className="ebay-product-price">{product.price}</strong>
+                </div>
+              ))
+            )}
           </div>
         </article>
 
@@ -934,31 +804,37 @@ function DashboardContent({ searchQuery }) {
               <h2>Recent Activity</h2>
             </div>
 
-            <button type="button" className="ebay-view-all">
+            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>
               View All
             </button>
           </div>
 
           <div className="ebay-activity-list">
-            {activities.map((activity) => {
-              const Icon = activity.icon;
+            {activities.length === 0 ? (
+              <div style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
+                {summaryLoading ? "Loading activity…" : "No recent activity."}
+              </div>
+            ) : (
+              activities.map((activity, index) => {
+                const Icon = activity.icon;
 
-              return (
-                <div className="ebay-activity-row" key={activity.title}>
-                  <span className="ebay-activity-icon">
-                    <Icon />
-                  </span>
+                return (
+                  <div className="ebay-activity-row" key={`${activity.title}-${index}`}>
+                    <span className="ebay-activity-icon">
+                      <Icon />
+                    </span>
 
-                  <div>
-                    <strong>{activity.title}</strong>
+                    <div>
+                      <strong>{activity.title}</strong>
 
-                    <span>{activity.text}</span>
+                      <span>{activity.text}</span>
 
-                    <small>{activity.time}</small>
+                      <small>{activity.time}</small>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </article>
       </section>
