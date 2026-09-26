@@ -11,6 +11,7 @@ import {
   LuSettings2,
   LuShieldCheck,
   LuStore,
+  LuUndo2,
   LuUsers,
   LuVideo,
   LuWalletCards,
@@ -35,6 +36,7 @@ export const sidebarGroups = [
   ],
   [
     { label: "Orders", page: "orders", icon: LuClipboardList },
+    { label: "Returns & Disputes", page: "returns-disputes", icon: LuUndo2, marker: "#f87171" },
     { label: "Sourcing Request", page: "sourcing-request", icon: LuPackageSearch, marker: "#f1b45c" },
     { label: "Products", page: "products", icon: LuPackage2, marker: "#9ad2c0" },
     { label: "Drafts", page: "drafts", icon: LuFilePenLine },

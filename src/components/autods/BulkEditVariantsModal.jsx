@@ -47,6 +47,7 @@ function BulkEditVariantsModal({
   const [profitPercent, setProfitPercent] = useState("");
   const [profitAmount, setProfitAmount] = useState("");
   const [sellPrice, setSellPrice] = useState("");
+  const [pricingMode, setPricingMode] = useState("none"); // "percent" | "amount" | "sellPrice" | "none"
 
   // Determine baseline cost from target variants (or default to first variant / 0)
   const baseCost = (() => {
@@ -61,33 +62,14 @@ function BulkEditVariantsModal({
       const initialFees = Number(defaultFeesPercent) || 0;
       setFeesPercent(String(initialFees));
 
-      // Check first variant or target variants for existing quantity & profit/price
       const first = targetVariants && targetVariants[0];
       const initialQty = first ? Math.max(1, Number(first.quantity) || 1) : 1;
       setQuantity(String(initialQty));
 
-      if (first) {
-        const cost = Number(first.buyPrice ?? first.price ?? 0);
-        const profit = Number(first.profit ?? 0);
-        const listPrice = Number(first.listingPrice ?? (cost + profit));
-
-        setProfitAmount(profit > 0 ? String(round2(profit)) : "");
-        if (cost > 0 && profit > 0) {
-          setProfitPercent(String(round2((profit / cost) * 100)));
-        } else {
-          setProfitPercent("");
-        }
-
-        if (listPrice > 0) {
-          setSellPrice(String(round2(listPrice)));
-        } else {
-          setSellPrice("");
-        }
-      } else {
-        setProfitPercent("");
-        setProfitAmount("");
-        setSellPrice("");
-      }
+      setProfitPercent("");
+      setProfitAmount("");
+      setSellPrice("");
+      setPricingMode("none");
     }
   }, [open, defaultFeesPercent, targetVariants]);
 
@@ -98,83 +80,54 @@ function BulkEditVariantsModal({
   // Handle changes with automatic calculation
   const handleFeesChange = (val) => {
     setFeesPercent(val);
-    const fPct = Number(val) || 0;
-    if (profitAmount !== "" && !isNaN(Number(profitAmount))) {
-      const pAmt = Number(profitAmount) || 0;
-      const calculatedSell = computeSellPrice(baseCost, fPct, pAmt);
-      setSellPrice(String(calculatedSell));
-    } else if (profitPercent !== "" && !isNaN(Number(profitPercent))) {
-      const pPct = Number(profitPercent) || 0;
-      const pAmt = round2(baseCost * (pPct / 100));
-      const calculatedSell = computeSellPrice(baseCost, fPct, pAmt);
-      setSellPrice(String(calculatedSell));
-    }
   };
 
   const handleProfitPercentChange = (val) => {
     setProfitPercent(val);
     if (val === "" || isNaN(Number(val))) {
-      setProfitAmount("");
-      if (sellPrice !== "") {
-        // If cleared profit %, don't blow away sell price immediately or set to cost + fees
-        const fPct = Number(feesPercent) || 0;
-        setSellPrice(String(computeSellPrice(baseCost, fPct, 0)));
-      }
+      setPricingMode("none");
       return;
     }
-
-    const pPct = Number(val);
-    const pAmt = round2(baseCost * (pPct / 100));
-    setProfitAmount(String(pAmt));
-
-    const fPct = Number(feesPercent) || 0;
-    const calculatedSell = computeSellPrice(baseCost, fPct, pAmt);
-    setSellPrice(String(calculatedSell));
+    setPricingMode("percent");
+    setProfitAmount("");
+    setSellPrice("");
   };
 
   const handleProfitAmountChange = (val) => {
     setProfitAmount(val);
     if (val === "" || isNaN(Number(val))) {
-      setProfitPercent("");
+      setPricingMode("none");
       return;
     }
-
-    const pAmt = Number(val);
-    if (baseCost > 0) {
-      setProfitPercent(String(round2((pAmt / baseCost) * 100)));
-    }
-
-    const fPct = Number(feesPercent) || 0;
-    const calculatedSell = computeSellPrice(baseCost, fPct, pAmt);
-    setSellPrice(String(calculatedSell));
+    setPricingMode("amount");
+    setProfitPercent("");
+    setSellPrice("");
   };
 
   const handleSellPriceChange = (val) => {
     setSellPrice(val);
     if (val === "" || isNaN(Number(val))) {
+      setPricingMode("none");
       return;
     }
-
-    const sPrice = Number(val);
-    const fPct = Number(feesPercent) || 0;
-    const pAmt = computeProfitFromSellPrice(sPrice, baseCost, fPct);
-    setProfitAmount(String(pAmt));
-
-    if (baseCost > 0) {
-      setProfitPercent(String(round2((pAmt / baseCost) * 100)));
-    }
+    setPricingMode("sellPrice");
+    setProfitPercent("");
+    setProfitAmount("");
   };
 
   const parsedQty = Number(quantity);
   const isValidQty = !isNaN(parsedQty) && parsedQty >= 1;
   const isFeesValid = feesPercent === "" || (!isNaN(Number(feesPercent)) && Number(feesPercent) >= 0);
   const isSellPriceValid = sellPrice === "" || (!isNaN(Number(sellPrice)) && Number(sellPrice) >= 0);
-  const canApply = isValidQty && isFeesValid && isSellPriceValid;
+  const isProfitPercentValid = profitPercent === "" || !isNaN(Number(profitPercent));
+  const isProfitAmountValid = profitAmount === "" || !isNaN(Number(profitAmount));
+  const canApply = isValidQty && isFeesValid && isSellPriceValid && isProfitPercentValid && isProfitAmountValid;
 
   const handleApply = () => {
     if (!canApply) return;
 
     onApply({
+      mode: pricingMode,
       feesPercent: Number(feesPercent) || 0,
       quantity: Math.max(1, Number(quantity) || 1),
       profitPercent: profitPercent !== "" ? Number(profitPercent) : null,
@@ -244,12 +197,12 @@ function BulkEditVariantsModal({
             />
           </BulkFieldRow>
 
-          <BulkFieldRow label="Profit %">
+          <BulkFieldRow label="Profit Increase %">
             <div className="bulk-edit-modal__percent">
               <input
                 type="number"
                 step="0.1"
-                placeholder="0"
+                placeholder="e.g. 20"
                 value={profitPercent}
                 onChange={(e) => handleProfitPercentChange(e.target.value)}
               />
@@ -270,7 +223,7 @@ function BulkEditVariantsModal({
             </div>
           </BulkFieldRow>
 
-          <BulkFieldRow label="Sell Price">
+          <BulkFieldRow label="Sell Price (Fixed)">
             <div className="bulk-edit-modal__money">
               <span className="bulk-edit-modal__money-prefix">$</span>
               <input
@@ -284,6 +237,39 @@ function BulkEditVariantsModal({
             </div>
           </BulkFieldRow>
         </div>
+
+        {profitPercent !== "" && !isNaN(Number(profitPercent)) ? (
+          <div
+            className="bulk-edit-modal__calc-preview"
+            style={{
+              padding: "10px 14px",
+              background: "#f0fdf4",
+              border: "1px solid #bbf7d0",
+              borderRadius: 6,
+              fontSize: 12,
+              color: "#166534",
+              marginTop: 12,
+            }}
+          >
+            <strong>Preview: </strong>
+            Each variation's listing price will increase by{" "}
+            <strong>{Number(profitPercent) >= 0 ? `+${profitPercent}%` : `${profitPercent}%`}</strong> according to its own price.
+            {targetVariants.slice(0, 3).map((v, i) => {
+              const cur = Number(v.listingPrice ?? v.listPrice ?? v.price ?? v.buyPrice ?? 0);
+              const after = round2(cur * (1 + Number(profitPercent) / 100));
+              return (
+                <div key={v.id || i} style={{ marginTop: 3 }}>
+                  {v.label || `Variation ${i + 1}`}: ${cur.toFixed(2)} → <strong>${after.toFixed(2)}</strong>
+                </div>
+              );
+            })}
+            {targetVariants.length > 3 ? (
+              <div style={{ color: "#15803d", fontStyle: "italic", marginTop: 3 }}>
+                ... and {targetVariants.length - 3} more
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {!isValidQty ? (
           <p className="bulk-edit-modal__hint" style={{ color: "#e05252" }}>
@@ -317,25 +303,44 @@ export function applyBulkEditToVariant(variant, changes) {
   }
 
   const cost = Math.max(0, Number(next.buyPrice ?? next.price ?? 0));
+  const currentListingPrice = Number(
+    next.listingPrice ?? next.listPrice ?? next.price ?? (cost + Number(next.profit ?? 0)),
+  );
   const feesPct = Math.max(0, Number(changes.feesPercent) || 0);
 
-  // If sellPrice is explicitly specified and non-null
-  if (changes.sellPrice != null && changes.sellPrice > 0) {
-    // If all variants share baseCost or there is a single direct sellPrice
-    next.listingPrice = round2(changes.sellPrice);
+  if (
+    changes.mode === "percent" ||
+    (changes.profitPercent != null && changes.mode !== "sellPrice" && changes.mode !== "amount")
+  ) {
+    const pct = Number(changes.profitPercent) || 0;
+    // Apply profit increase percentage to each variation according to its OWN listing price
+    // Example: 1st Variation: $5, 2nd Variation: $6, increase 20% -> 1st: $6, 2nd: $7.2
+    const basePrice = currentListingPrice > 0 ? currentListingPrice : cost;
+    const newListingPrice = round2(basePrice * (1 + pct / 100));
+    next.listingPrice = Math.max(0.01, newListingPrice);
+    next.listPrice = next.listingPrice;
+    next.price = next.listingPrice;
     const feeAmount = round2(cost * (feesPct / 100));
     next.profit = round2(next.listingPrice - cost - feeAmount);
-  } else if (changes.profitPercent != null) {
-    const profitPct = Number(changes.profitPercent) || 0;
-    const profit = round2(cost * (profitPct / 100));
+  } else if (changes.mode === "sellPrice" || (changes.sellPrice != null && changes.sellPrice > 0)) {
+    next.listingPrice = round2(changes.sellPrice);
+    next.listPrice = next.listingPrice;
+    next.price = next.listingPrice;
     const feeAmount = round2(cost * (feesPct / 100));
-    next.profit = profit;
-    next.listingPrice = round2(cost + feeAmount + profit);
-  } else if (changes.profitAmount != null) {
+    next.profit = round2(next.listingPrice - cost - feeAmount);
+  } else if (changes.mode === "amount" || changes.profitAmount != null) {
     const profit = Number(changes.profitAmount) || 0;
     const feeAmount = round2(cost * (feesPct / 100));
     next.profit = round2(profit);
     next.listingPrice = round2(cost + feeAmount + profit);
+    next.listPrice = next.listingPrice;
+    next.price = next.listingPrice;
+  } else if (changes.feesPercent != null) {
+    const feeAmount = round2(cost * (feesPct / 100));
+    next.profit = round2(currentListingPrice - cost - feeAmount);
+    next.listingPrice = currentListingPrice;
+    next.listPrice = currentListingPrice;
+    next.price = currentListingPrice;
   }
 
   return next;

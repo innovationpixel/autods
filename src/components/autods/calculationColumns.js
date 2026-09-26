@@ -1,10 +1,12 @@
-export const CALCULATION_COLUMN_STORAGE_KEY = "autods_calculations_visible_columns_v1";
+export const CALCULATION_COLUMN_STORAGE_KEY = "autods_calculations_visible_columns_v2";
 
 const COLUMN_MIN_WIDTHS = {
   orderId: 140,
   itemId: 220,
-  itemTracking: 190,
-  name: 260,
+  itemTracking: 230,
+  trackingBuy: 180,
+  trackingSell: 180,
+  name: 240,
   date: 110,
   ebayStatus: 160,
   qty: 70,
@@ -24,7 +26,9 @@ const COLUMN_MIN_WIDTHS = {
 export const calculationTableColumns = [
   { id: "orderId", label: "Order Id", defaultVisible: true, manage: true },
   { id: "itemId", label: "Item ID (Buy/Sell/SKU)", defaultVisible: true, manage: true },
-  { id: "itemTracking", label: "eBay Item / Tracking", defaultVisible: true, manage: true },
+  { id: "itemTracking", label: "Tracking ID (Buy/Sell)", defaultVisible: true, manage: true },
+  { id: "trackingBuy", label: "Buy Tracking ID", defaultVisible: false, manage: true },
+  { id: "trackingSell", label: "Sell Tracking ID", defaultVisible: false, manage: true },
   { id: "name", label: "Name", defaultVisible: true, manage: true },
   { id: "date", label: "Date", defaultVisible: true, manage: true },
   { id: "ebayStatus", label: "eBay Status", defaultVisible: true, manage: true },
@@ -55,7 +59,21 @@ export function defaultVisibleCalculationColumnIds() {
 
 export function loadVisibleCalculationColumnIds() {
   try {
-    const raw = localStorage.getItem(CALCULATION_COLUMN_STORAGE_KEY);
+    let raw = localStorage.getItem(CALCULATION_COLUMN_STORAGE_KEY);
+    if (!raw) {
+      const legacyRaw = localStorage.getItem("autods_calculations_visible_columns_v1");
+      if (legacyRaw) {
+        try {
+          const legacyParsed = JSON.parse(legacyRaw);
+          if (Array.isArray(legacyParsed)) {
+            raw = legacyRaw;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
     if (!raw) {
       return defaultVisibleCalculationColumnIds();
     }
@@ -67,6 +85,17 @@ export function loadVisibleCalculationColumnIds() {
 
     const allowed = new Set(manageableCalculationColumns.map((column) => column.id));
     const filtered = parsed.filter((id) => allowed.has(id));
+
+    // Ensure tracking column is always present for the user
+    if (!filtered.includes("itemTracking") && !filtered.includes("trackingBuy") && !filtered.includes("trackingSell")) {
+      const itemIdIdx = filtered.indexOf("itemId");
+      if (itemIdIdx !== -1) {
+        filtered.splice(itemIdIdx + 1, 0, "itemTracking");
+      } else {
+        filtered.splice(2, 0, "itemTracking");
+      }
+    }
+
     return filtered.length ? filtered : defaultVisibleCalculationColumnIds();
   } catch {
     return defaultVisibleCalculationColumnIds();

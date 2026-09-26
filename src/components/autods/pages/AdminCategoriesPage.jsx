@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { LuLoader, LuLayers, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import ConfirmModal from "../ConfirmModal";
+import GridSortHeader from "../GridSortHeader";
+import AdminPagination from "../AdminPagination";
 import {
   createAdminCategory,
   deleteAdminCategory,
@@ -25,6 +27,8 @@ function AdminCategoriesPage() {
 
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyCategory);
   const [editingId, setEditingId] = useState(null);
@@ -44,6 +48,47 @@ function AdminCategoriesPage() {
       .catch(() => toast.error("Failed to load categories."))
       .finally(() => setLoading(false));
   };
+
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedCategories = useMemo(() => {
+    return [...categories].sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+      if (sortBy === "name" || sortBy === "slug") {
+        valA = (valA ?? "").toString().toLowerCase();
+        valB = (valB ?? "").toString().toLowerCase();
+        return sortDirection === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      }
+      if (sortBy === "sort_order") {
+        valA = Number(valA ?? 0);
+        valB = Number(valB ?? 0);
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      }
+      if (sortBy === "is_active") {
+        valA = a.is_active ? 1 : 0;
+        valB = b.is_active ? 1 : 0;
+        return sortDirection === "asc" ? valA - valB : valB - valA;
+      }
+      return 0;
+    });
+  }, [categories, sortBy, sortDirection]);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+
+  const totalPages = Math.max(1, Math.ceil(sortedCategories.length / perPage));
+  const paginatedCategories = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return sortedCategories.slice(start, start + perPage);
+  }, [sortedCategories, page, perPage]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -149,15 +194,23 @@ function AdminCategoriesPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Slug</th>
-                <th>Sort Order</th>
-                <th>Status</th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("name")}>
+                  <GridSortHeader columnId="name" label="Name" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("slug")}>
+                  <GridSortHeader columnId="slug" label="Slug" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("sort_order")}>
+                  <GridSortHeader columnId="sort_order" label="Sort Order" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("is_active")}>
+                  <GridSortHeader columnId="is_active" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {categories.length ? categories.map((category) => (
+              {paginatedCategories.length ? paginatedCategories.map((category) => (
                 <tr key={category.id}>
                   <td><strong>{category.name}</strong></td>
                   <td>{category.slug}</td>
@@ -187,6 +240,16 @@ function AdminCategoriesPage() {
           </table>
         </div>
       )}
+
+      <AdminPagination
+        currentPage={page}
+        lastPage={totalPages}
+        total={sortedCategories.length}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="categories"
+      />
 
       {modalOpen ? (
         <div className="orders-modal">

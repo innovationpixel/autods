@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { LuChartLine, LuLoader, LuPencil, LuPlus, LuRefreshCcw, LuTrash2 } from "react-icons/lu";
@@ -14,6 +14,9 @@ import {
   resolveAliExpressProduct,
   updateAdminTrendingProduct,
 } from "../../../services/CuratedProductService";
+import { compareGridValues } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
+import AdminPagination from "../AdminPagination";
 
 const emptyForm = {
   url_or_id: "",
@@ -39,6 +42,58 @@ function AdminTrendingProductsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState("sort_order");
+  const [sortDirection, setSortDirection] = useState("asc");
+
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = ["price"].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
+    }
+  };
+
+  const sortedProducts = useMemo(() => {
+    const list = [...products];
+    list.sort((left, right) => {
+      let aVal = left[sortBy];
+      let bVal = right[sortBy];
+
+      if (sortBy === "product") {
+        aVal = left.title;
+        bVal = right.title;
+      } else if (sortBy === "category") {
+        aVal = left.category?.name ?? "";
+        bVal = right.category?.name ?? "";
+      } else if (sortBy === "country") {
+        aVal = left.country;
+        bVal = right.country;
+      } else if (sortBy === "price") {
+        aVal = left.price;
+        bVal = right.price;
+      } else if (sortBy === "sort_order") {
+        aVal = left.sort_order ?? 0;
+        bVal = right.sort_order ?? 0;
+      } else if (sortBy === "status") {
+        aVal = left.is_active ? 1 : 0;
+        bVal = right.is_active ? 1 : 0;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
+    });
+    return list;
+  }, [products, sortBy, sortDirection]);
+
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
+
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / perPage));
+  const paginatedProducts = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return sortedProducts.slice(start, start + perPage);
+  }, [sortedProducts, page, perPage]);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -161,6 +216,19 @@ function AdminTrendingProductsPage() {
         return;
       }
 
+      const p = previews[0];
+      const dup = products.find((existing) => existing.id !== editingId && (
+        (p.aliexpress_product_id && String(existing.aliexpress_product_id) === String(p.aliexpress_product_id)) ||
+        (p.title && existing.title && existing.title.trim().toLowerCase() === p.title.trim().toLowerCase())
+      ));
+      if (dup) {
+        const reason = (p.aliexpress_product_id && String(dup.aliexpress_product_id) === String(p.aliexpress_product_id))
+          ? `same item ID (${p.aliexpress_product_id})`
+          : `same name ("${p.title}")`;
+        toast.error(`Cannot save: product with ${reason} already exists.`);
+        return;
+      }
+
       setSaving(true);
       try {
         await updateAdminTrendingProduct(editingId, {
@@ -190,6 +258,39 @@ function AdminTrendingProductsPage() {
       return;
     }
 
+    // Check duplicate item ID or name against existing products
+    for (const preview of previews) {
+      const dup = products.find((existing) => (
+        (preview.aliexpress_product_id && String(existing.aliexpress_product_id) === String(preview.aliexpress_product_id)) ||
+        (preview.title && existing.title && existing.title.trim().toLowerCase() === preview.title.trim().toLowerCase())
+      ));
+      if (dup) {
+        const reason = (preview.aliexpress_product_id && String(dup.aliexpress_product_id) === String(preview.aliexpress_product_id))
+          ? `same item ID (${preview.aliexpress_product_id})`
+          : `same name ("${preview.title}")`;
+        toast.error(`Cannot add product: an item with ${reason} already exists.`);
+        return;
+      }
+    }
+
+    // Also check for duplicates within the current batch of previews
+    const seenIds = new Set();
+    const seenTitles = new Set();
+    for (const preview of previews) {
+      const idKey = preview.aliexpress_product_id ? String(preview.aliexpress_product_id) : null;
+      const titleKey = preview.title ? preview.title.trim().toLowerCase() : null;
+      if (idKey && seenIds.has(idKey)) {
+        toast.error(`Cannot add: duplicate item ID (${idKey}) found in selection.`);
+        return;
+      }
+      if (titleKey && seenTitles.has(titleKey)) {
+        toast.error(`Cannot add: duplicate product name ("${preview.title}") found in selection.`);
+        return;
+      }
+      if (idKey) seenIds.add(idKey);
+      if (titleKey) seenTitles.add(titleKey);
+    }
+
     setSaving(true);
     const baseSortOrder = Number(form.sort_order) || 0;
     const results = await Promise.allSettled(
@@ -204,14 +305,22 @@ function AdminTrendingProductsPage() {
     setSaving(false);
 
     const succeeded = results.filter((r) => r.status === "fulfilled").length;
-    const failed = results.length - succeeded;
+    const failedPromises = results.filter((r) => r.status === "rejected");
 
     if (succeeded) {
-      toast.success(`Added ${succeeded} trending product${succeeded > 1 ? "s" : ""}.${failed ? ` ${failed} failed.` : ""}`);
+      toast.success(`Added ${succeeded} trending product${succeeded > 1 ? "s" : ""}.${failedPromises.length ? ` ${failedPromises.length} failed.` : ""}`);
+      if (failedPromises.length) {
+        const firstErr = failedPromises[0].reason?.response?.data?.error
+          || failedPromises[0].reason?.response?.data?.message;
+        if (firstErr) toast.error(firstErr);
+      }
       setModalOpen(false);
       loadProducts();
     } else {
-      toast.error("Failed to add the product(s).");
+      const firstErr = failedPromises[0]?.reason?.response?.data?.error
+        || failedPromises[0]?.reason?.response?.data?.message
+        || "Failed to add the product(s).";
+      toast.error(firstErr);
     }
   };
 
@@ -261,17 +370,29 @@ function AdminTrendingProductsPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Category</th>
-                <th>Country</th>
-                <th>Price</th>
-                <th>Sort</th>
-                <th>Status</th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("product")}>
+                  <GridSortHeader columnId="product" label="Product" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("category")}>
+                  <GridSortHeader columnId="category" label="Category" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("country")}>
+                  <GridSortHeader columnId="country" label="Country" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("price")}>
+                  <GridSortHeader columnId="price" label="Price" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("sort_order")}>
+                  <GridSortHeader columnId="sort_order" label="Sort" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                  <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {products.length ? products.map((product) => (
+              {paginatedProducts.length ? paginatedProducts.map((product) => (
                 <tr key={product.id}>
                   <td>
                     <div className="admin-curated-page__product">
@@ -308,6 +429,16 @@ function AdminTrendingProductsPage() {
           </table>
         </div>
       )}
+
+      <AdminPagination
+        currentPage={page}
+        lastPage={totalPages}
+        total={sortedProducts.length}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="products"
+      />
 
       {modalOpen ? (
         <div className="orders-modal">

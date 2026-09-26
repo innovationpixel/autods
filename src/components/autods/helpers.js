@@ -32,17 +32,29 @@ export function getDailySeed(salt = "") {
 }
 
 export function mapAliItemToCard(item, extra = {}) {
+  const soldCount = item.sold_count ? Number(item.sold_count) : 0;
+  const isChoice = item.is_choice !== undefined
+    ? Boolean(item.is_choice)
+    : (item.isChoice !== undefined ? Boolean(item.isChoice) : (item.choice !== undefined ? Boolean(item.choice) : true));
+
   return {
     id: item.id,
     vendor: item.seller || null,
     shopUrl: item.shop_url || null,
     title: item.title,
-    price: `$${Number(item.price ?? 0).toFixed(2)}`,
+    price: typeof item.price === "string" && (item.price.startsWith("$") || item.price.includes("-")) ? item.price : `$${Number(item.price ?? 0).toFixed(2)}`,
+    originalPrice: item.original_price ? `$${Number(item.original_price).toFixed(2)}` : null,
+    discount: item.discount || null,
+    rating: item.rating ?? item.evaluate_rate ?? null,
+    reviews: item.review_count ?? item.reviews ?? null,
+    stock: item.stock ?? item.quantity ?? null,
+    soldCount,
+    isChoice,
     shipping:
-      item.sold_count > 0
-        ? `${Number(item.sold_count).toLocaleString()} sold`
+      soldCount > 0
+        ? `${Number(soldCount).toLocaleString()} sold`
         : "Ships internationally",
-    shippingDays: 10,
+    shippingDays: item.shipping_days ?? 10,
     image_url: item.image_url,
     images: item.images,
     shippingTag: "AliExpress",
@@ -235,6 +247,73 @@ export function getEbayOrderDetailUrl(orderId, siteId) {
   const host = EBAY_ORDER_SITE_HOSTS[siteId] ?? "www.ebay.com";
 
   return `https://${host}/sh/ord/details?orderid=${encodeURIComponent(normalized)}`;
+}
+
+export function getEbayShippingLabelUrl(orderId, siteId, isGenerated = false) {
+  const normalized = String(orderId ?? "").trim();
+  if (!normalized || normalized === "—") {
+    return null;
+  }
+
+  const host = EBAY_ORDER_SITE_HOSTS[siteId] ?? "www.ebay.com";
+
+  if (isGenerated) {
+    return `https://${host}/ship/labels/seller/labels?orderId=${encodeURIComponent(normalized)}`;
+  }
+
+  return `https://${host}/ship/labels/seller/purchase?orderId=${encodeURIComponent(normalized)}`;
+}
+
+export function isShippingLabelGenerated(order) {
+  if (!order) return false;
+
+  // Direct label URL (e.g., PDF or label URL in order or raw)
+  if (
+    order.shippingLabelUrl ||
+    order.shipping_label_url ||
+    order.raw?.shipping_label_url ||
+    order.raw?.shippingLabelUrl
+  ) {
+    return true;
+  }
+
+  // Explicit label generated boolean / status flag
+  if (order.shippingLabelGenerated || order.shipping_label_generated || order.raw?.shipping_label_generated) {
+    return true;
+  }
+
+  // Local storage cache if generated in this browser session
+  const orderKey = order.orderId || order.id;
+  if (orderKey && typeof window !== "undefined" && window.localStorage) {
+    try {
+      if (
+        window.localStorage.getItem(`autods_label_generated_${orderKey}`) === "true" ||
+        (order.id && window.localStorage.getItem(`autods_label_generated_${order.id}`) === "true")
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore localStorage read errors
+    }
+  }
+
+  // Tracking already pushed to eBay with confirmation
+  if (order.trackingPushed || order.trackingPushedAt) {
+    return true;
+  }
+
+  // eBay fulfillment record created via eBay shipping
+  const raw = order.raw ?? {};
+  if (Array.isArray(raw.fulfillmentHrefs) && raw.fulfillmentHrefs.length > 0) {
+    return true;
+  }
+
+  const fulfillmentStatus = String(raw.orderFulfillmentStatus ?? order.shippingStatus ?? "").toUpperCase();
+  if (fulfillmentStatus === "FULFILLED") {
+    return true;
+  }
+
+  return false;
 }
 
 export function buildSourceProductUrl(platform, productId, sourceUrl) {
@@ -613,9 +692,35 @@ export function mapApiOrderToCalculationRow(order) {
     1,
   );
   const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
-  const trackingNumber =
+
+  const rawBuyTracking =
+    normalizeCalculationTracking(order.buy_tracking_number) ||
+    normalizeCalculationTracking(raw.buy_tracking_number) ||
+    normalizeCalculationTracking(raw.source_tracking_number) ||
+    "";
+
+  const rawSellTracking =
     normalizeCalculationTracking(order.tracking_number) ||
-    normalizeCalculationTracking(shippingStep.shipmentTrackingNumber);
+    normalizeCalculationTracking(shippingStep.shipmentTrackingNumber) ||
+    rawBuyTracking;
+
+  const buyCarrier =
+    normalizeTrackingCarrier(order.buy_carrier) ||
+    normalizeTrackingCarrier(raw.buy_carrier) ||
+    detectTrackingCarrier(rawBuyTracking) ||
+    "";
+
+  const sellCarrier =
+    normalizeTrackingCarrier(order.carrier) ||
+    normalizeTrackingCarrier(shippingStep.shippingCarrierCode) ||
+    buyCarrier ||
+    detectTrackingCarrier(rawSellTracking) ||
+    "";
+
+  const sellTrackingUrl = buildCarrierTrackingUrl(rawSellTracking, sellCarrier);
+  const buyTrackingUrl = rawBuyTracking
+    ? (buildCarrierTrackingUrl(rawBuyTracking, buyCarrier) || `https://www.17track.net/en/track?nums=${encodeURIComponent(rawBuyTracking)}`)
+    : null;
 
   const variationAspects = firstItem.lineItemFulfillmentInstructions?.variations
     ?? firstItem.variationAspects
@@ -662,7 +767,16 @@ export function mapApiOrderToCalculationRow(order) {
     sourceVariationText,
     hasSource: Boolean(sourceProductId || sourceUrl),
     sku: firstItem.sku ?? "—",
-    trackingNumber: trackingNumber || "—",
+    trackingNumber: rawSellTracking || rawBuyTracking || "—",
+    trackingNumberRaw: rawSellTracking || rawBuyTracking || "",
+    sellTrackingNumber: rawSellTracking || "—",
+    sellTrackingNumberRaw: rawSellTracking,
+    sellCarrier,
+    sellTrackingUrl,
+    buyTrackingNumber: rawBuyTracking || "—",
+    buyTrackingNumberRaw: rawBuyTracking,
+    buyCarrier,
+    buyTrackingUrl,
     qty,
     address: buildCalculationAddress(raw),
     tax,
@@ -723,6 +837,8 @@ export function buildSparklinePoints(values) {
     })
     .join(" ");
 }
+
+export const PAGE_SIZE_OPTIONS = [20, 40, 60, 120, 240];
 
 export function buildPaginationItems(currentPage, totalPages) {
   if (totalPages <= 7) {
@@ -796,3 +912,37 @@ export function downloadTextFile(filename, content, mimeType = "text/csv;charset
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Universal comparator for grid column sorting.
+ * Supports numbers, currencies, dates, and natural string sorting.
+ */
+export function compareGridValues(leftVal, rightVal, direction = "asc") {
+  if (leftVal === rightVal) return 0;
+  if (leftVal == null || leftVal === "" || leftVal === "—") return 1;
+  if (rightVal == null || rightVal === "" || rightVal === "—") return -1;
+
+  const cleanLeft = typeof leftVal === "string" ? leftVal.replace(/[$,€£¥\s%]/g, "").trim() : leftVal;
+  const cleanRight = typeof rightVal === "string" ? rightVal.replace(/[$,€£¥\s%]/g, "").trim() : rightVal;
+
+  const numLeft = Number(cleanLeft);
+  const numRight = Number(cleanRight);
+
+  let res = 0;
+  if (
+    !Number.isNaN(numLeft) &&
+    !Number.isNaN(numRight) &&
+    cleanLeft !== "" &&
+    cleanRight !== ""
+  ) {
+    res = numLeft - numRight;
+  } else {
+    res = String(leftVal).localeCompare(String(rightVal), undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  }
+
+  return direction === "desc" ? -res : res;
+}
+

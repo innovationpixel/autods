@@ -10,6 +10,9 @@ import {
   replyAdminSupportTicket,
   updateAdminSupportTicketStatus,
 } from "../../../services/AdminService";
+import { compareGridValues } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
+import AdminPagination from "../AdminPagination";
 
 function formatDateTime(value) {
   if (!value) return "—";
@@ -38,11 +41,52 @@ function AdminSupportTicketsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
 
   const [activeTicket, setActiveTicket] = useState(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [answer, setAnswer] = useState("");
+  const [sortBy, setSortBy] = useState("updated");
+  const [sortDirection, setSortDirection] = useState("desc");
+
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = ["updated"].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
+    }
+  };
+
+  const sortedTickets = useMemo(() => {
+    const list = [...tickets];
+    list.sort((left, right) => {
+      let aVal = left[sortBy];
+      let bVal = right[sortBy];
+
+      if (sortBy === "client") {
+        aVal = left.user?.name ?? "";
+        bVal = right.user?.name ?? "";
+      } else if (sortBy === "subject") {
+        aVal = left.subject;
+        bVal = right.subject;
+      } else if (sortBy === "last_message") {
+        aVal = left.last_message;
+        bVal = right.last_message;
+      } else if (sortBy === "status") {
+        aVal = left.status;
+        bVal = right.status;
+      } else if (sortBy === "updated") {
+        aVal = left.updated_at ? new Date(left.updated_at).getTime() : 0;
+        bVal = right.updated_at ? new Date(right.updated_at).getTime() : 0;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
+    });
+    return list;
+  }, [tickets, sortBy, sortDirection]);
   const [sending, setSending] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -56,7 +100,7 @@ function AdminSupportTicketsPage() {
     setLoading(true);
     getAdminSupportTickets({
       page,
-      per_page: 15,
+      per_page: perPage,
       q: search.trim() || undefined,
       status: statusFilter,
     })
@@ -70,7 +114,7 @@ function AdminSupportTicketsPage() {
       })
       .catch(() => toast.error("Failed to load support tickets."))
       .finally(() => setLoading(false));
-  }, [page, search, statusFilter]);
+  }, [page, perPage, search, statusFilter]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -174,15 +218,25 @@ function AdminSupportTicketsPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Client</th>
-                <th>Subject</th>
-                <th>Last message</th>
-                <th>Status</th>
-                <th>Updated</th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("client")}>
+                  <GridSortHeader columnId="client" label="Client" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("subject")}>
+                  <GridSortHeader columnId="subject" label="Subject" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("last_message")}>
+                  <GridSortHeader columnId="last_message" label="Last message" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                  <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("updated")}>
+                  <GridSortHeader columnId="updated" label="Updated" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
               </tr>
             </thead>
             <tbody>
-              {tickets.length ? tickets.map((ticket) => (
+              {sortedTickets.length ? sortedTickets.map((ticket) => (
                 <tr key={ticket.id} className="admin-table__row-clickable" onClick={() => openTicket(ticket.id)}>
                   <td>
                     <div className="admin-clients-page__identity">
@@ -211,13 +265,15 @@ function AdminSupportTicketsPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="tickets"
+      />
 
       {activeTicket ? (
         <div className="orders-modal">

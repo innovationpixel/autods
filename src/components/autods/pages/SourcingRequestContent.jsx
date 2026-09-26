@@ -17,7 +17,8 @@ import {
   LuX,
 } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
-import { buildPaginationItems, normalizeImageUrl } from "../helpers";
+import { buildPaginationItems, normalizeImageUrl, compareGridValues } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
 import { selectEbayConnections } from "../../../store/selectors/EbaySelectors";
 import {
   cancelSourcingRequest,
@@ -47,6 +48,8 @@ function SourcingRequestContent({ searchQuery = "" }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [quotesModalRow, setQuotesModalRow] = useState(null);
   const [actionId, setActionId] = useState(null);
+  const [sortBy, setSortBy] = useState("requested");
+  const [sortDirection, setSortDirection] = useState("desc");
 
   const [form, setForm] = useState({
     product_url: "",
@@ -178,6 +181,44 @@ function SourcingRequestContent({ searchQuery = "" }) {
     }
   };
 
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = ["requested", "quotes"].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    const list = [...rows];
+    list.sort((left, right) => {
+      let aVal = left[sortBy];
+      let bVal = right[sortBy];
+
+      if (sortBy === "product") {
+        aVal = left.product_title;
+        bVal = right.product_title;
+      } else if (sortBy === "store") {
+        aVal = left.store_name;
+        bVal = right.store_name;
+      } else if (sortBy === "status") {
+        aVal = left.status;
+        bVal = right.status;
+      } else if (sortBy === "quotes") {
+        aVal = left.quotes?.length ?? 0;
+        bVal = right.quotes?.length ?? 0;
+      } else if (sortBy === "requested") {
+        aVal = left.created_at ? new Date(left.created_at).getTime() : 0;
+        bVal = right.created_at ? new Date(right.created_at).getTime() : 0;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
+    });
+    return list;
+  }, [rows, sortBy, sortDirection]);
+
   return (
     <div className="sourcing-request-content">
       <section className="sourcing-hero">
@@ -224,11 +265,21 @@ function SourcingRequestContent({ searchQuery = "" }) {
           <table className="sourcing-table">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Store</th>
-                <th>Status</th>
-                <th>Quotes</th>
-                <th>Requested</th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("product")}>
+                  <GridSortHeader columnId="product" label="Product" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("store")}>
+                  <GridSortHeader columnId="store" label="Store" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                  <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("quotes")}>
+                  <GridSortHeader columnId="quotes" label="Quotes" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("requested")}>
+                  <GridSortHeader columnId="requested" label="Requested" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -240,8 +291,8 @@ function SourcingRequestContent({ searchQuery = "" }) {
                     Loading sourcing requests…
                   </td>
                 </tr>
-              ) : rows.length ? (
-                rows.map((row) => {
+              ) : sortedRows.length ? (
+                sortedRows.map((row) => {
                   const imageUrl = normalizeImageUrl(row.product_image_url);
 
                   return (
@@ -369,10 +420,19 @@ function SourcingRequestContent({ searchQuery = "" }) {
 
         <label>
           <span>Show </span>
-          <select value={pageSize} aria-label="Requests per page" onChange={(e) => setPageSize(Number(e.target.value))}>
+          <select
+            value={pageSize}
+            aria-label="Requests per page"
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+          >
             <option value={20}>20</option>
             <option value={40}>40</option>
             <option value={60}>60</option>
+            <option value={120}>120</option>
+            <option value={240}>240</option>
           </select>
           <span> of {totalCount} requests</span>
         </label>

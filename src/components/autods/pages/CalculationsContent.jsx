@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "../../../utils/toast";
-import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, syncOrdersGoogleSheet, updateOrderCost, updateOrderFulfillment, updateOrderSource } from "../../../services/OrderService";
+import { getOrders, getOrdersGoogleSheetStatus, inviteOrdersGoogleSheetMembers, pushOrderTracking, syncOrdersGoogleSheet, updateOrderCost, updateOrderFulfillment, updateOrderSource, updateOrderTracking } from "../../../services/OrderService";
 import {
   LuBadgeCheck,
   LuChartLine,
@@ -10,24 +10,30 @@ import {
   LuClock3,
   LuExternalLink,
   LuFileSpreadsheet,
+  LuLoader,
   LuPencil,
   LuRefreshCcw,
   LuSlidersHorizontal,
   LuStore,
   LuTruck,
+  LuUpload,
   LuUserPlus,
   LuWalletCards,
   LuX,
 } from "react-icons/lu";
 import {
   buildPaginationItems,
+  detectTrackingCarrier,
   formatCalculationAmount,
   formatCalculationRoi,
   formatDisplayDate,
   mapApiOrderToCalculationRow,
+  normalizeTrackingCarrier,
   platformLabel,
   summarizeCalculations,
+  compareGridValues,
 } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import InviteSheetMembersModal from "../InviteSheetMembersModal";
 import QuickEditModal from "../QuickEditModal";
@@ -105,6 +111,10 @@ function CalculationsContent({ searchQuery = "" }) {
   const [savingField, setSavingField] = useState(null);
   const [editingBuySourceOrder, setEditingBuySourceOrder] = useState(null);
   const [savingBuySourceId, setSavingBuySourceId] = useState("");
+  const [editingTracking, setEditingTracking] = useState(null);
+  const [trackingDraft, setTrackingDraft] = useState("");
+  const [savingTracking, setSavingTracking] = useState(false);
+  const [pushingTrackingId, setPushingTrackingId] = useState("");
   const [visibleColumnIds, setVisibleColumnIds] = useState(loadVisibleCalculationColumnIds);
 
   const [showFilters, setShowFilters] = useState(false);
@@ -296,6 +306,100 @@ function CalculationsContent({ searchQuery = "" }) {
     }
   };
 
+  const handleStartTrackingEdit = (row, side) => {
+    setEditingTracking({ id: row.id, side, orderId: row.orderId });
+    setTrackingDraft(side === "buy" ? (row.buyTrackingNumberRaw || "") : (row.sellTrackingNumberRaw || ""));
+  };
+
+  const handleCancelTrackingEdit = () => {
+    setEditingTracking(null);
+    setTrackingDraft("");
+  };
+
+  const handleSaveTracking = async () => {
+    if (!editingTracking) {
+      return;
+    }
+
+    const { id, side } = editingTracking;
+    const trimmed = trackingDraft.trim();
+    setSavingTracking(true);
+    try {
+      if (side === "buy") {
+        const res = await updateOrderFulfillment(id, { buy_tracking_number: trimmed || null });
+        const updatedOrder = res.data?.order ?? {};
+        setOrders((current) =>
+          current.map((order) =>
+            String(order.id) === id
+              ? {
+                  ...order,
+                  buy_tracking_number: updatedOrder.buy_tracking_number ?? (trimmed || null),
+                  raw_data: {
+                    ...(order.raw_data || {}),
+                    buy_tracking_number: trimmed || null,
+                  },
+                }
+              : order,
+          ),
+        );
+        toast.success("Buy tracking ID updated.");
+      } else {
+        const res = await updateOrderTracking(id, { tracking_number: trimmed || null });
+        const updatedOrder = res.data?.order ?? {};
+        setOrders((current) =>
+          current.map((order) =>
+            String(order.id) === id
+              ? {
+                  ...order,
+                  tracking_number: updatedOrder.tracking_number ?? (trimmed || null),
+                  carrier: updatedOrder.carrier ?? order.carrier,
+                }
+              : order,
+          ),
+        );
+        toast.success("Sell tracking ID updated.");
+      }
+      handleCancelTrackingEdit();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, `Failed to update ${side} tracking ID.`));
+    } finally {
+      setSavingTracking(false);
+    }
+  };
+
+  const handlePushTrackingToEbay = async (row) => {
+    const tracking = (row.sellTrackingNumberRaw || row.trackingNumberRaw || "").trim();
+    let carrier = normalizeTrackingCarrier(row.sellCarrier || row.carrier || detectTrackingCarrier(tracking) || "");
+
+    if (!tracking) {
+      handleStartTrackingEdit(row, "sell");
+      toast.info("Please enter a tracking number first.");
+      return;
+    }
+
+    if (!carrier) {
+      carrier = detectTrackingCarrier(tracking) || "";
+    }
+
+    if (!carrier) {
+      handleStartTrackingEdit(row, "sell");
+      toast.info("Please select or enter a carrier before pushing to eBay.");
+      return;
+    }
+
+    setPushingTrackingId(row.id);
+    try {
+      await updateOrderTracking(row.id, { tracking_number: tracking, carrier });
+      const res = await pushOrderTracking(row.id);
+      toast.success(res.data?.message ?? "Tracking pushed to eBay.");
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not push tracking to eBay."));
+    } finally {
+      setPushingTrackingId("");
+    }
+  };
+
   const handleVisibleColumnsChange = (nextIds) => {
     setVisibleColumnIds(nextIds);
     saveVisibleCalculationColumnIds(nextIds);
@@ -386,24 +490,54 @@ function CalculationsContent({ searchQuery = "" }) {
         return true;
       }
 
-      return [row.orderId, row.title, row.description, row.ebayStatus, row.date]
+      return [
+        row.orderId,
+        row.title,
+        row.description,
+        row.ebayStatus,
+        row.date,
+        row.buyTrackingNumberRaw,
+        row.sellTrackingNumberRaw,
+        row.trackingNumber,
+      ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(query);
     });
 
     return nextRows.sort((left, right) => {
-      let comparison = 0;
+      let leftVal = left[sortBy];
+      let rightVal = right[sortBy];
 
-      if (sortBy === "total") {
-        comparison = left.earn - right.earn;
-      } else if (sortBy === "profit") {
-        comparison = left.profit - right.profit;
-      } else {
-        comparison = left.date.localeCompare(right.date);
+      if (sortBy === "total" || sortBy === "earn") {
+        leftVal = left.earn;
+        rightVal = right.earn;
+      } else if (sortBy === "orderDate") {
+        leftVal = left.date;
+        rightVal = right.date;
+      } else if (sortBy === "name" || sortBy === "title") {
+        leftVal = left.title;
+        rightVal = right.title;
+      } else if (
+        sortBy === "trackingNumber" ||
+        sortBy === "itemTracking" ||
+        sortBy === "trackingBuy" ||
+        sortBy === "trackingSell"
+      ) {
+        if (sortBy === "trackingBuy") {
+          leftVal = left.buyTrackingNumberRaw || "";
+          rightVal = right.buyTrackingNumberRaw || "";
+        } else if (sortBy === "trackingSell") {
+          leftVal = left.sellTrackingNumberRaw || "";
+          rightVal = right.sellTrackingNumberRaw || "";
+        } else {
+          leftVal = left.sellTrackingNumberRaw || left.buyTrackingNumberRaw || left.trackingNumber || "";
+          rightVal = right.sellTrackingNumberRaw || right.buyTrackingNumberRaw || right.trackingNumber || "";
+        }
       }
 
-      return sortDirection === "desc" ? -comparison : comparison;
+      return compareGridValues(leftVal, rightVal, sortDirection);
     });
   }, [
     buyerFilter,
@@ -623,26 +757,167 @@ function CalculationsContent({ searchQuery = "" }) {
         );
       case "itemTracking":
         return (
-          <div className="calculations-item-tracking">
-            <div className="calculations-item-tracking__row">
-              <span className="calculations-item-tracking__label">Item</span>
-              {row.itemSellUrl ? (
+          <div className="orders-paired-values calculations-paired-tracking">
+            <div>
+              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__platform">{platformLabel(row.sourcePlatform)}</span>
+              <div className="calculations-tracking-val">
+                {row.buyTrackingNumberRaw ? (
+                  row.buyTrackingUrl ? (
+                    <a
+                      href={row.buyTrackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="products-item-id-link calculations-table__mono"
+                      title="Open buy shipment tracking"
+                    >
+                      <strong>{row.buyTrackingNumberRaw}</strong>
+                    </a>
+                  ) : (
+                    <strong className="calculations-table__mono">{row.buyTrackingNumberRaw}</strong>
+                  )
+                ) : (
+                  <span className="products-source-btn__placeholder">Add tracking</span>
+                )}
+                <button
+                  type="button"
+                  className="products-source-cell__edit"
+                  onClick={() => handleStartTrackingEdit(row, "buy")}
+                  title="Edit Buy tracking ID"
+                  aria-label="Edit Buy tracking ID"
+                >
+                  <LuPencil />
+                </button>
+              </div>
+            </div>
+            <div>
+              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__platform">eBay</span>
+              <div className="calculations-tracking-val">
+                {row.sellTrackingNumberRaw ? (
+                  row.sellTrackingUrl ? (
+                    <a
+                      href={row.sellTrackingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="products-item-id-link calculations-table__mono"
+                      title="Open sell shipment tracking"
+                    >
+                      <strong>{row.sellTrackingNumberRaw}</strong>
+                    </a>
+                  ) : (
+                    <strong className="calculations-table__mono">{row.sellTrackingNumberRaw}</strong>
+                  )
+                ) : (
+                  <span className="products-source-btn__placeholder">Add tracking</span>
+                )}
+                {row.sellCarrier ? (
+                  <span className="orders-table__carrier">{row.sellCarrier}</span>
+                ) : null}
+                <button
+                  type="button"
+                  className="products-source-cell__edit"
+                  onClick={() => handleStartTrackingEdit(row, "sell")}
+                  title="Edit Sell tracking ID"
+                  aria-label="Edit Sell tracking ID"
+                >
+                  <LuPencil />
+                </button>
+                <button
+                  type="button"
+                  className="orders-tracking-display__push"
+                  style={{ fontSize: 10, padding: "2px 6px" }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handlePushTrackingToEbay(row);
+                  }}
+                  disabled={pushingTrackingId === row.id}
+                  title={row.sellTrackingNumberRaw ? "Push tracking to eBay" : "Add tracking number and push to eBay"}
+                >
+                  {pushingTrackingId === row.id ? <LuLoader className="orders-tracking-panel__spin" /> : <LuUpload />}
+                  <span>Push to eBay</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      case "trackingBuy":
+        return (
+          <div className="calculations-tracking-val">
+            {row.buyTrackingNumberRaw ? (
+              row.buyTrackingUrl ? (
                 <a
-                  href={row.itemSellUrl}
+                  href={row.buyTrackingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="products-item-id-link"
+                  className="products-item-id-link calculations-table__mono"
+                  title="Open buy shipment tracking"
                 >
-                  <strong>{row.itemSell}</strong>
+                  <strong>{row.buyTrackingNumberRaw}</strong>
                 </a>
               ) : (
-                <strong>{row.itemSell}</strong>
-              )}
-            </div>
-            <div className="calculations-item-tracking__row">
-              <span className="calculations-item-tracking__label">Tracking</span>
-              <strong>{row.trackingNumber}</strong>
-            </div>
+                <strong className="calculations-table__mono">{row.buyTrackingNumberRaw}</strong>
+              )
+            ) : (
+              <span className="products-source-btn__placeholder">Add tracking</span>
+            )}
+            <button
+              type="button"
+              className="products-source-cell__edit"
+              onClick={() => handleStartTrackingEdit(row, "buy")}
+              title="Edit Buy tracking ID"
+              aria-label="Edit Buy tracking ID"
+            >
+              <LuPencil />
+            </button>
+          </div>
+        );
+      case "trackingSell":
+        return (
+          <div className="calculations-tracking-val">
+            {row.sellTrackingNumberRaw ? (
+              row.sellTrackingUrl ? (
+                <a
+                  href={row.sellTrackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="products-item-id-link calculations-table__mono"
+                  title="Open sell shipment tracking"
+                >
+                  <strong>{row.sellTrackingNumberRaw}</strong>
+                </a>
+              ) : (
+                <strong className="calculations-table__mono">{row.sellTrackingNumberRaw}</strong>
+              )
+            ) : (
+              <span className="products-source-btn__placeholder">Add tracking</span>
+            )}
+            {row.sellCarrier ? (
+              <span className="orders-table__carrier">{row.sellCarrier}</span>
+            ) : null}
+            <button
+              type="button"
+              className="products-source-cell__edit"
+              onClick={() => handleStartTrackingEdit(row, "sell")}
+              title="Edit Sell tracking ID"
+              aria-label="Edit Sell tracking ID"
+            >
+              <LuPencil />
+            </button>
+            <button
+              type="button"
+              className="orders-tracking-display__push"
+              style={{ fontSize: 10, padding: "2px 6px" }}
+              onClick={(event) => {
+                event.stopPropagation();
+                handlePushTrackingToEbay(row);
+              }}
+              disabled={pushingTrackingId === row.id}
+              title={row.sellTrackingNumberRaw ? "Push tracking to eBay" : "Add tracking number and push to eBay"}
+            >
+              {pushingTrackingId === row.id ? <LuLoader className="orders-tracking-panel__spin" /> : <LuUpload />}
+              <span>Push to eBay</span>
+            </button>
           </div>
         );
       case "name":
@@ -712,6 +987,18 @@ function CalculationsContent({ searchQuery = "" }) {
         return formatCalculationRoi(row.roi);
       default:
         return row[columnId] ?? "—";
+    }
+  };
+
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = ["date", "earn", "cost", "profit", "roi", "tax", "fee", "shipping", "sellPrice"].some((k) =>
+        columnId.toLowerCase().includes(k)
+      );
+      setSortDirection(isDescDefault ? "desc" : "asc");
     }
   };
 
@@ -970,6 +1257,27 @@ function CalculationsContent({ searchQuery = "" }) {
         placeholder="0.00"
       />
 
+      <QuickEditModal
+        open={Boolean(editingTracking)}
+        title={
+          editingTracking?.side === "buy"
+            ? "Edit Buy Tracking ID (Supplier / AliExpress)"
+            : "Edit Sell Tracking ID (eBay Customer Tracking)"
+        }
+        description={
+          editingTracking?.side === "buy"
+            ? "The tracking number provided by the supplier (AliExpress, etc.) when the order was purchased."
+            : "The shipment tracking number for the customer on eBay."
+        }
+        label={editingTracking?.side === "buy" ? "Buy Tracking ID" : "Sell Tracking ID"}
+        value={trackingDraft}
+        onChange={setTrackingDraft}
+        onSave={handleSaveTracking}
+        onClose={handleCancelTrackingEdit}
+        saving={savingTracking}
+        placeholder="Enter tracking number"
+      />
+
       <OrderSourceModal
         open={Boolean(editingBuySourceOrder)}
         order={editingBuySourceOrder}
@@ -1005,8 +1313,18 @@ function CalculationsContent({ searchQuery = "" }) {
                 </tr>
                 <tr>
                   {visibleColumns.map((column) => (
-                    <th key={column.id} style={{ minWidth: column.minWidth, width: column.minWidth }}>
-                      {column.label}
+                    <th
+                      key={column.id}
+                      style={{ minWidth: column.minWidth, width: column.minWidth, cursor: "pointer" }}
+                      onClick={() => handleSort(column.id)}
+                    >
+                      <GridSortHeader
+                        columnId={column.id}
+                        label={column.label}
+                        sortBy={sortBy}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      />
                     </th>
                   ))}
                 </tr>
@@ -1094,10 +1412,18 @@ function CalculationsContent({ searchQuery = "" }) {
             <div className="orders-table-footer__meta">
               <label>
                 <span>Show</span>
-                <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-                  <option value={10}>10</option>
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
                   <option value={20}>20</option>
-                  <option value={30}>30</option>
+                  <option value={40}>40</option>
+                  <option value={60}>60</option>
+                  <option value={120}>120</option>
+                  <option value={240}>240</option>
                 </select>
               </label>
               <span>

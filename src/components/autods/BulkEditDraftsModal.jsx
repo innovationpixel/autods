@@ -324,6 +324,21 @@ export function applyBulkEditToForm(form, changes) {
       ...next.monitoring,
       profit: Math.round(buyPrice * (profitPercent / 100) * 100) / 100,
     };
+
+    if (Array.isArray(next.variants) && next.variants.length) {
+      next.variants = next.variants.map((v) => {
+        const curPrice = Number(v.listingPrice ?? v.listPrice ?? v.price ?? v.buyPrice ?? 0);
+        const newPrice = Math.round(curPrice * (1 + profitPercent / 100) * 100) / 100;
+        const vCost = Number(v.buyPrice ?? 0);
+        return {
+          ...v,
+          listingPrice: Math.max(0.01, newPrice),
+          listPrice: Math.max(0.01, newPrice),
+          price: Math.max(0.01, newPrice),
+          profit: Math.round((newPrice - vCost) * 100) / 100,
+        };
+      });
+    }
   }
 
   if (changes.listPriceEnabled) {

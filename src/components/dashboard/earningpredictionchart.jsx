@@ -61,6 +61,7 @@ const EarningPredictionChart = () => {
         yaxis: {
             min: -5,
             max: 5,
+            tickAmount: 4,
         },
         xaxis: {
             axisBorder: {
@@ -86,9 +87,6 @@ const EarningPredictionChart = () => {
             labels: {
                 style: { fontSize: "13px", colors: "#adb0bb", fontWeight: "400" },
             },
-        },
-        yaxis: {
-            tickAmount: 4,
         },
         tooltip: {
             theme: "dark",

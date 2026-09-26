@@ -12,6 +12,9 @@ import {
   getAdminUsers,
   updateAdminUser,
 } from "../../../services/AdminService";
+import { compareGridValues } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
+import AdminPagination from "../AdminPagination";
 
 const emptyForm = {
   name: "",
@@ -40,6 +43,7 @@ function AdminUsersPage() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -47,6 +51,42 @@ function AdminUsersPage() {
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
+
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedAdmins = useMemo(() => {
+    const list = [...admins];
+    list.sort((left, right) => {
+      let aVal = left[sortBy];
+      let bVal = right[sortBy];
+
+      if (sortBy === "name") {
+        aVal = left.name;
+        bVal = right.name;
+      } else if (sortBy === "modules") {
+        aVal = left.admin_modules ? left.admin_modules.length : 999;
+        bVal = right.admin_modules ? right.admin_modules.length : 999;
+      } else if (sortBy === "status") {
+        aVal = left.is_active ? 1 : 0;
+        bVal = right.is_active ? 1 : 0;
+      } else if (sortBy === "joined") {
+        aVal = left.created_at ? new Date(left.created_at).getTime() : 0;
+        bVal = right.created_at ? new Date(right.created_at).getTime() : 0;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
+    });
+    return list;
+  }, [admins, sortBy, sortDirection]);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -58,7 +98,7 @@ function AdminUsersPage() {
     setLoading(true);
     getAdminUsers({
       page,
-      per_page: 15,
+      per_page: perPage,
       search: search.trim() || undefined,
       role: "super_admin",
     })
@@ -72,7 +112,7 @@ function AdminUsersPage() {
       })
       .catch(() => toast.error("Failed to load admin users."))
       .finally(() => setLoading(false));
-  }, [page, search]);
+  }, [page, perPage, search]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -214,15 +254,23 @@ function AdminUsersPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Admin</th>
-                <th>Modules</th>
-                <th>Status</th>
-                <th>Joined</th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("name")}>
+                  <GridSortHeader columnId="name" label="Admin" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("modules")}>
+                  <GridSortHeader columnId="modules" label="Modules" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                  <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
+                <th style={{ cursor: "pointer" }} onClick={() => handleSort("joined")}>
+                  <GridSortHeader columnId="joined" label="Joined" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                </th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {admins.length ? admins.map((admin) => (
+              {sortedAdmins.length ? sortedAdmins.map((admin) => (
                 <tr key={admin.id}>
                   <td>
                     <div className="admin-clients-page__identity">
@@ -270,13 +318,15 @@ function AdminUsersPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="users"
+      />
 
       {modalOpen ? (
         <div className="orders-modal">

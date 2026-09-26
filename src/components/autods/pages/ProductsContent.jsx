@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
   LuTriangleAlert,
   LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
+  LuChevronUp,
   LuEllipsisVertical,
   LuExternalLink,
   LuInbox,
@@ -34,7 +35,7 @@ import {
   fetchEbayListings,
   syncEbayListingsAction,
 } from "../../../store/actions/EbayActions";
-import { bulkDeleteProducts, deleteProduct, getImportHistory, publishProduct, syncProductToStore, updateProduct } from "../../../services/ProductService";
+import { bulkDeleteProducts, deleteProduct, getImportHistory, monitorProductPriceStock, publishProduct, syncProductToStore, updateProduct } from "../../../services/ProductService";
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
 import ProductEditorModal from "../ProductEditorModal";
 import QuickEditModal from "../QuickEditModal";
@@ -53,6 +54,8 @@ import {
   saveVisibleProductColumnIds,
 } from "../productColumns";
 import ProductItemIdCell from "../ProductItemIdCell";
+import { compareGridValues } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -82,14 +85,83 @@ function buildImportBatchAlert(batch) {
   const total = Number(batch.total ?? 0);
   const isActive = batch.status === "processing" || batch.status === "pending";
   const progressLabel = isActive ? `${processed}/${total} in progress` : `${processed}/${total} finished`;
+  const isDraftAction = String(batch.action ?? "").toLowerCase() !== "publish";
+  const actionLabel = isDraftAction ? "move to draft" : importActionLabel(batch.action);
 
   return {
     id: `import-batch-${batch.id}`,
     batchId: batch.id,
     tone: !isActive && Number(batch.failed ?? 0) > 0 ? "danger" : "warning",
-    message: `Import Products #${batch.id} (${importActionLabel(batch.action)}) (${progressLabel})`,
+    message: `Import Products #${batch.id} (${actionLabel}) (${progressLabel})`,
     isActive,
+    isDraftAction,
   };
+}
+
+export function resolveTimeLeft(item) {
+  if (!item) return "30d";
+
+  const status = String(item.status ?? "").toLowerCase();
+  if (status === "ended") {
+    return "0d";
+  }
+
+  // 1. Direct numeric or string days_left / daysLeft / time_left / timeLeft
+  const explicit = item.days_left ?? item.daysLeft ?? item.time_left ?? item.timeLeft;
+  if (explicit !== undefined && explicit !== null && explicit !== "") {
+    if (typeof explicit === "number" && !Number.isNaN(explicit)) {
+      return `${Math.max(0, Math.round(explicit))}d`;
+    }
+    const str = String(explicit).trim();
+    if (str && str !== "—" && str !== "null" && str !== "undefined") {
+      if (/^\d+$/.test(str)) {
+        return `${str}d`;
+      }
+      return str;
+    }
+  }
+
+  // 2. Check raw_source_data or raw for TimeLeft string (e.g. "P28DT14H32M" or "28 days")
+  const raw = item.raw_source_data ?? item.raw ?? {};
+  const rawTimeLeft = String(raw.TimeLeft ?? raw.timeLeft ?? raw.time_left ?? "").trim();
+  if (rawTimeLeft) {
+    const match = rawTimeLeft.match(/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/i);
+    if (match && (match[1] || match[2])) {
+      const days = match[1] ? Number(match[1]) : 0;
+      const hours = match[2] ? Number(match[2]) : 0;
+      if (days > 0) return `${days}d`;
+      if (hours > 0) return `${hours}h`;
+    }
+    const numMatch = rawTimeLeft.match(/(\d+)\s*(?:d|day)/i);
+    if (numMatch) {
+      return `${numMatch[1]}d`;
+    }
+  }
+
+  // 3. Check listing end date or endTime
+  const endDate = item.listing_end_date ?? raw.listingEndTime ?? raw.endTime ?? raw.itemEndDate;
+  if (endDate) {
+    const diffMs = new Date(endDate).getTime() - Date.now();
+    if (diffMs > 0) {
+      const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      return days > 0 ? `${days}d` : `${hours}h`;
+    }
+    return "0d";
+  }
+
+  // 4. Good 'Til Cancelled (GTC): eBay listings renew every 30 days
+  const pubDate = item.published_at ?? item.created_at ?? item.uploaded ?? item.synced_at;
+  if (pubDate) {
+    const startTime = new Date(pubDate).getTime();
+    if (!Number.isNaN(startTime) && startTime > 0) {
+      const elapsedDays = Math.floor((Date.now() - startTime) / (1000 * 60 * 60 * 24));
+      const cycleDays = Math.max(1, 30 - (Math.max(0, elapsedDays) % 30));
+      return `${cycleDays}d`;
+    }
+  }
+
+  return status === "ended" ? "0d" : "30d";
 }
 
 function mapListingRow(item) {
@@ -105,6 +177,8 @@ function mapListingRow(item) {
   const itemBuyUrl = buildSourceProductUrl(item.source_platform, item.source_product_id, item.source_url);
   const itemSellUrl = buildEbayListingProductUrl(item);
   const asin = item.source_platform === "amazon" ? item.source_product_id : "—";
+  const timeLeftDisplay = resolveTimeLeft(item);
+  const timeLeftDays = parseInt(timeLeftDisplay, 10) || 0;
 
   return {
     ...item,
@@ -125,12 +199,17 @@ function mapListingRow(item) {
     sourcePlatform: item.source_platform ?? "aliexpress",
     sourceSkuId: item.source_sku_id ?? null,
     dws: item.days_without_sale ?? "—",
+    daysLeft: timeLeftDisplay,
+    days_left: item.days_left ?? timeLeftDays,
+    timeLeft: timeLeftDisplay,
+    time_left: timeLeftDisplay,
     warning: item.import_status === "failed" || available === 0,
   };
 }
 
 function ProductsContent({ searchQuery }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const connected = useSelector(selectEbayConnected);
   const connections = useSelector(selectEbayConnections);
@@ -142,11 +221,13 @@ function ProductsContent({ searchQuery }) {
 
   const [importBatches, setImportBatches] = useState([]);
   const [dismissedBatchIds, setDismissedBatchIds] = useState([]);
+  const [showAllAlerts, setShowAllAlerts] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [sortBy, setSortBy] = useState("uploaded");
   const [sortDirection, setSortDirection] = useState("desc");
   const [filterStatus, setFilterStatus] = useState("Active");
   const [filterStore, setFilterStore] = useState("");
@@ -172,8 +253,82 @@ function ProductsContent({ searchQuery }) {
   const [editorTab, setEditorTab] = useState("general");
   const [editorSaving, setEditorSaving] = useState(false);
   const [syncingId, setSyncingId] = useState("");
+  const [monitoringId, setMonitoringId] = useState("");
   const [publishingIds, setPublishingIds] = useState([]);
   const tableScrollRef = useRef(null);
+  const topScrollRef = useRef(null);
+  const stickyScrollRef = useRef(null);
+  const isSyncingScroll = useRef(false);
+  const [showStickyScroll, setShowStickyScroll] = useState(false);
+  const [stickyScrollStyle, setStickyScrollStyle] = useState({});
+
+  const syncScroll = (source) => {
+    if (!source || isSyncingScroll.current) return;
+    isSyncingScroll.current = true;
+    const scrollLeft = source.scrollLeft;
+    if (tableScrollRef.current && source !== tableScrollRef.current) {
+      tableScrollRef.current.scrollLeft = scrollLeft;
+    }
+    if (topScrollRef.current && source !== topScrollRef.current) {
+      topScrollRef.current.scrollLeft = scrollLeft;
+    }
+    if (stickyScrollRef.current && source !== stickyScrollRef.current) {
+      stickyScrollRef.current.scrollLeft = scrollLeft;
+    }
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false;
+    });
+  };
+
+  useEffect(() => {
+    const checkStickyVisibility = () => {
+      if (!tableScrollRef.current) {
+        setShowStickyScroll(false);
+        return;
+      }
+      const rect = tableScrollRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const hasHorizontalOverflow = tableScrollRef.current.scrollWidth > tableScrollRef.current.clientWidth + 10;
+      const isTopVisibleOrAbove = rect.top < viewportHeight - 80;
+      const isBottomBelowViewport = rect.bottom > viewportHeight + 30;
+
+      if (hasHorizontalOverflow && isTopVisibleOrAbove && isBottomBelowViewport) {
+        setShowStickyScroll(true);
+        setStickyScrollStyle({
+          left: `${Math.max(0, rect.left)}px`,
+          width: `${rect.width}px`,
+        });
+      } else {
+        setShowStickyScroll(false);
+      }
+    };
+
+    window.addEventListener("scroll", checkStickyVisibility, { passive: true });
+    window.addEventListener("resize", checkStickyVisibility, { passive: true });
+    checkStickyVisibility();
+
+    return () => {
+      window.removeEventListener("scroll", checkStickyVisibility);
+      window.removeEventListener("resize", checkStickyVisibility);
+    };
+  }, [tableMinWidth]);
+
+  useEffect(() => {
+    const node = tableScrollRef.current;
+    if (!node) return;
+
+    const handleWheel = (e) => {
+      if (e.shiftKey && e.deltaY !== 0) {
+        e.preventDefault();
+        node.scrollLeft += e.deltaY;
+      }
+    };
+
+    node.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      node.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
 
   const visibleColumns = useMemo(
     () => resolveVisibleProductColumns(visibleColumnIds),
@@ -186,7 +341,7 @@ function ProductsContent({ searchQuery }) {
   );
 
   const hasStockGroup = visibleStockColumns.length > 0;
-  const tableColumnCount = visibleColumns.length + 2;
+  const tableColumnCount = visibleColumns.length + 1;
   const tableMinWidth = useMemo(() => getVisibleProductTableMinWidth(visibleColumnIds), [visibleColumnIds]);
 
   const handleVisibleColumnsChange = (nextIds) => {
@@ -367,6 +522,11 @@ function ProductsContent({ searchQuery }) {
     [importBatches, dismissedBatchIds],
   );
 
+  const visibleAlerts = useMemo(
+    () => (showAllAlerts ? alerts : alerts.slice(0, 3)),
+    [alerts, showAllAlerts],
+  );
+
   const rows = useMemo(() => listings.map(mapListingRow), [listings]);
   const totalPages = meta?.last_page ?? 1;
   const totalCount = meta?.total ?? rows.length;
@@ -376,12 +536,57 @@ function ProductsContent({ searchQuery }) {
   const sortedRows = useMemo(() => {
     const next = [...rows];
     next.sort((a, b) => {
-      const aDate = new Date(a.uploaded ?? 0).getTime();
-      const bDate = new Date(b.uploaded ?? 0).getTime();
-      return sortDirection === "asc" ? aDate - bDate : bDate - aDate;
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
+
+      if (sortBy === "name") {
+        aVal = a.title;
+        bVal = b.title;
+      } else if (sortBy === "store") {
+        aVal = a.storeName;
+        bVal = b.storeName;
+      } else if (sortBy === "uploaded") {
+        aVal = a.uploaded ? new Date(a.uploaded).getTime() : null;
+        bVal = b.uploaded ? new Date(b.uploaded).getTime() : null;
+      } else if (sortBy === "stockAvailable") {
+        aVal = a.available;
+        bVal = b.available;
+      } else if (sortBy === "stockOnHold") {
+        aVal = a.onHold;
+        bVal = b.onHold;
+      } else if (sortBy === "stockOos") {
+        aVal = a.outOfStock;
+        bVal = b.outOfStock;
+      } else if (sortBy === "stockTotal") {
+        aVal = a.totalStock;
+        bVal = b.totalStock;
+      } else if (sortBy === "cost") {
+        aVal = a.sellPrice ?? a.buyPrice;
+        bVal = b.sellPrice ?? b.buyPrice;
+      } else if (sortBy === "sold") {
+        aVal = a.sold;
+        bVal = b.sold;
+      } else if (sortBy === "dws") {
+        aVal = a.dws;
+        bVal = b.dws;
+      } else if (sortBy === "itemIdBuy") {
+        aVal = a.itemBuy;
+        bVal = b.itemBuy;
+      } else if (sortBy === "itemIdSell") {
+        aVal = a.itemSell;
+        bVal = b.itemSell;
+      } else if (sortBy === "daysLeft" || sortBy === "timeLeft" || sortBy === "time_left") {
+        aVal = typeof a.days_left === "number" ? a.days_left : (parseInt(a.daysLeft ?? a.timeLeft, 10) || 0);
+        bVal = typeof b.days_left === "number" ? b.days_left : (parseInt(b.daysLeft ?? b.timeLeft, 10) || 0);
+      } else if (sortBy === "warnings") {
+        aVal = a.warning ? 1 : 0;
+        bVal = b.warning ? 1 : 0;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
     });
     return next;
-  }, [rows, sortDirection]);
+  }, [rows, sortBy, sortDirection]);
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
@@ -574,6 +779,35 @@ function ProductsContent({ searchQuery }) {
     }
   };
 
+  const handleMonitorPriceStock = async (item) => {
+    setMonitoringId(String(item.id));
+    setOpenMenuId("");
+    try {
+      const res = await monitorProductPriceStock(item.id);
+      const result = res.data?.result;
+      if (result?.status === "skipped") {
+        toast.info(result.reason || "Skipped by supplier settings");
+      } else if (result?.status === "error") {
+        toast.error(result.error || "Monitoring check failed.");
+      } else {
+        let msg = "Price & stock verified with supplier.";
+        if (result?.price_changed && result?.stock_changed) {
+          msg = `Price & stock updated! Price: $${result.details?.price?.new_price}, Qty: ${result.details?.stock?.new_quantity}`;
+        } else if (result?.price_changed) {
+          msg = `Price updated to $${result.details?.price?.new_price}`;
+        } else if (result?.stock_changed) {
+          msg = `Stock quantity updated to ${result.details?.stock?.new_quantity}`;
+        }
+        toast.success(msg);
+        loadListings();
+      }
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to monitor product."));
+    } finally {
+      setMonitoringId("");
+    }
+  };
+
   const handleSyncNow = () => {
     const primary = connections.find((c) => c.is_primary) ?? connections[0];
     if (primary) {
@@ -595,21 +829,99 @@ function ProductsContent({ searchQuery }) {
     }
   };
 
-  const renderProductColumnHeader = (column) => {
-    if (column.sortable) {
-      return (
-        <button type="button" className="orders-sort-btn" onClick={() => setSortDirection((c) => (c === "desc" ? "asc" : "desc"))}>
-          <span>{column.label}</span>
-          <LuChevronDown className={sortDirection === "asc" ? "orders-sort-btn__icon orders-sort-btn__icon--asc" : "orders-sort-btn__icon"} />
-        </button>
-      );
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = [
+        "uploaded",
+        "sold",
+        "cost",
+        "views",
+        "watchers",
+        "stockTotal",
+        "stockAvailable",
+        "stockOnHold",
+        "stockOos",
+      ].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
     }
+  };
 
-    return column.label;
+  const renderProductColumnHeader = (column) => {
+    if (column.id === "actions") {
+      return <span>Actions</span>;
+    }
+    return (
+      <GridSortHeader
+        columnId={column.id}
+        label={column.label}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+      />
+    );
   };
 
   const renderProductCell = (item, columnId, imageUrl) => {
     switch (columnId) {
+      case "actions":
+        return (
+          <div className="products-row-actions" onClick={(e) => e.stopPropagation()}>
+            {item.listing_url ? (
+              <a href={item.listing_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View on eBay" title="View on eBay">
+                <LuExternalLink />
+              </a>
+            ) : null}
+            <button type="button" className="orders-row-actions__icon" onClick={() => setOpenMenuId((c) => (c === item.id ? "" : item.id))} aria-label="Open product menu">
+              <LuEllipsisVertical />
+            </button>
+
+            {openMenuId === item.id ? (
+              <div className="products-actions-menu">
+                <button type="button" onClick={() => openProductEditor(item)}>
+                  <LuPencil />
+                  <span>Edit Product</span>
+                </button>
+                <button type="button" onClick={() => startEditStock(item)}>
+                  <LuPackage />
+                  <span>Update Stock Qty</span>
+                </button>
+                <button type="button" onClick={() => startEditBuySource(item)}>
+                  <LuLink />
+                  <span>Edit Source Link</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSyncToStore(item)}
+                  disabled={syncingId === String(item.id)}
+                >
+                  {syncingId === String(item.id) ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+                  <span>Sync To Store</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMonitorPriceStock(item)}
+                  disabled={monitoringId === String(item.id)}
+                >
+                  {monitoringId === String(item.id) ? <LuLoader className="spin-icon" /> : <LuEye />}
+                  <span>Monitor Price &amp; Stock</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirm({ type: "single", id: item.id });
+                    setOpenMenuId("");
+                  }}
+                >
+                  <LuTrash2 />
+                  <span>Delete Product</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        );
       case "name":
         return (
           <div className="products-item">
@@ -722,7 +1034,15 @@ function ProductsContent({ searchQuery }) {
       case "watchers":
         return item.watchers ?? 0;
       case "daysLeft":
-        return item.days_left != null ? `${item.days_left}d` : "—";
+      case "timeLeft":
+      case "time_left": {
+        const val = item.daysLeft ?? item.timeLeft ?? item.time_left ?? resolveTimeLeft(item);
+        return (
+          <span className="products-table__time-left" title={`Time left: ${val}`}>
+            {val || "30d"}
+          </span>
+        );
+      }
       case "warnings":
         return item.warning ? (
           <span className="products-warning-icon" title="Needs attention">
@@ -748,6 +1068,12 @@ function ProductsContent({ searchQuery }) {
         return "products-table__mono";
       case "tags":
         return "products-table__tags";
+      case "actions":
+        return "products-table__actions-col";
+      case "daysLeft":
+      case "timeLeft":
+      case "time_left":
+        return "products-table__time-left-col";
       default:
         return undefined;
     }
@@ -779,13 +1105,22 @@ function ProductsContent({ searchQuery }) {
     <section className="products-page-content">
       {alerts.length ? (
         <div className="products-alerts card-wrapper">
-          {alerts.map((alert) => (
+          {visibleAlerts.map((alert) => (
             <div className="products-alert" key={alert.id}>
               <div className="products-alert__copy">
                 <span className={`products-alert__dot products-alert__dot--${alert.tone === "danger" ? "danger" : "warning"}`} />
                 <span>{alert.message}</span>
               </div>
               <div className="products-alert__actions">
+                {alert.isDraftAction ? (
+                  <button
+                    type="button"
+                    className="products-alert__link products-alert__link--move-draft"
+                    onClick={() => navigate("/drafts")}
+                  >
+                    Move to draft
+                  </button>
+                ) : null}
                 <button type="button" className="products-alert__link" onClick={viewImportDetails}>
                   View details
                 </button>
@@ -800,6 +1135,27 @@ function ProductsContent({ searchQuery }) {
               </div>
             </div>
           ))}
+          {alerts.length > 3 ? (
+            <div className="products-alerts__footer">
+              <button
+                type="button"
+                className="products-alerts__more-btn"
+                onClick={() => setShowAllAlerts((prev) => !prev)}
+              >
+                {showAllAlerts ? (
+                  <>
+                    <LuChevronUp size={14} />
+                    <span>Show less</span>
+                  </>
+                ) : (
+                  <>
+                    <LuChevronDown size={14} />
+                    <span>More ({alerts.length - 3})...</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -927,7 +1283,16 @@ function ProductsContent({ searchQuery }) {
       <UploadHistoryPanel visible={historyVisible} onClose={() => setHistoryVisible(false)} />
 
       <div className="products-table-shell card-wrapper">
-        <div className="products-table-scroll" ref={tableScrollRef}>
+        <div
+          className="products-table-top-scroll"
+          ref={topScrollRef}
+          onScroll={(e) => syncScroll(e.currentTarget)}
+          aria-hidden="true"
+        >
+          <div style={{ width: tableMinWidth, height: 1 }} />
+        </div>
+
+        <div className="products-table-scroll" ref={tableScrollRef} onScroll={(e) => syncScroll(e.currentTarget)}>
           <table
             className={`products-table ${tableView === "comfortable" ? "products-table--comfortable" : ""}`}
             style={{ minWidth: tableMinWidth }}
@@ -936,6 +1301,19 @@ function ProductsContent({ searchQuery }) {
               <tr className="products-table__group-row">
                 <th className="products-table__checkbox-col" rowSpan={hasStockGroup ? 2 : 1} />
                 {visibleColumns.map((column) => {
+                  if (column.id === "actions") {
+                    return (
+                      <th
+                        key={column.id}
+                        className="products-table__actions-col"
+                        rowSpan={hasStockGroup ? 2 : 1}
+                        style={{ minWidth: column.minWidth }}
+                      >
+                        {renderProductColumnHeader(column)}
+                      </th>
+                    );
+                  }
+
                   if (column.group === "stock") {
                     if (column.id !== visibleStockColumns[0]?.id) {
                       return null;
@@ -953,12 +1331,16 @@ function ProductsContent({ searchQuery }) {
                   }
 
                   return (
-                    <th key={column.id} rowSpan={hasStockGroup ? 2 : 1} style={{ minWidth: column.minWidth }}>
+                    <th
+                      key={column.id}
+                      rowSpan={hasStockGroup ? 2 : 1}
+                      style={{ minWidth: column.minWidth, cursor: "pointer" }}
+                      onClick={() => handleSort(column.id)}
+                    >
                       {renderProductColumnHeader(column)}
                     </th>
                   );
                 })}
-                <th className="products-table__actions-col" rowSpan={hasStockGroup ? 2 : 1} />
               </tr>
               {hasStockGroup ? (
                 <tr className="products-table__sub-row">
@@ -966,9 +1348,16 @@ function ProductsContent({ searchQuery }) {
                     <th
                       key={column.id}
                       className={index === 0 ? "products-table__group--divider" : undefined}
-                      style={{ minWidth: column.minWidth }}
+                      style={{ minWidth: column.minWidth, cursor: "pointer" }}
+                      onClick={() => handleSort(column.id)}
                     >
-                      {column.label}
+                      <GridSortHeader
+                        columnId={column.id}
+                        label={column.label}
+                        sortBy={sortBy}
+                        sortDirection={sortDirection}
+                        onSort={handleSort}
+                      />
                     </th>
                   ))}
                 </tr>
@@ -1003,54 +1392,6 @@ function ProductsContent({ searchQuery }) {
                           {renderProductCell(item, column.id, imageUrl)}
                         </td>
                       ))}
-
-                      <td className="products-table__actions-col">
-                        <div className="products-row-actions" onClick={(e) => e.stopPropagation()}>
-                          {item.listing_url ? (
-                            <a href={item.listing_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View on eBay">
-                              <LuExternalLink />
-                            </a>
-                          ) : null}
-                          <button type="button" className="orders-row-actions__icon" onClick={() => setOpenMenuId((c) => (c === item.id ? "" : item.id))} aria-label="Open product menu">
-                            <LuEllipsisVertical />
-                          </button>
-
-                          {openMenuId === item.id ? (
-                            <div className="products-actions-menu">
-                              <button type="button" onClick={() => openProductEditor(item)}>
-                                <LuPencil />
-                                <span>Edit Product</span>
-                              </button>
-                              <button type="button" onClick={() => startEditStock(item)}>
-                                <LuPackage />
-                                <span>Update Stock Qty</span>
-                              </button>
-                              <button type="button" onClick={() => startEditBuySource(item)}>
-                                <LuLink />
-                                <span>Edit Source Link</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleSyncToStore(item)}
-                                disabled={syncingId === String(item.id)}
-                              >
-                                {syncingId === String(item.id) ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
-                                <span>Sync To Store</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDeleteConfirm({ type: "single", id: item.id });
-                                  setOpenMenuId("");
-                                }}
-                              >
-                                <LuTrash2 />
-                                <span>Delete Product</span>
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
@@ -1105,8 +1446,10 @@ function ProductsContent({ searchQuery }) {
                 }}
               >
                 <option value={20}>20</option>
-                <option value={30}>30</option>
                 <option value={40}>40</option>
+                <option value={60}>60</option>
+                <option value={120}>120</option>
+                <option value={240}>240</option>
               </select>
             </label>
             <span>
@@ -1115,6 +1458,18 @@ function ProductsContent({ searchQuery }) {
           </div>
         </div>
       </div>
+
+      {showStickyScroll ? (
+        <div
+          className="products-table-sticky-scroll"
+          style={stickyScrollStyle}
+          ref={stickyScrollRef}
+          onScroll={(e) => syncScroll(e.currentTarget)}
+          aria-hidden="true"
+        >
+          <div style={{ width: tableMinWidth, height: 1 }} />
+        </div>
+      ) : null}
 
       <BulkEditDraftsModal
         open={bulkEditTargets.length > 0}

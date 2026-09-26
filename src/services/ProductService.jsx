@@ -50,3 +50,10 @@ export const bulkDeleteProducts = (ids) =>
 
 export const getEbayPolicies = (connectionId) =>
     axiosInstance.get('/ebay/policies', { params: { connection_id: connectionId } });
+
+export const monitorProductPriceStock = (id, params = {}) =>
+    axiosInstance.post(`/products/${id}/monitor`, params);
+
+export const monitorAllProductsPriceStock = (params = {}) =>
+    axiosInstance.post('/products/monitor-all', params);
+

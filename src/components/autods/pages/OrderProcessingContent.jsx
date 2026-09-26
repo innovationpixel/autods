@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   LuArrowRightLeft,
   LuCheck,
+  LuChevronLeft,
+  LuChevronRight,
   LuClipboardList,
   LuLoader,
   LuPackageCheck,
@@ -27,12 +29,16 @@ import { getWalletSummary, transferToProcessingWallet } from "../../../services/
 import { getBuyerAccounts } from "../../../services/BuyerAccountService";
 import {
   buildCarrierTrackingUrl,
+  buildPaginationItems,
   buildSourceProductUrl,
   formatDisplayDate,
   formatTrackingDisplay,
   getEbayOrderDetailUrl,
   normalizeTrackingCarrier,
+  compareGridValues,
+  PAGE_SIZE_OPTIONS,
 } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
@@ -113,11 +119,18 @@ function mapProcessingOrder(order) {
     processingStatus: order.processing_status ?? "new",
     processingMethod: order.processing_method ?? "",
     ...(() => {
-      const rawTracking = order.tracking_number ?? fulfillment.shippingStep?.shipmentTrackingNumber ?? "";
+      const rawTracking =
+        order.tracking_number ??
+        fulfillment.shippingStep?.shipmentTrackingNumber ??
+        order.buy_tracking_number ??
+        order.raw_data?.buy_tracking_number ??
+        "";
       const parsed = formatTrackingDisplay(rawTracking);
       const carrier =
         normalizeTrackingCarrier(order.carrier) ||
         normalizeTrackingCarrier(fulfillment.shippingStep?.shippingCarrierCode) ||
+        normalizeTrackingCarrier(order.buy_carrier) ||
+        detectTrackingCarrier(parsed.trackingNumber) ||
         "";
       const trackingUrl = parsed.url || (parsed.trackingNumber ? buildCarrierTrackingUrl(parsed.trackingNumber, carrier) : null);
 
@@ -146,6 +159,8 @@ function OrderProcessingContent() {
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [sortBy, setSortBy] = useState("date");
+  const [sortDirection, setSortDirection] = useState("desc");
 
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [transferAmountDraft, setTransferAmountDraft] = useState("");
@@ -162,6 +177,9 @@ function OrderProcessingContent() {
   const [fulfillmentDraft, setFulfillmentDraft] = useState("");
   const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
 
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
   const FULFILLMENT_FIELDS = {
     aliexpressOrderId: { key: "aliexpress_order_id", label: "AliExpress order ID" },
     aliexpressOrderStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
@@ -170,7 +188,7 @@ function OrderProcessingContent() {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
+      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 500 });
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
       setOrders(mapped.filter((order) => order.sourcePlatform === "aliexpress"));
       setSelectedIds([]);
@@ -218,6 +236,7 @@ function OrderProcessingContent() {
   }, []);
 
   useEffect(() => {
+    setCurrentPage(1);
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -391,10 +410,66 @@ function OrderProcessingContent() {
     }
   };
 
-  const allSelected = orders.length > 0 && orders.every((order) => selectedIds.includes(order.id));
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = ["date", "sellPrice", "cost"].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
+    }
+  };
+
+  const sortedOrders = useMemo(() => {
+    const list = [...orders];
+    list.sort((left, right) => {
+      let aVal = left[sortBy];
+      let bVal = right[sortBy];
+
+      if (sortBy === "order") {
+        aVal = left.orderId;
+        bVal = right.orderId;
+      } else if (sortBy === "date") {
+        aVal = left.orderDate;
+        bVal = right.orderDate;
+      } else if (sortBy === "buyer") {
+        aVal = left.buyerName;
+        bVal = right.buyerName;
+      } else if (sortBy === "sellPrice") {
+        aVal = left.sellPrice;
+        bVal = right.sellPrice;
+      } else if (sortBy === "source") {
+        aVal = left.itemTitle;
+        bVal = right.itemTitle;
+      } else if (sortBy === "cost") {
+        aVal = left.buyPrice ?? left.cost;
+        bVal = right.buyPrice ?? right.cost;
+      } else if (sortBy === "aliexpressOrderId") {
+        aVal = left.aliexpressOrderId;
+        bVal = right.aliexpressOrderId;
+      } else if (sortBy === "aliexpressStatus") {
+        aVal = left.aliexpressOrderStatus;
+        bVal = right.aliexpressOrderStatus;
+      } else if (sortBy === "tracking") {
+        aVal = left.trackingNumber;
+        bVal = right.trackingNumber;
+      }
+
+      return compareGridValues(aVal, bVal, sortDirection);
+    });
+    return list;
+  }, [orders, sortBy, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedOrders.length / pageSize));
+  const visibleOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedOrders.slice(start, start + pageSize);
+  }, [sortedOrders, currentPage, pageSize]);
+
+  const allSelected = visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id));
 
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? [] : orders.map((order) => order.id));
+    setSelectedIds(allSelected ? [] : visibleOrders.map((order) => order.id));
   };
 
   const toggleSelectOrder = (id) => {
@@ -735,15 +810,33 @@ function OrderProcessingContent() {
                   <th className="orders-table__checkbox-col">
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all orders" />
                   </th>
-                  <th>Order</th>
-                  <th>Date</th>
-                  <th>Buyer</th>
-                  <th>Sell Price</th>
-                  <th>Source (AliExpress)</th>
-                  <th>Cost</th>
-                  <th>AliExpress Order ID</th>
-                  <th>AliExpress Status</th>
-                  <th>Tracking</th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("order")}>
+                    <GridSortHeader columnId="order" label="Order" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("date")}>
+                    <GridSortHeader columnId="date" label="Date" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("buyer")}>
+                    <GridSortHeader columnId="buyer" label="Buyer" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("sellPrice")}>
+                    <GridSortHeader columnId="sellPrice" label="Sell Price" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("source")}>
+                    <GridSortHeader columnId="source" label="Source (AliExpress)" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("cost")}>
+                    <GridSortHeader columnId="cost" label="Cost" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("aliexpressOrderId")}>
+                    <GridSortHeader columnId="aliexpressOrderId" label="AliExpress Order ID" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("aliexpressStatus")}>
+                    <GridSortHeader columnId="aliexpressStatus" label="AliExpress Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
+                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("tracking")}>
+                    <GridSortHeader columnId="tracking" label="Tracking" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+                  </th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -756,8 +849,8 @@ function OrderProcessingContent() {
                       <span>Loading orders…</span>
                     </td>
                   </tr>
-                ) : orders.length ? (
-                  orders.map((order) => (
+                ) : visibleOrders.length ? (
+                  visibleOrders.map((order) => (
                     <tr className="orders-table__row" key={order.id}>
                       <td className="orders-table__checkbox-col">
                         <input
@@ -981,6 +1074,63 @@ function OrderProcessingContent() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="orders-table-footer">
+            <div className="orders-pagination">
+              <button
+                type="button"
+                className="orders-pagination__arrow"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                aria-label="Previous page"
+              >
+                <LuChevronLeft />
+              </button>
+              {buildPaginationItems(currentPage, totalPages).map((item, idx) =>
+                item === "..." ? (
+                  <span className="orders-pagination__ellipsis" key={`ellipsis-${idx}`}>...</span>
+                ) : (
+                  <button
+                    type="button"
+                    key={item}
+                    className={item === currentPage ? "orders-pagination__page orders-pagination__page--active" : "orders-pagination__page"}
+                    onClick={() => setCurrentPage(item)}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                className="orders-pagination__arrow"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                aria-label="Next page"
+              >
+                <LuChevronRight />
+              </button>
+            </div>
+
+            <div className="orders-table-footer__meta">
+              <label>
+                <span>Show</span>
+                <select
+                  value={pageSize}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  {PAGE_SIZE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span>Orders out of {sortedOrders.length}</span>
+            </div>
           </div>
         </div>
       </section>

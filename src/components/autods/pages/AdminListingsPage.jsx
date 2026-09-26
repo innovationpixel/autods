@@ -8,6 +8,7 @@ import { getAdminListings } from "../../../services/AdminService";
 import { EBAY_MARKETPLACES } from "../ConnectEbayModal";
 import { importSuppliers } from "../constants";
 import AdminSortableHeader from "../AdminSortableHeader";
+import AdminPagination from "../AdminPagination";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -37,6 +38,7 @@ function AdminListingsPage() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
 
@@ -57,7 +59,7 @@ function AdminListingsPage() {
     setLoading(true);
     getAdminListings({
       page,
-      per_page: 20,
+      per_page: perPage,
       sort,
       sort_dir: sortDir,
       q: q.trim() || undefined,
@@ -77,7 +79,7 @@ function AdminListingsPage() {
       })
       .catch(() => toast.error("Failed to load listings."))
       .finally(() => setLoading(false));
-  }, [page, sort, sortDir, q, userSearch, marketplace, category, status, supplier]);
+  }, [page, perPage, sort, sortDir, q, userSearch, marketplace, category, status, supplier]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -178,12 +180,13 @@ function AdminListingsPage() {
             <thead>
               <tr>
                 <AdminSortableHeader label="Title" sortKey="title" sort={sort} sortDir={sortDir} onSort={handleSort} />
-                <th>User</th>
-                <th>Marketplace</th>
+                <AdminSortableHeader label="User" sortKey="user" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Marketplace" sortKey="marketplace" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Category" sortKey="category_name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Price" sortKey="price" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Profit" sortKey="profit" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Qty" sortKey="quantity" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Sold" sortKey="quantity_sold" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Status" sortKey="status" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Synced" sortKey="synced_at" sort={sort} sortDir={sortDir} onSort={handleSort} />
               </tr>
@@ -214,6 +217,7 @@ function AdminListingsPage() {
                   <td>{formatMoney(listing.price, listing.currency)}</td>
                   <td>{formatMoney(listing.profit, listing.currency)}</td>
                   <td>{listing.quantity ?? 0}</td>
+                  <td><strong>{listing.sold_count ?? listing.quantity_sold ?? 0}</strong></td>
                   <td>
                     <span className={listing.status === "active" ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
                       {listing.status ?? "—"}
@@ -223,7 +227,7 @@ function AdminListingsPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={9} className="admin-table__empty">No listings found.</td>
+                  <td colSpan={10} className="admin-table__empty">No listings found.</td>
                 </tr>
               )}
             </tbody>
@@ -231,13 +235,15 @@ function AdminListingsPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="listings"
+      />
     </section>
   );
 }

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { LuLoader, LuX } from "react-icons/lu";
 import { getImportHistory } from "../../services/ProductService";
 import { formatDisplayDateTime, getListingImageUrl } from "./helpers";
+import GridSortHeader from "./GridSortHeader";
+import AdminPagination from "./AdminPagination";
 
 function statusLabel(status) {
   if (!status) return "—";
@@ -59,6 +61,8 @@ function UploadHistoryPanel({ visible, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState(null);
+  const [sortBy, setSortBy] = useState("date");
+  const [sortDirection, setSortDirection] = useState("desc");
 
   useEffect(() => {
     if (!visible) {
@@ -93,6 +97,39 @@ function UploadHistoryPanel({ visible, onClose }) {
 
   const rows = useMemo(() => buildHistoryRows(payload), [payload]);
 
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      setSortDirection("asc");
+    }
+  };
+
+  const sortedRows = useMemo(() => {
+    return [...rows].sort((a, b) => {
+      let valA = a[sortBy];
+      let valB = b[sortBy];
+      if (sortBy === "date") {
+        const timeA = new Date(valA).getTime() || 0;
+        const timeB = new Date(valB).getTime() || 0;
+        return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
+      }
+      valA = (valA ?? "").toString().toLowerCase();
+      valB = (valB ?? "").toString().toLowerCase();
+      return sortDirection === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    });
+  }, [rows, sortBy, sortDirection]);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const paginatedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [sortedRows, page, pageSize]);
+
   if (!visible) {
     return null;
   }
@@ -113,10 +150,18 @@ function UploadHistoryPanel({ visible, onClose }) {
         <table className="upload-history-panel__table">
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Activity</th>
-              <th>Details</th>
-              <th>Status</th>
+              <th style={{ cursor: "pointer" }} onClick={() => handleSort("date")}>
+                <GridSortHeader columnId="date" label="Date" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+              </th>
+              <th style={{ cursor: "pointer" }} onClick={() => handleSort("title")}>
+                <GridSortHeader columnId="title" label="Activity" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+              </th>
+              <th style={{ cursor: "pointer" }} onClick={() => handleSort("detail")}>
+                <GridSortHeader columnId="detail" label="Details" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+              </th>
+              <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -133,14 +178,14 @@ function UploadHistoryPanel({ visible, onClose }) {
                   {error}
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : sortedRows.length === 0 ? (
               <tr>
                 <td className="upload-history-panel__empty" colSpan={4}>
                   No upload history yet. Import products to see activity here.
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              paginatedRows.map((row) => (
                 <tr key={row.id}>
                   <td>{formatDisplayDateTime(row.date)}</td>
                   <td>
@@ -166,6 +211,16 @@ function UploadHistoryPanel({ visible, onClose }) {
           </tbody>
         </table>
       </div>
+
+      <AdminPagination
+        currentPage={page}
+        lastPage={totalPages}
+        total={sortedRows.length}
+        perPage={pageSize}
+        onPageChange={setPage}
+        onPerPageChange={setPageSize}
+        entityName="records"
+      />
     </div>
   );
 }

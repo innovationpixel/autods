@@ -74,6 +74,7 @@ import CuratedProductsPage from '../autods/pages/CuratedProductsPage';
 import PrintOnDemandContent from '../autods/pages/PrintOnDemandContent';
 import DashboardContent from '../autods/pages/DashboardContent';
 import OrdersContent from '../autods/pages/OrdersContent';
+import ReturnsDisputesContent from '../autods/pages/ReturnsDisputesContent';
 import ProductsContent from '../autods/pages/ProductsContent';
 import DraftsContent from '../autods/pages/DraftsContent';
 import HelpCenterContent from '../autods/pages/HelpCenterContent';
@@ -2048,6 +2049,8 @@ const MarketplaceDashboard = () => {
               <DashboardContent searchQuery={searchAnything} />
             ) : activePage === "orders" ? (
               <OrdersContent searchQuery={searchAnything} />
+            ) : activePage === "returns-disputes" ? (
+              <ReturnsDisputesContent searchQuery={searchAnything} />
             ) : activePage === "sourcing-request" ? (
               <SourcingRequestContent searchQuery={searchAnything} />
             ) : activePage === "products" ? (

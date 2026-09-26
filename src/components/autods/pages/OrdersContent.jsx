@@ -46,16 +46,21 @@ import {
   saveVisibleColumnIds,
 } from "../orderColumns";
 import {
+  buildCarrierTrackingUrl,
   buildEbayListingProductUrl,
   buildOrdersCsv,
   buildSourceProductUrl,
+  compareGridValues,
   downloadTextFile,
   formatDisplayDate,
   formatTrackingDisplay,
   getEbayOrderDetailUrl,
+  getEbayShippingLabelUrl,
+  isShippingLabelGenerated,
   normalizeTrackingCarrier,
   platformLabel,
 } from "../helpers";
+import GridSortHeader from "../GridSortHeader";
 import { openPrintableDocument } from "../printDocuments";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import { orderRowBoltActions, orderRowPrintActions, orderStatusOptions } from "../constants";
@@ -172,13 +177,36 @@ function mapApiOrder(order) {
       order.status !== "Canceled" &&
       new Date(shipByDate) < new Date(new Date().toDateString()),
   );
+  const aliExpressTracking =
+    normalizeTrackingValue(order.buy_tracking_number) ||
+    normalizeTrackingValue(raw.buy_tracking_number) ||
+    normalizeTrackingValue(raw.source_tracking_number) ||
+    "";
+
+  const explicitEbayTracking = normalizeTrackingValue(order.tracking_number);
+  const ebayStepTracking = normalizeTrackingValue(shippingStep.shipmentTrackingNumber);
+
+  // If AliExpress gives the tracking ID, show the same in eBay tracking ID
   const trackingValue =
-    normalizeTrackingValue(order.tracking_number) || normalizeTrackingValue(shippingStep.shipmentTrackingNumber);
-  // Only a carrier eBay/the seller actually confirmed — never the guessed carrier
-  // from detectTrackingCarrier() (its patterns are broad and false-positive to
-  // "USPS" often enough that it shouldn't be shown or pushed to eBay as fact).
+    explicitEbayTracking ||
+    aliExpressTracking ||
+    ebayStepTracking ||
+    "";
+
+  const aliExpressCarrier =
+    normalizeTrackingCarrier(order.buy_carrier) ||
+    normalizeTrackingCarrier(raw.buy_carrier) ||
+    "";
+
   const carrierRaw =
-    normalizeTrackingCarrier(order.carrier) || normalizeTrackingCarrier(shippingStep.shippingCarrierCode) || "";
+    normalizeTrackingCarrier(order.carrier) ||
+    aliExpressCarrier ||
+    normalizeTrackingCarrier(shippingStep.shippingCarrierCode) ||
+    detectTrackingCarrier(trackingValue) ||
+    "";
+
+  const trackingParsed = formatTrackingDisplay(trackingValue);
+  const trackingUrl = trackingParsed.url || (trackingValue ? buildCarrierTrackingUrl(trackingValue, carrierRaw) : null);
 
   return {
     id: String(order.id),
@@ -226,6 +254,7 @@ function mapApiOrder(order) {
     shippingPrice: formatMoney(delivery.shippingCost?.value ?? delivery.amount?.value, delivery.shippingCost?.currency ?? currency),
     trackingNumber: trackingValue || "—",
     trackingNumberRaw: trackingValue,
+    trackingUrl,
     carrier: carrierRaw || "—",
     carrierRaw,
     trackingPushed: Boolean(order.tracking_pushed_at),
@@ -273,6 +302,16 @@ function mapApiOrder(order) {
     aliexpressStatusRaw: order.aliexpress_order_status ?? "",
     prepCost: order.prep_cost ?? 0,
     shippingCost: order.shipping_cost ?? 0,
+    siteId: order.connection?.site_id ?? raw.siteId ?? null,
+    raw,
+    connection: order.connection,
+    shippingLabelUrl: order.shipping_label_url ?? raw.shipping_label_url ?? raw.shippingLabelUrl ?? null,
+    shippingLabelGenerated: Boolean(
+      order.shipping_label_generated ||
+      order.shipping_label_url ||
+      raw.shipping_label_url ||
+      raw.shippingLabelUrl
+    ),
   };
 }
 
@@ -579,16 +618,22 @@ function OrdersContent({ searchQuery }) {
 
   const pushTrackingToEbay = async (order) => {
     const isEditing = editingTrackingId === order.id;
-    const tracking = (isEditing ? trackingDraft : order.trackingNumberRaw).trim();
-    const carrier = normalizeTrackingCarrier(isEditing ? carrierDraft : order.carrierRaw);
+    const tracking = (isEditing ? trackingDraft : (order.trackingNumberRaw || "")).trim();
+    let carrier = normalizeTrackingCarrier(isEditing ? carrierDraft : (order.carrierRaw || ""));
 
     if (!tracking) {
-      toast.error("Enter a tracking number first.");
+      startEditTracking(order);
+      toast.info("Please enter a tracking number first.");
       return;
     }
 
     if (!carrier) {
-      toast.error("Select a carrier before pushing to eBay.");
+      carrier = detectTrackingCarrier(tracking) || "";
+    }
+
+    if (!carrier) {
+      startEditTracking(order);
+      toast.info("Please select a carrier before pushing to eBay.");
       return;
     }
 
@@ -724,17 +769,39 @@ function OrdersContent({ searchQuery }) {
     });
 
     return nextOrders.sort((left, right) => {
-      let comparison = 0;
+      let leftVal = left[sortBy];
+      let rightVal = right[sortBy];
 
-      if (sortBy === "total") {
-        comparison = left.totalValue - right.totalValue;
+      if (sortBy === "name") {
+        leftVal = left.title;
+        rightVal = right.title;
+      } else if (sortBy === "total") {
+        leftVal = left.totalValue;
+        rightVal = right.totalValue;
       } else if (sortBy === "profit") {
-        comparison = (left.profitValue ?? Number.NEGATIVE_INFINITY) - (right.profitValue ?? Number.NEGATIVE_INFINITY);
-      } else {
-        comparison = left.date.localeCompare(right.date);
+        leftVal = left.profitValue;
+        rightVal = right.profitValue;
+      } else if (sortBy === "orderDate") {
+        leftVal = left.date;
+        rightVal = right.date;
+      } else if (sortBy === "trackingNumber") {
+        leftVal = left.trackingNumberRaw;
+        rightVal = right.trackingNumberRaw;
+      } else if (sortBy === "carrier") {
+        leftVal = left.carrierRaw;
+        rightVal = right.carrierRaw;
+      } else if (sortBy === "buyer") {
+        leftVal = left.buyer;
+        rightVal = right.buyer;
+      } else if (sortBy === "buyerName") {
+        leftVal = left.buyerName;
+        rightVal = right.buyerName;
+      } else if (sortBy === "orderId") {
+        leftVal = left.orderId;
+        rightVal = right.orderId;
       }
 
-      return sortDirection === "desc" ? -comparison : comparison;
+      return compareGridValues(leftVal, rightVal, sortDirection);
     });
   }, [
     buyerFilter,
@@ -956,6 +1023,56 @@ function OrdersContent({ searchQuery }) {
     }
   };
 
+  const handlePrintShippingLabel = (order) => {
+    if (!order) return;
+
+    const generated = isShippingLabelGenerated(order);
+
+    if (!generated) {
+      const orderKey = order.orderId || order.id;
+      const ebayUrl = getEbayShippingLabelUrl(order.orderId, order.siteId, false);
+
+      if (!ebayUrl) {
+        toast.warn("eBay order ID is missing for this order.");
+        return;
+      }
+
+      try {
+        if (orderKey) {
+          localStorage.setItem(`autods_label_generated_${orderKey}`, "true");
+        }
+        if (order.id) {
+          localStorage.setItem(`autods_label_generated_${order.id}`, "true");
+        }
+      } catch {
+        // ignore localStorage errors
+      }
+
+      setOrders((prev) =>
+        prev.map((item) =>
+          item.id === order.id
+            ? { ...item, shippingLabelGenerated: true }
+            : item
+        )
+      );
+
+      toast.info("Shipping label not yet generated. Redirecting to eBay to purchase and generate label…");
+      window.open(ebayUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (order.shippingLabelUrl && /^https?:\/\//i.test(order.shippingLabelUrl)) {
+      window.open(order.shippingLabelUrl, "_blank", "noopener,noreferrer");
+    } else {
+      const ebayReprintUrl = getEbayShippingLabelUrl(order.orderId, order.siteId, true);
+      if (ebayReprintUrl) {
+        window.open(ebayReprintUrl, "_blank", "noopener,noreferrer");
+      } else {
+        openPrintableDocument("shipping-label", order);
+      }
+    }
+  };
+
   const handleOrderAction = (orderId, action) => {
     const order = orders.find((row) => String(row.id) === String(orderId));
 
@@ -997,7 +1114,7 @@ function OrdersContent({ searchQuery }) {
         openPrintableDocument("barcode", order);
         break;
       case "generate-shipping-label":
-        openPrintableDocument("shipping-label", order);
+        handlePrintShippingLabel(order);
         break;
       default:
         toast.info(`${action} is not available.`);
@@ -1034,32 +1151,37 @@ function OrdersContent({ searchQuery }) {
     </div>
   );
 
-  const renderColumnHeader = (column) => {
-    if (column.sortable) {
-      const isActive = sortBy === "orderDate";
-
-      return (
-        <button
-          type="button"
-          className="orders-sort-btn"
-          onClick={() => {
-            setSortBy("orderDate");
-            setSortDirection((current) => (current === "desc" ? "asc" : "desc"));
-          }}
-        >
-          <span>{column.label}</span>
-          <LuChevronDown
-            className={
-              isActive && sortDirection === "asc"
-                ? "orders-sort-btn__icon orders-sort-btn__icon--asc"
-                : "orders-sort-btn__icon"
-            }
-          />
-        </button>
-      );
+  const handleSort = (columnId) => {
+    if (sortBy === columnId) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(columnId);
+      const isDescDefault = [
+        "orderDate",
+        "paidDate",
+        "shippingDate",
+        "refundDate",
+        "total",
+        "profit",
+        "refundTotal",
+        "totalQuantity",
+        "prepCost",
+        "shippingCost",
+      ].includes(columnId);
+      setSortDirection(isDescDefault ? "desc" : "asc");
     }
+  };
 
-    return column.label;
+  const renderColumnHeader = (column) => {
+    return (
+      <GridSortHeader
+        columnId={column.id}
+        label={column.label}
+        sortBy={sortBy}
+        sortDirection={sortDirection}
+        onSort={handleSort}
+      />
+    );
   };
 
   const renderOrderCell = (order, columnId, meta, StatusIcon) => {
@@ -1232,19 +1354,14 @@ function OrdersContent({ searchQuery }) {
       case "profit":
         return <span className="orders-table__profit">{order.profit}</span>;
       case "trackingNumber":
-        return (
-          <div className="orders-tracking-combined">
-            {renderFulfillmentCell(order, "aliexpressOrderId")}
-            {renderTrackingEditor(order)}
-          </div>
-        );
+        return renderTrackingEditor(order);
+      case "aliexpressOrderId":
       case "aliexpressStatus":
       case "prepCost":
       case "shippingCost":
         return renderFulfillmentCell(order, columnId);
       case "invoice":
       case "packingSlip":
-      case "shippingLabel":
         return (
           <button
             type="button"
@@ -1254,6 +1371,42 @@ function OrdersContent({ searchQuery }) {
             Print
           </button>
         );
+      case "shippingLabel": {
+        const generated = isShippingLabelGenerated(order);
+        return generated ? (
+          <div className="orders-shipping-label-cell">
+            <button
+              type="button"
+              className="orders-details__link"
+              title="Print generated shipping label"
+              onClick={() => handlePrintShippingLabel(order)}
+            >
+              Print
+            </button>
+            <button
+              type="button"
+              className="orders-shipping-label-ebay-link"
+              title="View / reprint label on eBay"
+              onClick={() => {
+                const url = getEbayShippingLabelUrl(order.orderId, order.siteId, true);
+                if (url) window.open(url, "_blank", "noopener,noreferrer");
+              }}
+            >
+              eBay
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="orders-details__link orders-shipping-label-btn--ebay"
+            title="Shipping label not generated yet. Click to redirect to eBay."
+            onClick={() => handlePrintShippingLabel(order)}
+          >
+            <span>Generate on eBay</span>
+            <LuExternalLink style={{ fontSize: "11px", marginLeft: "2px" }} />
+          </button>
+        );
+      }
       default:
         return order[columnId] ?? "—";
     }
@@ -1285,6 +1438,25 @@ function OrdersContent({ searchQuery }) {
 
   const handleBulkPrint = (docType) => {
     if (!selectedOrders.length) return;
+    if (docType === "shipping-label") {
+      const generatedList = selectedOrders.filter(isShippingLabelGenerated);
+      const ungeneratedList = selectedOrders.filter((o) => !isShippingLabelGenerated(o));
+      if (!generatedList.length) {
+        toast.info("Selected orders do not have generated shipping labels yet. Redirecting to eBay…");
+        ungeneratedList.forEach((order) => {
+          const url = getEbayShippingLabelUrl(order.orderId, order.siteId, false);
+          if (url) window.open(url, "_blank", "noopener,noreferrer");
+        });
+        setOpenPrintMenu(false);
+        return;
+      }
+      if (ungeneratedList.length > 0) {
+        toast.info(`Printing ${generatedList.length} generated label(s). ${ungeneratedList.length} order(s) not yet generated on eBay.`);
+      }
+      openPrintableDocument(docType, generatedList);
+      setOpenPrintMenu(false);
+      return;
+    }
     openPrintableDocument(docType, selectedOrders);
     setOpenPrintMenu(false);
   };
@@ -1575,7 +1747,8 @@ function OrdersContent({ searchQuery }) {
                     key={column.id}
                     className="orders-table__col"
                     data-column={column.id}
-                    style={{ minWidth: column.minWidth, width: column.minWidth }}
+                    style={{ minWidth: column.minWidth, width: column.minWidth, cursor: "pointer" }}
+                    onClick={() => handleSort(column.id)}
                   >
                     {renderColumnHeader(column)}
                   </th>
@@ -1713,10 +1886,18 @@ function OrdersContent({ searchQuery }) {
           <div className="orders-table-footer__meta">
             <label>
               <span>Show</span>
-              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
-                <option value={10}>10</option>
+              <select
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setCurrentPage(1);
+                }}
+              >
                 <option value={20}>20</option>
-                <option value={30}>30</option>
+                <option value={40}>40</option>
+                <option value={60}>60</option>
+                <option value={120}>120</option>
+                <option value={240}>240</option>
               </select>
             </label>
             <span>Orders out of {orders.length}</span>

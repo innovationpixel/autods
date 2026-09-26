@@ -16,13 +16,10 @@ export default function OrdersTrackingEditor({
   onSave,
   onPushToEbay,
 }) {
-  const detectedCarrier = detectTrackingCarrier(trackingDraft);
-  const resolvedCarrier = carrierDraft || order.carrierRaw || "";
-  const canPush = Boolean(order.trackingNumberRaw?.trim() && resolvedCarrier);
-  // Only show a carrier once there's an actual tracking number to go with it —
-  // eBay's shippingCarrierCode can be populated (an "expected" shipping service)
-  // before anything has really shipped, which isn't a fact worth displaying yet.
-  const carrierLabel = order.trackingNumberRaw && order.carrierRaw ? order.carrierRaw : "";
+  const currentTracking = isEditing ? trackingDraft : (order.trackingNumberRaw || "");
+  const detectedCarrier = detectTrackingCarrier(currentTracking);
+  const resolvedCarrier = (isEditing ? carrierDraft : "") || order.carrierRaw || detectedCarrier || "";
+  const carrierLabel = order.trackingNumberRaw ? (order.carrierRaw || detectedCarrier || "") : "";
 
   useEffect(() => {
     if (!isEditing) {
@@ -39,31 +36,64 @@ export default function OrdersTrackingEditor({
 
   const trigger = (
     <div className="orders-tracking-display">
-      <button type="button" className="products-tracking-btn" onClick={() => onStartEdit(order)} title="Edit tracking">
-        <span className="orders-tracking-display__copy">
-          <span className={order.trackingNumberRaw ? "orders-table__mono" : "products-tracking-btn__placeholder"}>
-            {order.trackingNumberRaw || "Add tracking"}
-          </span>
-          {carrierLabel ? <span className="orders-table__carrier">{carrierLabel}</span> : null}
-          {order.trackingPushed ? <span className="orders-tracking-display__badge">On eBay</span> : null}
-        </span>
-        <LuPencil className="products-tracking-btn__icon" />
-      </button>
-      {order.trackingNumberRaw && !order.trackingPushed ? (
+      <div className="orders-tracking-display__copy">
+        {order.trackingUrl && order.trackingNumberRaw ? (
+          <a
+            href={order.trackingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="orders-order-id-link orders-table__mono"
+            title={`Track shipment: ${order.trackingNumberRaw}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <strong>{order.trackingNumberRaw}</strong>
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="products-tracking-btn"
+            onClick={() => onStartEdit(order)}
+            title="Edit tracking"
+          >
+            <span className={order.trackingNumberRaw ? "orders-table__mono" : "products-tracking-btn__placeholder"}>
+              {order.trackingNumberRaw || "Add tracking"}
+            </span>
+          </button>
+        )}
+
+        {carrierLabel ? <span className="orders-table__carrier">{carrierLabel}</span> : null}
+        {order.trackingPushed ? <span className="orders-tracking-display__badge">On eBay</span> : null}
+
         <button
           type="button"
-          className="orders-tracking-display__push"
-          onClick={(event) => {
-            event.stopPropagation();
-            onPushToEbay(order);
-          }}
-          disabled={pushing || !canPush}
-          title={canPush ? "Push tracking to eBay" : "Set a carrier before pushing to eBay"}
+          className="products-source-cell__edit"
+          onClick={() => onStartEdit(order)}
+          title="Edit tracking"
+          aria-label="Edit tracking"
         >
-          {pushing ? <LuLoader className="orders-tracking-panel__spin" /> : <LuUpload />}
-          <span>Push to eBay</span>
+          <LuPencil />
         </button>
-      ) : null}
+      </div>
+
+      <button
+        type="button"
+        className={`orders-tracking-display__push ${order.trackingPushed ? "orders-tracking-display__push--pushed" : ""}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onPushToEbay(order);
+        }}
+        disabled={pushing}
+        title={
+          order.trackingPushed
+            ? "Tracking already on eBay — click to re-push tracking"
+            : order.trackingNumberRaw
+              ? "Push tracking number to eBay"
+              : "Add tracking number and push to eBay"
+        }
+      >
+        {pushing ? <LuLoader className="orders-tracking-panel__spin" /> : <LuUpload />}
+        <span>{order.trackingPushed ? "Re-push to eBay" : "Push to eBay"}</span>
+      </button>
     </div>
   );
 
@@ -146,7 +176,7 @@ export default function OrdersTrackingEditor({
               type="button"
               className="quick-edit-modal__btn orders-tracking-modal__push"
               onClick={() => onPushToEbay(order)}
-              disabled={saving || pushing || !trackingDraft.trim() || !resolvedCarrier}
+              disabled={saving || pushing || !trackingDraft.trim()}
               title="Save and push tracking to eBay"
             >
               {pushing ? <LuLoader className="spin-icon" /> : <LuUpload />}

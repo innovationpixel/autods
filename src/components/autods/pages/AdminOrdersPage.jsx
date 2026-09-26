@@ -8,6 +8,7 @@ import { getAdminOrders } from "../../../services/AdminService";
 import { EBAY_MARKETPLACES } from "../ConnectEbayModal";
 import { orderStatusOptions } from "../constants";
 import AdminSortableHeader from "../AdminSortableHeader";
+import AdminPagination from "../AdminPagination";
 
 function formatDate(value) {
   if (!value) return "—";
@@ -41,6 +42,7 @@ function AdminOrdersPage() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState("order_date");
   const [sortDir, setSortDir] = useState("desc");
 
@@ -62,7 +64,7 @@ function AdminOrdersPage() {
     setLoading(true);
     getAdminOrders({
       page,
-      per_page: 20,
+      per_page: perPage,
       sort,
       sort_dir: sortDir,
       q: q.trim() || undefined,
@@ -83,7 +85,7 @@ function AdminOrdersPage() {
       })
       .catch(() => toast.error("Failed to load orders."))
       .finally(() => setLoading(false));
-  }, [page, sort, sortDir, q, userSearch, marketplace, status, processingStatus, fromDate, toDate]);
+  }, [page, perPage, sort, sortDir, q, userSearch, marketplace, status, processingStatus, fromDate, toDate]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -188,9 +190,9 @@ function AdminOrdersPage() {
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Order</th>
-                <th>User</th>
-                <th>Marketplace</th>
+                <AdminSortableHeader label="Order" sortKey="ebay_order_id" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="User" sortKey="user" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Marketplace" sortKey="marketplace" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Buyer" sortKey="buyer_name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Date" sortKey="order_date" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Sell Price" sortKey="sell_price" sort={sort} sortDir={sortDir} onSort={handleSort} />
@@ -232,13 +234,15 @@ function AdminOrdersPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="orders"
+      />
     </section>
   );
 }

@@ -13,6 +13,7 @@ import {
 import AuthenticatedImage from "../AuthenticatedImage";
 import ConfirmModal from "../ConfirmModal";
 import QuickEditModal from "../QuickEditModal";
+import AdminPagination from "../AdminPagination";
 
 function formatMoney(value, currency = "USD") {
   try {
@@ -43,6 +44,7 @@ function AdminWalletDepositsPage() {
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [status, setStatus] = useState("pending");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
   const [approveTarget, setApproveTarget] = useState(null);
   const [approving, setApproving] = useState(false);
@@ -58,7 +60,7 @@ function AdminWalletDepositsPage() {
 
   const loadDeposits = useCallback(() => {
     setLoading(true);
-    getAdminWalletDeposits({ page, per_page: 20, status })
+    getAdminWalletDeposits({ page, per_page: perPage, status })
       .then((res) => {
         setDeposits(res.data?.data ?? []);
         setMeta({
@@ -69,7 +71,7 @@ function AdminWalletDepositsPage() {
       })
       .catch(() => toast.error("Failed to load wire transfer deposits."))
       .finally(() => setLoading(false));
-  }, [page, status]);
+  }, [page, perPage, status]);
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -207,13 +209,15 @@ function AdminWalletDepositsPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="deposits"
+      />
 
       <ConfirmModal
         open={Boolean(approveTarget)}

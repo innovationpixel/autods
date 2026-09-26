@@ -1,6 +1,7 @@
 export const PRODUCT_COLUMN_STORAGE_KEY = "autods_products_visible_columns_v1";
 
 const COLUMN_MIN_WIDTHS = {
+  actions: 78,
   name: 280,
   uploaded: 118,
   store: 120,
@@ -18,15 +19,17 @@ const COLUMN_MIN_WIDTHS = {
   views: 80,
   watchers: 90,
   daysLeft: 100,
+  timeLeft: 100,
+  time_left: 100,
   warnings: 48,
 };
 
 export const PRODUCT_TABLE_FIXED_WIDTH = {
   checkbox: 48,
-  actions: 88,
 };
 
 export const productTableColumns = [
+  { id: "actions", label: "Actions", defaultVisible: true, manage: true },
   { id: "name", label: "Name", defaultVisible: true, manage: true },
   { id: "uploaded", label: "Uploaded", defaultVisible: true, manage: true, sortable: true },
   { id: "store", label: "Store", defaultVisible: true, manage: true },
@@ -43,7 +46,7 @@ export const productTableColumns = [
   { id: "asin", label: "ASIN", defaultVisible: true, manage: true },
   { id: "views", label: "Views", defaultVisible: true, manage: true },
   { id: "watchers", label: "Watchers", defaultVisible: true, manage: true },
-  { id: "daysLeft", label: "Days Left", defaultVisible: true, manage: true },
+  { id: "daysLeft", label: "Time Left", defaultVisible: true, manage: true, sortable: true },
   { id: "warnings", label: "Warnings", defaultVisible: true, manage: true },
 ].map((column) => ({
   ...column,
@@ -52,7 +55,7 @@ export const productTableColumns = [
 
 export const manageableProductColumns = productTableColumns.filter((column) => column.manage);
 
-export const PRODUCT_GRID_COLUMN_COUNT = manageableProductColumns.length + 2;
+export const PRODUCT_GRID_COLUMN_COUNT = manageableProductColumns.length + 1;
 
 export function defaultVisibleProductColumnIds() {
   return manageableProductColumns.filter((column) => column.defaultVisible).map((column) => column.id);
@@ -71,7 +74,30 @@ export function loadVisibleProductColumnIds() {
     }
 
     const allowed = new Set(manageableProductColumns.map((column) => column.id));
-    const filtered = parsed.filter((id) => allowed.has(id));
+    allowed.add("timeLeft");
+    allowed.add("time_left");
+    const filtered = parsed.filter((id) => allowed.has(id)).map((id) => (id === "timeLeft" || id === "time_left" ? "daysLeft" : id));
+
+    // Ensure actions column is present at the start
+    if (!filtered.includes("actions")) {
+      filtered.unshift("actions");
+    }
+
+    // Ensure Time Left column is always present for the user
+    if (!filtered.includes("daysLeft")) {
+      const watchersIdx = filtered.indexOf("watchers");
+      if (watchersIdx !== -1) {
+        filtered.splice(watchersIdx + 1, 0, "daysLeft");
+      } else {
+        const warningsIdx = filtered.indexOf("warnings");
+        if (warningsIdx !== -1) {
+          filtered.splice(warningsIdx, 0, "daysLeft");
+        } else {
+          filtered.push("daysLeft");
+        }
+      }
+    }
+
     return filtered.length ? filtered : defaultVisibleProductColumnIds();
   } catch {
     return defaultVisibleProductColumnIds();
@@ -87,6 +113,9 @@ export function allManageableProductColumnIds() {
 }
 
 export function getProductColumnById(id) {
+  if (id === "timeLeft" || id === "time_left") {
+    return productTableColumns.find((column) => column.id === "daysLeft");
+  }
   return productTableColumns.find((column) => column.id === id);
 }
 
@@ -100,5 +129,5 @@ export function getVisibleProductTableMinWidth(visibleColumnIds) {
     0,
   );
 
-  return PRODUCT_TABLE_FIXED_WIDTH.checkbox + columnsWidth + PRODUCT_TABLE_FIXED_WIDTH.actions;
+  return PRODUCT_TABLE_FIXED_WIDTH.checkbox + columnsWidth;
 }

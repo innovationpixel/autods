@@ -13,6 +13,7 @@ import {
   updateAdminUser,
 } from "../../../services/AdminService";
 import AdminSortableHeader from "../AdminSortableHeader";
+import AdminPagination from "../AdminPagination";
 
 const emptyClientForm = {
   name: "",
@@ -61,6 +62,7 @@ function AdminClientsPage() {
   const [sort, setSort] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyClientForm);
@@ -79,7 +81,7 @@ function AdminClientsPage() {
     setLoading(true);
     getAdminUsers({
       page,
-      per_page: 15,
+      per_page: perPage,
       search: search.trim() || undefined,
       role: "client",
       is_active: statusFilter || undefined,
@@ -97,7 +99,7 @@ function AdminClientsPage() {
       })
       .catch(() => toast.error("Failed to load clients."))
       .finally(() => setLoading(false));
-  }, [page, search, statusFilter, planFilter, sort, sortDir]);
+  }, [page, perPage, search, statusFilter, planFilter, sort, sortDir]);
 
   const handleSort = (key, dir) => {
     setSort(key);
@@ -265,10 +267,10 @@ function AdminClientsPage() {
             <thead>
               <tr>
                 <AdminSortableHeader label="Client" sortKey="name" sort={sort} sortDir={sortDir} onSort={handleSort} />
-                <th>Plan</th>
+                <AdminSortableHeader label="Plan" sortKey="plan" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Wallet" sortKey="wallet_balance" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Activity" sortKey="orders_count" sort={sort} sortDir={sortDir} onSort={handleSort} />
-                <th>Status</th>
+                <AdminSortableHeader label="Status" sortKey="status" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Joined" sortKey="created_at" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th aria-label="Actions" />
               </tr>
@@ -323,13 +325,15 @@ function AdminClientsPage() {
         </div>
       )}
 
-      {meta.last_page > 1 ? (
-        <div className="admin-page__pagination">
-          <button type="button" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-          <span>Page {meta.current_page} of {meta.last_page}</span>
-          <button type="button" disabled={page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Next</button>
-        </div>
-      ) : null}
+      <AdminPagination
+        currentPage={meta.current_page || page}
+        lastPage={meta.last_page || 1}
+        total={meta.total}
+        perPage={perPage}
+        onPageChange={setPage}
+        onPerPageChange={setPerPage}
+        entityName="clients"
+      />
 
       {modalOpen ? (
         <div className="orders-modal">
