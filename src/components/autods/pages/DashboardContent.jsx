@@ -7,6 +7,8 @@ import {
   LuChevronDown,
   LuChevronRight,
   LuCircleCheck,
+  LuEye,
+  LuGavel,
   LuHeart,
   LuMail,
   LuRefreshCw,
@@ -16,10 +18,8 @@ import {
   LuUser,
   LuWalletCards,
   LuZap,
-  LuGavel,
 } from "react-icons/lu";
 
-import { dashboardMetricCards } from "../constants";
 import { selectUser } from "../../../store/selectors/AuthSelectors";
 import { getDashboardSummary } from "../../../services/DashboardService";
 
@@ -247,24 +247,6 @@ function DashboardContent({ searchQuery }) {
   );
 
   /* =======================================================
-     SEARCH
-     ======================================================= */
-
-  const visibleMetrics = useMemo(() => {
-    const query = searchQuery?.trim().toLowerCase();
-
-    if (!query) {
-      return dashboardMetricCards;
-    }
-
-    return dashboardMetricCards.filter(
-      (item) =>
-        item.label?.toLowerCase().includes(query) ||
-        item.value?.toString().toLowerCase().includes(query),
-    );
-  }, [searchQuery]);
-
-  /* =======================================================
      NAVIGATION
      ======================================================= */
 
@@ -275,34 +257,69 @@ function DashboardContent({ searchQuery }) {
   };
 
   /* =======================================================
-     KPI DATA
+     DYNAMIC KPI CARDS
      ======================================================= */
 
-  const kpiValues = [
-    formatMoney(kpis.profit.value),
-    formatMoney(kpis.revenue.value),
-    formatNumber(kpis.orders.value),
-    formatNumber(kpis.listings.value),
-    formatNumber(kpis.views.value),
-  ];
+  const dynamicKpiCards = useMemo(() => [
+    {
+      id: "profit",
+      label: "Total Profit",
+      value: formatMoney(kpis.profit?.value ?? 0),
+      growth: kpis.profit?.growth ?? 0,
+      percentage: formatGrowth(kpis.profit?.growth ?? 0),
+      icon: LuWalletCards,
+    },
+    {
+      id: "revenue",
+      label: "Total Revenue",
+      value: formatMoney(kpis.revenue?.value ?? 0),
+      growth: kpis.revenue?.growth ?? 0,
+      percentage: formatGrowth(kpis.revenue?.growth ?? 0),
+      icon: LuTrendingUp,
+    },
+    {
+      id: "orders",
+      label: "Total Orders",
+      value: formatNumber(kpis.orders?.value ?? 0),
+      growth: kpis.orders?.growth ?? 0,
+      percentage: formatGrowth(kpis.orders?.growth ?? 0),
+      icon: LuShoppingCart,
+    },
+    {
+      id: "listings",
+      label: "Active Listings",
+      value: formatNumber(kpis.listings?.value ?? 0),
+      growth: kpis.listings?.growth ?? 0,
+      percentage: formatGrowth(kpis.listings?.growth ?? 0),
+      icon: LuTag,
+    },
+    {
+      id: "views",
+      label: "Views",
+      value: formatNumber(kpis.views?.value ?? 0),
+      growth: kpis.views?.growth ?? 0,
+      percentage: formatGrowth(kpis.views?.growth ?? 0),
+      icon: LuEye,
+    },
+  ], [kpis]);
 
-  const kpiLabels = [
-    "Total Profit",
-    "Total Revenue",
-    "Total Orders",
-    "Active Listings",
-    "Views",
-  ];
+  /* =======================================================
+     SEARCH
+     ======================================================= */
 
-  const kpiGrowths = [
-    kpis.profit.growth,
-    kpis.revenue.growth,
-    kpis.orders.growth,
-    kpis.listings.growth,
-    kpis.views.growth,
-  ];
+  const visibleMetrics = useMemo(() => {
+    const query = searchQuery?.trim().toLowerCase();
 
-  const kpiPercentages = kpiGrowths.map(formatGrowth);
+    if (!query) {
+      return dynamicKpiCards;
+    }
+
+    return dynamicKpiCards.filter(
+      (item) =>
+        item.label.toLowerCase().includes(query) ||
+        item.value.toString().toLowerCase().includes(query),
+    );
+  }, [dynamicKpiCards, searchQuery]);
 
   /* =======================================================
      CHART POINTS
@@ -354,6 +371,7 @@ function DashboardContent({ searchQuery }) {
     title: activity.title,
     text: activity.text,
     time: timeAgo(activity.time),
+    type: activity.type,
   }));
 
   /* =======================================================
@@ -362,13 +380,13 @@ function DashboardContent({ searchQuery }) {
 
   const store = summary?.store ?? {};
   const storeRows = [
-    ["Account Status", store.account_status ?? "—", LuGavel],
-    ["Marketplace", store.marketplace ?? "—", LuShoppingCart],
-    ["eBay Username", store.username ?? "—", LuUser],
-    ["Total Listings", formatNumber(store.total_listings), LuTag],
-    ["Active Listings", formatNumber(store.active_listings), LuHeart],
-    ["Total Orders", formatNumber(store.total_orders), LuMail],
-    ["Member Since", store.member_since ?? "—", LuCalendarDays],
+    ["Account Status", store.account_status ?? "—", LuGavel, "settings"],
+    ["Marketplace", store.marketplace ?? "—", LuShoppingCart, "settings"],
+    ["eBay Username", store.username ?? "—", LuUser, "settings"],
+    ["Total Listings", formatNumber(store.total_listings), LuTag, "products"],
+    ["Active Listings", formatNumber(store.active_listings), LuHeart, "products"],
+    ["Total Orders", formatNumber(store.total_orders), LuMail, "orders"],
+    ["Member Since", store.member_since ?? "—", LuCalendarDays, "settings"],
   ];
 
   const firstName = (user?.name ?? "").trim().split(/\s+/)[0] || "there";
@@ -423,20 +441,20 @@ function DashboardContent({ searchQuery }) {
 
                 <span className="ebay-kpi-card__trend">
                   <LuTrendingUp />
-                  {summaryLoading ? "…" : kpiPercentages[index]}
+                  {summaryLoading ? "…" : item.percentage}
                 </span>
               </div>
 
               <div className="ebay-kpi-card__label">
-                {kpiLabels[index] || item.label}
+                {item.label}
               </div>
 
               <div className="ebay-kpi-card__value">
-                {summaryLoading ? "…" : kpiValues[index] || item.value}
+                {summaryLoading ? "…" : item.value}
               </div>
 
               <span className="ebay-kpi-card__period">
-                {summaryLoading ? "" : `${kpiGrowths[index] >= 0 ? "↑" : "↓"} ${kpiPercentages[index]} ${selectedDashboardFilter?.comparison ?? ""}`}
+                {summaryLoading ? "" : `${item.growth >= 0 ? "↑" : "↓"} ${item.percentage} ${selectedDashboardFilter?.comparison ?? ""}`}
               </span>
             </article>
           );
@@ -463,7 +481,7 @@ function DashboardContent({ searchQuery }) {
             faster with AutoDropship.
           </p>
 
-          <button type="button" onClick={() => openPage("premium")}>
+          <button type="button" onClick={() => openPage("plans")}>
             Upgrade to Pro
             <LuChevronRight />
           </button>
@@ -644,8 +662,13 @@ function DashboardContent({ searchQuery }) {
           </div>
 
           <div className="ebay-status-list">
-            {storeRows.map(([label, value, Icon]) => (
-              <div className="ebay-status-row" key={label}>
+            {storeRows.map(([label, value, Icon, targetPage]) => (
+              <div
+                className="ebay-status-row"
+                key={label}
+                onClick={() => openPage(targetPage)}
+                style={{ cursor: "pointer" }}
+              >
                 <div className="ebay-status-row__label">
                   <span>
                     <Icon />
@@ -708,11 +731,20 @@ function DashboardContent({ searchQuery }) {
               </div>
             ) : (
               orders.map((order) => (
-                <div className="ebay-order-row" key={order.id}>
+                <div
+                  className="ebay-order-row"
+                  key={order.id}
+                  onClick={() => openPage("orders")}
+                  style={{ cursor: "pointer" }}
+                >
                   <span className="ebay-order-id">{order.orderId ? `#${order.orderId}` : `#${order.id}`}</span>
 
                   <div className="ebay-order-product">
-                    <img src={order.image || PLACEHOLDER_IMAGE} alt={order.product} />
+                    <img
+                      src={order.image || PLACEHOLDER_IMAGE}
+                      alt={order.product}
+                      onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+                    />
 
                     <span>{order.product}</span>
                   </div>
@@ -729,7 +761,14 @@ function DashboardContent({ searchQuery }) {
 
                   <span>{order.date}</span>
 
-                  <button type="button" className="ebay-more-button">
+                  <button
+                    type="button"
+                    className="ebay-more-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPage("orders");
+                    }}
+                  >
                     •••
                   </button>
                 </div>
@@ -764,10 +803,19 @@ function DashboardContent({ searchQuery }) {
               </div>
             ) : (
               topProducts.map((product, index) => (
-                <div className="ebay-product-row" key={`${product.name}-${index}`}>
+                <div
+                  className="ebay-product-row"
+                  key={`${product.name}-${index}`}
+                  onClick={() => openPage("products")}
+                  style={{ cursor: "pointer" }}
+                >
                   <span className="ebay-product-rank">{index + 1}</span>
 
-                  <img src={product.image} alt={product.name} />
+                  <img
+                    src={product.image || PLACEHOLDER_IMAGE}
+                    alt={product.name}
+                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+                  />
 
                   <div className="ebay-product-info">
                     <strong>{product.name}</strong>
@@ -819,7 +867,12 @@ function DashboardContent({ searchQuery }) {
                 const Icon = activity.icon;
 
                 return (
-                  <div className="ebay-activity-row" key={`${activity.title}-${index}`}>
+                  <div
+                    className="ebay-activity-row"
+                    key={`${activity.title}-${index}`}
+                    onClick={() => openPage(activity.type === "order" ? "orders" : "products")}
+                    style={{ cursor: "pointer" }}
+                  >
                     <span className="ebay-activity-icon">
                       <Icon />
                     </span>
@@ -843,3 +896,4 @@ function DashboardContent({ searchQuery }) {
 }
 
 export default DashboardContent;
+
