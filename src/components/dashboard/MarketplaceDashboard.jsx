@@ -87,11 +87,22 @@ import { fetchEbayStatus, disconnectEbayAction, fetchEbayDrafts, fetchEbayListin
 import { selectEbayConnections, selectEbayConnectionsLoading, selectEbayListingsMeta, selectEbayDraftsMeta } from '../../store/selectors/EbaySelectors';
 import { selectUser } from '../../store/selectors/AuthSelectors';
 import { getUserEmail, getUserFullName, getUserShortName } from '../../utils/userDisplay';
-import { getEbayAuthUrl } from '../../services/EbayService';
+import { getEbayAuthUrl, updateEbayStoreName } from '../../services/EbayService';
 import {
   mapEbayConnectionToStore,
   parseEbayConnectionId,
 } from '../../utils/ebayStore';
+
+const STORE_OVERRIDES_STORAGE_KEY = 'autods_store_overrides_v1';
+
+function loadStoredStoreOverrides() {
+  try {
+    const raw = localStorage.getItem(STORE_OVERRIDES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
 import { logoutAction } from '../../store/actions/AuthActions';
 import { getAccountAlert } from '../../services/BillingService';
@@ -167,7 +178,7 @@ const MarketplaceDashboard = () => {
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
   const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
   const [ebayConnecting, setEbayConnecting] = useState(false);
-  const [storeOverrides, setStoreOverrides] = useState({});
+  const [storeOverrides, setStoreOverrides] = useState(loadStoredStoreOverrides);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const activePage = pathname === "/" ? "dashboard" : pathname.slice(1);
@@ -978,23 +989,38 @@ const MarketplaceDashboard = () => {
     setStoreRenameValue(nextStore.sidebarName);
   };
 
-  const saveStoreRename = (storeId) => {
+  const saveStoreRename = async (storeId) => {
     const nextName = storeRenameValue.trim();
 
     if (!nextName) {
       return;
     }
 
-    setStoreOverrides((current) => ({
-      ...current,
+    const nextOverrides = {
+      ...storeOverrides,
       [storeId]: {
-        ...current[storeId],
+        ...(storeOverrides[storeId] ?? {}),
         name: nextName,
         sidebarName: nextName,
+        storeName: nextName,
       },
-    }));
+    };
+
+    setStoreOverrides(nextOverrides);
+    try {
+      localStorage.setItem(STORE_OVERRIDES_STORAGE_KEY, JSON.stringify(nextOverrides));
+    } catch {}
+
     setRenamingStoreId("");
     setStoreRenameValue("");
+
+    const connId = parseEbayConnectionId(storeId);
+    if (connId) {
+      try {
+        await updateEbayStoreName(connId, nextName);
+        dispatch(fetchEbayStatus());
+      } catch {}
+    }
   };
 
   const handleStoreSwitcherAction = (actionId, storeId) => {

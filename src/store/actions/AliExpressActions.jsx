@@ -15,8 +15,12 @@ import {
 const handleAliError = (err) => {
     const data = err.response?.data ?? {};
     const platformUnavailable = Boolean(data.platform_unavailable ?? data.requires_auth);
+    let errorMsg = data.error ?? 'Products Load failed';
+    if (typeof errorMsg === 'string' && errorMsg.toLowerCase().includes('aliexpress authorization failed')) {
+        errorMsg = 'Products Load failed';
+    }
     return {
-        error: data.error ?? 'AliExpress request failed.',
+        error: errorMsg,
         requires_auth: platformUnavailable,
         credentials_missing: data.credentials_missing ?? false,
     };

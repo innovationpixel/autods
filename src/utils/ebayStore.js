@@ -61,22 +61,28 @@ export function parseEbayConnectionId(storeId) {
 
 /** Build a store-switcher row from a backend eBay connection. */
 export function mapEbayConnectionToStore(connection) {
-  const username = connection.ebay_username ?? '';
+  const rawUsername = String(connection.ebay_username ?? connection.store_name ?? connection.name ?? '').trim();
+  // Filter out site identifiers like "EBAY_US", "EBAY US", "EBAY" so they aren't used as the store name
+  const isSitePlaceholder = !rawUsername || /^ebay[\s_-]*(us|uk|gb|au|de|ca|fr|it|es)?$/i.test(rawUsername);
   const siteId = connection.site_id ?? 'EBAY_US';
   const siteDisplay = ebaySiteToDisplayLabel(siteId);
-  const name = username
-    ? username.toLowerCase().replace(/\s+/g, '-')
-    : siteDisplay.toLowerCase().replace(/\s+/g, '-');
+
+  const storeName = !isSitePlaceholder
+    ? rawUsername
+    : 'eBay Store';
+
+  const name = storeName.toLowerCase().replace(/\s+/g, '-');
 
   return {
     id: ebayConnectionId(connection.id),
     connectionId: connection.id,
     name,
-    sidebarName: truncateStoreLabel(username || siteDisplay, 18),
+    storeName,
+    sidebarName: truncateStoreLabel(storeName, 22),
     platformLabel: 'Platform',
     platformDisplay: 'EBAY',
     siteDisplay,
-    initials: username ? storeInitialsFromName(username) : ebaySiteToCountry(siteId) || 'EB',
+    initials: storeInitialsFromName(storeName),
     country: ebaySiteToCountry(siteId),
     marketplace: 'eBay',
     siteId,

@@ -2887,14 +2887,32 @@
 
 .marketplace-sidebar__nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 6px 0 14px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) rgba(255, 255, 255, 0.04);
 }
 
-.marketplace-sidebar__nav::-webkit-scrollbar,
+.marketplace-sidebar__nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.marketplace-sidebar__nav::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.marketplace-sidebar__nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+
+.marketplace-sidebar__nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
 .marketplace-carousel__track::-webkit-scrollbar {
   width: 0;
   height: 0;

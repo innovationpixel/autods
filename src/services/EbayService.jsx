@@ -30,6 +30,10 @@ export const setEbayPrimary = (id) =>
 export const setEbayConnectionMarketplace = (id, siteId) =>
     axiosInstance.patch(`/ebay/connections/${id}/marketplace`, { site_id: siteId });
 
+// Update store name for a connection
+export const updateEbayStoreName = (id, name) =>
+    axiosInstance.patch(`/ebay/connections/${id}/name`, { name });
+
 // Sync listings for a specific connection
 export const syncEbayListings = (id) =>
     axiosInstance.post(`/ebay/connections/${id}/sync`);

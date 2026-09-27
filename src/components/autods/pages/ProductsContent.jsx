@@ -263,6 +263,25 @@ function ProductsContent({ searchQuery }) {
   const [showStickyScroll, setShowStickyScroll] = useState(false);
   const [stickyScrollStyle, setStickyScrollStyle] = useState({});
 
+  const visibleColumns = useMemo(
+    () => resolveVisibleProductColumns(visibleColumnIds),
+    [visibleColumnIds],
+  );
+
+  const visibleStockColumns = useMemo(
+    () => visibleColumns.filter((column) => column.group === "stock"),
+    [visibleColumns],
+  );
+
+  const hasStockGroup = visibleStockColumns.length > 0;
+  const tableColumnCount = visibleColumns.length + 1;
+  const tableMinWidth = useMemo(() => getVisibleProductTableMinWidth(visibleColumnIds), [visibleColumnIds]);
+
+  const handleVisibleColumnsChange = (nextIds) => {
+    setVisibleColumnIds(nextIds);
+    saveVisibleProductColumnIds(nextIds);
+  };
+
   const syncScroll = (source) => {
     if (!source || isSyncingScroll.current) return;
     isSyncingScroll.current = true;
@@ -330,25 +349,6 @@ function ProductsContent({ searchQuery }) {
       node.removeEventListener("wheel", handleWheel);
     };
   }, []);
-
-  const visibleColumns = useMemo(
-    () => resolveVisibleProductColumns(visibleColumnIds),
-    [visibleColumnIds],
-  );
-
-  const visibleStockColumns = useMemo(
-    () => visibleColumns.filter((column) => column.group === "stock"),
-    [visibleColumns],
-  );
-
-  const hasStockGroup = visibleStockColumns.length > 0;
-  const tableColumnCount = visibleColumns.length + 1;
-  const tableMinWidth = useMemo(() => getVisibleProductTableMinWidth(visibleColumnIds), [visibleColumnIds]);
-
-  const handleVisibleColumnsChange = (nextIds) => {
-    setVisibleColumnIds(nextIds);
-    saveVisibleProductColumnIds(nextIds);
-  };
 
   const clearProductFilters = () => {
     setFilterStatus("Active");
