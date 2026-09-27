@@ -8,14 +8,19 @@ import {
   LuArrowUp,
   LuArrowUpLeft,
   LuArrowUpRight,
+  LuChevronDown,
   LuCircleDot,
+  LuCloudUpload,
   LuDownload,
   LuFilm,
   LuImage,
+  LuLink,
   LuLoader,
   LuMic,
+  LuMinus,
+  LuPlus,
   LuSparkles,
-  LuStamp,
+  LuTrash2,
   LuType,
   LuUpload,
   LuVideo,
@@ -24,13 +29,25 @@ import {
 import { toast } from "../../../utils/toast";
 import { generateAiImage, generateAiVideo } from "../../../services/AiGenerationService";
 
-const IMAGE_RATIOS = ["1:1", "4:5", "16:9", "9:16"];
+const MAX_INPUT_IMAGES = 20;
+const MAX_PROMPTS = 6;
+
 const VIDEO_RATIOS = ["9:16", "16:9", "1:1"];
 const VIDEO_VOICES = [
   { value: "female", label: "Female voice" },
   { value: "male", label: "Male voice" },
 ];
-const PROMPT_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+const ASPECT_RATIOS = [
+  { value: "1:1", label: "1:1", sub: "Square" },
+  { value: "16:9", label: "16:9", sub: "Landscape" },
+  { value: "9:16", label: "9:16", sub: "Portrait" },
+  { value: "4:3", label: "4:3", sub: "Landscape" },
+  { value: "3:4", label: "3:4", sub: "Portrait" },
+  { value: "custom", label: "Custom", sub: "" },
+];
+
+const OUTPUT_FORMATS = ["PNG", "JPG", "WEBP"];
 
 const POSITIONS = [
   "top-left",
@@ -44,16 +61,16 @@ const POSITIONS = [
   "bottom-right",
 ];
 
-const POSITION_ICONS = {
-  "top-left": LuArrowUpLeft,
-  "top-center": LuArrowUp,
-  "top-right": LuArrowUpRight,
-  "middle-left": LuArrowLeft,
-  center: LuCircleDot,
-  "middle-right": LuArrowRight,
-  "bottom-left": LuArrowDownLeft,
-  "bottom-center": LuArrowDown,
-  "bottom-right": LuArrowDownRight,
+const POSITION_META = {
+  "top-left": { icon: LuArrowUpLeft, label: "Top Left" },
+  "top-center": { icon: LuArrowUp, label: "Top Center" },
+  "top-right": { icon: LuArrowUpRight, label: "Top Right" },
+  "middle-left": { icon: LuArrowLeft, label: "Middle Left" },
+  center: { icon: LuCircleDot, label: "Center" },
+  "middle-right": { icon: LuArrowRight, label: "Middle Right" },
+  "bottom-left": { icon: LuArrowDownLeft, label: "Bottom Left" },
+  "bottom-center": { icon: LuArrowDown, label: "Bottom Center" },
+  "bottom-right": { icon: LuArrowDownRight, label: "Bottom Right" },
 };
 
 function extractMediaUrl(data) {
@@ -183,19 +200,63 @@ function PositionPicker({ value, onChange }) {
   return (
     <div className="ai-gen-hub__position-grid">
       {POSITIONS.map((position) => {
-        const Icon = POSITION_ICONS[position];
+        const { icon: Icon, label } = POSITION_META[position];
         return (
           <button
             type="button"
             key={position}
-            title={position.replace("-", " ")}
             className={`ai-gen-hub__position-cell ${value === position ? "ai-gen-hub__position-cell--active" : ""}`}
             onClick={() => onChange(position)}
           >
             <Icon />
+            <span>{label}</span>
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function ReferenceImagePicker({ images, valueId, isOpen, onToggle, onChange }) {
+  const selected = images.find((image) => image.id === valueId) ?? null;
+
+  return (
+    <div className="ai-gen-hub__ref-picker">
+      <button
+        type="button"
+        className="ai-gen-hub__ref-trigger"
+        title="Reference input image (optional)"
+        onClick={onToggle}
+      >
+        {selected ? <img src={selected.preview} alt="Reference" /> : <LuImage />}
+        <LuChevronDown />
+      </button>
+
+      {isOpen && (
+        <div className="ai-gen-hub__ref-menu">
+          <button
+            type="button"
+            className={`ai-gen-hub__ref-option ${!valueId ? "ai-gen-hub__ref-option--active" : ""}`}
+            onClick={() => onChange(null)}
+          >
+            <span className="ai-gen-hub__ref-option-none">
+              <LuX />
+            </span>
+            <span>No reference</span>
+          </button>
+          {images.map((image, index) => (
+            <button
+              type="button"
+              key={image.id}
+              className={`ai-gen-hub__ref-option ${valueId === image.id ? "ai-gen-hub__ref-option--active" : ""}`}
+              onClick={() => onChange(image.id)}
+            >
+              <img src={image.preview} alt={`Input ${index + 1}`} />
+              <span>Image {index + 1}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -218,35 +279,55 @@ function SliderField({ label, value, min, max, step = 1, unit = "", onChange }) 
   );
 }
 
+function Stepper({ value, min, max, onChange }) {
+  return (
+    <div className="ai-gen-hub__stepper">
+      <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min}>
+        <LuMinus />
+      </button>
+      <span>{value}</span>
+      <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max}>
+        <LuPlus />
+      </button>
+    </div>
+  );
+}
+
 function AiVideoGenerationContent() {
   const [mode, setMode] = useState("image");
 
-  // Image generation state
-  const [promptCount, setPromptCount] = useState(1);
-  const [prompts, setPrompts] = useState([""]);
-  const [productImage, setProductImage] = useState(null);
-  const [productImagePreview, setProductImagePreview] = useState(null);
-  const [imageRatio, setImageRatio] = useState("1:1");
-  const [imageGenerating, setImageGenerating] = useState(false);
-  const [generatingStep, setGeneratingStep] = useState(0);
-  const [stepResults, setStepResults] = useState([]);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState(null);
-  const productImageInputRef = useRef(null);
+  // Section 1: input images (up to MAX_INPUT_IMAGES)
+  const [inputImages, setInputImages] = useState([]);
+  const inputImagesRef = useRef(null);
 
-  // Branding: watermark
+  // Section 2: logo + position (+ optional text watermark)
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoSizePercent, setLogoSizePercent] = useState(18);
+  const [logoPosition, setLogoPosition] = useState("bottom-right");
+  const logoInputRef = useRef(null);
+
   const [watermarkEnabled, setWatermarkEnabled] = useState(false);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkSize, setWatermarkSize] = useState(36);
-  const [watermarkPosition, setWatermarkPosition] = useState("bottom-right");
+  const [watermarkPosition, setWatermarkPosition] = useState("bottom-left");
 
-  // Branding: logo
-  const [logoPreview, setLogoPreview] = useState(null);
-  const [logoSizePercent, setLogoSizePercent] = useState(18);
-  const [logoPosition, setLogoPosition] = useState("bottom-left");
-  const logoInputRef = useRef(null);
+  // Section 3: output settings
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [outputWidth, setOutputWidth] = useState(1024);
+  const [outputHeight, setOutputHeight] = useState(1024);
+  const [sizeLinked, setSizeLinked] = useState(true);
+  const [outputFormat, setOutputFormat] = useState("PNG");
 
-  // Composed preview (branding baked onto the generated image)
-  const [composedImageUrl, setComposedImageUrl] = useState(null);
+  // Section 4: one prompt per output image, each with an optional reference image
+  const [prompts, setPrompts] = useState([""]);
+  const [referenceImageIds, setReferenceImageIds] = useState([null]);
+  const [openRefPicker, setOpenRefPicker] = useState(null);
+
+  // Section 5: generation + preview
+  const [imageGenerating, setImageGenerating] = useState(false);
+  const [generatingIndex, setGeneratingIndex] = useState(0);
+  const [outputs, setOutputs] = useState([]);
+  const [composedOutputs, setComposedOutputs] = useState([]);
   const [composeFailed, setComposeFailed] = useState(false);
 
   // Video generation state
@@ -259,23 +340,78 @@ function AiVideoGenerationContent() {
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState(null);
   const videoImageInputRef = useRef(null);
 
-  const handlePromptCountChange = (count) => {
-    setPromptCount(count);
-    setPrompts((prev) => {
-      const next = prev.slice(0, count);
-      while (next.length < count) next.push("");
-      return next;
-    });
+  const addInputImages = (fileList) => {
+    const files = Array.from(fileList ?? []).filter((file) => file.type.startsWith("image/"));
+    if (files.length === 0) return;
+
+    const remaining = MAX_INPUT_IMAGES - inputImages.length;
+    if (remaining <= 0) {
+      toast.warn(`You can upload up to ${MAX_INPUT_IMAGES} images.`);
+      return;
+    }
+
+    const accepted = files.slice(0, remaining);
+    if (files.length > accepted.length) {
+      toast.warn(`Only ${remaining} more image${remaining > 1 ? "s" : ""} could be added (max ${MAX_INPUT_IMAGES}).`);
+    }
+
+    setInputImages((prev) => [
+      ...prev,
+      ...accepted.map((file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        file,
+        preview: URL.createObjectURL(file),
+      })),
+    ]);
+  };
+
+  const handleInputImagesChange = (event) => {
+    addInputImages(event.target.files);
+    event.target.value = "";
+  };
+
+  const handleInputImagesDrop = (event) => {
+    event.preventDefault();
+    addInputImages(event.dataTransfer.files);
+  };
+
+  const removeInputImage = (id) => {
+    setInputImages((prev) => prev.filter((image) => image.id !== id));
+    setReferenceImageIds((prev) => prev.map((refId) => (refId === id ? null : refId)));
   };
 
   const handlePromptChange = (index, value) => {
     setPrompts((prev) => prev.map((prompt, i) => (i === index ? value : prompt)));
   };
 
-  const handleProductImageChange = (event) => {
-    const file = event.target.files?.[0] ?? null;
-    setProductImage(file);
-    setProductImagePreview(file ? URL.createObjectURL(file) : null);
+  const handleReferenceImageChange = (index, imageId) => {
+    setReferenceImageIds((prev) => prev.map((refId, i) => (i === index ? imageId : refId)));
+    setOpenRefPicker(null);
+  };
+
+  const addPromptRow = () => {
+    if (prompts.length >= MAX_PROMPTS) return;
+    setPrompts((prev) => [...prev, ""]);
+    setReferenceImageIds((prev) => [...prev, null]);
+  };
+
+  const removePromptRow = (index) => {
+    if (prompts.length <= 1) return;
+    setPrompts((prev) => prev.filter((_, i) => i !== index));
+    setReferenceImageIds((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const setPromptCount = (count) => {
+    setPrompts((prev) => {
+      const next = prev.slice(0, count);
+      while (next.length < count) next.push("");
+      return next;
+    });
+    setReferenceImageIds((prev) => {
+      const next = prev.slice(0, count);
+      while (next.length < count) next.push(null);
+      return next;
+    });
   };
 
   const handleVideoImageChange = (event) => {
@@ -284,21 +420,15 @@ function AiVideoGenerationContent() {
     setVideoImagePreview(file ? URL.createObjectURL(file) : null);
   };
 
-  const handleLogoChange = (event) => {
-    const file = event.target.files?.[0] ?? null;
-    setLogoPreview(file ? URL.createObjectURL(file) : null);
-  };
-
-  const clearProductImage = () => {
-    setProductImage(null);
-    setProductImagePreview(null);
-    if (productImageInputRef.current) productImageInputRef.current.value = "";
-  };
-
   const clearVideoImage = () => {
     setVideoImage(null);
     setVideoImagePreview(null);
     if (videoImageInputRef.current) videoImageInputRef.current.value = "";
+  };
+
+  const handleLogoChange = (event) => {
+    const file = event.target.files?.[0] ?? null;
+    setLogoPreview(file ? URL.createObjectURL(file) : null);
   };
 
   const clearLogo = () => {
@@ -306,67 +436,83 @@ function AiVideoGenerationContent() {
     if (logoInputRef.current) logoInputRef.current.value = "";
   };
 
-  const handleGenerateImage = async () => {
-    const trimmedPrompts = prompts.slice(0, promptCount).map((prompt) => prompt.trim());
+  const applyAspectRatio = (value) => {
+    setAspectRatio(value);
+    if (value === "custom") return;
+    const [w, h] = value.split(":").map(Number);
+    const scale = 1024 / Math.max(w, h);
+    setOutputWidth(Math.round(w * scale));
+    setOutputHeight(Math.round(h * scale));
+  };
+
+  const handleWidthChange = (value) => {
+    const width = Math.max(1, Number(value) || 0);
+    setOutputWidth(width);
+    if (sizeLinked && outputWidth > 0) {
+      const ratio = outputHeight / outputWidth;
+      setOutputHeight(Math.round(width * ratio));
+    }
+  };
+
+  const handleHeightChange = (value) => {
+    const height = Math.max(1, Number(value) || 0);
+    setOutputHeight(height);
+    if (sizeLinked && outputHeight > 0) {
+      const ratio = outputWidth / outputHeight;
+      setOutputWidth(Math.round(height * ratio));
+    }
+  };
+
+  const handleGenerateAllImages = async () => {
+    const trimmedPrompts = prompts.map((prompt) => prompt.trim());
     if (trimmedPrompts.some((prompt) => !prompt)) {
-      toast.warn(`Fill in all ${promptCount} prompt${promptCount > 1 ? "s" : ""} before generating.`);
+      toast.warn(`Fill in all ${prompts.length} prompt${prompts.length > 1 ? "s" : ""} before generating.`);
       return;
     }
-    if (!productImage) {
-      toast.warn("Upload a product image first.");
+    if (inputImages.length === 0) {
+      toast.warn("Upload at least one input image first.");
       return;
     }
 
     setImageGenerating(true);
-    setGeneratedImageUrl(null);
-    setStepResults([]);
+    setOutputs([]);
 
-    let currentImageFile = productImage;
-    let lastUrl = null;
+    const ratioValue = aspectRatio === "custom" ? `${outputWidth}:${outputHeight}` : aspectRatio;
 
-    try {
-      for (let i = 0; i < trimmedPrompts.length; i += 1) {
-        setGeneratingStep(i + 1);
+    for (let i = 0; i < trimmedPrompts.length; i += 1) {
+      setGeneratingIndex(i + 1);
 
-        const formData = new FormData();
-        formData.append("prompt", trimmedPrompts[i]);
-        formData.append("ratio", imageRatio);
-        formData.append("image", currentImageFile);
+      const referencedImage = referenceImageIds[i]
+        ? inputImages.find((image) => image.id === referenceImageIds[i])
+        : null;
 
+      const formData = new FormData();
+      formData.append("prompt", trimmedPrompts[i]);
+      formData.append("ratio", ratioValue);
+      formData.append("width", outputWidth);
+      formData.append("height", outputHeight);
+      formData.append("format", outputFormat.toLowerCase());
+      inputImages.forEach(({ file }) => formData.append("images", file));
+      formData.append("image", referencedImage ? referencedImage.file : inputImages[0].file);
+
+      try {
         const res = await generateAiImage(formData);
         const url = extractMediaUrl(res.data);
-        if (!url) {
-          toast.error(`Prompt ${i + 1} didn't return an image. Stopping here.`);
-          break;
+        if (url) {
+          setOutputs((prev) => [...prev, { index: i + 1, prompt: trimmedPrompts[i], url }]);
+        } else {
+          setOutputs((prev) => [...prev, { index: i + 1, prompt: trimmedPrompts[i], url: null }]);
+          toast.error(`Prompt ${i + 1} didn't return an image.`);
         }
-
-        lastUrl = url;
-        setStepResults((prev) => [...prev, { step: i + 1, prompt: trimmedPrompts[i], url }]);
-
-        const isLastPrompt = i === trimmedPrompts.length - 1;
-        if (!isLastPrompt) {
-          try {
-            const blob = await fetch(url).then((response) => response.blob());
-            currentImageFile = new File([blob], `step-${i + 1}.png`, { type: blob.type || "image/png" });
-          } catch {
-            toast.warn(`Couldn't chain into prompt ${i + 2} — using prompt ${i + 1}'s result as the final image.`);
-            break;
-          }
-        }
+      } catch (err) {
+        setOutputs((prev) => [...prev, { index: i + 1, prompt: trimmedPrompts[i], url: null }]);
+        toast.error(err.response?.data?.message ?? `Prompt ${i + 1} failed to generate.`);
       }
-
-      if (lastUrl) {
-        setGeneratedImageUrl(lastUrl);
-        toast.success("Image generated!");
-      } else {
-        toast.error("Failed to generate image.");
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message ?? "Failed to generate image.");
-    } finally {
-      setImageGenerating(false);
-      setGeneratingStep(0);
     }
+
+    setImageGenerating(false);
+    setGeneratingIndex(0);
+    toast.success("Finished generating your images!");
   };
 
   const handleGenerateVideo = async () => {
@@ -404,15 +550,17 @@ function AiVideoGenerationContent() {
   };
 
   useEffect(() => {
-    if (!generatedImageUrl) {
-      setComposedImageUrl(null);
+    if (outputs.length === 0) {
+      setComposedOutputs([]);
       setComposeFailed(false);
       return undefined;
     }
 
     const hasWatermark = watermarkEnabled && watermarkText.trim().length > 0;
-    if (!hasWatermark && !logoPreview) {
-      setComposedImageUrl(generatedImageUrl);
+    const hasLogo = Boolean(logoPreview);
+
+    if (!hasWatermark && !hasLogo) {
+      setComposedOutputs(outputs.map((output) => ({ ...output, finalUrl: output.url })));
       setComposeFailed(false);
       return undefined;
     }
@@ -420,48 +568,41 @@ function AiVideoGenerationContent() {
     let cancelled = false;
 
     (async () => {
-      try {
-        const dataUrl = await composeImageWithBranding({
-          baseUrl: generatedImageUrl,
-          watermark: hasWatermark
-            ? { text: watermarkText.trim(), sizePercent: watermarkSize, position: watermarkPosition }
-            : null,
-          logo: logoPreview ? { src: logoPreview, sizePercent: logoSizePercent, position: logoPosition } : null,
-        });
-        if (!cancelled) {
-          setComposedImageUrl(dataUrl);
-          setComposeFailed(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setComposedImageUrl(generatedImageUrl);
-          setComposeFailed(true);
-        }
+      let anyFailed = false;
+      const results = await Promise.all(
+        outputs.map(async (output) => {
+          if (!output.url) return { ...output, finalUrl: null };
+          try {
+            const dataUrl = await composeImageWithBranding({
+              baseUrl: output.url,
+              watermark: hasWatermark
+                ? { text: watermarkText.trim(), sizePercent: watermarkSize, position: watermarkPosition }
+                : null,
+              logo: hasLogo ? { src: logoPreview, sizePercent: logoSizePercent, position: logoPosition } : null,
+            });
+            return { ...output, finalUrl: dataUrl };
+          } catch {
+            anyFailed = true;
+            return { ...output, finalUrl: output.url };
+          }
+        })
+      );
+      if (!cancelled) {
+        setComposedOutputs(results);
+        setComposeFailed(anyFailed);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    generatedImageUrl,
-    watermarkEnabled,
-    watermarkText,
-    watermarkSize,
-    watermarkPosition,
-    logoPreview,
-    logoSizePercent,
-    logoPosition,
-  ]);
+  }, [outputs, watermarkEnabled, watermarkText, watermarkSize, watermarkPosition, logoPreview, logoSizePercent, logoPosition]);
 
   useEffect(() => {
     if (composeFailed) {
-      toast.warn("Couldn't overlay the watermark/logo on this preview — the image host blocks in-browser edits. Download will use the plain generated image.");
+      toast.warn("Couldn't overlay the watermark/logo on some previews — the image host blocks in-browser edits. Downloads will use the plain generated images.");
     }
   }, [composeFailed]);
-
-  const finalImageUrl = composedImageUrl ?? generatedImageUrl;
-  const finalImageIsComposed = Boolean(composedImageUrl) && composedImageUrl !== generatedImageUrl;
 
   return (
     <section className="ai-gen-hub card-wrapper">
@@ -470,8 +611,8 @@ function AiVideoGenerationContent() {
           <span className="ai-gen-hub__eyebrow"><LuSparkles /> AI Studio</span>
           <h1>Generate product images &amp; videos</h1>
           <p>
-            Turn a prompt and a product photo into a polished image, or bring your product to
-            life with a talking video.
+            Upload your product photos, add your logo, and write a prompt for each output image
+            you want — or bring your product to life with a talking video.
           </p>
         </div>
       </header>
@@ -494,168 +635,334 @@ function AiVideoGenerationContent() {
       </div>
 
       {mode === "image" ? (
-        <div className="ai-gen-hub__layout">
-          <article className="ai-gen-hub__card">
-            <div className="ai-gen-hub__field">
-              <span className="ai-gen-hub__field-label">Number of prompts (1-6)</span>
-              <RatioPicker options={PROMPT_COUNT_OPTIONS} value={promptCount} onChange={handlePromptCountChange} />
-              {promptCount > 1 && (
-                <span className="ai-gen-hub__hint">
-                  Applied in order — prompt 2 edits the result of prompt 1, and so on.
-                </span>
-              )}
-            </div>
+        <div className="ai-gen-hub__template">
+          <div className="ai-gen-hub__template-row">
+            <article className="ai-gen-hub__card">
+              <div className="ai-gen-hub__section-head">
+                <span className="ai-gen-hub__section-badge">1</span>
+                <div>
+                  <h3>Upload Input Images</h3>
+                  <p>Upload product images to be used for generating output images. Max {MAX_INPUT_IMAGES}.</p>
+                </div>
+              </div>
 
-            {prompts.slice(0, promptCount).map((prompt, index) => (
-              <label className="ai-gen-hub__field" key={index}>
-                <span className="ai-gen-hub__field-label">
-                  Prompt {index + 1}
-                  {index === 0 ? " (applied first)" : ""}
-                </span>
-                <textarea
-                  rows={3}
-                  placeholder={
-                    index === 0
-                      ? "e.g. Place this product on a marble kitchen countertop with soft morning light"
-                      : `e.g. Now adjust the result of prompt ${index}...`
-                  }
-                  value={prompt}
-                  onChange={(event) => handlePromptChange(index, event.target.value)}
-                />
-              </label>
-            ))}
-
-            <UploadField
-              label="Product image"
-              hint="Click to upload a product photo"
-              preview={productImagePreview}
-              onChange={handleProductImageChange}
-              onClear={clearProductImage}
-              inputRef={productImageInputRef}
-            />
-
-            <div className="ai-gen-hub__field">
-              <span className="ai-gen-hub__field-label">Aspect ratio</span>
-              <RatioPicker options={IMAGE_RATIOS} value={imageRatio} onChange={setImageRatio} />
-            </div>
-
-            <div className="ai-gen-hub__section-title">Branding (optional)</div>
-
-            <label className="ai-gen-hub__toggle-row">
-              <input
-                type="checkbox"
-                checked={watermarkEnabled}
-                onChange={(event) => setWatermarkEnabled(event.target.checked)}
-              />
-              <span><LuType /> Add text watermark</span>
-            </label>
-
-            {watermarkEnabled && (
-              <>
-                <label className="ai-gen-hub__field">
-                  <span className="ai-gen-hub__field-label">Watermark text</span>
-                  <textarea
-                    rows={1}
-                    placeholder="e.g. @yourbrand"
-                    value={watermarkText}
-                    onChange={(event) => setWatermarkText(event.target.value)}
+              <div
+                className="ai-gen-hub__dropzone"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={handleInputImagesDrop}
+              >
+                <LuCloudUpload />
+                <span>Drag &amp; drop images here or click to upload</span>
+                <label className="ai-gen-hub__btn ai-gen-hub__btn--ghost ai-gen-hub__choose-files">
+                  Choose Files
+                  <input
+                    ref={inputImagesRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleInputImagesChange}
                   />
                 </label>
-                <SliderField
-                  label="Watermark size"
-                  value={watermarkSize}
-                  min={16}
-                  max={96}
-                  onChange={setWatermarkSize}
-                />
-                <div className="ai-gen-hub__field">
-                  <span className="ai-gen-hub__field-label">Watermark position</span>
-                  <PositionPicker value={watermarkPosition} onChange={setWatermarkPosition} />
+                <small>Supported formats: JPG, PNG, WebP</small>
+              </div>
+
+              {inputImages.length > 0 && (
+                <div className="ai-gen-hub__image-grid">
+                  {inputImages.map((image) => (
+                    <div className="ai-gen-hub__image-thumb" key={image.id}>
+                      <img src={image.preview} alt="Input" />
+                      <button type="button" onClick={() => removeInputImage(image.id)}>
+                        <LuX />
+                      </button>
+                    </div>
+                  ))}
+                  {inputImages.length < MAX_INPUT_IMAGES && (
+                    <label className="ai-gen-hub__image-add-tile">
+                      <LuPlus />
+                      <span>Add More</span>
+                      <input type="file" accept="image/*" multiple onChange={handleInputImagesChange} />
+                    </label>
+                  )}
                 </div>
-              </>
-            )}
+              )}
+            </article>
 
-            <UploadField
-              label={<span><LuStamp /> Logo (optional)</span>}
-              hint="Click to upload a logo to stamp on the image"
-              preview={logoPreview}
-              onChange={handleLogoChange}
-              onClear={clearLogo}
-              inputRef={logoInputRef}
-            />
-
-            {logoPreview && (
-              <>
-                <SliderField
-                  label="Logo size"
-                  value={logoSizePercent}
-                  min={5}
-                  max={50}
-                  unit="%"
-                  onChange={setLogoSizePercent}
-                />
-                <div className="ai-gen-hub__field">
-                  <span className="ai-gen-hub__field-label">Logo position</span>
-                  <PositionPicker value={logoPosition} onChange={setLogoPosition} />
+            <article className="ai-gen-hub__card">
+              <div className="ai-gen-hub__section-head">
+                <span className="ai-gen-hub__section-badge">2</span>
+                <div>
+                  <h3>Upload Logo &amp; Position</h3>
+                  <p>Upload your brand logo and choose its position.</p>
                 </div>
-              </>
-            )}
+              </div>
 
+              <UploadField
+                label="Logo"
+                hint="Click to upload your logo"
+                preview={logoPreview}
+                onChange={handleLogoChange}
+                onClear={clearLogo}
+                inputRef={logoInputRef}
+              />
+
+              {logoPreview && (
+                <>
+                  <SliderField
+                    label="Logo size"
+                    value={logoSizePercent}
+                    min={5}
+                    max={50}
+                    unit="%"
+                    onChange={setLogoSizePercent}
+                  />
+                  <div className="ai-gen-hub__field">
+                    <span className="ai-gen-hub__field-label">Logo Position (on all output images)</span>
+                    <PositionPicker value={logoPosition} onChange={setLogoPosition} />
+                  </div>
+                </>
+              )}
+
+              <label className="ai-gen-hub__toggle-row">
+                <input
+                  type="checkbox"
+                  checked={watermarkEnabled}
+                  onChange={(event) => setWatermarkEnabled(event.target.checked)}
+                />
+                <span><LuType /> Also add a text watermark</span>
+              </label>
+
+              {watermarkEnabled && (
+                <>
+                  <label className="ai-gen-hub__field">
+                    <span className="ai-gen-hub__field-label">Watermark text</span>
+                    <textarea
+                      rows={1}
+                      placeholder="e.g. @yourbrand"
+                      value={watermarkText}
+                      onChange={(event) => setWatermarkText(event.target.value)}
+                    />
+                  </label>
+                  <SliderField
+                    label="Watermark size"
+                    value={watermarkSize}
+                    min={16}
+                    max={96}
+                    onChange={setWatermarkSize}
+                  />
+                  <div className="ai-gen-hub__field">
+                    <span className="ai-gen-hub__field-label">Watermark Position</span>
+                    <PositionPicker value={watermarkPosition} onChange={setWatermarkPosition} />
+                  </div>
+                </>
+              )}
+            </article>
+
+            <article className="ai-gen-hub__card">
+              <div className="ai-gen-hub__section-head">
+                <span className="ai-gen-hub__section-badge">3</span>
+                <div>
+                  <h3>Output Settings</h3>
+                  <p>Configure output image settings.</p>
+                </div>
+              </div>
+
+              <div className="ai-gen-hub__field">
+                <span className="ai-gen-hub__field-label">Aspect Ratio</span>
+                <div className="ai-gen-hub__aspect-grid">
+                  {ASPECT_RATIOS.map((ratio) => (
+                    <button
+                      type="button"
+                      key={ratio.value}
+                      className={`ai-gen-hub__aspect-chip ${aspectRatio === ratio.value ? "ai-gen-hub__aspect-chip--active" : ""}`}
+                      onClick={() => applyAspectRatio(ratio.value)}
+                    >
+                      <span
+                        className={`ai-gen-hub__aspect-swatch ai-gen-hub__aspect-swatch--${ratio.value === "custom" ? "custom" : ratio.value.replace(":", "-")}`}
+                      >
+                        {ratio.value === "custom" && <LuPlus />}
+                      </span>
+                      <strong>{ratio.label}</strong>
+                      {ratio.sub && <small>{ratio.sub}</small>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="ai-gen-hub__field">
+                <span className="ai-gen-hub__field-label">Output Size (px)</span>
+                <div className="ai-gen-hub__size-row">
+                  <label>
+                    <span>Width</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={outputWidth}
+                      onChange={(event) => handleWidthChange(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className={`ai-gen-hub__link-btn ${sizeLinked ? "ai-gen-hub__link-btn--active" : ""}`}
+                    title={sizeLinked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                    onClick={() => setSizeLinked((prev) => !prev)}
+                  >
+                    <LuLink />
+                  </button>
+                  <label>
+                    <span>Height</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={outputHeight}
+                      onChange={(event) => handleHeightChange(event.target.value)}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="ai-gen-hub__field">
+                <span className="ai-gen-hub__field-label">Output Format</span>
+                <RatioPicker options={OUTPUT_FORMATS} value={outputFormat} onChange={setOutputFormat} />
+              </div>
+
+              <div className="ai-gen-hub__field">
+                <span className="ai-gen-hub__field-label">Number of Output Images</span>
+                <Stepper value={prompts.length} min={1} max={MAX_PROMPTS} onChange={setPromptCount} />
+                <span className="ai-gen-hub__hint">
+                  We will generate {prompts.length} image{prompts.length > 1 ? "s" : ""} using your input images and prompts below.
+                </span>
+              </div>
+            </article>
+          </div>
+
+          <div className="ai-gen-hub__template-row ai-gen-hub__template-row--split">
+            <article className="ai-gen-hub__card">
+              <div className="ai-gen-hub__section-head">
+                <span className="ai-gen-hub__section-badge">4</span>
+                <div>
+                  <h3>Prompts for Each Output Image</h3>
+                  <p>Write a custom prompt for each image. Each prompt will generate one output image.</p>
+                </div>
+              </div>
+
+              {openRefPicker !== null && (
+                <div className="ai-gen-hub__ref-backdrop" onClick={() => setOpenRefPicker(null)} />
+              )}
+
+              <div className="ai-gen-hub__prompt-table">
+                {prompts.map((prompt, index) => (
+                  <div className="ai-gen-hub__prompt-row" key={index}>
+                    <span className="ai-gen-hub__prompt-number">{index + 1}</span>
+                    <textarea
+                      rows={2}
+                      placeholder={`e.g. ${
+                        index === 0
+                          ? "Main product image with clean white background, premium look."
+                          : "Describe output image " + (index + 1) + "..."
+                      }`}
+                      value={prompt}
+                      onChange={(event) => handlePromptChange(index, event.target.value)}
+                    />
+                    <ReferenceImagePicker
+                      images={inputImages}
+                      valueId={referenceImageIds[index]}
+                      isOpen={openRefPicker === index}
+                      onToggle={() => setOpenRefPicker((prev) => (prev === index ? null : index))}
+                      onChange={(imageId) => handleReferenceImageChange(index, imageId)}
+                    />
+                    <button
+                      type="button"
+                      className="ai-gen-hub__prompt-delete"
+                      disabled={prompts.length <= 1}
+                      onClick={() => removePromptRow(index)}
+                    >
+                      <LuTrash2 />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <span className="ai-gen-hub__hint">
+                Optionally pick which uploaded input image a prompt should use as its reference.
+              </span>
+
+              <button
+                type="button"
+                className="ai-gen-hub__add-prompt-btn"
+                disabled={prompts.length >= MAX_PROMPTS}
+                onClick={addPromptRow}
+              >
+                <LuPlus /> Add Another Prompt
+              </button>
+            </article>
+
+            <article className="ai-gen-hub__result">
+              <div className="ai-gen-hub__section-head">
+                <span className="ai-gen-hub__section-badge">5</span>
+                <div>
+                  <h3>Preview</h3>
+                  <p>Your generated output images will appear here.</p>
+                </div>
+              </div>
+
+              {composedOutputs.length === 0 && !imageGenerating ? (
+                <div className="ai-gen-hub__empty">
+                  <LuImage />
+                  <strong>No images yet</strong>
+                  <span>Generate to see your output images here.</span>
+                </div>
+              ) : (
+                <div className="ai-gen-hub__preview-grid">
+                  {prompts.map((_, index) => {
+                    const result = composedOutputs[index] ?? outputs[index];
+                    const isCurrentlyGenerating = imageGenerating && generatingIndex === index + 1;
+                    return (
+                      <div className="ai-gen-hub__preview-item" key={index}>
+                        <span className="ai-gen-hub__preview-badge">{index + 1}</span>
+                        {isCurrentlyGenerating ? (
+                          <div className="ai-gen-hub__preview-loading">
+                            <LuLoader className="spin-icon" />
+                          </div>
+                        ) : result?.finalUrl ?? result?.url ? (
+                          <>
+                            <img src={result.finalUrl ?? result.url} alt={`Output ${index + 1}`} />
+                            <a
+                              className="ai-gen-hub__preview-download"
+                              href={result.finalUrl ?? result.url}
+                              target={result.finalUrl ? undefined : "_blank"}
+                              rel="noreferrer"
+                              download={`ai-output-${index + 1}.png`}
+                            >
+                              <LuDownload />
+                            </a>
+                          </>
+                        ) : (
+                          <div className="ai-gen-hub__preview-placeholder">
+                            <LuImage />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </article>
+          </div>
+
+          <div className="ai-gen-hub__action-bar">
             <button
               type="button"
               className="ai-gen-hub__btn ai-gen-hub__btn--primary"
               disabled={imageGenerating}
-              onClick={handleGenerateImage}
+              onClick={handleGenerateAllImages}
             >
               {imageGenerating ? <LuLoader className="spin-icon" /> : <LuSparkles />}
               <span>
                 {imageGenerating
-                  ? `Applying prompt ${generatingStep} of ${promptCount}…`
-                  : promptCount > 1
-                  ? `Generate with ${promptCount} prompts`
-                  : "Generate image"}
+                  ? `Generating image ${generatingIndex} of ${prompts.length}…`
+                  : "Generate All Images"}
               </span>
             </button>
-          </article>
-
-          <article className="ai-gen-hub__result">
-            {imageGenerating ? (
-              <div className="ai-gen-hub__result-loading">
-                <LuLoader className="spin-icon" />
-                <span>Applying prompt {generatingStep} of {promptCount}…</span>
-              </div>
-            ) : finalImageUrl ? (
-              <div className="ai-gen-hub__result-media">
-                <img src={finalImageUrl} alt="Generated result" />
-                <a
-                  className="ai-gen-hub__btn ai-gen-hub__btn--ghost"
-                  href={finalImageUrl}
-                  target={finalImageIsComposed ? undefined : "_blank"}
-                  rel="noreferrer"
-                  download="ai-generated-image.png"
-                >
-                  <LuDownload /> <span>Download</span>
-                </a>
-
-                {stepResults.length > 1 && (
-                  <div className="ai-gen-hub__step-strip">
-                    {stepResults.map((step) => (
-                      <div key={step.step} className="ai-gen-hub__step-thumb" title={step.prompt}>
-                        <img src={step.url} alt={`Step ${step.step} result`} />
-                        <span>Step {step.step}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="ai-gen-hub__empty">
-                <LuImage />
-                <strong>No image yet</strong>
-                <span>Your generated image will appear here.</span>
-              </div>
-            )}
-          </article>
+          </div>
         </div>
       ) : (
         <div className="ai-gen-hub__layout">
