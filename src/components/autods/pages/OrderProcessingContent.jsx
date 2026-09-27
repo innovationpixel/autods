@@ -188,7 +188,7 @@ function OrderProcessingContent() {
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 500 });
+      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
       setOrders(mapped.filter((order) => order.sourcePlatform === "aliexpress"));
       setSelectedIds([]);

@@ -422,7 +422,7 @@ function OrdersContent({ searchQuery }) {
         buyer: buyerFilter,
         hide_canceled: showOnlyActive ? 1 : 0,
         sort: sortDirection,
-        limit: 500,
+        limit: 100,
         archived: showArchived ? 1 : 0,
       };
 

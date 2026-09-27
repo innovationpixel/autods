@@ -173,7 +173,7 @@ function CalculationsContent({ searchQuery = "" }) {
         buyer: buyerFilter,
         hide_canceled: showOnlyActive ? 1 : 0,
         sort: sortDirection,
-        limit: 500,
+        limit: 100,
       };
 
       if (fromDate) {
