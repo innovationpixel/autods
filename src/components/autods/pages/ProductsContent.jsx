@@ -10,6 +10,7 @@ import {
   LuChevronUp,
   LuEllipsisVertical,
   LuExternalLink,
+  LuEye,
   LuInbox,
   LuLink,
   LuLoader,
