@@ -31,11 +31,12 @@ import {
   buildCarrierTrackingUrl,
   buildPaginationItems,
   buildSourceProductUrl,
+  compareGridValues,
+  detectTrackingCarrier,
   formatDisplayDate,
   formatTrackingDisplay,
   getEbayOrderDetailUrl,
   normalizeTrackingCarrier,
-  compareGridValues,
   PAGE_SIZE_OPTIONS,
 } from "../helpers";
 import GridSortHeader from "../GridSortHeader";
