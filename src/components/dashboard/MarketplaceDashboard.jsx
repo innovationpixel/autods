@@ -619,6 +619,11 @@ const MarketplaceDashboard = () => {
     setSearchAnything("");
   };
 
+  const openReturnsDisputesPage = () => {
+    setActivePage("returns-disputes");
+    setSearchAnything("");
+  };
+
   const openProductsPage = () => {
     setActivePage("products");
     setSearchAnything("");
@@ -1073,6 +1078,8 @@ const MarketplaceDashboard = () => {
         ? "Dashboard"
         : activePage === "orders"
           ? `Orders`
+          : activePage === "returns-disputes"
+            ? "Returns & Disputes"
           : activePage === "sourcing-request"
             ? "Sourcing Request"
           : activePage === "products"
@@ -1196,6 +1203,7 @@ const MarketplaceDashboard = () => {
                         calculations: openCalculationsPage,
                         dashboard: openDashboardPage,
                         orders: openOrdersPage,
+                        "returns-disputes": openReturnsDisputesPage,
                         "sourcing-request": openSourcingRequestPage,
                         products: openProductsPage,
                         drafts: openDraftsPage,
@@ -1205,7 +1213,12 @@ const MarketplaceDashboard = () => {
                         settings: openSettingsPage,
                       };
 
-                      pageHandlers[selectedItem.page]?.();
+                      if (pageHandlers[selectedItem.page]) {
+                        pageHandlers[selectedItem.page]();
+                      } else {
+                        setActivePage(selectedItem.page);
+                        setSearchAnything("");
+                      }
                     }}
                     onSelectChild={(child) => {
                       if (!child.curatedType) {
