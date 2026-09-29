@@ -6,9 +6,12 @@ import {
   LuChevronLeft,
   LuChevronRight,
   LuClipboardList,
+  LuCopy,
+  LuExternalLink,
   LuLoader,
   LuPackageCheck,
   LuPencil,
+  LuPlus,
   LuRefreshCcw,
   LuStore,
   LuUserRound,
@@ -43,6 +46,8 @@ import GridSortHeader from "../GridSortHeader";
 import ProductItemIdCell from "../ProductItemIdCell";
 import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
+import OrderConfirmModal from "../OrderConfirmModal";
+import ExternalOrderModal from "../ExternalOrderModal";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
@@ -181,6 +186,9 @@ function OrderProcessingContent() {
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [confirmOrder, setConfirmOrder] = useState(null);
+  const [externalOrder, setExternalOrder] = useState(null);
+
   const FULFILLMENT_FIELDS = {
     aliexpressOrderId: { key: "aliexpress_order_id", label: "AliExpress order ID" },
     aliexpressOrderStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
@@ -191,7 +199,7 @@ function OrderProcessingContent() {
     try {
       const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
-      setOrders(mapped.filter((order) => order.sourcePlatform === "aliexpress"));
+      setOrders(mapped);
       setSelectedIds([]);
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to load orders."));
@@ -356,12 +364,78 @@ function OrderProcessingContent() {
     }
   };
 
-  const handleProcessOrder = async (order) => {
-    if (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)) {
-      toast.warn("Connect or tag a buyer account for this order's marketplace in Settings → Buyer Accounts first.");
+  const handleProcessOrder = (order) => {
+    // Condition 1: Missing supplier source link
+    if (!order.hasSource) {
+      toast.warn("Please link a supplier source link or item ID before processing this order.");
+      startEditSource(order);
       return;
     }
 
+    // Condition 2: Already placed on AliExpress / supplier
+    if (order.aliexpressOrderId) {
+      toast.info(
+        `This order has already been placed on AliExpress (Supplier Order #${order.aliexpressOrderId}). You can track shipment status or update fulfillment details directly.`,
+        { autoClose: 7000 }
+      );
+      return;
+    }
+
+    // Condition 3: Missing shipping address from buyer
+    const cleanAddress = (order.shippingAddress || "").trim();
+    if (!cleanAddress || cleanAddress === "—") {
+      toast.error(
+        "Buyer shipping address is missing from the marketplace order data. Please verify the shipping details on eBay.",
+        { autoClose: 8000 }
+      );
+      return;
+    }
+
+    // Condition 4: Non-AliExpress supplier platform (Amazon, Walmart, Etsy, eBay, etc.)
+    if (order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress") {
+      setExternalOrder(order);
+      return;
+    }
+
+    // Condition 5: Buyer account mode checks
+    if (processingMethod === "buyer") {
+      if (!buyerAccounts.length) {
+        toast.warn(
+          "No active AliExpress buyer accounts found. Please connect an account in Settings → Buyer Accounts, or switch to AutoDS Wallet mode.",
+          { autoClose: 8000 }
+        );
+        return;
+      }
+      if (!hasBuyerAccountForSite(order.siteId)) {
+        toast.warn(
+          `No buyer account is tagged for this order's marketplace (${order.siteId || "current store"}). Please tag one in Settings → Buyer Accounts or choose a buyer account from the dropdown.`,
+          { autoClose: 8000 }
+        );
+        return;
+      }
+    }
+
+    // Condition 6: AutoDS Wallet mode & insufficient balance
+    if (processingMethod === "autods") {
+      const walletBalance = Number(wallet?.processing_wallet_balance ?? 0);
+      const buyCost = Number(order.buyPrice ?? 0);
+      if (buyCost > 0 && walletBalance < buyCost) {
+        const shortfall = (buyCost - walletBalance).toFixed(2);
+        setTransferAmountDraft(shortfall);
+        setTransferModalOpen(true);
+        toast.warn(
+          `Insufficient Processing Wallet balance ($${walletBalance.toFixed(2)}). Need $${buyCost.toFixed(2)} ($${shortfall} more). Please transfer funds from your main wallet to proceed.`,
+          { autoClose: 8000 }
+        );
+        return;
+      }
+    }
+
+    // Condition 7: Open pre-flight confirmation modal
+    setConfirmOrder(order);
+  };
+
+  const executeProcessOrder = async (order) => {
     setProcessingId(order.id);
     try {
       const res = await placeAliExpressOrder(order.id, {
@@ -369,14 +443,24 @@ function OrderProcessingContent() {
         buyer_account_id:
           processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
       });
-      toast.success(res.data?.message ?? "Order processed.");
+      toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
+      setConfirmOrder(null);
       setOrders((current) => current.filter((item) => item.id !== order.id));
       setSelectedIds((current) => current.filter((id) => id !== order.id));
       if (processingMethod === "autods") {
         loadWallet();
       }
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Could not process this order."), { autoClose: 8000 });
+      const message = getApiErrorMessage(err, "Could not process this order.");
+      const lower = message.toLowerCase();
+
+      if (lower.includes("insufficient") || lower.includes("balance") || lower.includes("wallet")) {
+        setTransferModalOpen(true);
+      } else if (lower.includes("source") || lower.includes("link") || lower.includes("product") || lower.includes("sku")) {
+        startEditSource(order);
+      }
+
+      toast.error(message, { autoClose: 9000 });
     } finally {
       setProcessingId("");
     }
@@ -912,21 +996,35 @@ function OrderProcessingContent() {
                       </td>
                       <td className="calculations-table__money">{formatMoney(order.sellPrice, order.currency)}</td>
                       <td>
-                        <div className="products-source-cell">
-                          {order.hasSource ? (
-                            <ProductItemIdCell itemId={order.itemBuy} url={order.itemBuyUrl} />
-                          ) : (
-                            <span className="products-source-btn__placeholder">Add source</span>
-                          )}
-                          <button
-                            type="button"
-                            className="products-source-cell__edit"
-                            onClick={() => startEditSource(order)}
-                            title="Edit source link"
-                            aria-label="Edit source link"
-                          >
-                            <LuPencil />
-                          </button>
+                        <div className="products-source-cell" style={{ flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, maxWidth: "100%" }}>
+                            {order.hasSource ? (
+                              <ProductItemIdCell itemId={order.itemBuy} url={order.itemBuyUrl} />
+                            ) : (
+                              <span
+                                className="products-source-btn__placeholder"
+                                onClick={() => startEditSource(order)}
+                                style={{ cursor: "pointer" }}
+                                title="Click to add supplier source"
+                              >
+                                Add source
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              className="products-source-cell__edit"
+                              onClick={() => startEditSource(order)}
+                              title="Edit source link"
+                              aria-label="Edit source link"
+                            >
+                              <LuPencil />
+                            </button>
+                          </div>
+                          {order.sourcePlatform ? (
+                            <span className={`orders-source-badge orders-source-badge--${order.sourcePlatform.toLowerCase()}`}>
+                              {order.sourcePlatform}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="calculations-table__money">
@@ -994,26 +1092,53 @@ function OrderProcessingContent() {
                             <>
                               <button
                                 type="button"
-                                className="order-processing-mark-btn order-processing-mark-btn--primary"
+                                className={`order-processing-mark-btn ${
+                                  order.aliexpressOrderId
+                                    ? "order-processing-mark-btn--placed"
+                                    : !order.hasSource
+                                    ? "order-processing-mark-btn--warning"
+                                    : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress"
+                                    ? "order-processing-mark-btn--external"
+                                    : "order-processing-mark-btn--primary"
+                                }`}
                                 onClick={() => handleProcessOrder(order)}
-                                disabled={
-                                  processingId === order.id ||
-                                  !order.hasSource ||
-                                  Boolean(order.aliexpressOrderId) ||
-                                  (processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId))
-                                }
+                                disabled={processingId === order.id}
                                 title={
-                                  !order.hasSource
-                                    ? "Add a source link before processing"
-                                    : order.aliexpressOrderId
-                                      ? "Already placed on AliExpress"
-                                      : processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId)
-                                        ? "No buyer account is tagged for this order's marketplace — tag one in Settings → Buyer Accounts"
-                                        : `Automatically purchase this item via ${processingMethod === "autods" ? "AutoDS" : "your buyer account"} and ship it to the buyer`
+                                  order.aliexpressOrderId
+                                    ? `Already placed on AliExpress (#${order.aliexpressOrderId})`
+                                    : !order.hasSource
+                                    ? "Missing supplier link — click to add source and process"
+                                    : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress"
+                                    ? `Click to view fulfillment steps for ${order.sourcePlatform}`
+                                    : "Review and process order"
                                 }
                               >
-                                {processingId === order.id ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                                <span>{processingId === order.id ? "Processing…" : "Process order"}</span>
+                                {processingId === order.id ? (
+                                  <>
+                                    <LuLoader className="spin-icon" />
+                                    <span>Processing…</span>
+                                  </>
+                                ) : order.aliexpressOrderId ? (
+                                  <>
+                                    <LuCheck />
+                                    <span>Placed</span>
+                                  </>
+                                ) : !order.hasSource ? (
+                                  <>
+                                    <LuPlus />
+                                    <span>Add Source</span>
+                                  </>
+                                ) : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress" ? (
+                                  <>
+                                    <LuExternalLink />
+                                    <span>Fulfill ({order.sourcePlatform})</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <LuZap />
+                                    <span>Process order</span>
+                                  </>
+                                )}
                               </button>
                               {processingMethod === "buyer" && !hasBuyerAccountForSite(order.siteId) ? (
                                 <button
@@ -1186,6 +1311,33 @@ function OrderProcessingContent() {
         onClose={() => setTransferModalOpen(false)}
         saving={transferring}
         placeholder="0.00"
+      />
+
+      <OrderConfirmModal
+        open={Boolean(confirmOrder)}
+        order={confirmOrder}
+        processingMethod={processingMethod}
+        wallet={wallet}
+        buyerAccount={
+          buyerAccounts.find((acc) => String(acc.id) === String(selectedBuyerAccountId)) ||
+          buyerAccounts[0] ||
+          null
+        }
+        processing={Boolean(confirmOrder) && processingId === confirmOrder.id}
+        onClose={() => setConfirmOrder(null)}
+        onConfirm={executeProcessOrder}
+      />
+
+      <ExternalOrderModal
+        open={Boolean(externalOrder)}
+        order={externalOrder}
+        onClose={() => setExternalOrder(null)}
+        onMarkProcessed={async (order) => {
+          await handleMarkProcessed(order);
+          setExternalOrder(null);
+        }}
+        onEditSource={startEditSource}
+        marking={Boolean(externalOrder) && processingId === externalOrder.id}
       />
     </section>
   );
