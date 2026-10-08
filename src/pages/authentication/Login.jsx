@@ -242,6 +242,13 @@ function Login() {
             </button>
           </form>
 
+          <div className="auth-page__card-foot">
+            <p>
+              Don’t have an account?{" "}
+              <Link to="/user/register">Get started with Auto DS</Link>
+            </p>
+          </div>
+
           <div className="auth-page__trust">
             <span><LuCheck /> Secure sign-in</span>
             <span><LuCheck /> Encrypted credentials</span>

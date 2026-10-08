@@ -93,20 +93,24 @@ export function checkAutoLogin(dispatch, navigate) {
     }
 }
 
-export function signupAction(name, email, password, passwordConfirmation, navigate) {
+export function signupAction(nameOrPayload, email, password, passwordConfirmation, navigate) {
     return (dispatch) => {
         dispatch(loadingToggleAction(true));
-        register(name, email, password, passwordConfirmation)
+        dispatch(clearAuthErrorsAction());
+        return register(nameOrPayload, email, password, passwordConfirmation)
             .then((response) => {
                 saveSession(response.data);
                 dispatch(loginConfirmedAction(response.data));
-                toast.success('Account created successfully!');
-                navigate('/');
+                if (typeof navigate === 'function') {
+                    navigate('/');
+                }
+                return response.data;
             })
             .catch((error) => {
                 const { message, fieldErrors } = parseApiErrors(error);
                 dispatch(loginFailedAction({ message, fieldErrors }));
                 toast.error(message);
+                throw error;
             })
             .finally(() => dispatch(loadingToggleAction(false)));
     };

@@ -6,13 +6,17 @@ export function login(email, password) {
     return axiosInstance.post('/auth/login', { email, password });
 }
 
-export function register(name, email, password, passwordConfirmation) {
-    return axiosInstance.post('/auth/register', {
-        name,
-        email,
-        password,
-        password_confirmation: passwordConfirmation,
-    });
+export function register(payloadOrName, email, password, passwordConfirmation) {
+    const payload = typeof payloadOrName === 'object' && payloadOrName !== null
+        ? payloadOrName
+        : {
+            name: payloadOrName,
+            email,
+            password,
+            password_confirmation: passwordConfirmation,
+        };
+
+    return axiosInstance.post('/auth/register', payload);
 }
 
 export function logout() {

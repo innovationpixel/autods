@@ -387,3 +387,569 @@
     font-size: 22px;
   }
 }
+
+/* ============================================================
+   ONBOARDING MULTI-STEP WIZARD STYLES
+   ============================================================ */
+
+.auth-page--onboarding {
+  grid-template-columns: minmax(0, 0.95fr) minmax(480px, 1.35fr);
+}
+
+.auth-page__card--wide {
+  width: min(720px, 100%);
+  max-width: 100%;
+}
+
+.onboarding-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.onboarding-stepper::before {
+  content: "";
+  position: absolute;
+  top: 18px;
+  left: 36px;
+  right: 36px;
+  height: 2px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.onboarding-stepper__progress {
+  position: absolute;
+  top: 18px;
+  left: 36px;
+  height: 2px;
+  background: linear-gradient(90deg, #ebb058, #e29c41);
+  transition: width 0.35s ease;
+  z-index: 1;
+}
+
+.onboarding-step-item {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+}
+
+.onboarding-step-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: #ffffff;
+  border: 2px solid #d1d5db;
+  color: #6b7280;
+  transition: all 0.25s ease;
+}
+
+.onboarding-step-item--active .onboarding-step-circle {
+  border-color: #e29c41;
+  background: #fff8eb;
+  color: #b87418;
+  box-shadow: 0 0 0 4px rgba(226, 156, 65, 0.2);
+}
+
+.onboarding-step-item--completed .onboarding-step-circle {
+  border-color: #10b981;
+  background: #10b981;
+  color: #ffffff;
+}
+
+.onboarding-step-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.onboarding-step-item--active .onboarding-step-label {
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.onboarding-step-item--completed .onboarding-step-label {
+  color: #10b981;
+}
+
+/* Password strength & restrictions */
+.password-strength {
+  margin-top: 8px;
+}
+
+.password-strength__bar-wrapper {
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.password-strength__bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.password-strength__bar--1 { width: 25%; background: #ef4444; }
+.password-strength__bar--2 { width: 50%; background: #f59e0b; }
+.password-strength__bar--3 { width: 75%; background: #3b82f6; }
+.password-strength__bar--4 { width: 100%; background: #10b981; }
+
+.password-strength__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.restrictions-checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 12px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #eef0f4;
+  border-radius: 8px;
+}
+
+.restriction-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #6b7280;
+  transition: color 0.2s ease;
+}
+
+.restriction-item--valid {
+  color: #059669;
+  font-weight: 600;
+}
+
+.restriction-item svg {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* Form grid helpers */
+.auth-page__form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .auth-page__form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auth-page__select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px 0 42px;
+  border: 1px solid #dfe3ed;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #3f3e47;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b8a93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+}
+
+.auth-page__select:focus {
+  border-color: #e29c41;
+  box-shadow: 0 0 0 3px rgba(226, 156, 65, 0.14);
+}
+
+.auth-page__checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.auth-page__checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #e29c41;
+  cursor: pointer;
+}
+
+/* Plan selection cards */
+.onboarding-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.onboarding-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border-radius: 14px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.onboarding-plan-card:hover {
+  border-color: #f3c27e;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(226, 156, 65, 0.12);
+}
+
+.onboarding-plan-card--selected {
+  border-color: #e29c41;
+  background: #fffdf9;
+  box-shadow: 0 12px 28px rgba(226, 156, 65, 0.16);
+}
+
+.onboarding-plan-card__badge {
+  position: absolute;
+  top: -11px;
+  right: 14px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ebb058, #e29c41);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 10px rgba(226, 156, 65, 0.3);
+}
+
+.onboarding-plan-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.onboarding-plan-card__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.onboarding-plan-card__check {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  transition: all 0.2s ease;
+}
+
+.onboarding-plan-card--selected .onboarding-plan-card__check {
+  background: #e29c41;
+  border-color: #e29c41;
+  color: #ffffff;
+}
+
+.onboarding-plan-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.onboarding-plan-card__amount {
+  font-size: 26px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.onboarding-plan-card__period {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.onboarding-plan-card__desc {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.45;
+  margin-bottom: 14px;
+  flex-grow: 1;
+}
+
+.onboarding-plan-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.onboarding-plan-card__features li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.onboarding-plan-card__features svg {
+  color: #10b981;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* Payment & Activation Screen */
+.onboarding-checkout-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fff8ed;
+  border: 1px solid #fde6c4;
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+
+.onboarding-checkout-summary__title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #8c5308;
+}
+
+.onboarding-checkout-summary__meta {
+  font-size: 12px;
+  color: #a86c1d;
+}
+
+.onboarding-checkout-summary__price {
+  font-size: 22px;
+  font-weight: 800;
+  color: #8c5308;
+  letter-spacing: -0.01em;
+}
+
+.onboarding-payment-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+@media (max-width: 580px) {
+  .onboarding-payment-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.onboarding-payment-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 2px solid #e5e7eb;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.onboarding-payment-card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.onboarding-payment-card--active {
+  border-color: #e29c41;
+  background: #fffcf7;
+  box-shadow: 0 6px 18px rgba(226, 156, 65, 0.14);
+}
+
+.onboarding-payment-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: #f3f4f6;
+  color: #4b5563;
+  flex-shrink: 0;
+}
+
+.onboarding-payment-card--stripe .onboarding-payment-card__icon {
+  background: #635bff15;
+  color: #635bff;
+}
+
+.onboarding-payment-card--paypal .onboarding-payment-card__icon {
+  background: #0070ba15;
+  color: #0070ba;
+}
+
+.onboarding-payment-card__info {
+  flex-grow: 1;
+}
+
+.onboarding-payment-card__name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.onboarding-payment-card__desc {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.onboarding-action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.onboarding-action-buttons .auth-page__submit {
+  margin-top: 0;
+}
+
+.onboarding-btn-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.onboarding-btn-back:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #1f2937;
+}
+
+/* Success Celebration Screen */
+.onboarding-success {
+  text-align: center;
+  padding: 24px 10px 14px;
+}
+
+.onboarding-success__icon-wrap {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  background: #ecfdf5;
+  border: 2px solid #a7f3d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #10b981;
+  font-size: 36px;
+  box-shadow: 0 12px 28px rgba(16, 185, 129, 0.2);
+  animation: bounce-in 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes bounce-in {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.onboarding-success h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.onboarding-success p {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 400px;
+  margin: 0 auto 20px;
+}
+
+.onboarding-success__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.onboarding-success__countdown-bar {
+  width: 100%;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.onboarding-success__countdown-fill {
+  height: 100%;
+  background: #10b981;
+  animation: countdown-fill 3.5s linear forwards;
+}
+
+@keyframes countdown-fill {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
