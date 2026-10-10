@@ -7553,8 +7553,45 @@
 }
 
 .orders-table-scroll {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.orders-table-scroll::-webkit-scrollbar {
+  height: 9px;
+}
+
+.orders-table-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.orders-table-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.orders-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+[data-theme-version="dark"] .orders-table-scroll {
+  scrollbar-color: #475569 #1e293b;
+}
+
+[data-theme-version="dark"] .orders-table-scroll::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+[data-theme-version="dark"] .orders-table-scroll::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+[data-theme-version="dark"] .orders-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 .orders-table {

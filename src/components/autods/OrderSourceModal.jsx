@@ -42,25 +42,14 @@ function skuMatchesSelection(sku, selected) {
   });
 }
 
-function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
+function OrderSourceModal({ open, order, requireAliExpress = false, saving = false, onClose, onSave }) {
   const [input, setInput] = useState("");
   const [platform, setPlatform] = useState("aliexpress");
+  const [ebayNotice, setEbayNotice] = useState(false);
   const [lookupState, setLookupState] = useState("idle");
   const [lookupError, setLookupError] = useState("");
   const [product, setProduct] = useState(null);
   const [selected, setSelected] = useState({});
-
-  useEffect(() => {
-    if (!open || !order) {
-      return;
-    }
-    setInput(order.sourceUrl ?? (order.itemBuy && order.itemBuy !== "—" ? order.itemBuy : ""));
-    setPlatform(order.sourcePlatform ?? "aliexpress");
-    setLookupState("idle");
-    setLookupError("");
-    setProduct(null);
-    setSelected({});
-  }, [open, order]);
 
   const dimensions = useMemo(() => (product ? buildDimensions(product.skus) : []), [product]);
 
@@ -71,11 +60,11 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
     return product.skus.filter((sku) => skuMatchesSelection(sku, selected));
   }, [product, selected]);
 
-  const resolvedSku = matchingSkus.length === 1 ? matchingSkus[0] : null;
-
-  if (!open) {
-    return null;
-  }
+  const resolvedSku = useMemo(() => {
+    if (!product) return null;
+    if (product.skus.length === 1) return product.skus[0];
+    return matchingSkus.length === 1 ? matchingSkus[0] : null;
+  }, [product, matchingSkus]);
 
   const resetLookup = () => {
     if (lookupState !== "idle") {
@@ -96,15 +85,15 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
     resetLookup();
   };
 
-  const handleLookup = async () => {
-    const trimmed = input.trim();
+  const performLookup = async (targetInput, targetPlatform) => {
+    const trimmed = (targetInput ?? input).trim();
     if (!trimmed) {
       setLookupState("error");
       setLookupError("Enter a source link or item ID first.");
       return;
     }
 
-    const resolved = normalizeListingSourceInput(trimmed, platform);
+    const resolved = normalizeListingSourceInput(trimmed, targetPlatform ?? platform);
 
     if (resolved.source_platform !== "aliexpress" || !resolved.source_product_id) {
       setLookupState("unsupported");
@@ -120,14 +109,13 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
       const skus = Array.isArray(res.data?.skus) ? res.data.skus : [];
       const dims = buildDimensions(skus);
 
+      setProduct({ title: res.data?.title ?? "", image: res.data?.image_url ?? null, skus });
+
       if (skus.length <= 1 || dims.length === 0) {
         setLookupState("single");
-        setProduct(null);
         setSelected({});
         return;
       }
-
-      setProduct({ title: res.data?.title ?? "", image: res.data?.image_url ?? null, skus });
 
       const existingSku = order?.sourceSkuId
         ? skus.find((sku) => String(sku.id) === String(order.sourceSkuId))
@@ -150,6 +138,40 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
     }
   };
 
+  const handleLookup = () => {
+    performLookup(input, platform);
+  };
+
+  useEffect(() => {
+    if (!open || !order) {
+      return;
+    }
+    const orderPlatform = (order.sourcePlatform ?? "aliexpress").toLowerCase();
+    const isEbay =
+      orderPlatform === "ebay" ||
+      (typeof order.sourceUrl === "string" && order.sourceUrl.toLowerCase().includes("ebay."));
+
+    const mustUseAliExpress = requireAliExpress || isEbay;
+    const initialPlatform = mustUseAliExpress ? "aliexpress" : (order.sourcePlatform ?? "aliexpress");
+    // If the existing source was eBay, its URL/itemBuy is an eBay link/item ID, NOT an AliExpress link.
+    // Clear it so the user can paste the actual AliExpress supplier link.
+    const initialInput = isEbay
+      ? ""
+      : (order.sourceUrl ?? (order.itemBuy && order.itemBuy !== "—" ? order.itemBuy : ""));
+
+    setInput(initialInput);
+    setPlatform(initialPlatform);
+    setEbayNotice(isEbay);
+    setLookupState("idle");
+    setLookupError("");
+    setProduct(null);
+    setSelected({});
+
+    if (initialInput && initialPlatform === "aliexpress") {
+      performLookup(initialInput, initialPlatform);
+    }
+  }, [open, order, requireAliExpress]);
+
   const handleSave = () => {
     const trimmed = input.trim();
     if (!trimmed) {
@@ -164,6 +186,12 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
 
     const resolved = normalizeListingSourceInput(trimmed, platform);
 
+    if (requireAliExpress && (resolved.source_platform !== "aliexpress" || !resolved.source_product_id)) {
+      setLookupState("error");
+      setLookupError("All orders are fulfilled via AliExpress. Please enter a valid AliExpress product link or item ID.");
+      return;
+    }
+
     onSave({
       source_input: resolved.source_input,
       source_platform: resolved.source_platform,
@@ -173,6 +201,23 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
         : null,
     });
   };
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
 
   const canSave = !saving && !(lookupState === "ready" && !resolvedSku);
 
@@ -195,18 +240,46 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
             <LuPencil />
           </span>
           <div>
-            <h2>Edit Source Link</h2>
-            <p>Paste the AliExpress (or other supplier) URL or item ID this order was sourced from.</p>
+            <h2>{requireAliExpress ? "Link AliExpress Supplier" : "Edit Source Link"}</h2>
+            <p>
+              {requireAliExpress
+                ? "Enter the AliExpress product link or item ID required to fulfill this order."
+                : "Paste the AliExpress (or other supplier) URL or item ID this order was sourced from."}
+            </p>
           </div>
         </div>
 
+        {ebayNotice ? (
+          <div
+            className="order-source-modal__ebay-notice"
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+              padding: "11px 14px",
+              marginBottom: 16,
+              borderRadius: 8,
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              color: "#b45309",
+              fontSize: 13,
+              lineHeight: 1.45,
+            }}
+          >
+            <LuTriangleAlert style={{ flexShrink: 0, marginTop: 2, fontSize: 16 }} />
+            <div>
+              <strong>eBay Source Detected:</strong> This order originated on eBay. All orders in AutoDS are processed through AliExpress. Please paste the AliExpress product link or item ID below to continue.
+            </div>
+          </div>
+        ) : null}
+
         <div className="order-source-modal__row">
           <label className="quick-edit-modal__field order-source-modal__input-field">
-            <span>Source link or item ID</span>
+            <span>AliExpress link or item ID</span>
             <input
               type="text"
               value={input}
-              placeholder="https://www.aliexpress.com/item/... or item ID"
+              placeholder="https://www.aliexpress.com/item/... or product ID"
               onChange={(event) => handleInputChange(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
@@ -222,11 +295,16 @@ function OrderSourceModal({ open, order, saving = false, onClose, onSave }) {
             <select
               value={platform}
               onChange={(event) => handlePlatformChange(event.target.value)}
-              disabled={saving}
+              disabled={saving || requireAliExpress}
             >
               {PLATFORM_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
+                <option
+                  key={option.value}
+                  value={option.value}
+                  disabled={requireAliExpress && option.value !== "aliexpress"}
+                >
                   {option.label}
+                  {requireAliExpress && option.value !== "aliexpress" ? " (Unsupported)" : ""}
                 </option>
               ))}
             </select>

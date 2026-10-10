@@ -180,6 +180,8 @@ function AdminListingsPage() {
             <thead>
               <tr>
                 <AdminSortableHeader label="Title" sortKey="title" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Sell SKU #" sortKey="sku" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <th>Buy SKU #</th>
                 <AdminSortableHeader label="User" sortKey="user" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Marketplace" sortKey="marketplace" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Category" sortKey="category_name" sort={sort} sortDir={sortDir} onSort={handleSort} />
@@ -203,8 +205,18 @@ function AdminListingsPage() {
                       ) : (
                         <strong>{listing.title}</strong>
                       )}
-                      <span>{listing.sku ?? "—"} · {listing.source_platform ?? "—"}</span>
+                      <span>{listing.source_platform ? listing.source_platform.toUpperCase() : "—"}</span>
                     </div>
+                  </td>
+                  <td>
+                    <code style={{ fontSize: 11.5, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4, color: "#334155", fontWeight: 600 }}>
+                      {listing.sell_sku || listing.sku || "—"}
+                    </code>
+                  </td>
+                  <td>
+                    <code style={{ fontSize: 11.5, background: "#eff6ff", padding: "2px 6px", borderRadius: 4, color: "#1d4ed8", fontWeight: 600 }}>
+                      {listing.buy_sku || listing.source_sku_id || listing.source_product_id || "—"}
+                    </code>
                   </td>
                   <td>
                     <div className="admin-clients-page__identity">
@@ -227,7 +239,7 @@ function AdminListingsPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={10} className="admin-table__empty">No listings found.</td>
+                  <td colSpan={12} className="admin-table__empty">No listings found.</td>
                 </tr>
               )}
             </tbody>

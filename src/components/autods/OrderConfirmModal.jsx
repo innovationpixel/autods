@@ -4,6 +4,7 @@ import { LuCheck, LuDollarSign, LuExternalLink, LuLoader, LuShieldAlert, LuStore
 function OrderConfirmModal({
   open,
   order,
+  quote,
   processingMethod,
   wallet,
   buyerAccount,
@@ -28,12 +29,18 @@ function OrderConfirmModal({
     return null;
   }
 
-  const buyCost = Number(order.buyPrice || 0);
+  const itemPrice = quote?.item_price != null ? Number(quote.item_price) : Number(order.buyPrice || 0);
+  const shippingCost = quote?.shipping_cost != null ? Number(quote.shipping_cost) : 0;
+  const taxAmount = quote?.tax_amount != null ? Number(quote.tax_amount) : 0;
+  const subtotal = itemPrice + shippingCost + taxAmount;
+  const autodsFee = quote?.autods_fee != null ? Number(quote.autods_fee) : Number((subtotal * 0.10).toFixed(2));
+  const totalCost = quote?.total_cost != null ? Number(quote.total_cost) : Number((subtotal + autodsFee).toFixed(2));
+
   const sellPrice = Number(order.sellPrice || 0);
-  const estProfit = order.buyPrice != null ? sellPrice - buyCost : null;
+  const estProfit = sellPrice > 0 ? sellPrice - totalCost : null;
   const walletBalance = Number(wallet?.processing_wallet_balance || 0);
   const isWallet = processingMethod === "autods";
-  const hasSufficientWallet = !isWallet || order.buyPrice == null || walletBalance >= buyCost;
+  const hasSufficientWallet = !isWallet || walletBalance >= totalCost;
 
   return (
     <div className="quick-edit-modal-layer" role="presentation">
@@ -148,15 +155,31 @@ function OrderConfirmModal({
         <div className="order-confirm-pricing-table">
           <div className="order-confirm-pricing-row">
             <span>Customer Sale Price</span>
-            <strong>${sellPrice.toFixed(2)} {order.currency}</strong>
+            <strong>${sellPrice.toFixed(2)} {order.currency || "USD"}</strong>
           </div>
           <div className="order-confirm-pricing-row">
-            <span>Estimated Supplier Cost</span>
-            <strong>{order.buyPrice != null ? `$${buyCost.toFixed(2)}` : "Calculated at checkout"}</strong>
+            <span>Supplier Item Price</span>
+            <strong>${itemPrice.toFixed(2)}</strong>
+          </div>
+          <div className="order-confirm-pricing-row">
+            <span>Supplier Shipping</span>
+            <strong>{shippingCost > 0 ? `$${shippingCost.toFixed(2)}` : "Free"}</strong>
+          </div>
+          <div className="order-confirm-pricing-row">
+            <span>Estimated Tax</span>
+            <strong>${taxAmount.toFixed(2)}</strong>
+          </div>
+          <div className="order-confirm-pricing-row" style={{ color: "#7c3aed" }}>
+            <span style={{ fontWeight: 600 }}>AutoDS Processing Fee (10%)</span>
+            <strong>+${autodsFee.toFixed(2)}</strong>
+          </div>
+          <div className="order-confirm-pricing-row" style={{ borderTop: "2px solid #e2e8f0", paddingTop: 8, marginTop: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>Total to Deduct from Wallet</span>
+            <strong style={{ fontWeight: 800, fontSize: 15, color: "#0f172a" }}>${totalCost.toFixed(2)} {quote?.currency || "USD"}</strong>
           </div>
           {estProfit != null ? (
-            <div className="order-confirm-pricing-row order-confirm-pricing-row--profit">
-              <span>Estimated Profit</span>
+            <div className="order-confirm-pricing-row order-confirm-pricing-row--profit" style={{ marginTop: 6 }}>
+              <span>Estimated Net Profit</span>
               <strong className={estProfit >= 0 ? "positive" : ""}>
                 {estProfit >= 0 ? `+$${estProfit.toFixed(2)}` : `-$${Math.abs(estProfit).toFixed(2)}`}
               </strong>

@@ -21,8 +21,17 @@ export const updateOrderFulfillment = (id, payload) =>
 export const updateOrderProcessingStatus = (id, processing_status) =>
     axiosInstance.patch(`/orders/${id}/processing-status`, { processing_status });
 
+export const getOrderCheckoutQuote = (id, params = {}) =>
+    axiosInstance.get(`/orders/${id}/checkout-quote`, { params });
+
+export const acceptRecommendedAddress = (id, payload = {}) =>
+    axiosInstance.post(`/orders/${id}/accept-recommended-address`, payload);
+
 export const placeAliExpressOrder = (id, payload = {}) =>
     axiosInstance.post(`/orders/${id}/place-aliexpress-order`, payload);
+
+export const updateOrderShippingAddress = (id, payload) =>
+    axiosInstance.put(`/orders/${id}/shipping-address`, payload);
 
 export const updateOrderTracking = (id, payload) =>
     axiosInstance.patch(`/orders/${id}/tracking`, payload);

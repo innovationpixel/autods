@@ -397,6 +397,7 @@ function createInitialSupplierSettings() {
       state: "",
       shippingMethod: "Cheapest with tracking",
       defaultTemplate: "Select default template",
+      blockedKeywords: "",
       useDynamicPolicies: false,
       paymentPolicyId: "",
       shippingPolicyId: "",
@@ -746,6 +747,7 @@ export default function MarketplaceSettingsPage() {
                   state: remote.lister.state ?? supplier.settings.lister.state ?? "",
                   shippingMethod: remote.lister.shipping_method ?? supplier.settings.lister.shippingMethod,
                   defaultTemplate: remote.lister.template ?? supplier.settings.lister.defaultTemplate,
+                  blockedKeywords: remote.lister.blocked_keywords ?? remote.lister.blockedKeywords ?? supplier.settings.lister.blockedKeywords ?? "",
                 },
               },
             })),
@@ -1481,6 +1483,7 @@ export default function MarketplaceSettingsPage() {
           zipcode: currentSettings.lister.zipcode,
           shipping_method: currentSettings.lister.shippingMethod,
           template: currentSettings.lister.defaultTemplate,
+          blocked_keywords: currentSettings.lister.blockedKeywords ?? "",
         },
         pricing: {
           product_cost_percent: 0,
@@ -1794,6 +1797,23 @@ export default function MarketplaceSettingsPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="marketplace-settings__section">
+        <h3 className="marketplace-settings__section-title">Blocked Keywords Settings</h3>
+        <p style={{ color: "#64748b", fontSize: 13, margin: "4px 0 10px" }}>
+          Listings containing any of these keywords in the title or description will be blocked from being listed on eBay.
+        </p>
+        <SettingsField label="Blocked Keywords (comma-separated or one per line)">
+          <textarea
+            className="marketplace-settings__control"
+            rows={3}
+            style={{ width: "100%", padding: 10, fontSize: 13, borderRadius: 6, border: "1px solid #cbd5e1", resize: "vertical" }}
+            placeholder="e.g. counterfeit, replica, fake, vero_brand, rolex"
+            value={currentSettings.lister.blockedKeywords ?? ""}
+            onChange={(event) => patchSection("lister", { blockedKeywords: event.target.value })}
+          />
+        </SettingsField>
       </section>
 
       <section className="marketplace-settings__section">

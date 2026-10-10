@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   LuArrowRightLeft,
@@ -20,13 +20,18 @@ import {
 import { toast } from "../../../utils/toast";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import {
+  acceptRecommendedAddress,
   getOrders,
+  getOrderCheckoutQuote,
   placeAliExpressOrder,
+  pushOrderTracking,
   syncOrders,
   updateOrderCost,
   updateOrderFulfillment,
   updateOrderProcessingStatus,
+  updateOrderShippingAddress,
   updateOrderSource,
+  updateOrderTracking,
 } from "../../../services/OrderService";
 import { getWalletSummary, transferToProcessingWallet } from "../../../services/WalletService";
 import { getBuyerAccounts } from "../../../services/BuyerAccountService";
@@ -48,6 +53,9 @@ import QuickEditModal from "../QuickEditModal";
 import OrderSourceModal from "../OrderSourceModal";
 import OrderConfirmModal from "../OrderConfirmModal";
 import ExternalOrderModal from "../ExternalOrderModal";
+import OrdersTrackingEditor from "../OrdersTrackingEditor";
+import OrderShippingAddressModal from "../OrderShippingAddressModal";
+import AddressRecommendationModal from "../AddressRecommendationModal";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
@@ -86,7 +94,21 @@ function mapProcessingOrder(order) {
   const buyer = raw.buyer ?? {};
   const pricing = raw.pricingSummary ?? {};
   const fulfillment = raw.fulfillmentStartInstructions?.[0] ?? {};
-  const shipTo = fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
+  const customAddr = raw.customShippingAddress ?? null;
+  const shipTo = customAddr
+    ? {
+        fullName: customAddr.fullName,
+        primaryPhone: { phoneNumber: customAddr.phone },
+        contactAddress: {
+          addressLine1: customAddr.addressLine1,
+          addressLine2: customAddr.addressLine2,
+          city: customAddr.city,
+          stateOrProvince: customAddr.stateOrProvince,
+          postalCode: customAddr.postalCode,
+          countryCode: customAddr.countryCode,
+        },
+      }
+    : fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
   const sellPrice = order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0;
   const currency = order.currency ?? pricing.total?.currency ?? "USD";
   const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
@@ -110,6 +132,16 @@ function mapProcessingOrder(order) {
       shipTo.contactAddress?.postalCode ?? shipTo.postalCode,
       shipTo.contactAddress?.countryCode ?? shipTo.countryCode,
     ]),
+    rawAddress: {
+      fullName: shipTo.fullName ?? buyer.buyerRegistrationAddress?.fullName ?? order.buyer_name ?? "",
+      addressLine1: shipTo.contactAddress?.addressLine1 ?? shipTo.addressLine1 ?? "",
+      addressLine2: shipTo.contactAddress?.addressLine2 ?? shipTo.addressLine2 ?? "",
+      city: shipTo.contactAddress?.city ?? shipTo.city ?? "",
+      stateOrProvince: shipTo.contactAddress?.stateOrProvince ?? shipTo.stateOrProvince ?? "",
+      postalCode: shipTo.contactAddress?.postalCode ?? shipTo.postalCode ?? "",
+      countryCode: shipTo.contactAddress?.countryCode ?? shipTo.countryCode ?? "US",
+      phone: shipTo.primaryPhone?.phoneNumber ?? buyer.primaryPhone?.phoneNumber ?? "",
+    },
     buyerPhone: shipTo.primaryPhone?.phoneNumber ?? buyer.primaryPhone?.phoneNumber ?? "—",
     sellPrice: Number(sellPrice) || 0,
     currency,
@@ -142,8 +174,11 @@ function mapProcessingOrder(order) {
 
       return {
         trackingNumber: parsed.trackingNumber,
+        trackingNumberRaw: parsed.trackingNumber,
         trackingUrl,
         carrier,
+        carrierRaw: carrier,
+        trackingPushed: Boolean(order.tracking_pushed_at),
       };
     })(),
   };
@@ -179,6 +214,12 @@ function OrderProcessingContent() {
   const [costDraft, setCostDraft] = useState("");
   const [savingCostId, setSavingCostId] = useState("");
 
+  const [editingTrackingId, setEditingTrackingId] = useState("");
+  const [trackingDraft, setTrackingDraft] = useState("");
+  const [carrierDraft, setCarrierDraft] = useState("");
+  const [savingTrackingId, setSavingTrackingId] = useState("");
+  const [pushingTrackingId, setPushingTrackingId] = useState("");
+
   const [editingFulfillment, setEditingFulfillment] = useState(null);
   const [fulfillmentDraft, setFulfillmentDraft] = useState("");
   const [savingFulfillmentKey, setSavingFulfillmentKey] = useState("");
@@ -187,7 +228,24 @@ function OrderProcessingContent() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [confirmOrder, setConfirmOrder] = useState(null);
+  const [orderQuote, setOrderQuote] = useState(null);
+  const [fetchingQuoteId, setFetchingQuoteId] = useState("");
+  const [addressRecommendationModal, setAddressRecommendationModal] = useState({
+    open: false,
+    order: null,
+    validation: null,
+  });
+  const [acceptingRecommended, setAcceptingRecommended] = useState(false);
   const [externalOrder, setExternalOrder] = useState(null);
+  const [addressModalOrder, setAddressModalOrder] = useState(null);
+  const [addressModalSaving, setAddressModalSaving] = useState(false);
+  const tableScrollRef = useRef(null);
+
+  const scrollTable = (direction) => {
+    if (!tableScrollRef.current) return;
+    const offset = direction === "left" ? -400 : 400;
+    tableScrollRef.current.scrollBy({ left: offset, behavior: "smooth" });
+  };
 
   const FULFILLMENT_FIELDS = {
     aliexpressOrderId: { key: "aliexpress_order_id", label: "AliExpress order ID" },
@@ -338,6 +396,79 @@ function OrderProcessingContent() {
     }
   };
 
+  const startEditTracking = (order) => {
+    setEditingTrackingId(order.id);
+    setTrackingDraft(order.trackingNumberRaw || "");
+    setCarrierDraft(order.carrierRaw || order.carrier || "");
+  };
+
+  const cancelEditTracking = () => {
+    setEditingTrackingId("");
+    setTrackingDraft("");
+    setCarrierDraft("");
+  };
+
+  const saveTracking = async (order) => {
+    const tracking = trackingDraft.trim();
+    let carrier = normalizeTrackingCarrier(carrierDraft);
+    if (!carrier && tracking) {
+      carrier = detectTrackingCarrier(tracking) || "";
+    }
+
+    setSavingTrackingId(order.id);
+    try {
+      await updateOrderTracking(order.id, {
+        tracking_number: tracking || null,
+        carrier: carrier || null,
+      });
+      toast.success("Tracking updated.");
+      cancelEditTracking();
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update tracking."));
+    } finally {
+      setSavingTrackingId("");
+    }
+  };
+
+  const pushTrackingToEbay = async (order) => {
+    const isEditing = editingTrackingId === order.id;
+    const tracking = (isEditing ? trackingDraft : (order.trackingNumberRaw || "")).trim();
+    let carrier = normalizeTrackingCarrier(isEditing ? carrierDraft : (order.carrierRaw || order.carrier || ""));
+
+    if (!tracking) {
+      startEditTracking(order);
+      toast.info("Please enter a tracking number first.");
+      return;
+    }
+
+    if (!carrier) {
+      carrier = detectTrackingCarrier(tracking) || "";
+    }
+
+    if (!carrier) {
+      startEditTracking(order);
+      toast.info("Please select a carrier before pushing to eBay.");
+      return;
+    }
+
+    setPushingTrackingId(order.id);
+    try {
+      await updateOrderTracking(order.id, {
+        tracking_number: tracking,
+        carrier,
+      });
+      const res = await pushOrderTracking(order.id);
+      toast.success(res.data?.message ?? "Tracking pushed to eBay.");
+      cancelEditTracking();
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not push tracking to eBay."));
+    } finally {
+      setPushingTrackingId("");
+    }
+  };
+
   const startEditFulfillment = (order, field) => {
     setEditingFulfillment({ orderId: order.id, field });
     setFulfillmentDraft(order[field] ?? "");
@@ -364,10 +495,25 @@ function OrderProcessingContent() {
     }
   };
 
-  const handleProcessOrder = (order) => {
-    // Condition 1: Missing supplier source link
-    if (!order.hasSource) {
-      toast.warn("Please link a supplier source link or item ID before processing this order.");
+  const handleProcessOrder = async (order) => {
+    // Condition 1: Supplier source must be AliExpress
+    const isAliExpress =
+      order.hasSource &&
+      order.sourcePlatform &&
+      order.sourcePlatform.toLowerCase() === "aliexpress";
+
+    if (!isAliExpress) {
+      if (order.sourcePlatform && order.sourcePlatform.toLowerCase() === "ebay") {
+        toast.warn(
+          "The source for this order is currently set to eBay. All orders are processed with AliExpress only — please enter the AliExpress supplier link or product ID to proceed.",
+          { autoClose: 9000 }
+        );
+      } else {
+        toast.warn(
+          "All orders can be processed with AliExpress only. Please provide the AliExpress source link or product ID to proceed.",
+          { autoClose: 8000 }
+        );
+      }
       startEditSource(order);
       return;
     }
@@ -385,19 +531,14 @@ function OrderProcessingContent() {
     const cleanAddress = (order.shippingAddress || "").trim();
     if (!cleanAddress || cleanAddress === "—") {
       toast.error(
-        "Buyer shipping address is missing from the marketplace order data. Please verify the shipping details on eBay.",
+        "Buyer shipping address is missing from the order data. Please enter the delivery address to proceed.",
         { autoClose: 8000 }
       );
+      setAddressModalOrder(order);
       return;
     }
 
-    // Condition 4: Non-AliExpress supplier platform (Amazon, Walmart, Etsy, eBay, etc.)
-    if (order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress") {
-      setExternalOrder(order);
-      return;
-    }
-
-    // Condition 5: Buyer account mode checks
+    // Condition 4: Buyer account mode checks
     if (processingMethod === "buyer") {
       if (!buyerAccounts.length) {
         toast.warn(
@@ -415,24 +556,76 @@ function OrderProcessingContent() {
       }
     }
 
-    // Condition 6: AutoDS Wallet mode & insufficient balance
+    // Condition 5: Fetch checkout quote & run address validation
+    setFetchingQuoteId(order.id);
+    let quote = null;
+    try {
+      const res = await getOrderCheckoutQuote(order.id, {
+        processing_method: processingMethod,
+        buyer_account_id: processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
+      });
+      quote = res.data;
+      setOrderQuote(quote);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not fetch checkout quote for order."));
+      setFetchingQuoteId("");
+      return;
+    } finally {
+      setFetchingQuoteId("");
+    }
+
+    // Address verification check: only proceed if exact address match, otherwise show recommendation modal
+    const validation = quote?.address_validation;
+    if (validation && validation.is_exact_match === false) {
+      setAddressRecommendationModal({
+        open: true,
+        order,
+        validation,
+      });
+      return;
+    }
+
+    // Wallet balance verification with full quote total cost (Item + Shipping + Tax + 10% AutoDS Fee)
     if (processingMethod === "autods") {
       const walletBalance = Number(wallet?.processing_wallet_balance ?? 0);
-      const buyCost = Number(order.buyPrice ?? 0);
-      if (buyCost > 0 && walletBalance < buyCost) {
-        const shortfall = (buyCost - walletBalance).toFixed(2);
+      const totalRequired = Number(quote?.total_cost ?? order.buyPrice ?? 0);
+      if (totalRequired > 0 && walletBalance < totalRequired) {
+        const shortfall = (totalRequired - walletBalance).toFixed(2);
         setTransferAmountDraft(shortfall);
         setTransferModalOpen(true);
         toast.warn(
-          `Insufficient Processing Wallet balance ($${walletBalance.toFixed(2)}). Need $${buyCost.toFixed(2)} ($${shortfall} more). Please transfer funds from your main wallet to proceed.`,
+          `Insufficient Processing Wallet balance ($${walletBalance.toFixed(2)}). Total order cost is $${totalRequired.toFixed(2)} ($${shortfall} more). Please transfer funds from your main wallet to proceed.`,
           { autoClose: 8000 }
         );
         return;
       }
     }
 
-    // Condition 7: Open pre-flight confirmation modal
+    // Condition 6: Open pre-flight confirmation modal with full cost breakdown
     setConfirmOrder(order);
+  };
+
+  const handleAcceptRecommendedAddress = async () => {
+    const { order, validation } = addressRecommendationModal;
+    if (!order || !validation?.recommended_address) return;
+
+    setAcceptingRecommended(true);
+    try {
+      const res = await acceptRecommendedAddress(order.id, {
+        recommended_address: validation.recommended_address,
+      });
+      toast.success(res.data?.message ?? "Address updated to AliExpress format.");
+      setAddressRecommendationModal({ open: false, order: null, validation: null });
+      await loadOrders();
+
+      const updated = res.data?.order ? mapProcessingOrder(res.data.order) : order;
+      // Re-trigger order processing with validated address
+      handleProcessOrder(updated);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not save recommended address."));
+    } finally {
+      setAcceptingRecommended(false);
+    }
   };
 
   const executeProcessOrder = async (order) => {
@@ -445,18 +638,24 @@ function OrderProcessingContent() {
       });
       toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
       setConfirmOrder(null);
-      setOrders((current) => current.filter((item) => item.id !== order.id));
-      setSelectedIds((current) => current.filter((id) => id !== order.id));
       if (processingMethod === "autods") {
         loadWallet();
       }
+      setActiveTab("processed");
     } catch (err) {
+      setConfirmOrder(null);
       const message = getApiErrorMessage(err, "Could not process this order.");
       const lower = message.toLowerCase();
 
       if (lower.includes("insufficient") || lower.includes("balance") || lower.includes("wallet")) {
         setTransferModalOpen(true);
-      } else if (lower.includes("source") || lower.includes("link") || lower.includes("product") || lower.includes("sku")) {
+      } else if (
+        lower.includes("source") ||
+        lower.includes("link") ||
+        lower.includes("product") ||
+        lower.includes("sku") ||
+        lower.includes("variation")
+      ) {
         startEditSource(order);
       }
 
@@ -492,6 +691,25 @@ function OrderProcessingContent() {
       toast.error(getApiErrorMessage(err, "Could not update processing status."));
     } finally {
       setProcessingId("");
+    }
+  };
+
+  const handleSaveAddress = async (addressData) => {
+    if (!addressModalOrder) return;
+    setAddressModalSaving(true);
+    try {
+      const res = await updateOrderShippingAddress(addressModalOrder.id, addressData);
+      toast.success("Shipping address updated.");
+      const updatedOrder = res.data?.order;
+      if (updatedOrder) {
+        const mapped = mapProcessingOrder(updatedOrder);
+        setOrders((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
+      }
+      setAddressModalOrder(null);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update shipping address."));
+    } finally {
+      setAddressModalSaving(false);
     }
   };
 
@@ -562,10 +780,28 @@ function OrderProcessingContent() {
   };
 
   const handleBulkProcess = async () => {
-    const selected = orders.filter((order) => selectedIds.includes(order.id) && order.hasSource && !order.aliexpressOrderId);
+    const selected = orders.filter(
+      (order) =>
+        selectedIds.includes(order.id) &&
+        order.hasSource &&
+        order.sourcePlatform?.toLowerCase() === "aliexpress" &&
+        !order.aliexpressOrderId
+    );
+
+    const nonAliExpressCount = orders.filter(
+      (order) =>
+        selectedIds.includes(order.id) &&
+        (!order.hasSource || order.sourcePlatform?.toLowerCase() !== "aliexpress")
+    ).length;
 
     if (!selected.length) {
-      toast.warn("Select orders with a source link that haven't been processed yet.");
+      if (nonAliExpressCount > 0) {
+        toast.warn(
+          "Selected order(s) do not have a valid AliExpress source. All orders are processed with AliExpress only — please add AliExpress source links first."
+        );
+      } else {
+        toast.warn("Select orders with an AliExpress source link that haven't been processed yet.");
+      }
       return;
     }
 
@@ -857,72 +1093,85 @@ function OrderProcessingContent() {
 
       <section className="calculations-table-panel card-wrapper">
         <div className="calculations-table-toolbar">
-          <strong>{orders.length} orders</strong>
-          {selectedIds.length ? (
-            <div className="order-processing-bulk-bar">
-              <span>{selectedIds.length} selected</span>
-              <button
-                type="button"
-                className="order-processing-bulk-bar__btn"
-                onClick={handleBulkProcess}
-                disabled={bulkProcessing}
-              >
-                {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
-              </button>
-              {activeTab === "new" || activeTab === "pending" ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <strong>{orders.length} orders</strong>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {selectedIds.length ? (
+              <div className="order-processing-bulk-bar">
+                <span>{selectedIds.length} selected</span>
                 <button
                   type="button"
                   className="order-processing-bulk-bar__btn"
-                  style={{ background: "#475569" }}
-                  onClick={handleBulkMarkProcessed}
+                  onClick={handleBulkProcess}
                   disabled={bulkProcessing}
-                  title="Mark all selected orders as processed without calling AliExpress API"
                 >
-                  <LuCheck />
-                  <span>Mark Processed</span>
+                  {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                  <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
                 </button>
-              ) : null}
+              </div>
+            ) : null}
+
+            <div className="calculations-table-toolbar__actions">
+              <button
+                type="button"
+                className="orders-icon-btn"
+                onClick={() => scrollTable("left")}
+                aria-label="Scroll grid left"
+                title="Scroll left"
+              >
+                <LuChevronLeft />
+              </button>
+              <button
+                type="button"
+                className="orders-icon-btn"
+                onClick={() => scrollTable("right")}
+                aria-label="Scroll grid right"
+                title="Scroll right"
+              >
+                <LuChevronRight />
+              </button>
             </div>
-          ) : null}
+          </div>
         </div>
 
         <div className="orders-table-shell">
-          <div className="orders-table-scroll">
-            <table className="orders-table calculations-table">
+          <div className="orders-table-scroll" ref={tableScrollRef}>
+            <table className="orders-table calculations-table" style={{ minWidth: 1680 }}>
               <thead>
                 <tr>
-                  <th className="orders-table__checkbox-col">
+                  <th className="orders-table__checkbox-col" style={{ width: 44, minWidth: 44 }}>
                     <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all orders" />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("order")}>
+                  <th style={{ width: 280, minWidth: 280, cursor: "pointer" }} onClick={() => handleSort("order")}>
                     <GridSortHeader columnId="order" label="Order" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("date")}>
+                  <th style={{ width: 110, minWidth: 110, cursor: "pointer" }} onClick={() => handleSort("date")}>
                     <GridSortHeader columnId="date" label="Date" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("buyer")}>
+                  <th style={{ width: 140, minWidth: 140, cursor: "pointer" }} onClick={() => handleSort("buyer")}>
                     <GridSortHeader columnId="buyer" label="Buyer" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("sellPrice")}>
+                  <th style={{ width: 110, minWidth: 110, cursor: "pointer" }} onClick={() => handleSort("sellPrice")}>
                     <GridSortHeader columnId="sellPrice" label="Sell Price" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("source")}>
+                  <th style={{ width: 220, minWidth: 220, cursor: "pointer" }} onClick={() => handleSort("source")}>
                     <GridSortHeader columnId="source" label="Source (AliExpress)" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("cost")}>
+                  <th style={{ width: 110, minWidth: 110, cursor: "pointer" }} onClick={() => handleSort("cost")}>
                     <GridSortHeader columnId="cost" label="Cost" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("aliexpressOrderId")}>
+                  <th style={{ width: 180, minWidth: 180, cursor: "pointer" }} onClick={() => handleSort("aliexpressOrderId")}>
                     <GridSortHeader columnId="aliexpressOrderId" label="AliExpress Order ID" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("aliexpressStatus")}>
+                  <th style={{ width: 140, minWidth: 140, cursor: "pointer" }} onClick={() => handleSort("aliexpressStatus")}>
                     <GridSortHeader columnId="aliexpressStatus" label="AliExpress Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th style={{ cursor: "pointer" }} onClick={() => handleSort("tracking")}>
+                  <th style={{ width: 220, minWidth: 220, cursor: "pointer" }} onClick={() => handleSort("tracking")}>
                     <GridSortHeader columnId="tracking" label="Tracking" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                   </th>
-                  <th>Action</th>
+                  <th style={{ width: 160, minWidth: 160 }}>Action</th>
                 </tr>
               </thead>
 
@@ -989,7 +1238,18 @@ function OrderProcessingContent() {
                       <td className="orders-table__date">{formatDisplayDate(order.orderDate)}</td>
                       <td>
                         <div className="orders-table__buyer-cell">
-                          <strong>{order.buyerName}</strong>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                            <strong>{order.buyerName}</strong>
+                            <button
+                              type="button"
+                              className="products-source-cell__edit"
+                              onClick={() => setAddressModalOrder(order)}
+                              title="Edit shipping address"
+                              aria-label="Edit shipping address"
+                            >
+                              <LuPencil />
+                            </button>
+                          </div>
                           <span>{order.shippingAddress}</span>
                           {order.buyerPhone !== "—" ? <span>{order.buyerPhone}</span> : null}
                         </div>
@@ -998,31 +1258,59 @@ function OrderProcessingContent() {
                       <td>
                         <div className="products-source-cell" style={{ flexDirection: "column", alignItems: "flex-start", gap: 3 }}>
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, maxWidth: "100%" }}>
-                            {order.hasSource ? (
+                            {order.hasSource && order.sourcePlatform && order.sourcePlatform.toLowerCase() === "aliexpress" ? (
                               <ProductItemIdCell itemId={order.itemBuy} url={order.itemBuyUrl} />
-                            ) : (
-                              <span
+                            ) : order.sourcePlatform && order.sourcePlatform.toLowerCase() === "ebay" ? (
+                              <button
+                                type="button"
                                 className="products-source-btn__placeholder"
                                 onClick={() => startEditSource(order)}
-                                style={{ cursor: "pointer" }}
-                                title="Click to add supplier source"
+                                style={{
+                                  cursor: "pointer",
+                                  color: "#b45309",
+                                  fontWeight: 600,
+                                  background: "rgba(245, 158, 11, 0.12)",
+                                  padding: "3px 8px",
+                                  borderRadius: "4px",
+                                  border: "1px dashed #f59e0b",
+                                }}
+                                title="Source is set to eBay. Click to enter AliExpress source."
                               >
-                                Add source
-                              </span>
+                                + Set AliExpress Source
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="products-source-btn__placeholder"
+                                onClick={() => startEditSource(order)}
+                                style={{ cursor: "pointer", padding: "3px 8px", borderRadius: "4px" }}
+                                title="Click to add AliExpress supplier source"
+                              >
+                                + Add AliExpress Source
+                              </button>
                             )}
                             <button
                               type="button"
                               className="products-source-cell__edit"
                               onClick={() => startEditSource(order)}
-                              title="Edit source link"
+                              title="Edit AliExpress source link"
                               aria-label="Edit source link"
                             >
                               <LuPencil />
                             </button>
                           </div>
                           {order.sourcePlatform ? (
-                            <span className={`orders-source-badge orders-source-badge--${order.sourcePlatform.toLowerCase()}`}>
-                              {order.sourcePlatform}
+                            <span
+                              className={`orders-source-badge orders-source-badge--${order.sourcePlatform.toLowerCase()}`}
+                              style={
+                                order.sourcePlatform.toLowerCase() === "ebay"
+                                  ? { background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", fontWeight: 600 }
+                                  : undefined
+                              }
+                            >
+                              {order.sourcePlatform.toLowerCase() === "ebay"
+                                ? "eBay (Needs AliExpress)"
+                                : order.sourcePlatform}
                             </span>
                           ) : null}
                         </div>
@@ -1062,29 +1350,20 @@ function OrderProcessingContent() {
                         </button>
                       </td>
                       <td>
-                        {order.trackingNumber ? (
-                          <div className="orders-tracking-display">
-                            <span className="orders-tracking-display__copy">
-                              {order.trackingUrl ? (
-                                <a
-                                  href={order.trackingUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="orders-order-id-link orders-table__mono"
-                                  title={`Track package: ${order.trackingNumber}`}
-                                  style={{ textDecoration: "underline" }}
-                                >
-                                  {order.trackingNumber}
-                                </a>
-                              ) : (
-                                <span className="orders-table__mono">{order.trackingNumber}</span>
-                              )}
-                              {order.carrier ? <span className="orders-table__carrier">{order.carrier}</span> : null}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="products-tracking-btn__placeholder">—</span>
-                        )}
+                        <OrdersTrackingEditor
+                          order={order}
+                          isEditing={editingTrackingId === order.id}
+                          trackingDraft={trackingDraft}
+                          carrierDraft={carrierDraft}
+                          saving={savingTrackingId === order.id}
+                          pushing={pushingTrackingId === order.id}
+                          onStartEdit={startEditTracking}
+                          onCancel={cancelEditTracking}
+                          onTrackingChange={setTrackingDraft}
+                          onCarrierChange={setCarrierDraft}
+                          onSave={saveTracking}
+                          onPushToEbay={pushTrackingToEbay}
+                        />
                       </td>
                       <td>
                         <div className="order-processing-actions">
@@ -1095,10 +1374,9 @@ function OrderProcessingContent() {
                                 className={`order-processing-mark-btn ${
                                   order.aliexpressOrderId
                                     ? "order-processing-mark-btn--placed"
-                                    : !order.hasSource
+                                    : !order.hasSource ||
+                                      (order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress")
                                     ? "order-processing-mark-btn--warning"
-                                    : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress"
-                                    ? "order-processing-mark-btn--external"
                                     : "order-processing-mark-btn--primary"
                                 }`}
                                 onClick={() => handleProcessOrder(order)}
@@ -1107,9 +1385,11 @@ function OrderProcessingContent() {
                                   order.aliexpressOrderId
                                     ? `Already placed on AliExpress (#${order.aliexpressOrderId})`
                                     : !order.hasSource
-                                    ? "Missing supplier link — click to add source and process"
+                                    ? "Missing AliExpress supplier link — click to add source"
+                                    : order.sourcePlatform && order.sourcePlatform.toLowerCase() === "ebay"
+                                    ? "Current source is eBay. All orders must be fulfilled with AliExpress — click to enter AliExpress source."
                                     : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress"
-                                    ? `Click to view fulfillment steps for ${order.sourcePlatform}`
+                                    ? `Current source is ${order.sourcePlatform}. Orders can only be processed with AliExpress.`
                                     : "Review and process order"
                                 }
                               >
@@ -1123,15 +1403,11 @@ function OrderProcessingContent() {
                                     <LuCheck />
                                     <span>Placed</span>
                                   </>
-                                ) : !order.hasSource ? (
+                                ) : !order.hasSource ||
+                                  (order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress") ? (
                                   <>
                                     <LuPlus />
-                                    <span>Add Source</span>
-                                  </>
-                                ) : order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress" ? (
-                                  <>
-                                    <LuExternalLink />
-                                    <span>Fulfill ({order.sourcePlatform})</span>
+                                    <span>Add AliExpress Source</span>
                                   </>
                                 ) : (
                                   <>
@@ -1161,15 +1437,6 @@ function OrderProcessingContent() {
                                   Tag Buyer Account →
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
-                                className="order-processing-mark-btn order-processing-mark-btn--secondary"
-                                onClick={() => handleMarkProcessed(order)}
-                                disabled={processingId === order.id}
-                                title="Manually mark this order as processed (paid) without calling AliExpress API"
-                              >
-                                <span>Mark Processed</span>
-                              </button>
                             </>
                           ) : (
                             <select
@@ -1261,13 +1528,16 @@ function OrderProcessingContent() {
         </div>
       </section>
 
-      <OrderSourceModal
-        open={Boolean(editingSourceOrder)}
-        order={editingSourceOrder}
-        saving={Boolean(editingSourceOrder) && savingSourceId === editingSourceOrder.id}
-        onClose={cancelEditSource}
-        onSave={saveSource}
-      />
+      {Boolean(editingSourceOrder) ? (
+        <OrderSourceModal
+          open={Boolean(editingSourceOrder)}
+          order={editingSourceOrder}
+          requireAliExpress={true}
+          saving={Boolean(editingSourceOrder) && savingSourceId === editingSourceOrder.id}
+          onClose={cancelEditSource}
+          onSave={saveSource}
+        />
+      ) : null}
 
       <QuickEditModal
         open={Boolean(editingCostId)}
@@ -1313,9 +1583,24 @@ function OrderProcessingContent() {
         placeholder="0.00"
       />
 
+      <AddressRecommendationModal
+        open={addressRecommendationModal.open}
+        order={addressRecommendationModal.order}
+        validation={addressRecommendationModal.validation}
+        accepting={acceptingRecommended}
+        onClose={() => setAddressRecommendationModal({ open: false, order: null, validation: null })}
+        onAcceptRecommended={handleAcceptRecommendedAddress}
+        onEditManual={() => {
+          const ord = addressRecommendationModal.order;
+          setAddressRecommendationModal({ open: false, order: null, validation: null });
+          if (ord) setAddressModalOrder(ord);
+        }}
+      />
+
       <OrderConfirmModal
         open={Boolean(confirmOrder)}
         order={confirmOrder}
+        quote={orderQuote}
         processingMethod={processingMethod}
         wallet={wallet}
         buyerAccount={
@@ -1324,7 +1609,10 @@ function OrderProcessingContent() {
           null
         }
         processing={Boolean(confirmOrder) && processingId === confirmOrder.id}
-        onClose={() => setConfirmOrder(null)}
+        onClose={() => {
+          setConfirmOrder(null);
+          setOrderQuote(null);
+        }}
         onConfirm={executeProcessOrder}
       />
 
@@ -1338,6 +1626,14 @@ function OrderProcessingContent() {
         }}
         onEditSource={startEditSource}
         marking={Boolean(externalOrder) && processingId === externalOrder.id}
+      />
+
+      <OrderShippingAddressModal
+        open={Boolean(addressModalOrder)}
+        order={addressModalOrder}
+        saving={addressModalSaving}
+        onClose={() => setAddressModalOrder(null)}
+        onSave={handleSaveAddress}
       />
     </section>
   );
