@@ -5,6 +5,13 @@ import { BrowserRouter } from 'react-router-dom'
 import ThemeContext from './context/ThemeContext'
 import { store } from './store/store.jsx'
 import { Provider } from 'react-redux'
+import './assets/css/autoprime-dashboard-v2.css'
+import './assets/css/auth-autoprime.css'
+import './assets/css/recent-orders-single-line.css'
+import './assets/css/autoprime-accent-overrides.css'
+import './assets/css/autoprime-finder-polish.css'
+import './assets/css/autoprime-product-card-classic.css'
+import './assets/css/ant-marketplace-search-fix.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -17,4 +24,3 @@ createRoot(document.getElementById('root')).render(
     </Provider>
   </StrictMode>,
 )
-

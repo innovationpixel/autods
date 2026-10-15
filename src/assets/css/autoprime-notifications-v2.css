@@ -1,0 +1,405 @@
+/* AutoDrop Prime notification surface polish.
+   Scoped to the marketplace shell so legacy/global dropdown rules cannot leak in. */
+
+.autoprime-portal .marketplace-header__notifications {
+  position: relative !important;
+}
+
+.autoprime-portal .marketplace-header__icon-btn--bell {
+  position: relative !important;
+}
+
+.autoprime-portal .marketplace-header__icon-btn--bell::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  width: 7px !important;
+  height: 7px !important;
+  border: 2px solid #fff !important;
+  border-radius: 999px !important;
+  background: #6d28d9 !important;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.08) !important;
+}
+
+.autoprime-portal .notification-popover {
+  position: absolute !important;
+  top: calc(100% + 12px) !important;
+  right: 0 !important;
+  z-index: 1200 !important;
+  width: min(440px, calc(100vw - 24px)) !important;
+  overflow: hidden !important;
+  border: 1px solid #e8def7 !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 22px 60px rgba(51, 32, 75, 0.18), 0 4px 14px rgba(51, 32, 75, 0.08) !important;
+}
+
+.autoprime-portal .notification-popover__head,
+.autoprime-portal .notification-modal__head,
+.autoprime-portal .notification-empty-modal__head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  min-height: 68px !important;
+  padding: 14px 16px !important;
+  border-bottom: 1px solid #eee8f5 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fbf9ff 100%) !important;
+}
+
+.autoprime-portal .notification-popover__title {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  gap: 10px !important;
+}
+
+.autoprime-portal .notification-popover__title > svg {
+  width: 21px !important;
+  height: 21px !important;
+  flex: 0 0 21px !important;
+  color: #6d28d9 !important;
+  stroke-width: 2 !important;
+}
+
+.autoprime-portal .notification-popover__title h2 {
+  margin: 0 !important;
+  color: #241a31 !important;
+  font-size: 18px !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.autoprime-portal .notification-popover__title > span {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  padding: 0 8px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.2) !important;
+}
+
+.autoprime-portal .notification-popover__close {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 36px !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  border: 1px solid #e8e1ef !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #72677e !important;
+  box-shadow: none !important;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
+}
+
+.autoprime-portal .notification-popover__close:hover {
+  border-color: #cdb7eb !important;
+  background: #f7f2ff !important;
+  color: #6d28d9 !important;
+  transform: translateY(-1px) !important;
+}
+
+.autoprime-portal .notification-popover__close svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.autoprime-portal .notification-popover__list,
+.autoprime-portal .notification-modal__body {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding: 8px !important;
+  background: #fff !important;
+}
+
+.autoprime-portal .notification-popover__list {
+  max-height: 356px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+.autoprime-portal .notification-popover__list::-webkit-scrollbar,
+.autoprime-portal .notification-modal__body::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.autoprime-portal .notification-popover__list::-webkit-scrollbar-track,
+.autoprime-portal .notification-modal__body::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.autoprime-portal .notification-popover__list::-webkit-scrollbar-thumb,
+.autoprime-portal .notification-modal__body::-webkit-scrollbar-thumb {
+  border-radius: 999px !important;
+  background: #d9c9ef !important;
+}
+
+.autoprime-portal .notification-popover__item {
+  display: grid !important;
+  grid-template-columns: 40px minmax(0, 1fr) auto !important;
+  align-items: start !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  gap: 11px !important;
+  padding: 12px !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  color: inherit !important;
+  text-align: left !important;
+  box-shadow: none !important;
+  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease !important;
+}
+
+.autoprime-portal .notification-popover__item:hover {
+  border-color: #e7dbf6 !important;
+  background: #faf7ff !important;
+  transform: translateY(-1px) !important;
+}
+
+.autoprime-portal .notification-popover__dot {
+  position: relative !important;
+  display: block !important;
+  width: 40px !important;
+  height: 40px !important;
+  margin: 0 !important;
+  border: 1px solid #e5d8f7 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(145deg, #f7f2ff 0%, #eee6ff 100%) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75) !important;
+}
+
+.autoprime-portal .notification-popover__dot::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 999px !important;
+  background: #6d28d9 !important;
+  box-shadow: 0 0 0 5px rgba(109, 40, 217, 0.1) !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+.autoprime-portal .notification-popover__copy {
+  display: flex !important;
+  min-width: 0 !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  padding-top: 1px !important;
+}
+
+.autoprime-portal .notification-popover__copy strong {
+  display: block !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  color: #30253b !important;
+  font-size: 13.5px !important;
+  font-weight: 750 !important;
+  line-height: 1.35 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.autoprime-portal .notification-popover__copy > span {
+  display: -webkit-box !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #82778d !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.autoprime-portal .notification-popover__time {
+  align-self: start !important;
+  padding-top: 2px !important;
+  color: #9d94a5 !important;
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+}
+
+.autoprime-portal .notification-popover__footer {
+  padding: 10px 12px 12px !important;
+  border-top: 1px solid #eee8f5 !important;
+  background: #fff !important;
+}
+
+.autoprime-portal .notification-popover__see-more {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 42px !important;
+  padding: 0 16px !important;
+  border: 1px solid #ddcef3 !important;
+  border-radius: 11px !important;
+  background: #f7f2ff !important;
+  color: #6124c8 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  box-shadow: none !important;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
+}
+
+.autoprime-portal .notification-popover__see-more:hover {
+  border-color: #6d28d9 !important;
+  background: #6d28d9 !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Full notification modal opened from See more. */
+.autoprime-portal .notification-modal-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2000 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 24px !important;
+}
+
+.autoprime-portal .notification-modal-layer__backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: rgba(31, 22, 43, 0.42) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+.autoprime-portal .notification-modal {
+  position: relative !important;
+  z-index: 1 !important;
+  width: min(620px, calc(100vw - 32px)) !important;
+  max-height: min(76vh, 720px) !important;
+  overflow: hidden !important;
+  border: 1px solid #e6dcf3 !important;
+  border-radius: 20px !important;
+  background: #fff !important;
+  box-shadow: 0 28px 80px rgba(31, 22, 43, 0.26) !important;
+}
+
+.autoprime-portal .notification-modal__body {
+  max-height: calc(min(76vh, 720px) - 68px) !important;
+  overflow-y: auto !important;
+  padding: 10px !important;
+}
+
+.autoprime-portal .notification-empty-modal {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  z-index: 2001 !important;
+  width: min(420px, calc(100vw - 32px)) !important;
+  overflow: hidden !important;
+  border: 1px solid #e6dcf3 !important;
+  border-radius: 18px !important;
+  background: #fff !important;
+  box-shadow: 0 24px 70px rgba(31, 22, 43, 0.22) !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+/* Dark theme parity. */
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-modal,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-modal,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__list,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-modal__body,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__footer {
+  border-color: #352c44 !important;
+  background: #18131f !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__head,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-modal__head,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-modal__head {
+  border-color: #352c44 !important;
+  background: linear-gradient(180deg, #1c1624 0%, #18131f 100%) !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__title h2,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy strong {
+  color: #f7f3fb !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy > span,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__time {
+  color: #aaa0b7 !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__item:hover {
+  border-color: #4b3a60 !important;
+  background: #221a2c !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__close,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__see-more {
+  border-color: #453852 !important;
+  background: #211927 !important;
+  color: #cbb4f3 !important;
+}
+
+@media (max-width: 760px) {
+  .autoprime-portal .notification-popover {
+    position: fixed !important;
+    top: 72px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    max-height: calc(100vh - 88px) !important;
+  }
+
+  .autoprime-portal .notification-popover__list {
+    max-height: calc(100vh - 226px) !important;
+  }
+
+  .autoprime-portal .notification-popover__item {
+    grid-template-columns: 36px minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .autoprime-portal .notification-popover__dot {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  .autoprime-portal .notification-popover__time {
+    grid-column: 2 !important;
+    padding-top: 0 !important;
+  }
+
+  .autoprime-portal .notification-modal-layer {
+    padding: 12px !important;
+  }
+
+  .autoprime-portal .notification-modal {
+    width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  .autoprime-portal .notification-modal__body {
+    max-height: calc(100vh - 92px) !important;
+  }
+}

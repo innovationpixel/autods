@@ -1,0 +1,492 @@
+/* AutoPrime — Calculations table polish
+   Scoped to calculations page only. Keeps data/actions intact while fixing
+   density, hierarchy, status decorations, theme consistency and wrapping. */
+
+.calculations-page-content {
+  --calc-purple: #6d28d9;
+  --calc-purple-deep: #5420b4;
+  --calc-purple-soft: #f4efff;
+  --calc-purple-line: #ddd2f2;
+  --calc-text: #231f2d;
+  --calc-muted: #7f788b;
+  --calc-faint: #a29cab;
+  --calc-border: #ece8f1;
+  --calc-green: #16865f;
+  --calc-green-soft: #edf8f3;
+}
+
+/* Card / table shell */
+.calculations-page-content .calculations-table-panel.card-wrapper {
+  overflow: hidden !important;
+  border: 1px solid var(--calc-border) !important;
+  border-radius: 16px !important;
+  background: #fff !important;
+  box-shadow: 0 8px 28px rgba(41, 31, 61, .035) !important;
+}
+
+.calculations-page-content .calculations-table-toolbar {
+  min-height: 54px !important;
+  padding: 0 18px !important;
+  border-bottom: 1px solid var(--calc-border) !important;
+  background: #fff !important;
+}
+
+.calculations-page-content .calculations-table-toolbar strong {
+  color: var(--calc-text) !important;
+  font-size: 13px !important;
+  font-weight: 760 !important;
+}
+
+/* Horizontal scroll instead of column squeeze */
+.calculations-page-content .calculations-table-scroll {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #b9a5df #f4f1f8 !important;
+}
+
+.calculations-page-content .calculations-table-scroll::-webkit-scrollbar {
+  height: 8px !important;
+}
+.calculations-page-content .calculations-table-scroll::-webkit-scrollbar-track {
+  background: #f5f2f9 !important;
+  border-radius: 999px !important;
+}
+.calculations-page-content .calculations-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #f5f2f9 !important;
+  border-radius: 999px !important;
+  background: #b9a5df !important;
+  background-clip: padding-box !important;
+}
+.calculations-page-content .calculations-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9d82d1 !important;
+}
+
+.calculations-page-content .calculations-table {
+  table-layout: fixed !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.calculations-page-content .calculations-table thead th {
+  height: 48px !important;
+  padding: 0 14px !important;
+  vertical-align: middle !important;
+  border-bottom: 1px solid var(--calc-border) !important;
+  background: #faf9fc !important;
+  color: #6e6878 !important;
+  font-size: 10.5px !important;
+  font-weight: 760 !important;
+  line-height: 1.15 !important;
+  letter-spacing: .015em !important;
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .calculations-table tbody td {
+  padding: 13px 14px !important;
+  vertical-align: top !important;
+  border-bottom: 1px solid #f0edf4 !important;
+  background: #fff !important;
+  color: #383140 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.calculations-page-content .calculations-table__totals-row td {
+  height: 42px !important;
+  padding: 0 14px !important;
+  vertical-align: middle !important;
+  border-bottom: 1px solid var(--calc-border) !important;
+  background: #f7f5fa !important;
+  color: #5f5869 !important;
+  font-size: 10.5px !important;
+  font-weight: 750 !important;
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .orders-table__row:last-child td {
+  border-bottom: 0 !important;
+}
+.calculations-page-content .orders-table__row:hover td {
+  background: #fcfbfe !important;
+}
+
+/* Sort treatment: remove legacy blue state */
+.calculations-page-content .orders-sort-btn {
+  justify-content: flex-start !important;
+  color: inherit !important;
+}
+.calculations-page-content .orders-sort-btn--active {
+  color: var(--calc-purple-deep) !important;
+}
+.calculations-page-content .orders-sort-btn__icon {
+  color: #aaa4b3 !important;
+}
+.calculations-page-content .orders-sort-btn__icon--active {
+  color: var(--calc-purple) !important;
+}
+
+/* IDs never break into vertical / multi-line number fragments */
+.calculations-page-content .calculations-table__order-id,
+.calculations-page-content .calculations-table__mono,
+.calculations-page-content .products-item-id__primary,
+.calculations-page-content .products-item-id__sku,
+.calculations-page-content .products-item-id-link {
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+.calculations-page-content .calculations-table__order-id,
+.calculations-page-content .calculations-table__mono,
+.calculations-page-content .products-item-id__primary {
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .products-item-id {
+  display: grid !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+.calculations-page-content .products-item-id__primary {
+  color: #292432 !important;
+  font-size: 11.5px !important;
+  font-weight: 760 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.calculations-page-content .products-item-id__sku {
+  display: block !important;
+  max-width: 225px !important;
+  overflow: hidden !important;
+  color: #928b9b !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+.calculations-page-content .products-item-id-link {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+.calculations-page-content .products-item-id-link:hover .products-item-id__primary {
+  color: var(--calc-purple) !important;
+}
+
+/* BUY / SELL blocks: compact, themed, readable */
+.calculations-page-content .orders-paired-values {
+  display: grid !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+.calculations-page-content .orders-paired-values > div {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 5px 6px !important;
+  min-width: 0 !important;
+}
+
+.calculations-page-content .orders-paired-values__type {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 36px !important;
+  height: 21px !important;
+  padding: 0 7px !important;
+  border: 1px solid #d8cdf0 !important;
+  border-radius: 6px !important;
+  background: #f6f2ff !important;
+  color: #6840b6 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: .035em !important;
+}
+
+.calculations-page-content .orders-paired-values__platform {
+  color: #8d8797 !important;
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .orders-paired-values > div > :is(.products-source-cell,.products-item-id,.products-item-id-link,.orders-source-cell__variation,.calculations-tracking-val) {
+  grid-column: 1 / -1 !important;
+}
+
+.calculations-page-content .orders-source-cell__variation {
+  max-width: 230px !important;
+  overflow: hidden !important;
+  color: #9b95a4 !important;
+  font-size: 9.5px !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Add source / tracking are actions, not disabled-looking text */
+.calculations-page-content .products-source-btn__placeholder {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  padding: 0 9px !important;
+  border: 1px solid #d3c5ed !important;
+  border-radius: 7px !important;
+  background: #f8f5ff !important;
+  color: var(--calc-purple-deep) !important;
+  font-size: 10px !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .products-source-cell {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+.calculations-page-content .products-source-cell__edit {
+  flex: 0 0 auto !important;
+  width: 27px !important;
+  height: 27px !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: #a19aa9 !important;
+}
+.calculations-page-content .products-source-cell__edit:hover {
+  background: var(--calc-purple-soft) !important;
+  color: var(--calc-purple) !important;
+}
+
+/* Tracking layout */
+.calculations-page-content .calculations-tracking-val {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+
+.calculations-page-content .calculations-tracking-val > strong,
+.calculations-page-content .calculations-tracking-val > a {
+  max-width: 190px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.calculations-page-content .orders-table__carrier {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 22px !important;
+  padding: 0 7px !important;
+  border: 1px solid #ded8e7 !important;
+  border-radius: 999px !important;
+  background: #f7f6f9 !important;
+  color: #696270 !important;
+  font-size: 9px !important;
+  font-weight: 750 !important;
+  letter-spacing: .02em !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  writing-mode: horizontal-tb !important;
+  word-break: keep-all !important;
+}
+
+.calculations-page-content .orders-tracking-display__push {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  min-height: 28px !important;
+  padding: 0 9px !important;
+  border: 1px solid #d3c5ed !important;
+  border-radius: 7px !important;
+  background: #f7f3ff !important;
+  color: var(--calc-purple-deep) !important;
+  box-shadow: none !important;
+  font-size: 9.5px !important;
+  font-weight: 750 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+.calculations-page-content .orders-tracking-display__push:hover:not(:disabled) {
+  border-color: #bba5e5 !important;
+  background: #f0eaff !important;
+  color: var(--calc-purple) !important;
+}
+.calculations-page-content .orders-tracking-display__push:disabled {
+  opacity: .55 !important;
+}
+
+/* Product cell */
+.calculations-page-content .calculations-product {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 11px !important;
+  min-width: 0 !important;
+}
+
+.calculations-page-content .calculations-product .orders-product__thumb {
+  flex: 0 0 56px !important;
+  width: 56px !important;
+  height: 56px !important;
+  overflow: hidden !important;
+  border: 1px solid #ebe7ef !important;
+  border-radius: 10px !important;
+  background: #f7f6f8 !important;
+}
+.calculations-page-content .calculations-product .orders-product__thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.calculations-page-content .calculations-product__copy {
+  min-width: 0 !important;
+  padding-top: 1px !important;
+}
+.calculations-page-content .calculations-product__copy h3 {
+  display: -webkit-box !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  color: #292431 !important;
+  font-size: 12.5px !important;
+  font-weight: 730 !important;
+  line-height: 1.4 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+/* The API description currently duplicates the product title in this grid. */
+.calculations-page-content .calculations-product__description {
+  display: none !important;
+}
+
+/* Status: kill the huge legacy circular decoration */
+.calculations-page-content .orders-table__status-cell {
+  position: static !important;
+  overflow: visible !important;
+  background: #fff !important;
+}
+.calculations-page-content .orders-table__status-cell::before,
+.calculations-page-content .orders-table__status-cell::after {
+  content: none !important;
+  display: none !important;
+}
+
+.calculations-page-content .calculations-status-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  border: 1px solid #d8cdf0 !important;
+  border-radius: 999px !important;
+  background: #f5f1ff !important;
+  color: #6032b8 !important;
+  box-shadow: none !important;
+  font-size: 10.5px !important;
+  font-weight: 750 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+.calculations-page-content .calculations-status-badge .orders-status-badge__left {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+}
+.calculations-page-content .calculations-status-badge svg {
+  flex: 0 0 auto !important;
+  width: 13px !important;
+  height: 13px !important;
+}
+
+/* Fulfilled/success stays semantic green; pending/not-started becomes neutral purple. */
+.calculations-page-content :is(.orders-status-badge--shipped,.orders-status-badge--delivered,.orders-status-badge--fulfilled).calculations-status-badge {
+  border-color: #c9e8db !important;
+  background: var(--calc-green-soft) !important;
+  color: var(--calc-green) !important;
+}
+
+/* Address / money / quantity density */
+.calculations-page-content .calculations-table__address {
+  color: #5f5868 !important;
+  font-size: 11px !important;
+  line-height: 1.5 !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+.calculations-page-content .calculations-table__money {
+  color: #37313f !important;
+  font-variant-numeric: tabular-nums !important;
+  white-space: nowrap !important;
+}
+.calculations-page-content .calculations-table__money .products-tracking-btn {
+  min-height: 28px !important;
+  padding: 0 5px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+.calculations-page-content .calculations-table__money .products-tracking-btn:hover {
+  background: #f7f3ff !important;
+  color: var(--calc-purple-deep) !important;
+}
+
+/* Keep row height compact and consistent */
+.calculations-page-content .orders-table__row td {
+  min-height: 82px !important;
+}
+
+/* Footer / pagination theme consistency */
+.calculations-page-content .calculations-table-footer {
+  min-height: 58px !important;
+  padding: 10px 88px 10px 16px !important;
+  border-top: 1px solid var(--calc-border) !important;
+  background: #fff !important;
+}
+
+.calculations-page-content .orders-pagination__page,
+.calculations-page-content .orders-pagination__arrow {
+  border-radius: 7px !important;
+  color: #756e7e !important;
+}
+.calculations-page-content .orders-pagination__page--active {
+  border-color: var(--calc-purple) !important;
+  background: var(--calc-purple) !important;
+  color: #fff !important;
+}
+.calculations-page-content .orders-pagination__arrow:hover:not(:disabled),
+.calculations-page-content .orders-pagination__page:hover:not(.orders-pagination__page--active) {
+  border-color: #d3c5ed !important;
+  background: #f7f3ff !important;
+  color: var(--calc-purple) !important;
+}
+
+@media (max-width: 900px) {
+  .calculations-page-content .calculations-table-toolbar {
+    padding-inline: 14px !important;
+  }
+
+  .calculations-page-content .calculations-table-footer {
+    padding-right: 16px !important;
+  }
+}

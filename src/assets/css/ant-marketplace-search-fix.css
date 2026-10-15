@@ -1,0 +1,136 @@
+/* Final isolation for the Ant Design marketplace search.
+   Loaded last so legacy marketplace input styles cannot create double borders. */
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search.ant-input-search,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search.ant-input-group-wrapper {
+  display: block !important;
+  width: 100% !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-wrapper.ant-input-group {
+  display: flex !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-wrapper.ant-input-group::before,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-wrapper.ant-input-group::after {
+  display: none !important;
+  content: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-affix-wrapper {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  padding: 0 18px !important;
+  margin: 0 !important;
+  border: 1px solid #d8d1e4 !important;
+  border-right: 0 !important;
+  border-radius: 12px 0 0 12px !important;
+  outline: 0 !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-affix-wrapper:hover {
+  border-color: #bda9e8 !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-affix-wrapper-focused,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-affix-wrapper:focus,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-affix-wrapper:focus-within {
+  border-color: #6d28d9 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input:hover,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input:focus,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input:focus-visible {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  color: #211b2d !important;
+  font-size: 16px !important;
+  box-shadow: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input::placeholder {
+  color: #aaa3b5 !important;
+  opacity: 1 !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-clear-icon {
+  color: #958ca4 !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-group-addon {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button:hover,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button:focus,
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button:focus-visible {
+  width: 138px !important;
+  min-width: 138px !important;
+  height: 58px !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+  padding: 0 22px !important;
+  border: 1px solid #6d28d9 !important;
+  border-radius: 0 12px 12px 0 !important;
+  outline: 0 !important;
+  background: #6d28d9 !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+.marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button:hover {
+  border-color: #5b21b6 !important;
+  background: #5b21b6 !important;
+}
+
+@media (max-width: 640px) {
+  .marketplace-dashboard-page .marketplace-search-panel__top-row .marketplace-ant-search .ant-input-search-button {
+    width: 100px !important;
+    min-width: 100px !important;
+    padding-inline: 14px !important;
+  }
+}

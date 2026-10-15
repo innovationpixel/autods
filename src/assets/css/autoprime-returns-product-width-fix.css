@@ -1,0 +1,223 @@
+/* Returns & Disputes — final table column / product visibility fix */
+
+.returns-disputes-page .rd-table {
+  width: 100% !important;
+  min-width: 1410px !important;
+  table-layout: fixed !important;
+}
+
+.returns-disputes-page .rd-table th,
+.returns-disputes-page .rd-table td {
+  box-sizing: border-box !important;
+}
+
+/* Balanced desktop column architecture. */
+.returns-disputes-page .rd-table th:nth-child(1),
+.returns-disputes-page .rd-table td:nth-child(1) {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+}
+
+/* Product & Order gets priority width so title + Item + Order remain readable. */
+.returns-disputes-page .rd-table th:nth-child(2),
+.returns-disputes-page .rd-table td:nth-child(2) {
+  width: 390px !important;
+  min-width: 390px !important;
+  max-width: 390px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(3),
+.returns-disputes-page .rd-table td:nth-child(3) {
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(4),
+.returns-disputes-page .rd-table td:nth-child(4) {
+  width: 185px !important;
+  min-width: 185px !important;
+  max-width: 185px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(5),
+.returns-disputes-page .rd-table td:nth-child(5) {
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(6),
+.returns-disputes-page .rd-table td:nth-child(6) {
+  width: 95px !important;
+  min-width: 95px !important;
+  max-width: 95px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(7),
+.returns-disputes-page .rd-table td:nth-child(7) {
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(8),
+.returns-disputes-page .rd-table td:nth-child(8) {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+  white-space: nowrap !important;
+}
+
+/* Actions stay fully visible and aligned at the far right. */
+.returns-disputes-page .rd-table th:nth-child(9),
+.returns-disputes-page .rd-table td:nth-child(9) {
+  position: sticky !important;
+  right: 0 !important;
+  width: 170px !important;
+  min-width: 170px !important;
+  max-width: 170px !important;
+  z-index: 4 !important;
+  background: #fff !important;
+  border-left: 1px solid #eee8f4 !important;
+  box-shadow: -8px 0 16px -14px rgba(43, 30, 63, .35) !important;
+}
+
+.returns-disputes-page .rd-table thead th:nth-child(9) {
+  z-index: 7 !important;
+  background: #faf8fd !important;
+  text-align: center !important;
+}
+
+.returns-disputes-page .rd-table tbody tr:hover td:nth-child(9) {
+  background: #fcfaff !important;
+}
+
+/* Product & Order: full metadata visibility without bleeding into Store. */
+.returns-disputes-page .rd-item-cell {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-cell img,
+.returns-disputes-page .rd-item-thumb {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  object-fit: cover !important;
+  border-radius: 9px !important;
+}
+
+.returns-disputes-page .rd-item-details {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-title {
+  display: -webkit-box !important;
+  margin: 0 0 5px !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  text-overflow: ellipsis !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-height: 1.25 !important;
+}
+
+.returns-disputes-page .rd-item-submeta {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-link-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.returns-disputes-page .rd-link-pill > span {
+  min-width: 0 !important;
+  max-width: calc(100% - 16px) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Keep Store content inside its own compact column. */
+.returns-disputes-page .rd-table td:nth-child(3) > div {
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-table td:nth-child(3) span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Actual JSX classes: View + Resolve must sit on one centered baseline. */
+.returns-disputes-page .rd-actions-cell {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-btn-action {
+  box-sizing: border-box !important;
+  min-width: 68px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+}
+
+.returns-disputes-page .rd-btn-action--primary {
+  min-width: 78px !important;
+}
+
+/* Native horizontal scroll remains available only when viewport is genuinely narrower. */
+.returns-disputes-page .rd-table-wrapper {
+  overflow-x: auto !important;
+}
+
+@media (max-width: 1450px) {
+  .returns-disputes-page .rd-table {
+    min-width: 1410px !important;
+  }
+}

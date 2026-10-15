@@ -10,14 +10,22 @@ function Home() {
 	const { pathname } = useLocation();
 
 	if (role === "super_admin") {
-		return <SuperAdminShell />;
+		return (
+		<div className="autoprime-portal">
+			<SuperAdminShell />
+		</div>
+	);
 	}
 
 	if (pathname.startsWith("/admin")) {
 		return <Navigate to="/" replace />;
 	}
 
-	return <MarketplaceDashboard />;
+	return (
+		<div className="autoprime-portal">
+			<MarketplaceDashboard />
+		</div>
+	);
 }
 
 export default Home;

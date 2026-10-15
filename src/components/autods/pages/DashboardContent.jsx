@@ -11,9 +11,11 @@ import {
   LuGavel,
   LuHeart,
   LuMail,
+  LuMinus,
   LuRefreshCw,
   LuShoppingCart,
   LuTag,
+  LuTrendingDown,
   LuTrendingUp,
   LuUser,
   LuWalletCards,
@@ -22,82 +24,89 @@ import {
 
 import { selectUser } from "../../../store/selectors/AuthSelectors";
 import { getDashboardSummary } from "../../../services/DashboardService";
+import DashboardOrderActions from "../DashboardOrderActions";
 
 const PLACEHOLDER_IMAGE =
   "data:image/svg+xml;utf8," +
   encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#eef0f4"/></svg>');
 
 const dateFilterOptions = [
-  {
-    value: "today",
-    label: "Today",
-    comparison: "vs yesterday",
-  },
-  {
-    value: "15",
-    label: "Last 15 Days",
-    comparison: "vs previous 15 days",
-  },
-  {
-    value: "30",
-    label: "Last 30 Days",
-    comparison: "vs previous 30 days",
-  },
-  {
-    value: "year",
-    label: "This Year",
-    comparison: "vs last year",
-  },
+  { value: "today", label: "Today", comparison: "vs yesterday" },
+  { value: "15", label: "Last 15 Days", comparison: "vs previous 15 days" },
+  { value: "30", label: "Last 30 Days", comparison: "vs previous 30 days" },
+  { value: "year", label: "This Year", comparison: "vs last year" },
 ];
 
 function DateFilterDropdown({ value, onChange, small = false }) {
   const [open, setOpen] = useState(false);
-
-  const selected =
-    dateFilterOptions.find((item) => item.value === value) ||
-    dateFilterOptions[2];
+  const selected = dateFilterOptions.find((item) => item.value === value) || dateFilterOptions[2];
 
   return (
-    <div
-      className={`ebay-date-filter ${small ? "ebay-date-filter--small" : ""}`}
-    >
+    <div className={`ebay-date-filter ${small ? "ebay-date-filter--small" : ""}`}>
       <button
         type="button"
         className={small ? "ebay-small-select" : "ebay-date-button"}
         onClick={() => setOpen((current) => !current)}
+        aria-expanded={open}
       >
         <LuCalendarDays />
-
         <span>{selected.label}</span>
-
         <LuChevronDown className={open ? "ebay-chevron--open" : ""} />
       </button>
 
       {open && (
-        <div
-          className={`ebay-date-dropdown ${
-            small ? "ebay-date-dropdown--small" : ""
-          }`}
-        >
+        <div className={`ebay-date-dropdown ${small ? "ebay-date-dropdown--small" : ""}`}>
           {dateFilterOptions.map((option) => (
             <button
               type="button"
               key={option.value}
-              className={`ebay-date-option ${
-                value === option.value ? "ebay-date-option--active" : ""
-              }`}
+              className={`ebay-date-option ${value === option.value ? "ebay-date-option--active" : ""}`}
               onClick={() => {
                 onChange(option.value);
                 setOpen(false);
               }}
             >
               <span>{option.label}</span>
-
               {value === option.value && <LuCircleCheck />}
             </button>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function Skeleton({ className = "" }) {
+  return <span className={`ap-skeleton ${className}`} aria-hidden="true" />;
+}
+
+function MetricSkeleton() {
+  return (
+    <article className="ebay-kpi-card ebay-kpi-card--loading" aria-hidden="true">
+      <div className="ebay-kpi-card__top">
+        <Skeleton className="ap-skeleton--icon" />
+        <Skeleton className="ap-skeleton--chip" />
+      </div>
+      <Skeleton className="ap-skeleton--label" />
+      <Skeleton className="ap-skeleton--metric" />
+      <Skeleton className="ap-skeleton--caption" />
+    </article>
+  );
+}
+
+function PanelRowsSkeleton({ rows = 5, compact = false }) {
+  return (
+    <div className={`ap-list-skeleton ${compact ? "ap-list-skeleton--compact" : ""}`} aria-hidden="true">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div className="ap-list-skeleton__row" key={index}>
+          <Skeleton className="ap-skeleton--avatar" />
+          <div className="ap-list-skeleton__copy">
+            <Skeleton className="ap-skeleton--line-wide" />
+            <Skeleton className="ap-skeleton--line-short" />
+          </div>
+          <Skeleton className="ap-skeleton--value" />
+        </div>
+      ))}
     </div>
   );
 }
@@ -116,45 +125,39 @@ function formatGrowth(value) {
   return `${growth > 0 ? "+" : ""}${growth}%`;
 }
 
+function growthClass(value) {
+  const growth = Number(value ?? 0);
+  if (growth > 0) return "is-positive";
+  if (growth < 0) return "is-negative";
+  return "is-neutral";
+}
+
 function timeAgo(iso) {
   if (!iso) return "";
-
   const diffSec = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (diffSec < 60) return "Just now";
-
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
-
   const diffDay = Math.floor(diffHour / 24);
   return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
 }
 
-const ACTIVITY_ICONS = {
-  order: LuShoppingCart,
-  listing: LuTag,
-};
+const ACTIVITY_ICONS = { order: LuShoppingCart, listing: LuTag };
 
 function createPolylinePoints(values) {
   if (!values?.length) return "";
-
   const width = 700;
   const height = 210;
-
   const max = Math.max(...values);
   const min = Math.min(...values);
-
   const range = max - min || 1;
 
   return values
     .map((value, index) => {
-      const x =
-        values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
-
+      const x = values.length === 1 ? width / 2 : (index / (values.length - 1)) * width;
       const y = height - ((value - min) / range) * 150 - 25;
-
       return `${x},${y}`;
     })
     .join(" ");
@@ -170,31 +173,13 @@ const EMPTY_KPIS = {
   views: { value: 0, growth: 0 },
 };
 
-/* =========================================================
-   COMPONENT
-   ========================================================= */
-
 function DashboardContent({ searchQuery }) {
   const navigate = useNavigate();
   const user = useSelector(selectUser);
-
-  /* =======================================================
-     FILTER STATE
-     ======================================================= */
-
-  // Main dashboard filter
   const [dateFilter, setDateFilter] = useState("30");
-
-  // Sales & Profit Overview filter
   const [salesDateFilter, setSalesDateFilter] = useState("30");
-
-  /* =======================================================
-     REAL DATA
-     ======================================================= */
-
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
-
   const [salesSummary, setSalesSummary] = useState(null);
   const [salesLoading, setSalesLoading] = useState(true);
 
@@ -241,117 +226,73 @@ function DashboardContent({ searchQuery }) {
   const kpis = summary?.kpis ?? EMPTY_KPIS;
   const salesChart = salesSummary?.sales_chart ?? EMPTY_CHART;
   const salesKpis = salesSummary?.kpis ?? EMPTY_KPIS;
-
-  const selectedDashboardFilter = dateFilterOptions.find(
-    (item) => item.value === dateFilter,
-  );
-
-  /* =======================================================
-     NAVIGATION
-     ======================================================= */
+  const selectedDashboardFilter = dateFilterOptions.find((item) => item.value === dateFilter);
 
   const openPage = (page) => {
     if (!page) return;
-
     navigate(page === "dashboard" ? "/" : `/${page}`);
   };
 
-  /* =======================================================
-     DYNAMIC KPI CARDS
-     ======================================================= */
-
-  const dynamicKpiCards = useMemo(() => [
-    {
-      id: "profit",
-      label: "Total Profit",
-      value: formatMoney(kpis.profit?.value ?? 0),
-      growth: kpis.profit?.growth ?? 0,
-      percentage: formatGrowth(kpis.profit?.growth ?? 0),
-      icon: LuWalletCards,
-    },
-    {
-      id: "revenue",
-      label: "Total Revenue",
-      value: formatMoney(kpis.revenue?.value ?? 0),
-      growth: kpis.revenue?.growth ?? 0,
-      percentage: formatGrowth(kpis.revenue?.growth ?? 0),
-      icon: LuTrendingUp,
-    },
-    {
-      id: "orders",
-      label: "Total Orders",
-      value: formatNumber(kpis.orders?.value ?? 0),
-      growth: kpis.orders?.growth ?? 0,
-      percentage: formatGrowth(kpis.orders?.growth ?? 0),
-      icon: LuShoppingCart,
-    },
-    {
-      id: "listings",
-      label: "Active Listings",
-      value: formatNumber(kpis.listings?.value ?? 0),
-      growth: kpis.listings?.growth ?? 0,
-      percentage: formatGrowth(kpis.listings?.growth ?? 0),
-      icon: LuTag,
-    },
-    {
-      id: "views",
-      label: "Views",
-      value: formatNumber(kpis.views?.value ?? 0),
-      growth: kpis.views?.growth ?? 0,
-      percentage: formatGrowth(kpis.views?.growth ?? 0),
-      icon: LuEye,
-    },
-  ], [kpis]);
-
-  /* =======================================================
-     SEARCH
-     ======================================================= */
+  const dynamicKpiCards = useMemo(
+    () => [
+      {
+        id: "profit",
+        label: "Total Profit",
+        value: formatMoney(kpis.profit?.value ?? 0),
+        growth: kpis.profit?.growth ?? 0,
+        percentage: formatGrowth(kpis.profit?.growth ?? 0),
+        icon: LuWalletCards,
+      },
+      {
+        id: "revenue",
+        label: "Total Revenue",
+        value: formatMoney(kpis.revenue?.value ?? 0),
+        growth: kpis.revenue?.growth ?? 0,
+        percentage: formatGrowth(kpis.revenue?.growth ?? 0),
+        icon: LuTrendingUp,
+      },
+      {
+        id: "orders",
+        label: "Total Orders",
+        value: formatNumber(kpis.orders?.value ?? 0),
+        growth: kpis.orders?.growth ?? 0,
+        percentage: formatGrowth(kpis.orders?.growth ?? 0),
+        icon: LuShoppingCart,
+      },
+      {
+        id: "listings",
+        label: "Active Listings",
+        value: formatNumber(kpis.listings?.value ?? 0),
+        growth: kpis.listings?.growth ?? 0,
+        percentage: formatGrowth(kpis.listings?.growth ?? 0),
+        icon: LuTag,
+      },
+      {
+        id: "views",
+        label: "Views",
+        value: formatNumber(kpis.views?.value ?? 0),
+        growth: kpis.views?.growth ?? 0,
+        percentage: formatGrowth(kpis.views?.growth ?? 0),
+        icon: LuEye,
+      },
+    ],
+    [kpis],
+  );
 
   const visibleMetrics = useMemo(() => {
     const query = searchQuery?.trim().toLowerCase();
-
-    if (!query) {
-      return dynamicKpiCards;
-    }
-
+    if (!query) return dynamicKpiCards;
     return dynamicKpiCards.filter(
-      (item) =>
-        item.label.toLowerCase().includes(query) ||
-        item.value.toString().toLowerCase().includes(query),
+      (item) => item.label.toLowerCase().includes(query) || item.value.toLowerCase().includes(query),
     );
   }, [dynamicKpiCards, searchQuery]);
 
-  /* =======================================================
-     CHART POINTS
-     ======================================================= */
-
-  const salesPoints = useMemo(
-    () => createPolylinePoints(salesChart.sales),
-    [salesChart],
-  );
-
-  const costPoints = useMemo(
-    () => createPolylinePoints(salesChart.cost),
-    [salesChart],
-  );
-
-  const profitPoints = useMemo(
-    () => createPolylinePoints(salesChart.profit),
-    [salesChart],
-  );
-
+  const salesPoints = useMemo(() => createPolylinePoints(salesChart.sales), [salesChart]);
+  const costPoints = useMemo(() => createPolylinePoints(salesChart.cost), [salesChart]);
+  const profitPoints = useMemo(() => createPolylinePoints(salesChart.profit), [salesChart]);
   const chartMax = Math.max(1, ...salesChart.sales, ...salesChart.cost, ...salesChart.profit);
 
-  /* =======================================================
-     ORDERS
-     ======================================================= */
-
   const orders = summary?.recent_orders ?? [];
-
-  /* =======================================================
-     TOP PRODUCTS
-     ======================================================= */
-
   const rawTopProducts = summary?.top_products ?? [];
   const maxSold = Math.max(1, ...rawTopProducts.map((product) => product.sold));
   const topProducts = rawTopProducts.map((product) => ({
@@ -362,10 +303,6 @@ function DashboardContent({ searchQuery }) {
     image: product.image || PLACEHOLDER_IMAGE,
   }));
 
-  /* =======================================================
-     ACTIVITIES
-     ======================================================= */
-
   const activities = (summary?.recent_activity ?? []).map((activity) => ({
     icon: ACTIVITY_ICONS[activity.type] ?? LuTag,
     title: activity.title,
@@ -373,10 +310,6 @@ function DashboardContent({ searchQuery }) {
     time: timeAgo(activity.time),
     type: activity.type,
   }));
-
-  /* =======================================================
-     STORE PERFORMANCE
-     ======================================================= */
 
   const store = summary?.store ?? {};
   const storeRows = [
@@ -391,504 +324,295 @@ function DashboardContent({ searchQuery }) {
 
   const firstName = (user?.name ?? "").trim().split(/\s+/)[0] || "there";
 
-  /* =======================================================
-     RETURN
-     ======================================================= */
-
   return (
-    <section className="ebay-dashboard">
-      {/* ===================================================
-          HEADER
-          =================================================== */}
-
+    <section className="ebay-dashboard" aria-busy={summaryLoading || salesLoading}>
       <header className="ebay-dashboard__header">
         <div className="ebay-dashboard__welcome">
-          <h1>
-            Good to see you again, {firstName}! <span>👋</span>
-          </h1>
-
-          <p>Here's your eBay business performance at a glance.</p>
+          <span className="ebay-dashboard__eyebrow">Store analytics</span>
+          <h1>Welcome back, {firstName}</h1>
+          <p>Monitor profit, sales, listings and recent store activity.</p>
         </div>
 
         <div className="ebay-dashboard__header-right">
-          <div className="ebay-logo">
-            <span className="ebay-logo__e">e</span>
-            <span className="ebay-logo__b">b</span>
-            <span className="ebay-logo__a">a</span>
-            <span className="ebay-logo__y">y</span>
-          </div>
-
-          {/* MAIN DATE FILTER */}
-
+          <span className="ebay-marketplace-chip" aria-label="eBay marketplace">
+            <span className="ebay-marketplace-chip__logo" aria-hidden="true">
+              <b>e</b><b>B</b><b>a</b><b>y</b>
+            </span>
+            <span>Marketplace</span>
+          </span>
           <DateFilterDropdown value={dateFilter} onChange={setDateFilter} />
         </div>
       </header>
 
-      {/* ===================================================
-          KPI CARDS
-          =================================================== */}
+      <section className="ebay-kpi-grid" aria-label="Store performance metrics">
+        {summaryLoading
+          ? Array.from({ length: 5 }).map((_, index) => <MetricSkeleton key={index} />)
+          : visibleMetrics.slice(0, 5).map((item, index) => {
+              const Icon = item.icon || LuWalletCards;
+              const growth = Number(item.growth) || 0;
+              const trendState = growth > 0 ? "positive" : growth < 0 ? "negative" : "neutral";
+              const TrendIcon = trendState === "positive" ? LuTrendingUp : trendState === "negative" ? LuTrendingDown : LuMinus;
+              const comparisonLabel = (selectedDashboardFilter?.comparison ?? "vs previous period").replace(/^vs\s+/i, "");
+              const periodCopy = trendState === "neutral"
+                ? `No change from ${comparisonLabel}`
+                : `${Math.abs(growth)}% ${trendState === "positive" ? "higher" : "lower"} than ${comparisonLabel}`;
 
-      <section className="ebay-kpi-grid">
-        {visibleMetrics.slice(0, 5).map((item, index) => {
-          const Icon = item.icon || LuWalletCards;
-
-          return (
-            <article className="ebay-kpi-card" key={item.id || index}>
-              <div className="ebay-kpi-card__top">
-                <span className="ebay-kpi-card__icon">
-                  <Icon />
-                </span>
-
-                <span className="ebay-kpi-card__trend">
-                  <LuTrendingUp />
-                  {summaryLoading ? "…" : item.percentage}
-                </span>
-              </div>
-
-              <div className="ebay-kpi-card__label">
-                {item.label}
-              </div>
-
-              <div className="ebay-kpi-card__value">
-                {summaryLoading ? "…" : item.value}
-              </div>
-
-              <span className="ebay-kpi-card__period">
-                {summaryLoading ? "" : `${item.growth >= 0 ? "↑" : "↓"} ${item.percentage} ${selectedDashboardFilter?.comparison ?? ""}`}
-              </span>
-            </article>
-          );
-        })}
-
-        {/* PROMO */}
-
-        <article className="ebay-pro-card">
-          <div className="ebay-pro-card__icon">
-            <LuZap />
-          </div>
-
-          <h3>
-            Scale Your
-            <br />
-            eBay Business
-          </h3>
-
-          <p>
-            Find, list and sell
-            <br />
-            winning products —
-            <br />
-            faster with AutoDropship.
-          </p>
-
-          <button type="button" onClick={() => openPage("plans")}>
-            Upgrade to Pro
-            <LuChevronRight />
-          </button>
-        </article>
+              return (
+                <article className={`ebay-kpi-card ebay-kpi-card--${item.id || index}`} key={item.id || index}>
+                  <div className="ebay-kpi-card__top">
+                    <span className="ebay-kpi-card__icon">
+                      <Icon />
+                    </span>
+                    <span className={`ebay-kpi-card__trend is-${trendState}`}>
+                      <TrendIcon />
+                      {item.percentage}
+                    </span>
+                  </div>
+                  <div className="ebay-kpi-card__label">{item.label}</div>
+                  <div className="ebay-kpi-card__value">{item.value}</div>
+                  <span className="ebay-kpi-card__period">{periodCopy}</span>
+                </article>
+              );
+            })}
       </section>
 
-      {/* ===================================================
-          MAIN GRID
-          =================================================== */}
+      <section className="ebay-upgrade-banner">
+        <div className="ebay-upgrade-banner__icon">
+          <LuZap />
+        </div>
+        <div className="ebay-upgrade-banner__copy">
+          <strong>Automate more with Pro</strong>
+          <span>Higher limits, faster product workflows and more room to scale.</span>
+        </div>
+        <button type="button" onClick={() => openPage("plans")}>
+          View plans
+          <LuChevronRight />
+        </button>
+      </section>
 
       <section className="ebay-main-grid">
-        {/* =================================================
-            SALES & PROFIT OVERVIEW
-            ================================================= */}
-
         <article className="ebay-card ebay-sales-card">
           <div className="ebay-card__header">
             <div>
               <div className="ebay-card__title-row">
-                <span className="ebay-purple-icon">
-                  <LuTrendingUp />
-                </span>
-
-                <h2>Sales &amp; Profit Overview</h2>
+                <span className="ebay-purple-icon"><LuTrendingUp /></span>
+                <h2>Sales &amp; profit</h2>
               </div>
-
-              <p>Track your revenue, costs and profit in real time.</p>
+              <p>Revenue, costs and profit for the selected period.</p>
             </div>
-
-            {/* SALES FILTER */}
-
-            <DateFilterDropdown
-              value={salesDateFilter}
-              onChange={setSalesDateFilter}
-              small
-            />
+            <DateFilterDropdown value={salesDateFilter} onChange={setSalesDateFilter} small />
           </div>
 
-          {/* SALES VALUES */}
-
-          <div className="ebay-sales-values">
-            <div>
-              <span>Total Sales</span>
-
-              <strong>{salesLoading ? "…" : formatMoney(salesKpis.revenue.value)}</strong>
-
-              <small>{salesLoading ? "" : `${salesKpis.revenue.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.revenue.growth)}`}</small>
-            </div>
-
-            <div>
-              <span>Total Cost</span>
-
-              <strong>{salesLoading ? "…" : formatMoney(salesKpis.cost.value)}</strong>
-
-              <small>{salesLoading ? "" : `${salesKpis.cost.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.cost.growth)}`}</small>
-            </div>
-
-            <div>
-              <span>Total Profit</span>
-
-              <strong>{salesLoading ? "…" : formatMoney(salesKpis.profit.value)}</strong>
-
-              <small>{salesLoading ? "" : `${salesKpis.profit.growth >= 0 ? "↑" : "↓"} ${formatGrowth(salesKpis.profit.growth)}`}</small>
-            </div>
-          </div>
-
-          {/* CHART */}
-
-          <div className="ebay-chart">
-            <div className="ebay-chart__y">
-              <span>{formatMoney(chartMax)}</span>
-              <span>{formatMoney(chartMax * 0.75)}</span>
-              <span>{formatMoney(chartMax * 0.5)}</span>
-              <span>{formatMoney(chartMax * 0.25)}</span>
-              <span>{formatMoney(chartMax * 0.1)}</span>
-              <span>$0</span>
-            </div>
-
-            <div className="ebay-chart__area">
-              <div className="ebay-chart__grid">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-
-              <svg
-                className="ebay-chart__svg"
-                viewBox="0 0 700 210"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient id="profitFill" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopOpacity="0.22" />
-
-                    <stop offset="100%" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-
-                {/* PROFIT AREA */}
-
-                <polyline
-                  className="ebay-chart__profit-fill"
-                  points={`${profitPoints} 700,210 0,210`}
-                  fill="url(#profitFill)"
-                  stroke="none"
-                />
-
-                {/* SALES */}
-
-                <polyline
-                  className="ebay-chart__line ebay-chart__line--sales"
-                  points={salesPoints}
-                />
-
-                {/* COST */}
-
-                <polyline
-                  className="ebay-chart__line ebay-chart__line--cost"
-                  points={costPoints}
-                />
-
-                {/* PROFIT */}
-
-                <polyline
-                  className="ebay-chart__line ebay-chart__line--profit"
-                  points={profitPoints}
-                />
-              </svg>
-
-              {/* X AXIS */}
-
-              <div className="ebay-chart__dates">
-                {salesChart.labels.map((label, index) => (
-                  <span key={`${label}-${index}`}>{label}</span>
+          {salesLoading ? (
+            <div className="ebay-chart-skeleton" aria-label="Loading sales chart">
+              <div className="ebay-sales-values ebay-sales-values--loading">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index}>
+                    <Skeleton className="ap-skeleton--label" />
+                    <Skeleton className="ap-skeleton--metric-small" />
+                  </div>
                 ))}
               </div>
+              <div className="ebay-chart-skeleton__plot">
+                <Skeleton className="ap-skeleton--chart-line ap-skeleton--chart-line-1" />
+                <Skeleton className="ap-skeleton--chart-line ap-skeleton--chart-line-2" />
+                <Skeleton className="ap-skeleton--chart-line ap-skeleton--chart-line-3" />
+                <Skeleton className="ap-skeleton--chart-block" />
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="ebay-sales-values">
+                <div>
+                  <span>Total Sales</span>
+                  <strong>{formatMoney(salesKpis.revenue.value)}</strong>
+                  <small className={growthClass(salesKpis.revenue.growth)}>
+                    {formatGrowth(salesKpis.revenue.growth)}
+                  </small>
+                </div>
+                <div>
+                  <span>Total Cost</span>
+                  <strong>{formatMoney(salesKpis.cost.value)}</strong>
+                  <small className={growthClass(salesKpis.cost.growth)}>
+                    {formatGrowth(salesKpis.cost.growth)}
+                  </small>
+                </div>
+                <div>
+                  <span>Total Profit</span>
+                  <strong>{formatMoney(salesKpis.profit.value)}</strong>
+                  <small className={growthClass(salesKpis.profit.growth)}>
+                    {formatGrowth(salesKpis.profit.growth)}
+                  </small>
+                </div>
+              </div>
 
-          {/* LEGEND */}
+              <div className="ebay-chart">
+                <div className="ebay-chart__y">
+                  <span>{formatMoney(chartMax)}</span>
+                  <span>{formatMoney(chartMax * 0.75)}</span>
+                  <span>{formatMoney(chartMax * 0.5)}</span>
+                  <span>{formatMoney(chartMax * 0.25)}</span>
+                  <span>{formatMoney(chartMax * 0.1)}</span>
+                  <span>$0</span>
+                </div>
 
-          <div className="ebay-chart-legend">
-            <span>
-              <i className="sales" />
-              Sales
-            </span>
+                <div className="ebay-chart__area">
+                  <div className="ebay-chart__grid"><i /><i /><i /><i /><i /><i /></div>
+                  <svg className="ebay-chart__svg" viewBox="0 0 700 210" preserveAspectRatio="none" aria-hidden="true">
+                    <defs>
+                      <linearGradient id="profitFill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopOpacity="0.16" />
+                        <stop offset="100%" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <polyline className="ebay-chart__profit-fill" points={`${profitPoints} 700,210 0,210`} fill="url(#profitFill)" stroke="none" />
+                    <polyline className="ebay-chart__line ebay-chart__line--sales" points={salesPoints} />
+                    <polyline className="ebay-chart__line ebay-chart__line--cost" points={costPoints} />
+                    <polyline className="ebay-chart__line ebay-chart__line--profit" points={profitPoints} />
+                  </svg>
+                  <div className="ebay-chart__dates">
+                    {salesChart.labels.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}
+                  </div>
+                </div>
+              </div>
 
-            <span>
-              <i className="cost" />
-              Cost
-            </span>
-
-            <span>
-              <i className="profit" />
-              Profit
-            </span>
-          </div>
+              <div className="ebay-chart-legend">
+                <span><i className="sales" />Sales</span>
+                <span><i className="cost" />Cost</span>
+                <span><i className="profit" />Profit</span>
+              </div>
+            </>
+          )}
         </article>
-
-        {/* =================================================
-            STORE PERFORMANCE
-            ================================================= */}
 
         <article className="ebay-card ebay-performance-card">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
               <div className="ebay-mini-logo">eBay</div>
-
-              <h2>eBay Store Performance</h2>
-            </div>
-
-            <button type="button" className="ebay-view-all" onClick={() => openPage("settings")}>
-              View All
-            </button>
-          </div>
-
-          <div className="ebay-status-list">
-            {storeRows.map(([label, value, Icon, targetPage]) => (
-              <div
-                className="ebay-status-row"
-                key={label}
-                onClick={() => openPage(targetPage)}
-                style={{ cursor: "pointer" }}
-              >
-                <div className="ebay-status-row__label">
-                  <span>
-                    <Icon />
-                  </span>
-
-                  {label}
-                </div>
-
-                <div className="ebay-status-row__value">
-                  <i />
-
-                  {value}
-
-                  <LuChevronRight />
-                </div>
+              <div>
+                <h2>Store health</h2>
+                <p>Connection and marketplace status.</p>
               </div>
-            ))}
+            </div>
+            <button type="button" className="ebay-view-all" onClick={() => openPage("settings")}>Manage</button>
           </div>
+
+          {summaryLoading ? (
+            <PanelRowsSkeleton rows={7} compact />
+          ) : (
+            <div className="ebay-status-list">
+              {storeRows.map(([label, value, Icon, targetPage]) => (
+                <button className="ebay-status-row" type="button" key={label} onClick={() => openPage(targetPage)}>
+                  <span className="ebay-status-row__label"><span><Icon /></span>{label}</span>
+                  <span className="ebay-status-row__value"><i />{value}<LuChevronRight /></span>
+                </button>
+              ))}
+            </div>
+          )}
         </article>
       </section>
 
-      {/* ===================================================
-          LOWER GRID
-          =================================================== */}
-
       <section className="ebay-lower-grid">
-        {/* =================================================
-            RECENT ORDERS
-            ================================================= */}
-
         <article className="ebay-card ebay-orders-card">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
-              <span className="ebay-purple-icon">
-                <LuShoppingCart />
-              </span>
-
-              <h2>Recent eBay Orders</h2>
+              <span className="ebay-purple-icon"><LuShoppingCart /></span>
+              <div><h2>Recent orders</h2><p>Latest orders from your connected store.</p></div>
             </div>
-
-            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>
-              View All
-            </button>
+            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>View all</button>
           </div>
 
-          <div className="ebay-orders-table">
-            <div className="ebay-orders-table__head">
-              <span>#</span>
-              <span>Product</span>
-              <span>Buyer</span>
-              <span>Amount</span>
-              <span>Status</span>
-              <span>Date</span>
-              <span />
-            </div>
-
-            {orders.length === 0 ? (
-              <div className="ebay-orders-table__empty" style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
-                {summaryLoading ? "Loading orders…" : "No orders yet."}
+          {summaryLoading ? (
+            <PanelRowsSkeleton rows={5} />
+          ) : (
+            <div className="ebay-orders-table">
+              <div className="ebay-orders-table__head">
+                <span>#</span><span>Product</span><span>Buyer</span><span>Amount</span><span>Status</span><span>Date</span><span />
               </div>
-            ) : (
-              orders.map((order) => (
-                <div
-                  className="ebay-order-row"
-                  key={order.id}
-                  onClick={() => openPage("orders")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <span className="ebay-order-id">{order.orderId ? `#${order.orderId}` : `#${order.id}`}</span>
-
-                  <div className="ebay-order-product">
-                    <img
-                      src={order.image || PLACEHOLDER_IMAGE}
-                      alt={order.product}
-                      onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
+              {orders.length === 0 ? (
+                <div className="ebay-empty-state">No orders yet.</div>
+              ) : (
+                orders.map((order) => (
+                  <div className="ebay-order-row" key={order.id}>
+                    <span className="ebay-order-id">{order.orderId ? `#${order.orderId}` : `#${order.id}`}</span>
+                    <div className="ebay-order-product">
+                      <img src={order.image || PLACEHOLDER_IMAGE} alt={order.product} onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }} />
+                      <span>{order.product}</span>
+                    </div>
+                    <span>{order.buyer}</span>
+                    <strong>{formatMoney(order.amount)}</strong>
+                    <span className={`ebay-order-status ebay-order-status--${(order.status || "pending").toLowerCase()}`}>{order.status}</span>
+                    <span>{order.date}</span>
+                    <DashboardOrderActions
+                      order={order}
+                      store={summary?.store ?? {}}
+                      onSettings={() => openPage("settings")}
                     />
-
-                    <span>{order.product}</span>
                   </div>
-
-                  <span>{order.buyer}</span>
-
-                  <strong>{formatMoney(order.amount)}</strong>
-
-                  <span
-                    className={`ebay-order-status ebay-order-status--${(order.status || "pending").toLowerCase()}`}
-                  >
-                    {order.status}
-                  </span>
-
-                  <span>{order.date}</span>
-
-                  <button
-                    type="button"
-                    className="ebay-more-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openPage("orders");
-                    }}
-                  >
-                    •••
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+                ))
+              )}
+            </div>
+          )}
         </article>
-
-        {/* =================================================
-            TOP PRODUCTS
-            ================================================= */}
 
         <article className="ebay-card ebay-products-card">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
-              <span className="ebay-purple-icon">
-                <LuTrendingUp />
-              </span>
-
-              <h2>Top Selling Products</h2>
+              <span className="ebay-purple-icon"><LuTrendingUp /></span>
+              <div><h2>Top products</h2><p>Best performers by revenue.</p></div>
             </div>
-
-            <button type="button" className="ebay-view-all" onClick={() => openPage("products")}>
-              View All
-            </button>
+            <button type="button" className="ebay-view-all" onClick={() => openPage("products")}>View all</button>
           </div>
 
-          <div className="ebay-products-list">
-            {topProducts.length === 0 ? (
-              <div style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
-                {summaryLoading ? "Loading products…" : "No sales in this period yet."}
-              </div>
-            ) : (
-              topProducts.map((product, index) => (
-                <div
-                  className="ebay-product-row"
-                  key={`${product.name}-${index}`}
-                  onClick={() => openPage("products")}
-                  style={{ cursor: "pointer" }}
-                >
-                  <span className="ebay-product-rank">{index + 1}</span>
-
-                  <img
-                    src={product.image || PLACEHOLDER_IMAGE}
-                    alt={product.name}
-                    onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }}
-                  />
-
-                  <div className="ebay-product-info">
-                    <strong>{product.name}</strong>
-
-                    <span>{product.sold}</span>
-                  </div>
-
-                  <div className="ebay-product-bar">
-                    <i
-                      style={{
-                        width: product.width,
-                      }}
-                    />
-                  </div>
-
-                  <strong className="ebay-product-price">{product.price}</strong>
-                </div>
-              ))
-            )}
-          </div>
+          {summaryLoading ? (
+            <PanelRowsSkeleton rows={5} />
+          ) : (
+            <div className="ebay-products-list">
+              {topProducts.length === 0 ? (
+                <div className="ebay-empty-state">No sales in this period yet.</div>
+              ) : (
+                topProducts.map((product, index) => (
+                  <button className="ebay-product-row" type="button" key={`${product.name}-${index}`} onClick={() => openPage("products")}>
+                    <span className="ebay-product-rank">{index + 1}</span>
+                    <img src={product.image || PLACEHOLDER_IMAGE} alt={product.name} onError={(e) => { e.currentTarget.src = PLACEHOLDER_IMAGE; }} />
+                    <span className="ebay-product-info"><strong>{product.name}</strong><span>{product.sold}</span></span>
+                    <span className="ebay-product-bar"><i style={{ width: product.width }} /></span>
+                    <strong className="ebay-product-price">{product.price}</strong>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </article>
-
-        {/* =================================================
-            RECENT ACTIVITY
-            ================================================= */}
 
         <article className="ebay-card ebay-activity-card">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
-              <span className="ebay-purple-icon">
-                <LuRefreshCw />
-              </span>
-
-              <h2>Recent Activity</h2>
+              <span className="ebay-purple-icon"><LuRefreshCw /></span>
+              <div><h2>Recent activity</h2><p>Store events and listing updates.</p></div>
             </div>
-
-            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>
-              View All
-            </button>
+            <button type="button" className="ebay-view-all" onClick={() => openPage("orders")}>View all</button>
           </div>
 
-          <div className="ebay-activity-list">
-            {activities.length === 0 ? (
-              <div style={{ padding: "20px 0", color: "#9aa0ac", textAlign: "center" }}>
-                {summaryLoading ? "Loading activity…" : "No recent activity."}
-              </div>
-            ) : (
-              activities.map((activity, index) => {
-                const Icon = activity.icon;
-
-                return (
-                  <div
-                    className="ebay-activity-row"
-                    key={`${activity.title}-${index}`}
-                    onClick={() => openPage(activity.type === "order" ? "orders" : "products")}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <span className="ebay-activity-icon">
-                      <Icon />
-                    </span>
-
-                    <div>
-                      <strong>{activity.title}</strong>
-
-                      <span>{activity.text}</span>
-
-                      <small>{activity.time}</small>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {summaryLoading ? (
+            <PanelRowsSkeleton rows={5} />
+          ) : (
+            <div className="ebay-activity-list">
+              {activities.length === 0 ? (
+                <div className="ebay-empty-state">No recent activity.</div>
+              ) : (
+                activities.map((activity, index) => {
+                  const Icon = activity.icon;
+                  return (
+                    <button className="ebay-activity-row" type="button" key={`${activity.title}-${index}`} onClick={() => openPage(activity.type === "order" ? "orders" : "products")}>
+                      <span className="ebay-activity-icon"><Icon /></span>
+                      <span><strong>{activity.title}</strong><span>{activity.text}</span><small>{activity.time}</small></span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
         </article>
       </section>
     </section>
@@ -896,4 +620,3 @@ function DashboardContent({ searchQuery }) {
 }
 
 export default DashboardContent;
-

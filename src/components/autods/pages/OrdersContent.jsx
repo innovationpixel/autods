@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
   getOrders,
@@ -318,6 +318,9 @@ function mapApiOrder(order) {
 
 function OrdersContent({ searchQuery }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusedOrderParam = (searchParams.get("focus") ?? "").trim();
+  const focusedOrderHandledRef = useRef("");
   const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -819,11 +822,56 @@ function OrdersContent({ searchQuery }) {
   ]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [filteredOrders.length, pageSize]);
+    if (!focusedOrderParam) {
+      setCurrentPage(1);
+    }
+  }, [filteredOrders.length, pageSize, focusedOrderParam]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
   const visibleOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    if (!focusedOrderParam || ordersLoading || !orders.length) {
+      return;
+    }
+
+    const matchedOrder = orders.find(
+      (order) =>
+        String(order.id) === focusedOrderParam ||
+        String(order.orderId) === focusedOrderParam,
+    );
+
+    if (!matchedOrder) {
+      return;
+    }
+
+    const focusKey = `${focusedOrderParam}:${matchedOrder.id}:${pageSize}`;
+    if (focusedOrderHandledRef.current === focusKey) {
+      return;
+    }
+    focusedOrderHandledRef.current = focusKey;
+
+    const filteredIndex = filteredOrders.findIndex((order) => order.id === matchedOrder.id);
+    if (filteredIndex >= 0) {
+      setCurrentPage(Math.floor(filteredIndex / pageSize) + 1);
+    } else {
+      setShowOnlyActive(false);
+      setStatusFilter("All Statuses");
+      setBuyerFilter("");
+      setOrderIdFilter("");
+      setStoreFilter("All Stores");
+      setCurrentPage(1);
+    }
+
+    setOpenDetailsId(matchedOrder.id);
+
+    window.setTimeout(() => {
+      document.getElementById(`orders-row-${matchedOrder.id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 180);
+  }, [focusedOrderParam, filteredOrders, orders, ordersLoading, pageSize]);
 
   const allVisibleSelected =
     visibleOrders.length > 0 && visibleOrders.every((order) => selectedIds.includes(order.id));
@@ -1773,6 +1821,7 @@ function OrdersContent({ searchQuery }) {
 
                   return (
                     <tr
+                      id={`orders-row-${order.id}`}
                       className={openDetailsId === order.id ? "orders-table__row orders-table__row--active" : "orders-table__row"}
                       key={order.id}
                     >

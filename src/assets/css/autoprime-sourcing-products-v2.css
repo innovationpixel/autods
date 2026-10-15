@@ -1,0 +1,514 @@
+/* AutoPrime — Sourcing Requests + Products polish
+   Scoped overrides only. Keeps all API/data behavior intact. */
+
+/* -------------------------------------------------------------------------- */
+/* Sourcing Requests                                                          */
+/* -------------------------------------------------------------------------- */
+.sourcing-request-content {
+  --sp-purple: #6d28d9;
+  --sp-purple-deep: #5420b4;
+  --sp-purple-soft: #f6f1ff;
+  --sp-purple-soft-2: #fbf9ff;
+  --sp-purple-line: #ddd0f2;
+  --sp-text: #241d31;
+  --sp-muted: #756d82;
+  --sp-border: #e8e2ef;
+  color: var(--sp-text) !important;
+}
+
+.sourcing-request-content .sourcing-hero {
+  margin-bottom: 16px !important;
+  padding: 24px 28px !important;
+  border: 1px solid var(--sp-border) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fbf8ff 62%, #f6f1ff 100%) !important;
+  box-shadow: 0 8px 28px rgba(64, 41, 93, .035) !important;
+}
+
+.sourcing-request-content .sourcing-hero__copy h2 {
+  color: var(--sp-text) !important;
+  font-size: 21px !important;
+  letter-spacing: -.02em !important;
+}
+
+.sourcing-request-content .sourcing-hero__copy p {
+  max-width: 700px !important;
+  color: var(--sp-muted) !important;
+  line-height: 1.55 !important;
+}
+
+.sourcing-request-content .sourcing-hero__steps {
+  gap: 8px !important;
+  margin-top: 16px !important;
+}
+
+.sourcing-request-content .sourcing-hero__step {
+  min-height: 36px !important;
+  padding: 0 12px !important;
+  border: 1px solid #e3d9f2 !important;
+  border-radius: 999px !important;
+  background: rgba(255,255,255,.9) !important;
+  color: #5d5468 !important;
+  box-shadow: none !important;
+}
+
+.sourcing-request-content .sourcing-hero__step svg {
+  color: var(--sp-purple) !important;
+}
+
+.sourcing-request-content .sourcing-hero__cta,
+.sourcing-request-content .sourcing-refresh-btn {
+  min-height: 42px !important;
+  border: 1px solid #6422d0 !important;
+  border-radius: 10px !important;
+  background: linear-gradient(135deg, #5b21b6 0%, #7c2bd8 58%, #cf2fc2 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 6px 16px rgba(109, 40, 217, .15) !important;
+  font-weight: 720 !important;
+}
+
+.sourcing-request-content .sourcing-hero__cta:hover:not(:disabled),
+.sourcing-request-content .sourcing-refresh-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f1ca4 0%, #6f25c8 58%, #bd29b1 100%) !important;
+  box-shadow: 0 8px 20px rgba(109, 40, 217, .2) !important;
+  transform: translateY(-1px) !important;
+}
+
+.sourcing-request-content .sourcing-toolbar {
+  min-height: 52px !important;
+  margin-bottom: 14px !important;
+  gap: 14px !important;
+}
+
+.sourcing-request-content .sourcing-toolbar__left {
+  gap: 8px !important;
+}
+
+.sourcing-request-content .sourcing-status-pill {
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  border: 1px solid #e6e0ec !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: #655e70 !important;
+  font-weight: 650 !important;
+  box-shadow: none !important;
+}
+
+.sourcing-request-content .sourcing-status-pill:hover {
+  border-color: #cdb9e9 !important;
+  background: #faf7ff !important;
+  color: var(--sp-purple-deep) !important;
+}
+
+.sourcing-request-content .sourcing-status-pill--active {
+  border-color: #6d28d9 !important;
+  background: var(--sp-purple-soft) !important;
+  color: var(--sp-purple) !important;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, .04) !important;
+}
+
+.sourcing-request-content .sourcing-table-shell {
+  overflow: hidden !important;
+  border: 1px solid var(--sp-border) !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 6px 20px rgba(39, 29, 54, .025) !important;
+}
+
+.sourcing-request-content .sourcing-table-scroll {
+  overflow-x: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #b99fe0 #f6f2fa !important;
+}
+.sourcing-request-content .sourcing-table-scroll::-webkit-scrollbar { height: 7px !important; }
+.sourcing-request-content .sourcing-table-scroll::-webkit-scrollbar-track { background: #f6f2fa !important; }
+.sourcing-request-content .sourcing-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #f6f2fa !important;
+  border-radius: 999px !important;
+  background: #b99fe0 !important;
+  background-clip: padding-box !important;
+}
+
+.sourcing-request-content .sourcing-table thead th {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid #e8e1f0 !important;
+  background: #faf8fd !important;
+  color: #62596d !important;
+  font-size: 10.5px !important;
+  letter-spacing: .035em !important;
+}
+
+.sourcing-request-content .sourcing-table td {
+  padding: 15px 18px !important;
+  border-bottom: 1px solid #f0ebf4 !important;
+  color: #4f4858 !important;
+}
+
+.sourcing-request-content .sourcing-table__row:hover {
+  background: #fcfaff !important;
+}
+
+.sourcing-request-content .sourcing-product__title {
+  color: var(--sp-text) !important;
+}
+
+.sourcing-request-content .sourcing-product__url {
+  color: var(--sp-purple) !important;
+}
+
+.sourcing-request-content .sourcing-badge--processing,
+.sourcing-request-content .sourcing-badge--quoted {
+  border: 1px solid #dac9f3 !important;
+  background: #f6f1ff !important;
+  color: #6727c5 !important;
+}
+
+.sourcing-request-content .sourcing-badge--linked {
+  border: 1px solid #cde9dc !important;
+  background: #edf8f3 !important;
+  color: #187b5b !important;
+}
+
+.sourcing-request-content .sourcing-action-btn {
+  border: 1px solid #ddd5e8 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #57505f !important;
+}
+
+.sourcing-request-content .sourcing-action-btn--primary {
+  border-color: #cab7e8 !important;
+  background: #f7f2ff !important;
+  color: var(--sp-purple) !important;
+}
+
+.sourcing-request-content .sourcing-pagination__arrow,
+.sourcing-request-content .sourcing-pagination__page {
+  border-color: #e3dcea !important;
+  border-radius: 8px !important;
+  color: #625a6d !important;
+  background: #fff !important;
+}
+
+.sourcing-request-content .sourcing-pagination__page--active {
+  border-color: #6d28d9 !important;
+  background: #f5efff !important;
+  color: var(--sp-purple) !important;
+}
+
+.sourcing-request-content .sourcing-footer select {
+  min-height: 38px !important;
+  border: 1px solid #d8cce9 !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: var(--sp-text) !important;
+}
+
+.sourcing-request-content .sourcing-empty svg {
+  color: #8b67c8 !important;
+}
+
+/* Modal */
+.sourcing-request-content .sourcing-modal-layer__backdrop {
+  background: rgba(28, 18, 49, .48) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.sourcing-request-content .sourcing-modal {
+  border: 1px solid #e5dded !important;
+  border-radius: 16px !important;
+  box-shadow: 0 28px 70px rgba(32, 21, 47, .22) !important;
+}
+
+.sourcing-request-content .sourcing-modal__head h3 {
+  color: var(--sp-text) !important;
+  font-size: 20px !important;
+}
+
+.sourcing-request-content .sourcing-modal__head p {
+  color: var(--sp-muted) !important;
+}
+
+.sourcing-request-content .sourcing-modal__close {
+  border-color: #e0d8e9 !important;
+  border-radius: 9px !important;
+  color: #61596b !important;
+}
+
+.sourcing-request-content .sourcing-form input,
+.sourcing-request-content .sourcing-form select,
+.sourcing-request-content .sourcing-form textarea {
+  border-color: #dcd2e7 !important;
+  border-radius: 10px !important;
+  color: var(--sp-text) !important;
+  box-shadow: none !important;
+}
+
+.sourcing-request-content .sourcing-form input:focus,
+.sourcing-request-content .sourcing-form select:focus,
+.sourcing-request-content .sourcing-form textarea:focus {
+  outline: none !important;
+  border-color: #9b78cf !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, .08) !important;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Products table                                                             */
+/* -------------------------------------------------------------------------- */
+.products-page-content {
+  --pp-purple: #6d28d9;
+  --pp-purple-deep: #5420b4;
+  --pp-purple-soft: #f6f1ff;
+  --pp-border: #e8e2ef;
+  --pp-text: #251e31;
+  --pp-muted: #756d82;
+}
+
+/* Keep ONE horizontal scrollbar only: the table's native bottom scrollbar. */
+.products-page-content .products-table-top-scroll,
+.products-page-content .products-table-sticky-scroll {
+  display: none !important;
+}
+
+.products-page-content .products-table-shell {
+  overflow: hidden !important;
+  border: 1px solid var(--pp-border) !important;
+  border-radius: 14px !important;
+  background: #fff !important;
+  box-shadow: 0 6px 22px rgba(39, 29, 54, .025) !important;
+}
+
+.products-page-content .products-table-scroll {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #b79add #f5f1f9 !important;
+}
+.products-page-content .products-table-scroll::-webkit-scrollbar { height: 8px !important; }
+.products-page-content .products-table-scroll::-webkit-scrollbar-track { background: #f5f1f9 !important; }
+.products-page-content .products-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #f5f1f9 !important;
+  border-radius: 999px !important;
+  background: #b79add !important;
+  background-clip: padding-box !important;
+}
+.products-page-content .products-table-scroll::-webkit-scrollbar-thumb:hover { background: #9674ca !important; }
+
+.products-page-content .products-toolbar {
+  min-height: 54px !important;
+  margin: 4px 0 10px !important;
+  align-items: center !important;
+}
+
+.products-page-content .orders-filter-toggle {
+  border-radius: 9px !important;
+  color: #5f576a !important;
+}
+.products-page-content .orders-filter-toggle:hover,
+.products-page-content .orders-filter-toggle--active {
+  border-color: #cbb9e5 !important;
+  background: #f8f4ff !important;
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content .dashboard-secondary-btn--orders {
+  min-height: 40px !important;
+  border: 1px solid #d3c5e8 !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  color: var(--pp-purple-deep) !important;
+  box-shadow: none !important;
+}
+.products-page-content .dashboard-secondary-btn--orders:hover:not(:disabled) {
+  border-color: #b99bdc !important;
+  background: #f8f4ff !important;
+}
+
+.products-page-content .products-selection-row {
+  min-height: 58px !important;
+  align-items: center !important;
+  padding: 0 2px !important;
+}
+
+.products-page-content .products-selection-row__left,
+.products-page-content .products-selection-row__right {
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.products-page-content .products-bulk-actions--disabled button {
+  color: #aaa3b2 !important;
+  opacity: .68 !important;
+}
+
+.products-page-content .products-history-btn {
+  color: #756d80 !important;
+}
+.products-page-content .products-history-btn:hover,
+.products-page-content .products-history-btn--active {
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content .orders-icon-btn {
+  border-color: #e0d8e9 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  color: #635b6e !important;
+}
+.products-page-content .orders-icon-btn:hover {
+  border-color: #c7b4e3 !important;
+  background: #f8f4ff !important;
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content .products-alerts {
+  overflow: hidden !important;
+  border: 1px solid #e6dfed !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+
+.products-page-content .products-alert {
+  border-color: #eee9f2 !important;
+  color: #554d5f !important;
+}
+
+.products-page-content .products-alert__link {
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content .products-alert__link--move-draft {
+  color: #b02f78 !important;
+}
+
+.products-page-content .products-alerts__more-btn {
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content .products-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  color: var(--pp-text) !important;
+}
+
+.products-page-content .products-table thead th {
+  border-bottom-color: #e8e1ef !important;
+  background: #faf8fd !important;
+  color: #62596d !important;
+  font-size: 10.5px !important;
+  font-weight: 720 !important;
+}
+
+.products-page-content .products-table__group-row th {
+  padding-top: 16px !important;
+  padding-bottom: 12px !important;
+}
+
+.products-page-content .products-table__sub-row th {
+  padding-top: 10px !important;
+  padding-bottom: 12px !important;
+  background: #fcfaff !important;
+}
+
+.products-page-content .products-table td {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  border-bottom-color: #f0ebf4 !important;
+  vertical-align: middle !important;
+}
+
+.products-page-content .products-table__row:hover td {
+  background: #fcfaff !important;
+}
+
+.products-page-content .products-item {
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.products-page-content .products-item__thumb {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  height: 64px !important;
+  border: 1px solid #e7e0ed !important;
+  border-radius: 9px !important;
+  background: #faf9fc !important;
+}
+
+.products-page-content .products-item__copy h3 {
+  color: var(--pp-text) !important;
+  font-size: 12.5px !important;
+  font-weight: 670 !important;
+  line-height: 1.4 !important;
+}
+
+.products-page-content .products-store-chip {
+  border: 1px solid #e6e0ed !important;
+  background: #f7f5fa !important;
+  color: #5b5364 !important;
+}
+
+/* Sourcing Request is an action/category, not a warning: use product theme. */
+.products-page-content .products-sourcing-btn {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  border: 1px solid #cbb6ea !important;
+  border-radius: 7px !important;
+  background: #f5efff !important;
+  color: var(--pp-purple) !important;
+  font-weight: 700 !important;
+  box-shadow: none !important;
+}
+.products-page-content .products-sourcing-btn:hover {
+  border-color: #a989d3 !important;
+  background: #eee5ff !important;
+}
+
+.products-page-content .products-stock-btn {
+  border-radius: 7px !important;
+}
+
+.products-page-content .products-count {
+  border-radius: 6px !important;
+  font-weight: 740 !important;
+}
+.products-page-content .products-count--green {
+  background: #e9f7f0 !important;
+  color: #157754 !important;
+}
+.products-page-content .products-count--amber {
+  background: #fff7df !important;
+  color: #9a6900 !important;
+}
+.products-page-content .products-count--red {
+  background: #fff0f2 !important;
+  color: #c63c55 !important;
+}
+
+.products-page-content .products-table-footer {
+  min-height: 62px !important;
+  padding-right: 78px !important;
+  border-top: 1px solid #ece6f1 !important;
+  background: #fff !important;
+}
+
+.products-page-content .orders-pagination__page--active {
+  border-color: #6d28d9 !important;
+  background: #f5efff !important;
+  color: var(--pp-purple) !important;
+}
+
+.products-page-content input[type="checkbox"] {
+  accent-color: var(--pp-purple) !important;
+}
+
+@media (max-width: 900px) {
+  .sourcing-request-content .sourcing-hero {
+    padding: 20px !important;
+  }
+  .products-page-content .products-selection-row {
+    align-items: flex-start !important;
+  }
+}

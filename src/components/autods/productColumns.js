@@ -1,8 +1,7 @@
 export const PRODUCT_COLUMN_STORAGE_KEY = "autods_products_visible_columns_v1";
 
 const COLUMN_MIN_WIDTHS = {
-  actions: 78,
-  name: 280,
+  name: 320,
   uploaded: 118,
   store: 120,
   stockAvailable: 110,
@@ -22,14 +21,14 @@ const COLUMN_MIN_WIDTHS = {
   timeLeft: 100,
   time_left: 100,
   warnings: 48,
+  actions: 94,
 };
 
 export const PRODUCT_TABLE_FIXED_WIDTH = {
-  checkbox: 48,
+  checkbox: 36,
 };
 
 export const productTableColumns = [
-  { id: "actions", label: "Actions", defaultVisible: true, manage: true },
   { id: "name", label: "Name", defaultVisible: true, manage: true },
   { id: "uploaded", label: "Uploaded", defaultVisible: true, manage: true, sortable: true },
   { id: "store", label: "Store", defaultVisible: true, manage: true },
@@ -48,6 +47,7 @@ export const productTableColumns = [
   { id: "watchers", label: "Watchers", defaultVisible: true, manage: true },
   { id: "daysLeft", label: "Time Left", defaultVisible: true, manage: true, sortable: true },
   { id: "warnings", label: "Warnings", defaultVisible: true, manage: true },
+  { id: "actions", label: "Actions", defaultVisible: true, manage: true },
 ].map((column) => ({
   ...column,
   minWidth: COLUMN_MIN_WIDTHS[column.id] ?? 120,
@@ -57,8 +57,15 @@ export const manageableProductColumns = productTableColumns.filter((column) => c
 
 export const PRODUCT_GRID_COLUMN_COUNT = manageableProductColumns.length + 1;
 
+function normalizeVisibleColumnIds(ids) {
+  const withoutActions = ids.filter((id) => id !== "actions");
+  return [...withoutActions, "actions"];
+}
+
 export function defaultVisibleProductColumnIds() {
-  return manageableProductColumns.filter((column) => column.defaultVisible).map((column) => column.id);
+  return normalizeVisibleColumnIds(
+    manageableProductColumns.filter((column) => column.defaultVisible).map((column) => column.id),
+  );
 }
 
 export function loadVisibleProductColumnIds() {
@@ -76,14 +83,11 @@ export function loadVisibleProductColumnIds() {
     const allowed = new Set(manageableProductColumns.map((column) => column.id));
     allowed.add("timeLeft");
     allowed.add("time_left");
-    const filtered = parsed.filter((id) => allowed.has(id)).map((id) => (id === "timeLeft" || id === "time_left" ? "daysLeft" : id));
+    const filtered = parsed
+      .filter((id) => allowed.has(id))
+      .map((id) => (id === "timeLeft" || id === "time_left" ? "daysLeft" : id));
 
-    // Ensure actions column is present at the start
-    if (!filtered.includes("actions")) {
-      filtered.unshift("actions");
-    }
-
-    // Ensure Time Left column is always present for the user
+    // Keep Time Left available even for older saved column layouts.
     if (!filtered.includes("daysLeft")) {
       const watchersIdx = filtered.indexOf("watchers");
       if (watchersIdx !== -1) {
@@ -98,18 +102,18 @@ export function loadVisibleProductColumnIds() {
       }
     }
 
-    return filtered.length ? filtered : defaultVisibleProductColumnIds();
+    return normalizeVisibleColumnIds(filtered.length ? filtered : defaultVisibleProductColumnIds());
   } catch {
     return defaultVisibleProductColumnIds();
   }
 }
 
 export function saveVisibleProductColumnIds(ids) {
-  localStorage.setItem(PRODUCT_COLUMN_STORAGE_KEY, JSON.stringify(ids));
+  localStorage.setItem(PRODUCT_COLUMN_STORAGE_KEY, JSON.stringify(normalizeVisibleColumnIds(ids)));
 }
 
 export function allManageableProductColumnIds() {
-  return manageableProductColumns.map((column) => column.id);
+  return normalizeVisibleColumnIds(manageableProductColumns.map((column) => column.id));
 }
 
 export function getProductColumnById(id) {
@@ -120,11 +124,14 @@ export function getProductColumnById(id) {
 }
 
 export function resolveVisibleProductColumns(visibleColumnIds) {
-  return visibleColumnIds.map((id) => getProductColumnById(id)).filter(Boolean);
+  return normalizeVisibleColumnIds(visibleColumnIds)
+    .map((id) => getProductColumnById(id))
+    .filter(Boolean);
 }
 
 export function getVisibleProductTableMinWidth(visibleColumnIds) {
-  const columnsWidth = visibleColumnIds.reduce(
+  const normalizedIds = normalizeVisibleColumnIds(visibleColumnIds);
+  const columnsWidth = normalizedIds.reduce(
     (sum, id) => sum + (getProductColumnById(id)?.minWidth ?? 120),
     0,
   );

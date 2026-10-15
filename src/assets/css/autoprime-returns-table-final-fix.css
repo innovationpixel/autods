@@ -1,0 +1,159 @@
+/* AutoPrime — Returns & Disputes final targeted table fix
+   Scope: Product & Order visibility + Actions alignment only. */
+
+.returns-disputes-page .rd-table {
+  width: 100% !important;
+  min-width: 1485px !important;
+  table-layout: fixed !important;
+}
+
+/* Product & Order gets enough room for title + full eBay item/order IDs. */
+.returns-disputes-page .rd-table th:nth-child(2),
+.returns-disputes-page .rd-table td:nth-child(2) {
+  width: 410px !important;
+  min-width: 410px !important;
+  max-width: 410px !important;
+}
+
+.returns-disputes-page .rd-item-cell {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-thumb,
+.returns-disputes-page .rd-item-cell img {
+  flex: 0 0 64px !important;
+  width: 64px !important;
+  height: 64px !important;
+  object-fit: cover !important;
+  border-radius: 10px !important;
+}
+
+.returns-disputes-page .rd-item-details {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-title {
+  display: -webkit-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 0 5px !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  text-overflow: ellipsis !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  line-height: 1.28 !important;
+}
+
+.returns-disputes-page .rd-item-submeta {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 3px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: visible !important;
+}
+
+.returns-disputes-page .rd-link-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+  font-size: 11.5px !important;
+}
+
+.returns-disputes-page .rd-link-pill > span {
+  display: inline-block !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  text-overflow: clip !important;
+}
+
+.returns-disputes-page .rd-link-pill > svg {
+  flex: 0 0 auto !important;
+}
+
+/* Actions: enough width for both buttons, always aligned and visible. */
+.returns-disputes-page .rd-table th:nth-child(9),
+.returns-disputes-page .rd-table td:nth-child(9) {
+  position: sticky !important;
+  right: 0 !important;
+  width: 190px !important;
+  min-width: 190px !important;
+  max-width: 190px !important;
+  box-sizing: border-box !important;
+  z-index: 5 !important;
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  background: #fff !important;
+  border-left: 1px solid #eee8f4 !important;
+  box-shadow: -10px 0 18px -16px rgba(43, 30, 63, .42) !important;
+}
+
+.returns-disputes-page .rd-table thead th:nth-child(9) {
+  z-index: 8 !important;
+  text-align: center !important;
+  background: #faf8fd !important;
+}
+
+.returns-disputes-page .rd-table tbody tr:hover td:nth-child(9) {
+  background: #fcfaff !important;
+}
+
+.returns-disputes-page .rd-actions-cell {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-actions-cell .rd-btn-action {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  min-height: 36px !important;
+  height: 36px !important;
+  margin: 0 !important;
+  padding: 0 11px !important;
+  border-radius: 9px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-actions-cell .rd-btn-action:not(.rd-btn-action--primary) {
+  min-width: 68px !important;
+}
+
+.returns-disputes-page .rd-actions-cell .rd-btn-action--primary {
+  min-width: 84px !important;
+}
+
+@media (max-width: 1500px) {
+  .returns-disputes-page .rd-table {
+    min-width: 1485px !important;
+  }
+}

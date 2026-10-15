@@ -1,0 +1,175 @@
+/* AutoPrime Orders — final exact-selector theme override.
+   Loaded last so legacy orange/yellow/blue rules cannot win.
+   Direct .orders-page-content selectors match the real Orders DOM. */
+
+.orders-page-content {
+  --orders-final-purple: #6d28d9;
+  --orders-final-purple-deep: #5520b5;
+  --orders-final-purple-soft: #f5f1ff;
+  --orders-final-purple-soft-2: #faf8ff;
+  --orders-final-border: #ddd1f5;
+  --orders-final-muted: #756d82;
+  --orders-final-disabled: #aaa3b3;
+}
+
+/* Main toolbar controls */
+.orders-page-content .dashboard-secondary-btn--orders,
+.orders-page-content .orders-filter-toggle,
+.orders-page-content button.orders-toolbar-action,
+.orders-page-content .orders-icon-btn {
+  border-color: var(--orders-final-border) !important;
+  background: #fff !important;
+  color: var(--orders-final-purple-deep) !important;
+  box-shadow: none !important;
+}
+
+.orders-page-content .dashboard-secondary-btn--orders > *,
+.orders-page-content .orders-filter-toggle > *,
+.orders-page-content button.orders-toolbar-action > *,
+.orders-page-content .orders-icon-btn > * {
+  color: inherit !important;
+  stroke: currentColor !important;
+}
+
+.orders-page-content .dashboard-secondary-btn--orders:hover:not(:disabled),
+.orders-page-content .orders-filter-toggle:hover:not(:disabled),
+.orders-page-content button.orders-toolbar-action:hover:not(:disabled),
+.orders-page-content .orders-icon-btn:hover:not(:disabled) {
+  border-color: #c4adeb !important;
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple) !important;
+}
+
+/* Disabled Bulk Actions / Print: neutral, never orange. */
+.orders-page-content button.orders-toolbar-action:disabled,
+.orders-page-content button.orders-toolbar-action:disabled > *,
+.orders-page-content button.orders-toolbar-action:disabled svg,
+.orders-page-content button.orders-toolbar-action:disabled span {
+  border-color: #ebe6f0 !important;
+  background: #f8f7fa !important;
+  color: var(--orders-final-disabled) !important;
+  stroke: currentColor !important;
+  opacity: 1 !important;
+}
+
+/* Download / Archived and other enabled toolbar actions stay purple. */
+.orders-page-content button.orders-toolbar-action:not(:disabled),
+.orders-page-content button.orders-toolbar-action:not(:disabled) span,
+.orders-page-content button.orders-toolbar-action:not(:disabled) svg {
+  color: var(--orders-final-purple-deep) !important;
+  stroke: currentColor !important;
+}
+
+.orders-page-content button.orders-toolbar-action--active,
+.orders-page-content button.orders-toolbar-action--active span,
+.orders-page-content button.orders-toolbar-action--active svg {
+  border-color: #cab4ef !important;
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple) !important;
+  stroke: currentColor !important;
+}
+
+/* Dropdown menus */
+.orders-page-content .orders-toolbar-dropdown__menu {
+  border-color: var(--orders-final-border) !important;
+  box-shadow: 0 14px 36px rgba(67, 43, 101, .14) !important;
+}
+.orders-page-content .orders-toolbar-dropdown__menu button {
+  background: #fff !important;
+  color: #2f2739 !important;
+}
+.orders-page-content .orders-toolbar-dropdown__menu button:hover {
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple) !important;
+}
+
+/* Date / sort controls */
+.orders-page-content .orders-quick-filters {
+  border-color: #e7e1ef !important;
+  background: linear-gradient(180deg, #fff 0%, var(--orders-final-purple-soft-2) 100%) !important;
+}
+.orders-page-content .orders-quick-filters__pill {
+  border-color: #ded7e7 !important;
+  background: #fff !important;
+  color: #51495c !important;
+  box-shadow: none !important;
+}
+.orders-page-content .orders-quick-filters__pill:hover:not(.orders-quick-filters__pill--active) {
+  border-color: #c8b6e8 !important;
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple-deep) !important;
+}
+.orders-page-content .orders-quick-filters__pill.orders-quick-filters__pill--active,
+.orders-page-content .orders-quick-filters__pill.orders-quick-filters__pill--active:hover {
+  border-color: var(--orders-final-purple) !important;
+  background: var(--orders-final-purple) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 13px rgba(109, 40, 217, .14) !important;
+}
+.orders-page-content .orders-quick-filters__select:focus {
+  border-color: #a987dd !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, .08) !important;
+  outline: none !important;
+}
+
+/* Exact BUY / SELL classes used by OrdersContent. */
+.orders-page-content .orders-paired-values__type {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 34px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  border: 1px solid #d5c2f4 !important;
+  border-radius: 6px !important;
+  background: #f2ebff !important;
+  color: var(--orders-final-purple-deep) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+}
+.orders-page-content .orders-paired-values__platform {
+  color: #81778d !important;
+  font-weight: 650 !important;
+}
+
+/* IDs, source-edit links and listing links. */
+.orders-page-content .products-item-id-link,
+.orders-page-content .products-item-id__primary,
+.orders-page-content .products-source-cell__edit,
+.orders-page-content .orders-order-id-link,
+.orders-page-content .orders-details__link {
+  color: var(--orders-final-purple-deep) !important;
+}
+.orders-page-content .products-item-id-link:hover,
+.orders-page-content .products-source-cell__edit:hover,
+.orders-page-content .orders-order-id-link:hover,
+.orders-page-content .orders-details__link:hover {
+  color: var(--orders-final-purple) !important;
+}
+
+/* Table / selection / action polish */
+.orders-page-content input[type="checkbox"] {
+  accent-color: var(--orders-final-purple) !important;
+}
+.orders-page-content .orders-table thead th {
+  border-color: #e7e0ef !important;
+  background: #faf8fd !important;
+  color: #665d72 !important;
+}
+.orders-page-content .orders-table tbody tr:hover td {
+  background: #fdfbff !important;
+}
+.orders-page-content .orders-table button:hover,
+.orders-page-content .orders-actions-cell button:hover,
+.orders-page-content .orders-row-actions button:hover {
+  border-color: #cbb7ea !important;
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple) !important;
+}
+.orders-page-content .orders-pagination__arrow:hover:not(:disabled),
+.orders-page-content .orders-table-scroll-btn:hover:not(:disabled) {
+  border-color: #c3afe7 !important;
+  background: var(--orders-final-purple-soft) !important;
+  color: var(--orders-final-purple) !important;
+}

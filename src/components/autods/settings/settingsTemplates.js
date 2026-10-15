@@ -28,7 +28,7 @@ export const builtInTemplates = [
     id: "builtin-general-clean",
     name: "Clean Essentials",
     category: "general",
-    accent: "#eda343",
+    accent: "#6d28d9",
     html: `<div style="${baseStyles} max-width:860px;margin:0 auto;padding:18px;">
   <div style="background:#f7f8fb;border:1px solid #e7eaf1;border-radius:8px;padding:20px;text-align:center;">
     <h2 style="margin:0 0 12px;font-size:22px;color:#2f2e37;">TITLE_HERE</h2>
@@ -168,7 +168,7 @@ export function createBlankTemplate(name = "Untitled Template") {
     id: `custom-${Date.now()}`,
     name,
     category: "general",
-    accent: "#eda343",
+    accent: "#6d28d9",
     html: `<div style="${baseStyles} max-width:860px;margin:0 auto;padding:16px;">
   <h2 style="margin:0 0 12px;">TITLE_HERE</h2>
   <div style="margin:12px 0;text-align:center;">MAIN_IMAGE_HERE</div>

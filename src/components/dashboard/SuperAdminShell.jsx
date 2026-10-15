@@ -11,6 +11,7 @@ import {
 } from "react-icons/lu";
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
+import "../../assets/css/autoprime-theme.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import { adminPageModuleMap, adminPages, adminSidebarItems } from "../autods/menu";
 import SidebarLink from "../autods/SidebarLink";
@@ -142,7 +143,7 @@ function SuperAdminShell() {
 
       <aside className={sidebarMobileOpen ? "marketplace-sidebar marketplace-sidebar--mobile-open" : "marketplace-sidebar"}>
         <div className="marketplace-sidebar__logo-block">
-          <div className="marketplace-sidebar__logo">AUTO-DS-</div>
+          <img className="marketplace-sidebar__brand-logo" src="/autoprime-logo.png" alt="AutoDropshipPrime" />
         </div>
 
         <nav className="marketplace-sidebar__nav" aria-label="Admin navigation">

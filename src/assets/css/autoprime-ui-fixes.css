@@ -1,0 +1,315 @@
+/* AutoPrime dashboard UI fixes
+   Scoped visual corrections for Process Orders, Buyer Accounts and wide rules tables. */
+
+/* --------------------------------------------------------------------------
+   Buyer Accounts / Store Settings primary connection CTA
+   -------------------------------------------------------------------------- */
+.marketplace-dashboard-page
+  .marketplace-settings__store-settings-header
+  .marketplace-settings__ebay-btn--connect {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  height: auto !important;
+  padding: 10px 15px !important;
+  border: 0 !important;
+  border-radius: var(--ap-radius-sm, 10px) !important;
+  background: var(--ap-gradient, linear-gradient(135deg, #32158c 0%, #6d28d9 52%, #f22eb7 100%)) !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  box-shadow: 0 8px 20px rgba(79, 38, 165, 0.16) !important;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease !important;
+}
+
+.marketplace-dashboard-page
+  .marketplace-settings__store-settings-header
+  .marketplace-settings__ebay-btn--connect svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 auto !important;
+}
+
+.marketplace-dashboard-page
+  .marketplace-settings__store-settings-header
+  .marketplace-settings__ebay-btn--connect:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.03) !important;
+  box-shadow: 0 11px 24px rgba(79, 38, 165, 0.2) !important;
+}
+
+.marketplace-dashboard-page
+  .marketplace-settings__store-settings-header
+  .marketplace-settings__ebay-btn--connect:focus-visible {
+  outline: none !important;
+  box-shadow: var(--ap-focus, 0 0 0 3px rgba(109, 40, 217, 0.16)),
+    0 8px 20px rgba(79, 38, 165, 0.16) !important;
+}
+
+.marketplace-dashboard-page
+  .marketplace-settings__store-settings-header
+  .marketplace-settings__ebay-btn--connect:disabled {
+  opacity: 0.58 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Process Orders — bring legacy beige/orange surface into AutoPrime theme
+   -------------------------------------------------------------------------- */
+.order-processing-page .order-processing-hero {
+  border: 1px solid var(--ap-border, #e9e4f2) !important;
+  border-radius: var(--ap-radius-lg, 18px) !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fbf9ff 58%, #f4efff 100%) !important;
+  color: var(--ap-text, #171230) !important;
+  box-shadow: 0 18px 42px rgba(50, 21, 140, 0.07) !important;
+}
+
+.order-processing-page .order-processing-hero__mesh {
+  background-image: radial-gradient(rgba(109, 40, 217, 0.12) 1px, transparent 1px) !important;
+  background-size: 18px 18px !important;
+  opacity: 0.3 !important;
+}
+
+.order-processing-page .order-processing-hero__orb {
+  background: radial-gradient(circle, rgba(109, 40, 217, 0.15) 0%, rgba(139, 61, 255, 0.07) 48%, transparent 72%) !important;
+  opacity: 1 !important;
+}
+
+.order-processing-page .order-processing-hero__eyebrow {
+  border: 1px solid #e2d8f4 !important;
+  background: #f5f0ff !important;
+  color: #5b21b6 !important;
+}
+
+.order-processing-page .order-processing-hero__eyebrow svg {
+  color: var(--ap-purple, #6d28d9) !important;
+}
+
+.order-processing-page .order-processing-hero__title {
+  color: var(--ap-text, #171230) !important;
+}
+
+.order-processing-page .order-processing-hero__subtitle {
+  color: var(--ap-muted, #67627a) !important;
+}
+
+.order-processing-page .order-processing-hero__spotlight {
+  border: 1px solid #e1d6f2 !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: var(--ap-text, #171230) !important;
+  box-shadow: 0 10px 26px rgba(50, 21, 140, 0.06) !important;
+  backdrop-filter: blur(10px);
+}
+
+.order-processing-page .order-processing-hero__spotlight > span,
+.order-processing-page .order-processing-hero__spotlight > em {
+  color: var(--ap-muted, #67627a) !important;
+}
+
+.order-processing-page .order-processing-hero__spotlight > strong {
+  color: var(--ap-text, #171230) !important;
+}
+
+.order-processing-page .order-processing-btn--primary {
+  border: 0 !important;
+  background: var(--ap-gradient, linear-gradient(135deg, #32158c 0%, #6d28d9 52%, #f22eb7 100%)) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 26px rgba(79, 38, 165, 0.2) !important;
+}
+
+.order-processing-page .order-processing-btn--primary:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.03) !important;
+  box-shadow: 0 15px 30px rgba(79, 38, 165, 0.24) !important;
+}
+
+.order-processing-page .order-processing-btn--primary .order-processing-btn__icon {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+}
+
+.order-processing-page .order-processing-btn--primary .order-processing-btn__copy strong,
+.order-processing-page .order-processing-btn--primary .order-processing-btn__copy small {
+  color: #ffffff !important;
+}
+
+.order-processing-page .order-processing-btn--primary .order-processing-btn__copy small {
+  opacity: 0.78 !important;
+}
+
+.order-processing-page .order-processing-method-toggle {
+  border: 1px solid var(--ap-border-strong, #ddd3ec) !important;
+  background: #f5f1fb !important;
+  box-shadow: none !important;
+}
+
+.order-processing-page .order-processing-method-toggle__btn {
+  color: var(--ap-muted, #67627a) !important;
+}
+
+.order-processing-page .order-processing-method-toggle__btn--active {
+  border-color: #ddd3ec !important;
+  background: #ffffff !important;
+  color: var(--ap-purple, #6d28d9) !important;
+  box-shadow: 0 5px 14px rgba(50, 21, 140, 0.09) !important;
+}
+
+.order-processing-page .order-processing-wallet-chip {
+  border: 1px solid #e2d8f4 !important;
+  background: #f7f3ff !important;
+  color: var(--ap-text, #171230) !important;
+  box-shadow: none !important;
+}
+
+.order-processing-page .order-processing-wallet-chip > span {
+  color: var(--ap-muted, #67627a) !important;
+}
+
+.order-processing-page .order-processing-wallet-chip > strong {
+  color: var(--ap-text, #171230) !important;
+}
+
+.order-processing-page .order-processing-wallet-chip__transfer {
+  border: 1px solid #d8c8f0 !important;
+  background: #ffffff !important;
+  color: var(--ap-purple, #6d28d9) !important;
+  box-shadow: 0 4px 12px rgba(50, 21, 140, 0.05) !important;
+}
+
+.order-processing-page .order-processing-wallet-chip__transfer:hover {
+  border-color: #c8b3e9 !important;
+  background: #fbf9ff !important;
+}
+
+.order-processing-page .drafts-tab--active {
+  color: var(--ap-purple, #6d28d9) !important;
+}
+
+.order-processing-page .drafts-tab--active::after {
+  background: var(--ap-gradient, linear-gradient(90deg, #6d28d9, #f22eb7)) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Wide dashboard rules tables (incl. the 3DS Rules layout shown in review)
+   Keep data aligned and allow horizontal scrolling instead of squeezing text.
+   Existing order-processing grids are excluded because they already own scroll.
+   -------------------------------------------------------------------------- */
+.marketplace-dashboard-page
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))),
+.marketplace-dashboard-page
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))) {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)) {
+  width: 100% !important;
+  min-width: 1120px !important;
+  table-layout: auto !important;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  th,
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  td {
+  padding: 13px 16px !important;
+  vertical-align: middle !important;
+  text-align: left;
+  line-height: 1.35 !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  th {
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(1) {
+  min-width: 190px !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(2),
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(3) {
+  min-width: 130px !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(4) {
+  min-width: 105px !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(5) {
+  min-width: 190px !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(6) {
+  min-width: 105px !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  :is(th, td):nth-child(7) {
+  min-width: 120px !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar,
+.marketplace-dashboard-page
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar {
+  height: 9px;
+}
+
+.marketplace-dashboard-page
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb,
+.marketplace-dashboard-page
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #cfc3e3;
+  background-clip: padding-box;
+}
+
+@media (max-width: 767px) {
+  .marketplace-dashboard-page
+    .marketplace-settings__store-settings-header
+    .marketplace-settings__ebay-btn--connect {
+    width: 100% !important;
+  }
+
+  .order-processing-page .order-processing-hero__spotlight {
+    width: 100% !important;
+  }
+}

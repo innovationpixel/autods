@@ -1,0 +1,36 @@
+/* Final scoped stacking fix for the marketplace profile dropdown.
+   Keeps the account menu above Settings navigation without changing page logic. */
+
+.marketplace-dashboard-page {
+  isolation: isolate !important;
+}
+
+.marketplace-dashboard-page .marketplace-header {
+  position: relative !important;
+  z-index: 5000 !important;
+  overflow: visible !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__controls,
+.marketplace-dashboard-page .marketplace-header__profile-wrap {
+  position: relative !important;
+  z-index: 5100 !important;
+  overflow: visible !important;
+}
+
+.marketplace-dashboard-page .profile-dropdown {
+  z-index: 5200 !important;
+}
+
+.marketplace-dashboard-page .marketplace-content-wrapper,
+.marketplace-dashboard-page .marketplace-settings,
+.marketplace-dashboard-page .marketplace-settings__content,
+.marketplace-dashboard-page .marketplace-settings__primary-tabs {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.marketplace-dashboard-page .marketplace-settings__primary-tab {
+  position: relative !important;
+  z-index: 1 !important;
+}

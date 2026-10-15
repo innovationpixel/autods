@@ -1,0 +1,223 @@
+/* AutoPrime legacy accent cleanup
+   Loaded last. Keeps existing layout/functionality intact while replacing the old
+   #eda343 accent family with the current AutoPrime purple design tokens. */
+
+:root {
+  --ap-ui-purple: var(--ap-purple, #6d28d9);
+  --ap-ui-purple-deep: var(--ap-dark, #32158c);
+  --ap-ui-purple-soft: #f5f1ff;
+  --ap-ui-purple-border: #d9c7f4;
+}
+
+/* Catch legacy inline styles without touching layout. */
+[style*="background:#eda343"],
+[style*="background: #eda343"],
+[style*="background-color:#eda343"],
+[style*="background-color: #eda343"] {
+  background: var(--ap-gradient) !important;
+  background-color: var(--ap-ui-purple) !important;
+}
+
+[style*="color:#eda343"],
+[style*="color: #eda343"] {
+  color: var(--ap-ui-purple) !important;
+}
+
+[style*="border-color:#eda343"],
+[style*="border-color: #eda343"] {
+  border-color: var(--ap-ui-purple) !important;
+}
+
+/* Customer support legacy orange states. */
+.support-checkbox:checked {
+  border-color: var(--ap-ui-purple) !important;
+  background: var(--ap-ui-purple) !important;
+}
+
+.support-star--active,
+.support-star--active svg {
+  color: var(--ap-ui-purple) !important;
+}
+
+/* Sidebar / Add Products. */
+.marketplace-sidebar__add-btn:hover,
+.marketplace-sidebar__add-btn--open {
+  background: var(--ap-gradient) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 24px rgba(109, 40, 217, .18) !important;
+}
+
+.marketplace-sidebar__add-menu-item:hover {
+  background: var(--ap-ui-purple-soft) !important;
+}
+
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-icon,
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-copy strong,
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-copy span {
+  color: var(--ap-ui-purple) !important;
+}
+
+.add-product-modal__title-icon span,
+.page-filter-panel__title svg,
+.marketplace-inline-notice svg,
+.profile-dropdown__item-icon,
+.pod-hero__decor-icon {
+  color: var(--ap-ui-purple) !important;
+}
+
+.add-product-modal__field input:focus,
+.add-product-modal__field textarea:focus,
+.draft-editor__variant-edit-grid input:focus {
+  border-color: var(--ap-ui-purple) !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, .12) !important;
+}
+
+.add-product-modal__meta-option:hover,
+.add-product-modal__meta-option--active {
+  background: var(--ap-ui-purple-soft) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+.add-products-modal__finder-counter-row button:last-child,
+.add-products-modal__submit-main:not(:disabled),
+.add-products-modal__submit-toggle:not(:disabled),
+.store-switcher-modal__btn--primary,
+.schedule-modal__btn--primary,
+.product-editor-modal__btn--primary,
+.invite-sheet-modal__btn--primary,
+.quick-edit-modal__btn--primary,
+.bulk-edit-modal__btn--primary,
+.marketplace-inline-notice__action {
+  border-color: transparent !important;
+  background: var(--ap-gradient) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.store-switcher-modal__check input:checked + span,
+.bulk-edit-modal__row-check,
+.filter-field__checkbox,
+.orders-select-all input,
+.orders-table__checkbox-col input,
+.orders-active-toggle input,
+.drafts-row__check input,
+.drafts-select-all input,
+.draft-editor__variants-select-all input,
+.draft-editor__variant-check input,
+.marketplace-settings input[type="checkbox"] {
+  accent-color: var(--ap-ui-purple) !important;
+}
+
+.store-switcher-modal__check input:checked + span,
+.marketplace-settings__checkbox-box--checked {
+  border-color: var(--ap-ui-purple) !important;
+  background: var(--ap-ui-purple) !important;
+}
+
+.profile-dropdown__theme-btn--active {
+  border-color: var(--ap-ui-purple) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+/* Marketplace categories / POD cards. */
+.marketplace-category-item:hover .marketplace-category-item__icon,
+.marketplace-category-item--active .marketplace-category-item__icon {
+  background: var(--ap-gradient) !important;
+  color: #fff !important;
+}
+
+.marketplace-category-item--active .marketplace-category-item__label,
+.marketplace-category-item:hover .marketplace-category-item__label {
+  color: var(--ap-ui-purple) !important;
+}
+
+.pod-product-card:hover,
+.pod-product-card--advanced:hover {
+  border-color: var(--ap-ui-purple-border) !important;
+  box-shadow: 0 10px 22px rgba(109, 40, 217, .08) !important;
+}
+
+/* Orders: remove yellow/orange action and BUY/SELL states. */
+.orders-page-content .orders-toolbar-action:not(:disabled),
+.orders-page-content .orders-toolbar-action:not(:disabled) *,
+.orders-page-content .orders-filter-toggle,
+.orders-page-content .dashboard-secondary-btn--orders {
+  color: var(--ap-ui-purple-deep) !important;
+  stroke: currentColor !important;
+}
+
+.orders-page-content .orders-toolbar-action:disabled,
+.orders-page-content .orders-toolbar-action:disabled * {
+  color: #b7afc2 !important;
+  stroke: currentColor !important;
+}
+
+.orders-page-content .orders-paired-values__type,
+.orders-page-content .orders-buy-btn {
+  border: 1px solid var(--ap-ui-purple-border) !important;
+  background: var(--ap-ui-purple-soft) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+.orders-page-content .orders-quick-filters__pill--active,
+.orders-page-content .orders-pagination__page--active {
+  border-color: var(--ap-ui-purple) !important;
+  background: var(--ap-ui-purple) !important;
+  color: #fff !important;
+}
+
+.orders-page-content input[type="checkbox"] {
+  accent-color: var(--ap-ui-purple) !important;
+}
+
+/* Drafts / draft editor. */
+.drafts-tab--active,
+.drafts-row__expand--open,
+.draft-editor__tab--active {
+  color: var(--ap-ui-purple) !important;
+}
+
+.drafts-tab--active::after,
+.draft-editor__tab--active::after,
+.marketplace-settings__tab--active::after {
+  background: var(--ap-ui-purple) !important;
+}
+
+.drafts-row__edit-btn:hover,
+.draft-edit-view__btn--save:hover:not(:disabled) {
+  border-color: var(--ap-ui-purple-border) !important;
+  background: var(--ap-ui-purple-soft) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+.draft-edit-view__btn--save {
+  border-color: var(--ap-ui-purple) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+.draft-editor__toggle--active,
+.draft-editor__image-main {
+  background: var(--ap-ui-purple) !important;
+}
+
+.draft-editor__image--primary {
+  border-color: var(--ap-ui-purple) !important;
+}
+
+/* Settings / templates. */
+.templates-settings__tab--active,
+.templates-settings__category--active {
+  border-color: var(--ap-ui-purple-border) !important;
+  background: var(--ap-ui-purple-soft) !important;
+  color: var(--ap-ui-purple) !important;
+}
+
+.marketplace-settings__checkbox-box--checked {
+  color: #fff !important;
+}
+
+/* Generic active/focus accent fallback for legacy controls scoped to portal. */
+.autoprime-portal input[type="checkbox"]:checked,
+.autoprime-portal input[type="radio"]:checked {
+  accent-color: var(--ap-ui-purple) !important;
+}

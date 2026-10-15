@@ -1,0 +1,278 @@
+/* AutoPrime — consolidated repush of the latest UI fixes.
+   Loaded LAST from App.jsx so stale/legacy selectors cannot win.
+   2026-10-14 */
+
+/* =========================
+   PRODUCTS: compact selection column
+   ========================= */
+.products-page-content .products-table {
+  table-layout: fixed !important;
+}
+
+.products-page-content input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  margin: 0 !important;
+  accent-color: #6d28d9 !important;
+}
+
+.products-page-content .products-table thead th:first-child,
+.products-page-content .products-table tbody td:first-child,
+.products-page-content .products-table .products-table__checkbox-col {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+.products-page-content .products-select-all {
+  gap: 7px !important;
+  min-height: 34px !important;
+}
+
+.products-page-content .products-table tbody td:nth-child(2),
+.products-page-content .products-table thead tr:last-child th:nth-child(2) {
+  width: 320px !important;
+  min-width: 320px !important;
+}
+
+/* =========================
+   ORDERS: force AutoPrime purple theme
+   ========================= */
+.orders-page-content {
+  --repush-purple: #6d28d9;
+  --repush-purple-deep: #5520b5;
+  --repush-purple-soft: #f5f1ff;
+  --repush-purple-line: #ddd1f5;
+}
+
+.orders-page-content .dashboard-secondary-btn--orders,
+.orders-page-content .orders-filter-toggle,
+.orders-page-content .orders-toolbar-action,
+.orders-page-content .orders-icon-btn,
+.orders-page-content .orders-toolbar__actions button {
+  border-color: var(--repush-purple-line) !important;
+  background: #fff !important;
+  color: var(--repush-purple-deep) !important;
+}
+
+.orders-page-content .dashboard-secondary-btn--orders:hover:not(:disabled),
+.orders-page-content .orders-filter-toggle:hover:not(:disabled),
+.orders-page-content .orders-toolbar-action:hover:not(:disabled),
+.orders-page-content .orders-icon-btn:hover:not(:disabled),
+.orders-page-content .orders-toolbar__actions button:hover:not(:disabled) {
+  border-color: #c5b2ea !important;
+  background: var(--repush-purple-soft) !important;
+  color: var(--repush-purple) !important;
+}
+
+.orders-page-content .orders-toolbar-action:disabled {
+  border-color: #ece8f0 !important;
+  background: #f8f7fa !important;
+  color: #b9b2c2 !important;
+  opacity: 1 !important;
+}
+
+.orders-page-content .orders-filter-toggle--active,
+.orders-page-content .orders-toolbar-action--active,
+.orders-page-content .orders-quick-filters__pill--active,
+.orders-page-content .orders-quick-filters__pill--active:hover {
+  border-color: var(--repush-purple) !important;
+  background: var(--repush-purple) !important;
+  color: #fff !important;
+}
+
+.orders-page-content .orders-paired-values__type {
+  border: 1px solid #d6c4f3 !important;
+  background: #f2ebff !important;
+  color: var(--repush-purple-deep) !important;
+}
+
+.orders-page-content .orders-order-id-link,
+.orders-page-content .products-item-id-link,
+.orders-page-content .orders-details__link,
+.orders-page-content .products-source-btn__placeholder {
+  color: var(--repush-purple) !important;
+}
+
+.orders-page-content input[type="checkbox"] {
+  accent-color: var(--repush-purple) !important;
+}
+
+/* =========================
+   RETURNS: Product & Order visibility + aligned actions
+   ========================= */
+.returns-disputes-page .rd-table {
+  width: 100% !important;
+  min-width: 1410px !important;
+  table-layout: fixed !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(1),
+.returns-disputes-page .rd-table td:nth-child(1) {
+  width: 100px !important;
+  min-width: 100px !important;
+  max-width: 100px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(2),
+.returns-disputes-page .rd-table td:nth-child(2) {
+  width: 390px !important;
+  min-width: 390px !important;
+  max-width: 390px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(3),
+.returns-disputes-page .rd-table td:nth-child(3) {
+  width: 120px !important;
+  min-width: 120px !important;
+  max-width: 120px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(4),
+.returns-disputes-page .rd-table td:nth-child(4) {
+  width: 185px !important;
+  min-width: 185px !important;
+  max-width: 185px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(5),
+.returns-disputes-page .rd-table td:nth-child(5) {
+  width: 90px !important;
+  min-width: 90px !important;
+  max-width: 90px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(6),
+.returns-disputes-page .rd-table td:nth-child(6) {
+  width: 95px !important;
+  min-width: 95px !important;
+  max-width: 95px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(7),
+.returns-disputes-page .rd-table td:nth-child(7) {
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(8),
+.returns-disputes-page .rd-table td:nth-child(8) {
+  width: 110px !important;
+  min-width: 110px !important;
+  max-width: 110px !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-table th:nth-child(9),
+.returns-disputes-page .rd-table td:nth-child(9) {
+  position: sticky !important;
+  right: 0 !important;
+  width: 170px !important;
+  min-width: 170px !important;
+  max-width: 170px !important;
+  z-index: 5 !important;
+  background: #fff !important;
+  border-left: 1px solid #eee8f4 !important;
+  box-shadow: -8px 0 16px -14px rgba(43, 30, 63, .35) !important;
+}
+
+.returns-disputes-page .rd-table thead th:nth-child(9) {
+  z-index: 8 !important;
+  background: #faf8fd !important;
+  text-align: center !important;
+}
+
+.returns-disputes-page .rd-item-cell {
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-cell img,
+.returns-disputes-page .rd-item-thumb {
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  object-fit: cover !important;
+  border-radius: 9px !important;
+}
+
+.returns-disputes-page .rd-item-details,
+.returns-disputes-page .rd-item-submeta {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.returns-disputes-page .rd-item-title {
+  display: -webkit-box !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  text-overflow: ellipsis !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+.returns-disputes-page .rd-link-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-link-pill > span {
+  min-width: 0 !important;
+  max-width: calc(100% - 16px) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-actions-cell {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+}
+
+.returns-disputes-page .rd-btn-action {
+  box-sizing: border-box !important;
+  min-width: 68px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  text-decoration: none !important;
+}
+
+.returns-disputes-page .rd-btn-action--primary {
+  min-width: 78px !important;
+}

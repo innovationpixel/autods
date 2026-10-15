@@ -1,0 +1,136 @@
+/* AutoPrime — final topbar balance/alignment fix
+   Keeps wallet + AI credits on one row and locks all utility controls to a shared baseline. */
+
+.marketplace-dashboard-page .marketplace-header__controls {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__controls > * {
+  align-self: center !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control,
+.marketplace-dashboard-page .marketplace-header__icon-btn,
+.marketplace-dashboard-page .marketplace-header__profile {
+  box-sizing: border-box !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  vertical-align: middle !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  min-width: 126px !important;
+  width: auto !important;
+  padding: 0 11px !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control > svg {
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+/* Force the cash / AI text onto exactly one horizontal line. */
+.marketplace-dashboard-page .marketplace-header__control > span {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-self: center !important;
+  gap: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  line-height: 24px !important;
+  font-size: 0 !important;
+  color: transparent !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control > span::before,
+.marketplace-dashboard-page .marketplace-header__control > span::after {
+  position: static !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  width: auto !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  transform: none !important;
+  white-space: nowrap !important;
+  line-height: 24px !important;
+  font-size: 11.5px !important;
+  font-weight: 750 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control > span::before {
+  content: "$0" !important;
+  padding: 0 8px 0 0 !important;
+  border: 0 !important;
+  color: #3d3846 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__control > span::after {
+  content: "AI 30" !important;
+  padding: 0 0 0 8px !important;
+  border: 0 !important;
+  border-left: 1px solid #e3ddec !important;
+  color: #6d28d9 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__icon-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__profile {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+}
+
+@media (max-width: 900px) {
+  .marketplace-dashboard-page .marketplace-header__control {
+    min-width: 40px !important;
+    width: 40px !important;
+    padding: 0 !important;
+    justify-content: center !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__control > span {
+    display: none !important;
+  }
+}

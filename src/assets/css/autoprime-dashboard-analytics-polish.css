@@ -1,0 +1,325 @@
+/* AutoPrime dashboard analytics polish
+   Final scoped pass for header + KPI hierarchy. Loaded after legacy/dashboard layers. */
+
+.ebay-dashboard {
+  --ap-analytics-border: #e7e2ef;
+  --ap-analytics-border-strong: #ddd4ea;
+  --ap-analytics-surface: #ffffff;
+  --ap-analytics-soft: #faf9fc;
+  --ap-analytics-text: #171521;
+  --ap-analytics-muted: #747180;
+  --ap-analytics-faint: #94909f;
+  --ap-analytics-purple: #6d28d9;
+  --ap-analytics-purple-deep: #5520b6;
+  --ap-analytics-purple-soft: #f5f1fc;
+  --ap-analytics-green: #14835d;
+  --ap-analytics-green-soft: #edf8f3;
+  --ap-analytics-red: #c04a5f;
+  --ap-analytics-red-soft: #fff0f2;
+  --ap-analytics-neutral: #6f7280;
+  --ap-analytics-neutral-soft: #f3f4f6;
+}
+
+/* Header: make the intro and controls one intentional surface. */
+.ebay-dashboard .ebay-dashboard__header {
+  align-items: center !important;
+  gap: 28px !important;
+  margin: 0 0 18px !important;
+  padding: 20px 22px !important;
+  border: 1px solid var(--ap-analytics-border) !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #ffffff 0%, #fdfcff 68%, #f8f5ff 100%) !important;
+  box-shadow: 0 10px 28px rgba(39, 24, 72, 0.045) !important;
+}
+
+.ebay-dashboard .ebay-dashboard__welcome {
+  min-width: 0 !important;
+}
+
+.ebay-dashboard .ebay-dashboard__eyebrow {
+  margin: 0 0 5px !important;
+  color: #786a91 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .035em !important;
+  line-height: 1.2 !important;
+  text-transform: none !important;
+}
+
+.ebay-dashboard .ebay-dashboard__welcome h1 {
+  font-size: clamp(25px, 2vw, 30px) !important;
+  font-weight: 735 !important;
+  line-height: 1.14 !important;
+  letter-spacing: -.03em !important;
+}
+
+.ebay-dashboard .ebay-dashboard__welcome p {
+  margin-top: 6px !important;
+  color: var(--ap-analytics-muted) !important;
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+}
+
+.ebay-dashboard .ebay-dashboard__header-right {
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip,
+.ebay-dashboard .ebay-date-button {
+  min-height: 42px !important;
+  height: 42px !important;
+  border: 1px solid var(--ap-analytics-border-strong) !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #44414d !important;
+  box-shadow: none !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip {
+  gap: 8px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip__logo {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 0 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: -.08em !important;
+  line-height: 1 !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip__logo b {
+  font: inherit !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip__logo b:nth-child(1) { color: #e53238 !important; }
+.ebay-dashboard .ebay-marketplace-chip__logo b:nth-child(2) { color: #0064d2 !important; }
+.ebay-dashboard .ebay-marketplace-chip__logo b:nth-child(3) { color: #f5af02 !important; }
+.ebay-dashboard .ebay-marketplace-chip__logo b:nth-child(4) { color: #86b817 !important; }
+
+.ebay-dashboard .ebay-date-button {
+  gap: 8px !important;
+  padding: 0 13px !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+.ebay-dashboard .ebay-marketplace-chip:hover,
+.ebay-dashboard .ebay-date-button:hover {
+  border-color: #cfc4df !important;
+  background: #fcfbfe !important;
+}
+
+.ebay-dashboard .ebay-date-button:focus-visible {
+  outline: none !important;
+  border-color: #a98bdc !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, .10) !important;
+}
+
+/* KPI layout: primary metrics get slightly more room, views becomes secondary. */
+.ebay-dashboard .ebay-kpi-grid {
+  grid-template-columns: 1.08fr 1.08fr 1fr 1fr .92fr !important;
+  gap: 14px !important;
+  margin-bottom: 18px !important;
+}
+
+.ebay-dashboard .ebay-kpi-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  min-height: 164px !important;
+  padding: 17px 18px 15px !important;
+  border: 1px solid var(--ap-analytics-border) !important;
+  border-radius: 14px !important;
+  background: var(--ap-analytics-surface) !important;
+  box-shadow: 0 6px 18px rgba(38, 27, 57, .035) !important;
+  overflow: hidden !important;
+}
+
+.ebay-dashboard .ebay-kpi-card--profit,
+.ebay-dashboard .ebay-kpi-card--revenue {
+  border-color: #e2d8f2 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #fcfaff 100%) !important;
+}
+
+.ebay-dashboard .ebay-kpi-card--views {
+  background: #fbfbfc !important;
+  border-color: #e9e9ed !important;
+}
+
+/* Kill decorative legacy arcs/sparklines that were clipping into the footer. */
+.ebay-dashboard .ebay-kpi-card::before,
+.ebay-dashboard .ebay-kpi-card::after,
+.ebay-dashboard .ebay-kpi-card__period::before,
+.ebay-dashboard .ebay-kpi-card__period::after,
+.ebay-dashboard .ebay-kpi-card__value::before,
+.ebay-dashboard .ebay-kpi-card__value::after {
+  content: none !important;
+  display: none !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__top {
+  margin: 0 0 10px !important;
+  min-height: 40px !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__icon {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  border: 1px solid #e4daf5 !important;
+  border-radius: 11px !important;
+  background: var(--ap-analytics-purple-soft) !important;
+  color: var(--ap-analytics-purple) !important;
+  font-size: 19px !important;
+}
+
+.ebay-dashboard .ebay-kpi-card--views .ebay-kpi-card__icon {
+  border-color: #e6e6eb !important;
+  background: #f3f4f6 !important;
+  color: #6f7280 !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__trend {
+  min-height: 25px !important;
+  gap: 4px !important;
+  padding: 4px 8px !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 750 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__trend svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__trend.is-positive {
+  border-color: #d7eee4 !important;
+  background: var(--ap-analytics-green-soft) !important;
+  color: var(--ap-analytics-green) !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__trend.is-negative {
+  border-color: #f2dbe0 !important;
+  background: var(--ap-analytics-red-soft) !important;
+  color: var(--ap-analytics-red) !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__trend.is-neutral {
+  border-color: #e4e5e9 !important;
+  background: var(--ap-analytics-neutral-soft) !important;
+  color: var(--ap-analytics-neutral) !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__label {
+  margin: 0 0 5px !important;
+  color: #656270 !important;
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+  line-height: 1.3 !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__value {
+  margin: 0 !important;
+  color: var(--ap-analytics-text) !important;
+  font-size: clamp(24px, 1.9vw, 27px) !important;
+  font-weight: 720 !important;
+  line-height: 1.08 !important;
+  letter-spacing: -.028em !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__period {
+  display: block !important;
+  margin-top: auto !important;
+  padding-top: 11px !important;
+  border-top: 1px solid #f0eef4 !important;
+  color: #7e7b88 !important;
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.35 !important;
+}
+
+.ebay-dashboard .ebay-kpi-card__period strong {
+  color: inherit !important;
+  font-weight: 700 !important;
+}
+
+/* Skeletons should match the final KPI geometry to avoid layout shift. */
+.ebay-dashboard .ebay-kpi-card--loading {
+  min-height: 164px !important;
+}
+
+.ebay-dashboard .ap-skeleton--icon {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 11px !important;
+}
+
+.ebay-dashboard .ap-skeleton--chip {
+  width: 64px !important;
+  height: 25px !important;
+}
+
+.ebay-dashboard .ap-skeleton--metric {
+  width: 118px !important;
+  height: 26px !important;
+}
+
+/* Sales-summary delta zero state should also be neutral. */
+.ebay-dashboard .ebay-sales-values small.is-neutral {
+  background: var(--ap-analytics-neutral-soft) !important;
+  color: var(--ap-analytics-neutral) !important;
+}
+
+@media (max-width: 1380px) {
+  .ebay-dashboard .ebay-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .ebay-dashboard .ebay-dashboard__header {
+    padding: 18px !important;
+  }
+
+  .ebay-dashboard .ebay-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .ebay-dashboard .ebay-dashboard__header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    padding: 16px !important;
+  }
+
+  .ebay-dashboard .ebay-dashboard__header-right {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  .ebay-dashboard .ebay-kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ebay-dashboard .ebay-marketplace-chip,
+  .ebay-dashboard .ebay-date-filter,
+  .ebay-dashboard .ebay-date-button {
+    min-width: 0 !important;
+  }
+}

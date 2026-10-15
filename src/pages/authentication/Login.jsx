@@ -21,7 +21,6 @@ import {
 } from "../../store/actions/AuthActions";
 import { getStoredToken } from "../../services/AuthService";
 import { isValidEmail } from "../../utils/apiErrors";
-import logo from "../../assets/images/logo-full.png";
 import "../../assets/css/auth-page.css";
 
 const featureItems = [
@@ -117,7 +116,7 @@ function Login() {
       <aside className="auth-page__brand">
         <div className="auth-page__brand-inner">
           <Link to="/" className="auth-page__logo">
-            <img src={logo} alt="Auto DS" />
+            <img src="/autoprime-logo.png" alt="AutoDropshipPrime" />
           </Link>
 
           <div className="auth-page__brand-copy">
@@ -127,7 +126,7 @@ function Login() {
             </span>
             <h1>Run your store smarter, not harder</h1>
             <p>
-              Auto DS connects your suppliers and marketplaces so you can import,
+              AutoDropshipPrime connects your suppliers and marketplaces so you can import,
               list, and fulfill orders from a single dashboard.
             </p>
           </div>
@@ -245,7 +244,7 @@ function Login() {
           <div className="auth-page__card-foot">
             <p>
               Don’t have an account?{" "}
-              <Link to="/user/register">Get started with Auto DS</Link>
+              <Link to="/user/register">Create your AutoDropshipPrime account</Link>
             </p>
           </div>
 

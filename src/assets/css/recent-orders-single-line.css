@@ -1,0 +1,109 @@
+/* Recent orders: full-width card + one compact horizontal row per order. */
+
+/* Lower dashboard layout: orders gets its own full row. */
+.ebay-lower-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  align-items: stretch !important;
+}
+
+.ebay-lower-grid > .ebay-orders-card {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.ebay-lower-grid > .ebay-products-card,
+.ebay-lower-grid > .ebay-activity-card {
+  grid-column: auto !important;
+  min-width: 0 !important;
+}
+
+.ebay-orders-table {
+  width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: #d6c8ef transparent;
+}
+
+.ebay-orders-table__head,
+.ebay-order-row {
+  display: grid !important;
+  grid-template-columns: 140px minmax(300px, 1.6fr) minmax(150px, .8fr) 100px 120px 112px 36px !important;
+  align-items: center !important;
+  column-gap: 18px !important;
+  width: 100% !important;
+  min-width: 980px !important;
+}
+
+.ebay-orders-table__head {
+  min-height: 42px !important;
+}
+
+.ebay-order-row {
+  min-height: 64px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+.ebay-orders-table__head > *,
+.ebay-order-row > * {
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+.ebay-order-id {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+
+.ebay-order-product {
+  min-width: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  white-space: nowrap !important;
+}
+
+.ebay-order-product img {
+  flex: 0 0 42px !important;
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: cover !important;
+}
+
+.ebay-order-product > span,
+.ebay-order-row > span:not(.ebay-order-status),
+.ebay-order-row > strong {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.ebay-order-status {
+  justify-self: start !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 980px) {
+  .ebay-lower-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ebay-lower-grid > .ebay-orders-card,
+  .ebay-lower-grid > .ebay-products-card,
+  .ebay-lower-grid > .ebay-activity-card {
+    grid-column: 1 !important;
+  }
+
+  .ebay-orders-table__head,
+  .ebay-order-row {
+    min-width: 900px !important;
+  }
+}

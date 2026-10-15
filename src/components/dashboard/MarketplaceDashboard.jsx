@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Input } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -58,6 +59,7 @@ import {
 } from "react-icons/lu";
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
+import "../../assets/css/autoprime-theme.css";
 import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
@@ -134,6 +136,8 @@ import {
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
 import { toast } from '../../utils/toast';
+const { Search } = Input;
+
 const ALIEXPRESS_CATEGORY_MAP = {
   "Toys & Hobbies":             "1511",
   "Home & Garden":              "13",
@@ -226,6 +230,7 @@ const MarketplaceDashboard = () => {
   const [renamingStoreId, setRenamingStoreId] = useState("");
   const [storeRenameValue, setStoreRenameValue] = useState("");
   const [keywordSearch, setKeywordSearch] = useState("");
+  const [marketplaceSearchInput, setMarketplaceSearchInput] = useState("");
   const [activePodCategory, setActivePodCategory] = useState("All Products");
   const [shipsTo, setShipsTo] = useState("United States");
   const [currency, setCurrency] = useState("USD");
@@ -595,6 +600,7 @@ const MarketplaceDashboard = () => {
     setExpandedProductsTitle("");
     setSelectedPill("");
     setKeywordSearch("");
+    setMarketplaceSearchInput("");
     setCuratedType(null);
   };
 
@@ -1143,7 +1149,7 @@ const MarketplaceDashboard = () => {
 
       <aside className={sidebarMobileOpen ? "marketplace-sidebar marketplace-sidebar--mobile-open" : "marketplace-sidebar"}>
         <div className="marketplace-sidebar__logo-block">
-          <div className="marketplace-sidebar__logo">AUTO-DS-</div>
+          <img className="marketplace-sidebar__brand-logo" src="/autoprime-logo.png" alt="AutoDropshipPrime" />
         </div>
 
         <div className="marketplace-sidebar__store-block">
@@ -2122,20 +2128,31 @@ const MarketplaceDashboard = () => {
               <>
                 <section className="marketplace-search-panel card-wrapper">
                   <div className="marketplace-search-panel__top-row">
-                    <div className="marketplace-main-search">
-                      <LuSearch />
-                      <input
-                        type="text"
-                        className="form-control-ui input-border-style"
-                        placeholder="Search by product title, supplier or product description..."
-                        value={keywordSearch}
-                        onChange={(event) => setKeywordSearch(event.target.value)}
-                      />
-                    </div>
-
-                    <button type="button" className="button-base button-primary marketplace-search-panel__submit">
-                      Search
-                    </button>
+                    <Search
+                      className="marketplace-ant-search"
+                      placeholder="Search by product title, supplier or product description..."
+                      value={marketplaceSearchInput}
+                      allowClear
+                      size="large"
+                      enterButton="Search"
+                      loading={aliLoading}
+                      aria-label="Search marketplace products"
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        setMarketplaceSearchInput(nextValue);
+                        if (!nextValue.trim() && keywordSearch) {
+                          setKeywordSearch("");
+                          setAliPage(1);
+                        }
+                      }}
+                      onSearch={(value) => {
+                        const nextKeyword = value.trim();
+                        setMarketplaceSearchInput(value);
+                        setKeywordSearch(nextKeyword);
+                        setAliPage(1);
+                        setExpandedProductsTitle("");
+                      }}
+                    />
                   </div>
 
                   <div className="marketplace-search-panel__filters">

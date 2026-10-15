@@ -1,0 +1,408 @@
+/* AutoPrime accent normalization
+   Loaded after legacy marketplace styles so interactive branding stays on-theme.
+   Semantic warning/error colors are intentionally not overridden here. */
+
+.marketplace-dashboard-page {
+  --ap-accent: #6d28d9;
+  --ap-accent-strong: #5b21b6;
+  --ap-accent-soft: #f5f1ff;
+  --ap-accent-soft-strong: #eee7ff;
+  --ap-accent-border: #ddd3ff;
+  --ap-accent-muted: #74658f;
+  --ap-accent-shadow: rgba(109, 40, 217, 0.18);
+}
+
+/* Sidebar + Add Products */
+.marketplace-sidebar__store-name:hover .marketplace-sidebar__store-site {
+  color: var(--ap-accent) !important;
+}
+
+.marketplace-sidebar__add-btn:hover,
+.marketplace-sidebar__add-btn--open {
+  background: var(--ap-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 24px var(--ap-accent-shadow) !important;
+}
+
+.marketplace-sidebar__add-menu-item:hover,
+.marketplace-sidebar__add-menu-item:focus-visible {
+  background: var(--ap-accent-soft) !important;
+  outline: none;
+}
+
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-icon,
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-copy strong,
+.marketplace-sidebar__add-menu-item:focus-visible .marketplace-sidebar__add-menu-icon,
+.marketplace-sidebar__add-menu-item:focus-visible .marketplace-sidebar__add-menu-copy strong {
+  color: var(--ap-accent) !important;
+}
+
+.marketplace-sidebar__add-menu-item:hover .marketplace-sidebar__add-menu-copy span,
+.marketplace-sidebar__add-menu-item:focus-visible .marketplace-sidebar__add-menu-copy span {
+  color: var(--ap-accent-muted) !important;
+}
+
+/* Add product modal */
+.add-product-modal__title-icon span {
+  color: var(--ap-accent) !important;
+}
+
+.add-product-modal__field input:focus,
+.add-product-modal__field textarea:focus {
+  border-color: var(--ap-accent) !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.12) !important;
+}
+
+.add-product-modal__meta-option:hover,
+.add-product-modal__meta-option--active,
+.add-product-modal__actions button:not(:disabled):hover {
+  border-color: var(--ap-accent-border) !important;
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.add-products-modal__tab:hover,
+.add-products-modal__tab--active {
+  color: var(--ap-accent) !important;
+}
+
+.add-products-modal__tab--active::after {
+  background: var(--ap-accent) !important;
+}
+
+.add-products-modal__finder-icon {
+  color: var(--ap-accent) !important;
+}
+
+.add-products-modal__finder-counter-row button:last-child,
+.add-products-modal__submit-main:not(:disabled),
+.add-products-modal__submit-toggle:not(:disabled) {
+  border-color: var(--ap-accent) !important;
+  background: var(--ap-accent) !important;
+  color: #fff !important;
+}
+
+.add-products-modal__finder-counter-row button:last-child:hover,
+.add-products-modal__submit-main:not(:disabled):hover,
+.add-products-modal__submit-toggle:not(:disabled):hover {
+  border-color: var(--ap-accent-strong) !important;
+  background: var(--ap-accent-strong) !important;
+}
+
+/* Store switcher */
+.store-switcher-modal__check input:checked + span {
+  border-color: var(--ap-accent) !important;
+  background: var(--ap-accent) !important;
+}
+
+.store-switcher-modal__menu-item:hover,
+.store-switcher-modal__menu-item--active {
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.store-switcher-modal__rename input:focus,
+.store-switcher-modal__rename input {
+  border-color: var(--ap-accent-border) !important;
+}
+
+.store-switcher-modal__rename input:focus {
+  border-color: var(--ap-accent) !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1) !important;
+}
+
+.store-switcher-modal__update-btn {
+  background: var(--ap-accent) !important;
+  color: #fff !important;
+}
+
+.store-switcher-modal__update-btn:hover:not(:disabled) {
+  background: var(--ap-accent-strong) !important;
+  box-shadow: 0 10px 22px var(--ap-accent-shadow) !important;
+}
+
+.store-switcher-modal__update-btn:disabled {
+  background: #f4f5f8 !important;
+  color: #c8cad2 !important;
+  box-shadow: none !important;
+}
+
+/* Product finder / hand-picked marketplace layout */
+.marketplace-search-panel__top-row {
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+}
+
+.marketplace-search-panel__top-row > *:first-child {
+  min-width: 0;
+  width: 100%;
+}
+
+.marketplace-search-panel__top-row input {
+  min-height: 42px;
+}
+
+.marketplace-search-panel__submit {
+  width: auto !important;
+  min-width: 84px;
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, var(--ap-accent-strong), #9333ea) !important;
+  color: #fff !important;
+  box-shadow: 0 7px 18px rgba(109, 40, 217, 0.16);
+}
+
+.marketplace-search-panel__submit:hover:not(:disabled) {
+  background: var(--ap-accent-strong) !important;
+  box-shadow: 0 9px 22px var(--ap-accent-shadow) !important;
+}
+
+.marketplace-search-panel__filters {
+  grid-template-columns: minmax(150px, 0.65fr) minmax(150px, 0.65fr) repeat(3, minmax(220px, 1.35fr)) !important;
+  align-items: end !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+.marketplace-filter-field {
+  min-width: 0;
+}
+
+.marketplace-filter-field .muted-label {
+  display: block;
+  margin: 0 0 6px !important;
+  line-height: 1.2 !important;
+}
+
+.marketplace-select-wrap,
+.marketplace-select-wrap .select-control {
+  width: 100%;
+}
+
+.marketplace-select-wrap .select-control {
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 38px 0 14px !important;
+  border: 1px solid var(--ap-accent-border) !important;
+  border-radius: 12px !important;
+  background: var(--card-background, #fff) !important;
+}
+
+.marketplace-select-wrap .select-control:hover {
+  border-color: rgba(109, 40, 217, 0.42) !important;
+}
+
+.marketplace-select-wrap .select-control:focus,
+.marketplace-select-wrap .select-control:focus-visible {
+  border-color: var(--ap-accent) !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.1) !important;
+  outline: none !important;
+}
+
+.marketplace-select-wrap__icon {
+  right: 14px !important;
+  color: #a9a2b8 !important;
+}
+
+.marketplace-category-row {
+  grid-template-columns: repeat(12, minmax(88px, 1fr)) !important;
+  align-items: start;
+  gap: 12px !important;
+  margin-top: 18px !important;
+}
+
+.marketplace-category-item {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px !important;
+  min-width: 0;
+  min-height: 94px !important;
+  padding: 2px 4px 4px;
+}
+
+.marketplace-category-item__icon {
+  flex: 0 0 46px;
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 999px !important;
+  background: #f1f1f3 !important;
+  color: #737078 !important;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.marketplace-category-item__label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  color: var(--text-color, #29262f) !important;
+  line-height: 1.3 !important;
+  text-align: center;
+}
+
+.marketplace-category-item:hover .marketplace-category-item__icon,
+.marketplace-category-item:focus-visible .marketplace-category-item__icon {
+  background: var(--ap-accent-soft-strong) !important;
+  color: var(--ap-accent) !important;
+  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.12);
+  transform: translateY(-1px);
+}
+
+.marketplace-category-item--active .marketplace-category-item__icon {
+  background: var(--ap-accent) !important;
+  color: #fff !important;
+  box-shadow: 0 7px 18px var(--ap-accent-shadow) !important;
+}
+
+.marketplace-category-item:hover .marketplace-category-item__label,
+.marketplace-category-item:focus-visible .marketplace-category-item__label,
+.marketplace-category-item--active .marketplace-category-item__label {
+  color: var(--ap-accent) !important;
+}
+
+.marketplace-subfilters__chip:hover,
+.marketplace-subfilters__chip--active {
+  border-color: rgba(109, 40, 217, 0.48) !important;
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.marketplace-toolbar {
+  align-items: center !important;
+  gap: 14px !important;
+  margin-top: 16px !important;
+}
+
+.marketplace-toolbar__left,
+.marketplace-toolbar__right {
+  align-items: center !important;
+  min-height: 40px;
+}
+
+.marketplace-toolbar .filter-pill {
+  min-height: 40px !important;
+  padding: 0 20px !important;
+  border-color: var(--border-color, #e3e4ea) !important;
+  border-radius: 8px !important;
+  background: var(--card-background, #fff) !important;
+}
+
+.marketplace-toolbar .filter-pill:hover,
+.marketplace-toolbar .filter-pill--active,
+.marketplace-toolbar .filter-pill.active {
+  border-color: var(--ap-accent-border) !important;
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.marketplace-toolbar__sort-control {
+  min-height: 40px;
+  padding: 0 34px 0 14px !important;
+  border: 1px solid var(--border-color, #e3e4ea);
+  border-radius: 10px;
+  background: var(--card-background, #fff);
+}
+
+.marketplace-toolbar__sort-control select {
+  min-height: 38px;
+  color: var(--text-color, #5d5b65) !important;
+}
+
+.marketplace-toolbar__sort-control:focus-within {
+  border-color: var(--ap-accent) !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.08);
+}
+
+.marketplace-toolbar__sort-control svg {
+  right: 12px !important;
+  color: #a9a2b8 !important;
+}
+
+/* Dashboard recent-order action dropdown/modal */
+.dashboard-order-actions__menu > button:hover,
+.dashboard-order-actions__print-wrap > button:hover,
+.dashboard-order-actions__submenu > button:hover {
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.dashboard-order-modal__actions button:hover {
+  border-color: var(--ap-accent-border) !important;
+  background: var(--ap-accent-soft) !important;
+  color: var(--ap-accent) !important;
+}
+
+.dashboard-order-modal__spinner {
+  border-top-color: var(--ap-accent) !important;
+}
+
+.marketplace-dashboard-page--dark .dashboard-order-actions__menu > button:hover,
+.marketplace-dashboard-page--dark .dashboard-order-actions__print-wrap > button:hover,
+.marketplace-dashboard-page--dark .dashboard-order-actions__submenu > button:hover,
+.marketplace-dashboard-page--dark .dashboard-order-modal__actions button:hover {
+  background: rgba(109, 40, 217, 0.18) !important;
+  color: #c4b5fd !important;
+}
+
+/* Keep the finder responsive after the desktop alignment overrides above. */
+@media (max-width: 1024px) {
+  .marketplace-search-panel__filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .marketplace-category-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .marketplace-search-panel__top-row,
+  .marketplace-search-panel__filters {
+    grid-template-columns: 1fr !important;
+  }
+
+  .marketplace-search-panel__submit,
+  .marketplace-search-panel__ugc-btn {
+    width: 100% !important;
+  }
+
+  .marketplace-category-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .marketplace-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .marketplace-toolbar__left,
+  .marketplace-toolbar__right {
+    width: 100%;
+  }
+
+  .marketplace-toolbar__right {
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 520px) {
+  .marketplace-category-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .marketplace-category-item__label {
+    min-height: 0;
+  }
+}
+
+/* Keyboard accessibility should match hover/active branding */
+.marketplace-dashboard-page button:focus-visible,
+.marketplace-dashboard-page [role="button"]:focus-visible {
+  outline: 2px solid rgba(109, 40, 217, 0.55);
+  outline-offset: 2px;
+}

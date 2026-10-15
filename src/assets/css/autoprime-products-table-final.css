@@ -1,0 +1,204 @@
+/* AutoPrime — Products table final alignment pass
+   Scoped to Products page only. */
+
+.products-page-content {
+  --pt-purple: #6d28d9;
+  --pt-purple-soft: #f6f1ff;
+  --pt-border: #e7e0ef;
+  --pt-text: #251e31;
+  --pt-muted: #746c80;
+}
+
+/* Remove excess vertical gaps around toolbar / selection row. */
+.products-page-content .products-toolbar {
+  min-height: 44px !important;
+  margin: 0 0 6px !important;
+  padding: 0 !important;
+}
+
+.products-page-content .products-selection-row {
+  min-height: 46px !important;
+  margin: 0 0 8px !important;
+  padding: 0 2px !important;
+  gap: 14px !important;
+}
+
+.products-page-content .products-selection-row__left,
+.products-page-content .products-selection-row__right {
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.products-page-content .products-selection-row__left {
+  gap: 8px !important;
+}
+
+.products-page-content .products-selection-row__right {
+  gap: 8px !important;
+}
+
+.products-page-content .products-table-shell {
+  margin-top: 0 !important;
+}
+
+/* Lock the table sizing so browser leftover width cannot inflate the checkbox column. */
+.products-page-content .products-table {
+  table-layout: fixed !important;
+}
+
+/* Checkbox system: same compact size/alignment in toolbar and rows. */
+.products-page-content input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  margin: 0 !important;
+  accent-color: var(--pt-purple) !important;
+  vertical-align: middle !important;
+}
+
+.products-page-content .orders-select-all,
+.products-page-content .products-select-all {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+}
+
+/* First table column is selection only: keep it genuinely narrow and centered. */
+.products-page-content .products-table thead th:first-child,
+.products-page-content .products-table tbody td:first-child,
+.products-page-content .products-table .products-table__checkbox-col {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding-left: 8px !important;
+  padding-right: 6px !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  box-sizing: border-box !important;
+}
+
+.products-page-content .products-table tbody td:first-child input[type="checkbox"] {
+  display: block !important;
+  margin-inline: auto !important;
+}
+
+/* Product name gets the useful width that was previously consumed by Actions. */
+.products-page-content .products-table tbody td:nth-child(2),
+.products-page-content .products-table thead tr:last-child th:nth-child(2) {
+  width: 320px !important;
+  min-width: 320px !important;
+}
+
+.products-page-content .products-table tbody td:nth-child(2) {
+  padding-left: 12px !important;
+}
+
+.products-page-content .products-product-cell,
+.products-page-content .products-name-cell {
+  gap: 12px !important;
+  align-items: center !important;
+}
+
+.products-page-content .products-product-cell img,
+.products-page-content .products-name-cell img {
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  border-radius: 9px !important;
+  object-fit: cover !important;
+  border: 1px solid #ece6f2 !important;
+}
+
+/* Prevent product titles from looking cut off too early. */
+.products-page-content .products-product-cell__title,
+.products-page-content .products-name-cell__title,
+.products-page-content .products-table tbody td:nth-child(2) strong {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  line-height: 1.35 !important;
+}
+
+/* Actions now lives at the far right; keep it visible while horizontally scrolling. */
+.products-page-content .products-table thead th:last-child,
+.products-page-content .products-table tbody td:last-child {
+  position: sticky !important;
+  right: 0 !important;
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
+  z-index: 4 !important;
+  text-align: center !important;
+  border-left: 1px solid #eee8f4 !important;
+  box-shadow: -8px 0 16px -14px rgba(44, 31, 64, .42) !important;
+}
+
+.products-page-content .products-table thead th:last-child {
+  z-index: 7 !important;
+  background: #faf8fd !important;
+}
+
+.products-page-content .products-table tbody td:last-child {
+  background: #fff !important;
+}
+
+.products-page-content .products-table tbody tr:hover td:last-child {
+  background: #fcfaff !important;
+}
+
+.products-page-content .products-table tbody td:last-child > div,
+.products-page-content .products-table tbody td:last-child .products-row-actions,
+.products-page-content .products-table tbody td:last-child .orders-row-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  white-space: nowrap !important;
+}
+
+.products-page-content .products-table tbody td:last-child button,
+.products-page-content .products-table tbody td:last-child a {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+}
+
+/* Toolbar controls should read as one compact utility group. */
+.products-page-content .products-history-btn,
+.products-page-content .orders-icon-btn,
+.products-page-content .dashboard-secondary-btn--orders {
+  min-height: 38px !important;
+}
+
+.products-page-content .products-history-btn {
+  padding: 0 10px !important;
+}
+
+.products-page-content .products-selection-row__right > span[aria-hidden="true"] {
+  display: none !important;
+}
+
+/* Avoid the chat launcher sitting on top of the last action cell. */
+.products-page-content {
+  padding-bottom: 76px !important;
+}
+
+@media (max-width: 1100px) {
+  .products-page-content .products-selection-row {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  .products-page-content .products-selection-row__right {
+    margin-left: auto !important;
+  }
+}

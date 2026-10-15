@@ -39,7 +39,6 @@ import {
 import { getStoredToken, getStoredUser, saveSession } from "../../services/AuthService";
 import { openPaymentCheckout } from "../../utils/paymentCheckout";
 import { toast } from "../../utils/toast";
-import logo from "../../assets/images/logo-full.png";
 
 const COUNTRIES = [
   { code: "US", name: "United States" },
@@ -403,7 +402,7 @@ export default function Registration() {
       <aside className="auth-page__brand">
         <div className="auth-page__brand-inner">
           <Link to="/" className="auth-page__logo">
-            <img src={logo} alt="Auto DS" />
+            <img src="/autoprime-logo.png" alt="AutoDropshipPrime" />
           </Link>
 
           <div className="auth-page__brand-copy">
@@ -1003,7 +1002,7 @@ export default function Registration() {
                 <LuCheck />
               </div>
 
-              <h2>Welcome to Auto DS!</h2>
+              <h2>Welcome to AutoDropshipPrime!</h2>
               <p>
                 Your <strong>{activatedPlan?.title || "Subscription"}</strong> package is now active.
                 Your dropshipping dashboard is ready for product imports and order automation.
