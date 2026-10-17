@@ -25,6 +25,7 @@ import AdminCategoriesPage from "../autods/pages/AdminCategoriesPage";
 import AdminTrendingProductsPage from "../autods/pages/AdminTrendingProductsPage";
 import AdminHandPickedProductsPage from "../autods/pages/AdminHandPickedProductsPage";
 import AdminUsersPage from "../autods/pages/AdminUsersPage";
+import AdminAiTemplatesPage from "../autods/pages/AdminAiTemplatesPage";
 import AdminSupportTicketsPage from "../autods/pages/AdminSupportTicketsPage";
 import AdminSettingsPage from "../autods/pages/AdminSettingsPage";
 import { selectUser } from "../../store/selectors/AuthSelectors";
@@ -105,6 +106,7 @@ function SuperAdminShell() {
     "admin/trending-products": "Trending Products",
     "admin/hand-picked-products": "Hand-Picked Products",
     "admin/admin-users": "Admin Users",
+    "admin/ai-templates": "AI Templates",
     "admin/support": "Customer Support",
     "admin/settings": "Settings",
   };
@@ -122,6 +124,7 @@ function SuperAdminShell() {
     "admin/trending-products": () => setActivePage("admin/trending-products"),
     "admin/hand-picked-products": () => setActivePage("admin/hand-picked-products"),
     "admin/admin-users": () => setActivePage("admin/admin-users"),
+    "admin/ai-templates": () => setActivePage("admin/ai-templates"),
     "admin/support": () => setActivePage("admin/support"),
     "admin/settings": () => setActivePage("admin/settings"),
   };
@@ -277,6 +280,8 @@ function SuperAdminShell() {
               <AdminHandPickedProductsPage />
             ) : activePage === "admin/admin-users" ? (
               <AdminUsersPage />
+            ) : activePage === "admin/ai-templates" ? (
+              <AdminAiTemplatesPage />
             ) : activePage === "admin/support" ? (
               <AdminSupportTicketsPage />
             ) : activePage === "admin/settings" ? (

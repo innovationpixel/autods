@@ -5,6 +5,7 @@ import {
   LuFilePenLine,
   LuGauge,
   LuHeadphones,
+  LuImage,
   LuLayers,
   LuPackage2,
   LuPackageSearch,
@@ -41,7 +42,7 @@ export const sidebarGroups = [
     { label: "Products", page: "products", icon: LuPackage2, marker: "#9ad2c0" },
     { label: "Drafts", page: "drafts", icon: LuFilePenLine },
     { label: "Wallet", page: "wallet", icon: LuWalletCards },
-    { label: "AI Video Generation", page: "ai-video-generation", icon: LuVideo, marker: "#c7b8f5" },
+    { label: "AI Image Generation", page: "ai-image-generation", icon: LuVideo, marker: "#c7b8f5" },
     { label: "Customer Support", page: "customer-support", icon: LuHeadphones },
     { label: "Settings", page: "settings", icon: LuSettings2 },
   ],
@@ -60,6 +61,7 @@ export const adminSidebarItems = [
   { label: "Categories", page: "admin/categories", icon: LuLayers, marker: "#a5d8ff" },
   { label: "Trending Products", page: "admin/trending-products", icon: LuChartLine, marker: "#ffd8a8" },
   { label: "Hand-Picked Products", page: "admin/hand-picked-products", icon: LuBadgeCheck, marker: "#b2f2bb" },
+  { label: "AI Templates", page: "admin/ai-templates", icon: LuImage, marker: "#c7b8f5" },
   { label: "Admin Users", page: "admin/admin-users", icon: LuShieldCheck, marker: "#d0bfff" },
   { label: "Customer Support", page: "admin/support", icon: LuHeadphones, marker: "#f1b45c" },
   { label: "Settings", page: "admin/settings", icon: LuSettings2, marker: "#9ad2c0" },
@@ -77,6 +79,8 @@ export const adminPageModuleMap = {
   "admin/trending-products": "trending_products",
   "admin/hand-picked-products": "hand_picked_products",
   "admin/admin-users": "admin_users",
+  // Not module-gated on the backend yet — visible to any super admin.
+  "admin/ai-templates": null,
   // Not module-gated on the backend yet (support-tickets routes have no admin_module middleware),
   // so it stays visible to any super admin regardless of their module toggles.
   "admin/support": null,
@@ -95,6 +99,7 @@ export const adminPages = [
   "admin/trending-products",
   "admin/hand-picked-products",
   "admin/admin-users",
+  "admin/ai-templates",
   "admin/support",
   "admin/settings",
 ];

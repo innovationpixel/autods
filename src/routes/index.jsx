@@ -77,7 +77,7 @@ const Markup = () => {
                     <Route path="/wallet" element={<Home />} />
                     <Route path="/settings" element={<Home />} />
                     <Route path="/plans" element={<Home />} />
-                    <Route path="/ai-video-generation" element={<Home />} />
+                    <Route path="/ai-image-generation" element={<Home />} />
                     <Route path="/admin" element={<Home />} />
                     <Route path="/admin/clients" element={<Home />} />
                     <Route path="/admin/plans" element={<Home />} />

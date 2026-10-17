@@ -676,8 +676,8 @@ const MarketplaceDashboard = () => {
     setSearchAnything("");
   };
 
-  const openAiVideoGenerationPage = () => {
-    setActivePage("ai-video-generation");
+  const openAiImageGenerationPage = () => {
+    setActivePage("ai-image-generation");
     setSearchAnything("");
   };
 
@@ -1240,7 +1240,7 @@ const MarketplaceDashboard = () => {
                         products: openProductsPage,
                         drafts: openDraftsPage,
                         wallet: openWalletPage,
-                        "ai-video-generation": openAiVideoGenerationPage,
+                        "ai-image-generation": openAiImageGenerationPage,
                         "customer-support": openCustomerSupportPage,
                         settings: openSettingsPage,
                       };
@@ -2118,7 +2118,7 @@ const MarketplaceDashboard = () => {
               <HelpCenterContent />
             ) : activePage === "wallet" ? (
               <WalletContent />
-            ) : activePage === "ai-video-generation" ? (
+            ) : activePage === "ai-image-generation" ? (
               <AiVideoGenerationContent />
             ) : activePage === "settings" ? (
               <MarketplaceSettingsPage />
