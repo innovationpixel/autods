@@ -20,6 +20,7 @@ import {
 import { selectEbayConnections } from "../../../store/selectors/EbaySelectors";
 import {
   getReturnsDisputes,
+  respondReturnDispute,
   syncReturnsDisputes,
 } from "../../../services/ReturnDisputeService";
 import { toast } from "../../../utils/toast";
@@ -129,6 +130,63 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
   const [totalCount, setTotalCount] = useState(0);
 
   const [selectedDetailItem, setSelectedDetailItem] = useState(null);
+
+  const [activeResolveItem, setActiveResolveItem] = useState(null);
+  const [resolveAction, setResolveAction] = useState("accept_return");
+  const [resolveAmount, setResolveAmount] = useState("");
+  const [resolveMessage, setResolveMessage] = useState("");
+  const [resolveCarrier, setResolveCarrier] = useState("");
+  const [resolveTracking, setResolveTracking] = useState("");
+  const [resolving, setResolving] = useState(false);
+
+  const handleOpenResolve = (item) => {
+    setActiveResolveItem(item);
+    setResolveAction(item.type === "return" ? "accept_return" : "contest_dispute");
+    setResolveAmount(item.amount ? String(item.amount) : "");
+    setResolveMessage("");
+    setResolveCarrier("");
+    setResolveTracking("");
+  };
+
+  const handleSubmitResolve = async (e) => {
+    if (e) e.preventDefault();
+    if (!activeResolveItem) return;
+
+    setResolving(true);
+    try {
+      const payload = {
+        action: resolveAction,
+        message: resolveMessage,
+      };
+      if (resolveAction === "issue_refund" && resolveAmount) {
+        payload.amount = Number(resolveAmount);
+      }
+      if (resolveAction === "provide_label") {
+        payload.carrier = resolveCarrier;
+        payload.tracking_number = resolveTracking;
+      }
+
+      const res = await respondReturnDispute(activeResolveItem.id, payload);
+      const updated = res.data?.return_dispute;
+
+      if (updated) {
+        setItems((current) =>
+          current.map((it) => (it.id === updated.id ? { ...it, ...updated } : it))
+        );
+        if (selectedDetailItem?.id === updated.id) {
+          setSelectedDetailItem(updated);
+        }
+      }
+
+      toast.success(res.data?.message ?? "Resolution submitted successfully.");
+      setActiveResolveItem(null);
+      loadData();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to submit resolution."));
+    } finally {
+      setResolving(false);
+    }
+  };
 
   const effectiveSearch = searchQuery || localSearch;
 
@@ -635,16 +693,14 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
                             <span>View</span>
                           </button>
 
-                          <a
-                            href={getEbayResolutionUrl(item)}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
                             className="rd-btn-action rd-btn-action--primary"
-                            title="Respond or resolve directly on eBay"
+                            title="Resolve case in app"
+                            onClick={() => handleOpenResolve(item)}
                           >
                             <span>Resolve</span>
-                            <LuExternalLink size={12} />
-                          </a>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -925,16 +981,188 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
                 Close
               </button>
 
-              <a
-                href={getEbayResolutionUrl(selectedDetailItem)}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
                 className="rd-btn-action rd-btn-action--primary"
+                onClick={() => handleOpenResolve(selectedDetailItem)}
               >
-                <span>Respond on eBay</span>
-                <LuExternalLink size={13} />
-              </a>
+                <span>Resolve in App</span>
+              </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-App Return / Dispute Resolution Modal */}
+      {activeResolveItem && (
+        <div
+          className="rd-modal-backdrop"
+          onClick={() => setActiveResolveItem(null)}
+          role="presentation"
+        >
+          <div className="rd-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="rd-modal-header">
+              <div className="rd-modal-title">
+                <span
+                  className={`rd-type-badge ${
+                    activeResolveItem.type === "return"
+                      ? "rd-type-badge--return"
+                      : "rd-type-badge--dispute"
+                  }`}
+                >
+                  {activeResolveItem.type}
+                </span>
+                <h2>Resolve Case #{activeResolveItem.external_id || activeResolveItem.id}</h2>
+              </div>
+              <button
+                type="button"
+                className="rd-modal-close-btn"
+                onClick={() => setActiveResolveItem(null)}
+                aria-label="Close"
+              >
+                <LuX />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitResolve} className="rd-modal-body" style={{ padding: 24 }}>
+              <div style={{ marginBottom: 16 }}>
+                <span className="rd-form-label" style={{ display: "block", marginBottom: 8 }}>
+                  Select Resolution Action
+                </span>
+                <div className="rd-resolve-options">
+                  {activeResolveItem.type === "return" ? (
+                    <>
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "accept_return" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("accept_return")}
+                      >
+                        <span className="rd-resolve-card__title">Accept Return</span>
+                        <span className="rd-resolve-card__desc">Approve buyer request and authorize return.</span>
+                      </div>
+
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "issue_refund" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("issue_refund")}
+                      >
+                        <span className="rd-resolve-card__title">Issue Refund</span>
+                        <span className="rd-resolve-card__desc">Refund the buyer directly without return.</span>
+                      </div>
+
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "provide_label" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("provide_label")}
+                      >
+                        <span className="rd-resolve-card__title">Provide Shipping Label</span>
+                        <span className="rd-resolve-card__desc">Attach carrier and tracking number for return.</span>
+                      </div>
+
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "contest_dispute" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("contest_dispute")}
+                      >
+                        <span className="rd-resolve-card__title">Send Message / Contest</span>
+                        <span className="rd-resolve-card__desc">Provide seller response or contest the return.</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "contest_dispute" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("contest_dispute")}
+                      >
+                        <span className="rd-resolve-card__title">Challenge / Contest</span>
+                        <span className="rd-resolve-card__desc">Submit proof of delivery or dispute response.</span>
+                      </div>
+
+                      <div
+                        className={`rd-resolve-card ${resolveAction === "issue_refund" ? "rd-resolve-card--active" : ""}`}
+                        onClick={() => setResolveAction("issue_refund")}
+                      >
+                        <span className="rd-resolve-card__title">Accept & Full Refund</span>
+                        <span className="rd-resolve-card__desc">Accept dispute claim and issue full refund.</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {resolveAction === "issue_refund" && (
+                <div className="rd-form-group">
+                  <label className="rd-form-label">Refund Amount ({activeResolveItem.currency || "USD"})</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="rd-form-input"
+                    value={resolveAmount}
+                    onChange={(e) => setResolveAmount(e.target.value)}
+                    placeholder="e.g. 29.99"
+                    required
+                  />
+                </div>
+              )}
+
+              {resolveAction === "provide_label" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div className="rd-form-group">
+                    <label className="rd-form-label">Shipping Carrier</label>
+                    <input
+                      type="text"
+                      className="rd-form-input"
+                      value={resolveCarrier}
+                      onChange={(e) => setResolveCarrier(e.target.value)}
+                      placeholder="e.g. USPS, FedEx, UPS"
+                      required
+                    />
+                  </div>
+                  <div className="rd-form-group">
+                    <label className="rd-form-label">Tracking Number</label>
+                    <input
+                      type="text"
+                      className="rd-form-input"
+                      value={resolveTracking}
+                      onChange={(e) => setResolveTracking(e.target.value)}
+                      placeholder="e.g. 94001000000000000000"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="rd-form-group">
+                <label className="rd-form-label">
+                  Message / Comments {resolveAction === "contest_dispute" ? "(Required)" : "(Optional)"}
+                </label>
+                <textarea
+                  className="rd-form-textarea"
+                  rows={3}
+                  value={resolveMessage}
+                  onChange={(e) => setResolveMessage(e.target.value)}
+                  placeholder="Provide resolution details or instructions for the buyer..."
+                  required={resolveAction === "contest_dispute"}
+                />
+              </div>
+
+              <div className="rd-modal-footer" style={{ margin: "16px -24px -24px -24px" }}>
+                <button
+                  type="button"
+                  className="rd-btn-action"
+                  onClick={() => setActiveResolveItem(null)}
+                  disabled={resolving}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="rd-btn-action rd-btn-action--primary"
+                  disabled={resolving}
+                >
+                  {resolving && <LuRefreshCw className="rd-spin" size={13} style={{ marginRight: 6 }} />}
+                  <span>{resolving ? "Submitting…" : "Confirm Resolution"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

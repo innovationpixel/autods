@@ -416,6 +416,9 @@ function DraftEditorPanel({
                 <DraftDescriptionEditor
                   editorKey={`draft-description-${item.id}`}
                   value={form.description ?? ""}
+                  item={item}
+                  form={form}
+                  onTemplateChange={(templateId) => patch({ templateId, template_id: templateId })}
                   onChange={(description) => patch({ description })}
                 />
               </div>

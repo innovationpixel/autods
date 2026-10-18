@@ -269,6 +269,7 @@ function AdminClientsPage() {
                 <AdminSortableHeader label="Client" sortKey="name" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Plan" sortKey="plan" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Wallet" sortKey="wallet_balance" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Total Revenue" sortKey="total_paid" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Activity" sortKey="orders_count" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Status" sortKey="status" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Joined" sortKey="created_at" sort={sort} sortDir={sortDir} onSort={handleSort} />
@@ -294,6 +295,19 @@ function AdminClientsPage() {
                   </td>
                   <td>{formatMoney(client.wallet_balance, client.wallet_currency)}</td>
                   <td>
+                    <div
+                      className="admin-clients-page__revenue"
+                      title={`Subscriptions: ${formatMoney(client.subscription_paid, client.wallet_currency)} • Deposits: ${formatMoney(client.wallet_deposited, client.wallet_currency)}`}
+                    >
+                      <strong style={{ color: "#10b981", fontWeight: 700, fontSize: "13px" }}>
+                        {formatMoney(client.total_paid, client.wallet_currency)}
+                      </strong>
+                      <span style={{ fontSize: "11px", color: "var(--muted-color, #64748b)", display: "block", marginTop: "2px" }}>
+                        Sub: {formatMoney(client.subscription_paid, client.wallet_currency)} · Dep: {formatMoney(client.wallet_deposited, client.wallet_currency)}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
                     <span className="admin-clients-page__activity">
                       {client.orders_count ?? 0} orders · {client.ebay_listings_count ?? 0} listings
                     </span>
@@ -317,7 +331,7 @@ function AdminClientsPage() {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7} className="admin-table__empty">No clients found.</td>
+                  <td colSpan={8} className="admin-table__empty">No clients found.</td>
                 </tr>
               )}
             </tbody>

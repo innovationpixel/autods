@@ -164,35 +164,45 @@ function pickListSection(orders) {
 
 function shippingLabelSection(order) {
   const code = order.trackingNumber && order.trackingNumber !== "—" ? order.trackingNumber : order.orderId;
+  const carrier = order.carrier || order.buyCarrier || "STANDARD POSTAGE";
 
   return `
     <section class="doc shipping-label">
       <div class="shipping-label__header">
-        <strong>${escapeHtml(order.carrier || "Standard Shipping")}</strong>
-        <span>${escapeHtml(order.shippingService || "")}</span>
-      </div>
-      <div class="row">
-        <div class="box">
-          <strong>Ship from</strong>
-          <span>${escapeHtml(order.storeName || "—")}</span>
+        <div>
+          <strong style="font-size: 18px; letter-spacing: 0.5px;">${escapeHtml(carrier)}</strong>
+          <div style="font-size: 11px; color: #4b5563; font-weight: 600;">EBAY SHIPPING SERVICES</div>
         </div>
-        <div class="box">
-          <strong>Ship to</strong>
-          <span>${escapeHtml(order.buyerName || "—")}</span><br />
-          <span>${escapeHtml(order.shippingAddress || "—")}</span>
+        <div style="text-align: right;">
+          <span style="display: inline-block; border: 1.5px solid #000; padding: 2px 8px; font-weight: 800; font-size: 13px;">4x6 DOMESTIC</span>
+          <div style="font-size: 11px; margin-top: 2px;">${escapeHtml(order.shippingService || "Priority / Standard Delivery")}</div>
         </div>
       </div>
-      <div class="row">
-        <div class="box">
-          <strong>Order</strong>
-          <span>${escapeHtml(order.orderId)}</span>
+      <div class="row" style="border-bottom: 1.5px solid #000; padding-bottom: 12px; margin-bottom: 12px;">
+        <div class="box" style="flex: 1; max-width: 45%;">
+          <strong style="font-size: 10px;">SHIP FROM:</strong>
+          <span style="font-size: 12px; font-weight: 600;">${escapeHtml(order.storeName || "eBay Fulfillment Center")}</span>
         </div>
-        <div class="box">
-          <strong>Item</strong>
-          <span>${escapeHtml(order.title)}${order.totalQuantity > 1 ? ` &times; ${escapeHtml(order.totalQuantity)}` : ""}</span>
+        <div class="box" style="flex: 1.2;">
+          <strong style="font-size: 10px;">SHIP TO:</strong>
+          <span style="font-size: 14px; font-weight: 700; display: block; margin-bottom: 2px;">${escapeHtml(order.buyerName || "—")}</span>
+          <span style="font-size: 13px; line-height: 1.35; display: block;">${escapeHtml(order.shippingAddress || "—")}</span>
         </div>
       </div>
-      <div class="barcode-block">${buildBarcodeSvg(code)}</div>
+      <div class="row" style="margin-bottom: 12px;">
+        <div class="box">
+          <strong style="font-size: 10px;">EBAY ORDER ID:</strong>
+          <span style="font-family: monospace; font-size: 12px; font-weight: 700;">${escapeHtml(order.orderId)}</span>
+        </div>
+        <div class="box">
+          <strong style="font-size: 10px;">ITEM DESCRIPTION:</strong>
+          <span style="font-size: 12px;">${escapeHtml(order.title)}${order.totalQuantity > 1 ? ` &times; ${escapeHtml(order.totalQuantity)}` : ""}</span>
+        </div>
+      </div>
+      <div class="barcode-block" style="margin: 20px 0 10px;">
+        <div style="font-size: 11px; font-weight: 700; margin-bottom: 4px; letter-spacing: 1px;">TRACKING #: ${escapeHtml(code)}</div>
+        ${buildBarcodeSvg(code)}
+      </div>
     </section>`;
 }
 

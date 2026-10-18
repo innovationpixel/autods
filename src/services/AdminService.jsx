@@ -1,7 +1,7 @@
 import axiosInstance from './AxiosInstance';
 
-export const getAdminDashboard = () =>
-    axiosInstance.get('/admin/dashboard');
+export const getAdminDashboard = (params = {}) =>
+    axiosInstance.get('/admin/dashboard', { params });
 
 export const getAdminUsers = (params = {}) =>
     axiosInstance.get('/admin/users', { params });

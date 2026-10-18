@@ -138,6 +138,40 @@ function DraftsContent({
   }, [propBatchProgress]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const checkDraftImportBatches = async () => {
+      try {
+        const res = await getImportHistory({ limit: 5 });
+        if (cancelled) return;
+        const batches = res.data?.batches ?? [];
+        const active = batches.find(
+          (b) =>
+            String(b.action ?? "").toLowerCase() === "draft" &&
+            (b.status === "processing" || b.status === "pending"),
+        );
+        if (active) {
+          setActiveImportBatch(active);
+        } else if (!activeImportBatch) {
+          const recentDraft = batches.find(
+            (b) => String(b.action ?? "").toLowerCase() === "draft",
+          );
+          if (recentDraft && Number(recentDraft.failed ?? 0) > 0) {
+            setActiveImportBatch(recentDraft);
+          }
+        }
+      } catch {}
+    };
+
+    checkDraftImportBatches();
+    const interval = setInterval(checkDraftImportBatches, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeImportBatch]);
+
+  useEffect(() => {
     const handleBatchUpdate = (event) => {
       if (event.detail) {
         setActiveImportBatch(event.detail);
@@ -204,6 +238,8 @@ function DraftsContent({
     }
   };
 
+  const [blockedKeywordConfirm, setBlockedKeywordConfirm] = useState(null);
+
   const handlePublishSingle = async (item) => {
     if (!(await ensureShipFromReady())) return;
     setPublishingIds((cur) => [...cur, item.id]);
@@ -211,6 +247,31 @@ function DraftsContent({
       await saveDraftIfDirty(item);
       await publishProduct(item.id);
       toast.success("Draft published successfully.");
+      await loadDrafts();
+      handleBackToDrafts();
+    } catch (err) {
+      if (err.response?.data?.requires_confirmation) {
+        setBlockedKeywordConfirm({
+          item,
+          keyword: err.response.data.blocked_keyword,
+          message: err.response.data.error,
+        });
+        return;
+      }
+      toast.error(getApiErrorMessage(err, "Could not publish draft."));
+    } finally {
+      setPublishingIds((cur) => cur.filter((x) => x !== item.id));
+    }
+  };
+
+  const handleConfirmPublishBlockedKeyword = async () => {
+    if (!blockedKeywordConfirm?.item) return;
+    const item = blockedKeywordConfirm.item;
+    setPublishingIds((cur) => [...cur, item.id]);
+    try {
+      await publishProduct(item.id, { confirm_blocked_keywords: true });
+      toast.success("Draft published successfully.");
+      setBlockedKeywordConfirm(null);
       await loadDrafts();
       handleBackToDrafts();
     } catch (err) {
@@ -1355,6 +1416,20 @@ function DraftsContent({
             </div>
           </section>
         </div>
+      ) : null}
+
+      {blockedKeywordConfirm ? (
+        <ConfirmModal
+          open={Boolean(blockedKeywordConfirm)}
+          title="Blocked Keyword Warning"
+          description={blockedKeywordConfirm.message || "This product contains a blocked keyword. Do you want to proceed and publish anyway?"}
+          confirmLabel="Publish Anyway"
+          cancelLabel="Cancel"
+          danger={false}
+          saving={publishingIds.includes(blockedKeywordConfirm?.item?.id)}
+          onConfirm={handleConfirmPublishBlockedKeyword}
+          onClose={() => setBlockedKeywordConfirm(null)}
+        />
       ) : null}
     </section>
   );

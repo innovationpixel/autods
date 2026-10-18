@@ -1,14 +1,108 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuClipboardList, LuLoader, LuSearch } from "react-icons/lu";
+import { LuCheck, LuClipboardList, LuCopy, LuExternalLink, LuLoader, LuSearch } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import { getAdminOrders } from "../../../services/AdminService";
 import { EBAY_MARKETPLACES } from "../ConnectEbayModal";
 import { orderStatusOptions } from "../constants";
+import { buildSourceProductUrl, getEbayOrderDetailUrl } from "../helpers";
 import AdminSortableHeader from "../AdminSortableHeader";
 import AdminPagination from "../AdminPagination";
+
+function AdminCopyable({ text, url, label }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!text || text === "—") return <span style={{ color: "#94a3b8" }}>—</span>;
+
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(url || text);
+    setCopied(true);
+    toast.success(`Copied ${label || text} to clipboard!`);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        maxWidth: 180,
+      }}
+      title={url ? `${label ? label + ": " : ""}${text}\nLink: ${url}\n(Click copy to copy link)` : `${label ? label + ": " : ""}${text}`}
+    >
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "#2563eb",
+            fontWeight: 600,
+            fontSize: 11.5,
+            textDecoration: "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: 130,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+        >
+          {text}
+        </a>
+      ) : (
+        <code
+          style={{
+            fontSize: 11.5,
+            background: "#f1f5f9",
+            padding: "2px 6px",
+            borderRadius: 4,
+            color: "#334155",
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: 130,
+          }}
+        >
+          {text}
+        </code>
+      )}
+      <button
+        type="button"
+        onClick={handleCopy}
+        style={{
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          padding: 2,
+          display: "inline-flex",
+          alignItems: "center",
+          color: copied ? "#16a34a" : "#94a3b8",
+        }}
+        title={`Copy ${label || text}`}
+        aria-label={`Copy ${label || text}`}
+      >
+        {copied ? <LuCheck size={12} /> : <LuCopy size={12} />}
+      </button>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center" }}
+          title="Open in new tab"
+        >
+          <LuExternalLink size={11} />
+        </a>
+      )}
+    </div>
+  );
+}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -191,6 +285,8 @@ function AdminOrdersPage() {
             <thead>
               <tr>
                 <AdminSortableHeader label="Order" sortKey="ebay_order_id" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <th>Source Link</th>
+                <th>Buy SKU #</th>
                 <AdminSortableHeader label="User" sortKey="user" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Marketplace" sortKey="marketplace" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Buyer" sortKey="buyer_name" sort={sort} sortDir={sortDir} onSort={handleSort} />
@@ -202,31 +298,57 @@ function AdminOrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {orders.length ? orders.map((order) => (
-                <tr key={order.id}>
-                  <td>
-                    <div className="admin-clients-page__identity">
-                      <strong>{order.ebay_order_id ?? order.id}</strong>
-                      <span>{order.item_title ?? "—"}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="admin-clients-page__identity">
-                      <strong>{order.user?.name ?? "—"}</strong>
-                      <span>{order.user?.email ?? "—"}</span>
-                    </div>
-                  </td>
-                  <td>{order.marketplace ?? "—"}</td>
-                  <td>{order.buyer_name ?? "—"}</td>
-                  <td>{formatDate(order.order_date)}</td>
-                  <td>{formatMoney(order.sell_price, order.currency)}</td>
-                  <td>{formatMoney(order.profit, order.currency)}</td>
-                  <td><span className="admin-badge admin-badge--muted">{order.status ?? "—"}</span></td>
-                  <td><span className="admin-badge admin-badge--muted">{order.processing_status ?? "—"}</span></td>
-                </tr>
-              )) : (
+              {orders.length ? orders.map((order) => {
+                const sourceUrl = buildSourceProductUrl(order.source_platform, order.source_product_id, order.source_url);
+                const orderDetailUrl = getEbayOrderDetailUrl(order.ebay_order_id, order.marketplace);
+                return (
+                  <tr key={order.id}>
+                    <td>
+                      <div className="admin-clients-page__identity">
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <AdminCopyable
+                            text={order.ebay_order_id ?? String(order.id)}
+                            url={orderDetailUrl}
+                            label="eBay Order ID"
+                          />
+                        </div>
+                        <span title={order.item_title ?? "—"} style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {order.item_title ?? "—"}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <AdminCopyable
+                        text={order.source_product_id ? `${order.source_platform || "AliExpress"} #${order.source_product_id}` : (sourceUrl ? "Open Source" : "—")}
+                        url={sourceUrl}
+                        label="Source Product Link"
+                      />
+                    </td>
+                    <td>
+                      <AdminCopyable
+                        text={order.source_sku_id || order.source_product_id || (order.aliexpress_order_id ? `#${order.aliexpress_order_id}` : "—")}
+                        url={sourceUrl}
+                        label="Buy SKU"
+                      />
+                    </td>
+                    <td>
+                      <div className="admin-clients-page__identity">
+                        <strong>{order.user?.name ?? "—"}</strong>
+                        <span>{order.user?.email ?? "—"}</span>
+                      </div>
+                    </td>
+                    <td>{order.marketplace ?? "—"}</td>
+                    <td>{order.buyer_name ?? "—"}</td>
+                    <td>{formatDate(order.order_date)}</td>
+                    <td>{formatMoney(order.sell_price, order.currency)}</td>
+                    <td>{formatMoney(order.profit, order.currency)}</td>
+                    <td><span className="admin-badge admin-badge--muted">{order.status ?? "—"}</span></td>
+                    <td><span className="admin-badge admin-badge--muted">{order.processing_status ?? "—"}</span></td>
+                  </tr>
+                );
+              }) : (
                 <tr>
-                  <td colSpan={9} className="admin-table__empty">No orders found.</td>
+                  <td colSpan={11} className="admin-table__empty">No orders found.</td>
                 </tr>
               )}
             </tbody>

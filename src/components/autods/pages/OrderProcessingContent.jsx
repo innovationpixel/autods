@@ -9,6 +9,7 @@ import {
   LuCopy,
   LuExternalLink,
   LuLoader,
+  LuMapPin,
   LuPackageCheck,
   LuPencil,
   LuPlus,
@@ -59,7 +60,7 @@ import AddressRecommendationModal from "../AddressRecommendationModal";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
-  { key: "pending", label: "Pending" },
+  { key: "pending", label: "Pending Payment" },
   { key: "processed", label: "Processed (Paid)" },
   { key: "shipped", label: "Shipped" },
   { key: "completed", label: "Completed" },
@@ -154,7 +155,19 @@ function mapProcessingOrder(order) {
     buyPrice: order.buy_price != null ? Number(order.buy_price) : null,
     aliexpressOrderId: order.aliexpress_order_id ?? "",
     aliexpressOrderStatus: order.aliexpress_order_status ?? "",
-    processingStatus: order.processing_status ?? "new",
+    processingStatus: (() => {
+      const explicit = order.processing_status ?? "new";
+      const aeStatus = String(order.aliexpress_order_status ?? "").toLowerCase();
+      const isUnpaid =
+        aeStatus === "wait_buyer_pay" ||
+        aeStatus === "payment_pending" ||
+        aeStatus === "unpaid" ||
+        aeStatus === "pending";
+      if (order.aliexpress_order_id && isUnpaid && explicit !== "cancelled") {
+        return "pending";
+      }
+      return explicit;
+    })(),
     processingMethod: order.processing_method ?? "",
     ...(() => {
       const rawTracking =
@@ -239,7 +252,19 @@ function OrderProcessingContent() {
   const [externalOrder, setExternalOrder] = useState(null);
   const [addressModalOrder, setAddressModalOrder] = useState(null);
   const [addressModalSaving, setAddressModalSaving] = useState(false);
+  const [bulkAddressModalOpen, setBulkAddressModalOpen] = useState(false);
+  const [bulkAction, setBulkAction] = useState("");
   const tableScrollRef = useRef(null);
+
+  const selectedOrders = useMemo(() => {
+    return orders.filter((order) => selectedIds.includes(order.id));
+  }, [orders, selectedIds]);
+
+  const addressIssueCount = useMemo(() => {
+    return selectedOrders.filter(
+      (o) => !o.shippingAddress || o.shippingAddress === "—" || !o.rawAddress?.postalCode || !o.rawAddress?.addressLine1
+    ).length;
+  }, [selectedOrders]);
 
   const scrollTable = (direction) => {
     if (!tableScrollRef.current) return;
@@ -886,6 +911,50 @@ function OrderProcessingContent() {
     }
   };
 
+  const handleBulkSaveAddress = async (addressData) => {
+    if (!selectedIds.length) return;
+    setAddressModalSaving(true);
+    let succeeded = 0;
+    let failed = 0;
+    for (const id of selectedIds) {
+      try {
+        await updateOrderShippingAddress(id, addressData);
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setAddressModalSaving(false);
+    setBulkAddressModalOpen(false);
+    setSelectedIds([]);
+    if (succeeded) {
+      toast.success(`Shipping address updated for ${succeeded} order${succeeded === 1 ? "" : "s"}.`);
+      await loadOrders();
+    }
+    if (failed) {
+      toast.error(`Could not update address for ${failed} order${failed === 1 ? "" : "s"}.`);
+    }
+  };
+
+  const handleBulkMoveStatus = async (targetStatus) => {
+    const selected = orders.filter((order) => selectedIds.includes(order.id));
+    if (!selected.length) return;
+    setBulkProcessing(true);
+    let succeeded = 0;
+    for (const order of selected) {
+      try {
+        await updateOrderProcessingStatus(order.id, targetStatus);
+        succeeded += 1;
+      } catch {
+        // continue
+      }
+    }
+    setBulkProcessing(false);
+    setSelectedIds([]);
+    toast.success(`Moved ${succeeded} order${succeeded === 1 ? "" : "s"} to ${targetStatus}.`);
+    await loadOrders();
+  };
+
   const handleTransferFunds = async () => {
     const parsed = Number.parseFloat(transferAmountDraft);
     if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -1099,8 +1168,67 @@ function OrderProcessingContent() {
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {selectedIds.length ? (
-              <div className="order-processing-bulk-bar">
-                <span>{selectedIds.length} selected</span>
+              <div className="order-processing-bulk-bar" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 600 }}>{selectedIds.length} selected</span>
+
+                {addressIssueCount > 0 && (
+                  <span
+                    style={{
+                      background: "#fee2e2",
+                      color: "#dc2626",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 12,
+                    }}
+                  >
+                    {addressIssueCount} with address issue
+                  </span>
+                )}
+
+                <select
+                  value={bulkAction}
+                  onChange={(e) => {
+                    const action = e.target.value;
+                    setBulkAction(action);
+                    if (action === "process") {
+                      handleBulkProcess();
+                      setBulkAction("");
+                    } else if (action === "address") {
+                      setBulkAddressModalOpen(true);
+                      setBulkAction("");
+                    } else if (action === "mark_processed") {
+                      handleBulkMarkProcessed();
+                      setBulkAction("");
+                    } else if (action.startsWith("move_")) {
+                      const target = action.replace("move_", "");
+                      handleBulkMoveStatus(target);
+                      setBulkAction("");
+                    }
+                  }}
+                  style={{
+                    height: 32,
+                    padding: "0 10px",
+                    borderRadius: 6,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    background: "#fff",
+                    color: "#0f172a",
+                    cursor: "pointer",
+                  }}
+                  aria-label="Bulk actions"
+                >
+                  <option value="">Bulk operations...</option>
+                  <option value="process">⚡ Process Selected ({selectedIds.length})</option>
+                  <option value="address">📍 Update / Fix Shipping Address ({selectedIds.length})</option>
+                  <option value="mark_processed">✓ Mark as Processed</option>
+                  <option value="move_new">Move to New Orders</option>
+                  <option value="move_pending">Move to Pending Payment</option>
+                  <option value="move_shipped">Move to Shipped</option>
+                  <option value="move_cancelled">Move to Cancelled</option>
+                </select>
+
                 <button
                   type="button"
                   className="order-processing-bulk-bar__btn"
@@ -1109,6 +1237,17 @@ function OrderProcessingContent() {
                 >
                   {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
                   <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="order-processing-bulk-bar__btn"
+                  style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
+                  onClick={() => setBulkAddressModalOpen(true)}
+                  title="Update address across selected orders"
+                >
+                  <LuMapPin />
+                  <span>Fix Address</span>
                 </button>
               </div>
             ) : null}
@@ -1252,6 +1391,26 @@ function OrderProcessingContent() {
                           </div>
                           <span>{order.shippingAddress}</span>
                           {order.buyerPhone !== "—" ? <span>{order.buyerPhone}</span> : null}
+                          {!order.shippingAddress || order.shippingAddress === "—" || !order.rawAddress?.postalCode || !order.rawAddress?.addressLine1 ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                background: "#fee2e2",
+                                color: "#b91c1c",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                width: "fit-content",
+                                cursor: "pointer",
+                                marginTop: "3px",
+                              }}
+                              onClick={() => setAddressModalOrder(order)}
+                              title="Incomplete or missing address. Click to update."
+                            >
+                              ⚠️ Address Issue
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className="calculations-table__money">{formatMoney(order.sellPrice, order.currency)}</td>
@@ -1634,6 +1793,16 @@ function OrderProcessingContent() {
         saving={addressModalSaving}
         onClose={() => setAddressModalOrder(null)}
         onSave={handleSaveAddress}
+      />
+
+      <OrderShippingAddressModal
+        open={bulkAddressModalOpen}
+        order={selectedOrders[0] ?? null}
+        isBulk={true}
+        bulkCount={selectedIds.length}
+        saving={addressModalSaving}
+        onClose={() => setBulkAddressModalOpen(false)}
+        onSave={handleBulkSaveAddress}
       />
     </section>
   );

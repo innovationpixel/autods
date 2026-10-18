@@ -681,3 +681,234 @@
   border-color: #303854;
   background: #1b243d;
 }
+
+/* Conversation Thread Modal */
+.support-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.support-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--support-border);
+  overflow: hidden;
+}
+
+.support-modal__header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--support-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--support-primary-soft-2);
+}
+
+.support-modal__title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.support-modal__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--support-text);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.support-modal__subtitle {
+  font-size: 13px;
+  color: var(--support-muted);
+}
+
+.support-modal__close {
+  background: none;
+  border: none;
+  color: var(--support-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.support-modal__close:hover {
+  background: var(--support-border);
+  color: var(--support-text);
+}
+
+.support-modal__body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 250px;
+  background: #fafafa;
+}
+
+.support-bubble {
+  max-width: 82%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.support-bubble--buyer {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid var(--support-border);
+  color: var(--support-text);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.support-bubble--seller {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--support-primary-deep), var(--support-primary));
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.2);
+}
+
+.support-bubble__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.support-bubble--seller .support-bubble__meta {
+  color: #e9d5ff;
+}
+
+.support-bubble--buyer .support-bubble__meta {
+  color: var(--support-muted);
+}
+
+.support-bubble__text {
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.support-modal__footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--support-border);
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.support-composer {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.support-composer__input {
+  flex: 1;
+  border: 1px solid var(--support-border-strong);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 60px;
+  max-height: 140px;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.support-composer__input:focus {
+  border-color: var(--support-primary);
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.12);
+}
+
+.support-composer__send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 18px;
+  height: 44px;
+  background: var(--support-primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.support-composer__send-btn:hover:not(:disabled) {
+  background: var(--support-primary-deep);
+  transform: translateY(-1px);
+}
+
+.support-composer__send-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Dark mode overrides for modal */
+[data-theme-version="dark"] .support-modal {
+  background: #141c31;
+  border-color: #2a314d;
+}
+
+[data-theme-version="dark"] .support-modal__header {
+  background: #182139;
+  border-color: #2a314d;
+}
+
+[data-theme-version="dark"] .support-modal__title {
+  color: #edf0f8;
+}
+
+[data-theme-version="dark"] .support-modal__body {
+  background: #0d1322;
+}
+
+[data-theme-version="dark"] .support-bubble--buyer {
+  background: #1b243d;
+  border-color: #2a314d;
+  color: #edf0f8;
+}
+
+[data-theme-version="dark"] .support-modal__footer {
+  background: #141c31;
+  border-color: #2a314d;
+}
+
+[data-theme-version="dark"] .support-composer__input {
+  background: #0d1322;
+  border-color: #2a314d;
+  color: #edf0f8;
+}

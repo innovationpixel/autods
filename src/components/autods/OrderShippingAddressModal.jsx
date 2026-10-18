@@ -11,7 +11,7 @@ const US_STATES = [
   "District of Columbia", "Puerto Rico"
 ];
 
-function OrderShippingAddressModal({ open, order, saving = false, onClose, onSave }) {
+function OrderShippingAddressModal({ open, order, saving = false, isBulk = false, bulkCount = 0, onClose, onSave }) {
   const [form, setForm] = useState({
     fullName: "",
     addressLine1: "",
@@ -25,22 +25,23 @@ function OrderShippingAddressModal({ open, order, saving = false, onClose, onSav
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!open || !order) return;
-    const addr = order.rawAddress ?? {};
+    if (!open) return;
+    const addr = order?.rawAddress ?? {};
     setForm({
-      fullName: addr.fullName || order.buyerName || "",
+      fullName: addr.fullName || order?.buyerName || "",
       addressLine1: addr.addressLine1 || "",
       addressLine2: addr.addressLine2 || "",
       city: addr.city || "",
       stateOrProvince: addr.stateOrProvince || "",
       postalCode: addr.postalCode || "",
       countryCode: addr.countryCode || "US",
-      phone: addr.phone || (order.buyerPhone !== "—" ? order.buyerPhone : ""),
+      phone: addr.phone || (order?.buyerPhone !== "—" ? order?.buyerPhone : "") || "",
     });
     setError("");
   }, [open, order]);
 
-  if (!open || !order) return null;
+  if (!open) return null;
+  if (!isBulk && !order) return null;
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -91,9 +92,11 @@ function OrderShippingAddressModal({ open, order, saving = false, onClose, onSav
       >
         <header className="order-source-modal__header">
           <div>
-            <h3>Edit Shipping Address</h3>
+            <h3>{isBulk ? "Bulk Update Shipping Address" : "Edit Shipping Address"}</h3>
             <p className="order-source-modal__subtitle">
-              Order #{order.ebayOrderId || order.id} · Recipient destination
+              {isBulk
+                ? `${bulkCount} orders selected for batch address update`
+                : `Order #${order?.ebayOrderId || order?.id} · Recipient destination`}
             </p>
           </div>
           <button
@@ -286,7 +289,7 @@ function OrderShippingAddressModal({ open, order, saving = false, onClose, onSav
             ) : (
               <>
                 <LuCheck />
-                <span>Save Address</span>
+                <span>{isBulk ? `Apply to ${bulkCount} Orders` : "Save Address"}</span>
               </>
             )}
           </button>

@@ -8,3 +8,6 @@ export const syncReturnsDisputes = () =>
 
 export const getReturnDisputeDetail = (id) =>
   axiosInstance.get(`/returns-disputes/${id}`);
+
+export const respondReturnDispute = (id, payload) =>
+  axiosInstance.post(`/returns-disputes/${id}/respond`, payload);

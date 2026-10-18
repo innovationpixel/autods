@@ -21,8 +21,8 @@ export const getImportHistory = (params = {}) =>
 export const syncProductToStore = (id) =>
     axiosInstance.post(`/products/${id}/sync-to-store`);
 
-export const publishProduct = (id) =>
-    axiosInstance.post(`/products/${id}/publish`);
+export const publishProduct = (id, params = {}) =>
+    axiosInstance.post(`/products/${id}/publish`, params);
 
 export const retryProductImport = (id) =>
     axiosInstance.post(`/products/${id}/retry`);

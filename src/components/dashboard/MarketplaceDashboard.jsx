@@ -1,5 +1,4 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Input } from "antd";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -80,6 +79,7 @@ import ReturnsDisputesContent from '../autods/pages/ReturnsDisputesContent';
 import ProductsContent from '../autods/pages/ProductsContent';
 import DraftsContent from '../autods/pages/DraftsContent';
 import HelpCenterContent from '../autods/pages/HelpCenterContent';
+import UsageUpgradeContent from '../autods/pages/UsageUpgradeContent';
 import WalletContent from '../autods/pages/WalletContent';
 import OrderProcessingContent from '../autods/pages/OrderProcessingContent';
 import CalculationsContent from '../autods/pages/CalculationsContent';
@@ -136,7 +136,65 @@ import {
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
 import { toast } from '../../utils/toast';
-const { Search } = Input;
+
+function Search({
+  className = "",
+  placeholder = "",
+  value = "",
+  allowClear = false,
+  enterButton = "Search",
+  loading = false,
+  onChange,
+  onSearch,
+  ...props
+}) {
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      onSearch?.(value);
+    }
+  };
+
+  return (
+    <div className={`marketplace-ant-search ant-input-search ant-input-group-wrapper ${className}`}>
+      <div className="ant-input-wrapper ant-input-group">
+        <span className="ant-input-affix-wrapper">
+          <input
+            type="text"
+            className="ant-input"
+            placeholder={placeholder}
+            value={value}
+            onChange={onChange}
+            onKeyDown={handleKeyDown}
+            {...props}
+          />
+          {allowClear && value ? (
+            <span
+              className="ant-input-clear-icon"
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                onChange?.({ target: { value: "" } });
+                onSearch?.("");
+              }}
+            >
+              ✕
+            </span>
+          ) : null}
+        </span>
+        <span className="ant-input-group-addon">
+          <button
+            type="button"
+            className="ant-input-search-button"
+            onClick={() => onSearch?.(value)}
+            disabled={loading}
+          >
+            {loading ? <LuLoader className="spin-icon" /> : enterButton}
+          </button>
+        </span>
+      </div>
+    </div>
+  );
+}
 
 const ALIEXPRESS_CATEGORY_MAP = {
   "Toys & Hobbies":             "1511",
@@ -1122,9 +1180,11 @@ const MarketplaceDashboard = () => {
                 ? "Plans"
               : activePage === "customer-support"
                 ? "Customer Support"
-                : activePage === "support-center"
-                  ? "Help Center"
-                  : activePage === "wallet"
+                : activePage === "support-center" || activePage === "tickets"
+                  ? "Support Tickets"
+                  : activePage === "usage-upgrade"
+                    ? "Usage & Upgrade"
+                    : activePage === "wallet"
                     ? "AutoDS Wallet"
                     : activePage === "settings"
                       ? "Settings"
@@ -2114,8 +2174,10 @@ const MarketplaceDashboard = () => {
               />
             ) : activePage === "customer-support" ? (
               <CustomerSupportContent searchQuery={searchAnything} />
-            ) : activePage === "support-center" ? (
+            ) : activePage === "support-center" || activePage === "tickets" ? (
               <HelpCenterContent />
+            ) : activePage === "usage-upgrade" ? (
+              <UsageUpgradeContent onNavigateToPlans={() => { setActivePage("plans"); navigate("/plans"); }} />
             ) : activePage === "wallet" ? (
               <WalletContent />
             ) : activePage === "ai-image-generation" ? (

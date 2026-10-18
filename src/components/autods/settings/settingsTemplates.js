@@ -197,6 +197,34 @@ export function fillTemplatePreview(html) {
     .replace(/DIMENSIONS_HERE/g, "10 × 8 × 3 in (approx.)");
 }
 
+export function applyTemplateToProduct(html, product = {}) {
+  const title = product.title || "Product";
+  const mainImage =
+    product.image_url ||
+    product.imageUrl ||
+    (Array.isArray(product.images) ? product.images[0]?.url || product.images[0] : "") ||
+    "";
+  const imgTag = mainImage
+    ? `<img src="${mainImage}" alt="${title}" style="max-width:100%;height:auto;border-radius:8px;" />`
+    : "";
+  const description = product.cleanDescription || product.description || title;
+  const features =
+    product.features ||
+    `<ul style="margin:8px 0;padding-left:20px;">
+    <li>Premium materials and reliable build quality</li>
+    <li>Fast shipping from trusted fulfillment partners</li>
+    <li>Easy returns and responsive customer support</li>
+  </ul>`;
+  const dimensions = product.dimensions || "Standard dimensions";
+
+  return (html || "")
+    .replace(/TITLE_HERE/g, title)
+    .replace(/MAIN_IMAGE_HERE/g, imgTag)
+    .replace(/FEATURES_HERE/g, features)
+    .replace(/DESCRIPTION_HERE/g, description)
+    .replace(/DIMENSIONS_HERE/g, dimensions);
+}
+
 export function allTemplates(customTemplates = []) {
   return [...builtInTemplates, ...customTemplates];
 }

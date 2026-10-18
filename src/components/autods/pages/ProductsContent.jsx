@@ -518,7 +518,11 @@ function ProductsContent({ searchQuery }) {
   const alerts = useMemo(
     () =>
       importBatches
-        .filter((batch) => !dismissedBatchIds.includes(batch.id))
+        .filter(
+          (batch) =>
+            !dismissedBatchIds.includes(batch.id) &&
+            String(batch.action ?? "").toLowerCase() === "publish",
+        )
         .map(buildImportBatchAlert),
     [importBatches, dismissedBatchIds],
   );

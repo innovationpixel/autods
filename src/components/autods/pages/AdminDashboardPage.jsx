@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   LuArrowDownRight,
   LuArrowUpRight,
   LuBadgeCheck,
+  LuCalendarDays,
+  LuChevronDown,
+  LuCircleCheck,
   LuClipboardList,
   LuCrown,
   LuHeadphones,
@@ -34,6 +37,16 @@ import {
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import { getAdminDashboard } from "../../../services/AdminService";
+
+const DATE_PRESETS = [
+  { value: "today", label: "Today" },
+  { value: "7d", label: "Last 7 Days" },
+  { value: "30d", label: "Last 30 Days" },
+  { value: "90d", label: "Last 90 Days" },
+  { value: "1y", label: "Last 1 Year" },
+  { value: "all", label: "All Time" },
+  { value: "custom", label: "Custom Range…" },
+];
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -101,6 +114,11 @@ function AdminDashboardPage() {
   const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [datePreset, setDatePreset] = useState("30d");
+  const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -108,14 +126,52 @@ function AdminDashboardPage() {
     }
   }, [role, navigate]);
 
+  const loadDashboard = useCallback(
+    (preset = datePreset, from = customFrom, to = customTo) => {
+      setRefreshing(true);
+      const params = { preset };
+      if (preset === "custom") {
+        if (from) params.from_date = from;
+        if (to) params.to_date = to;
+      }
+
+      getAdminDashboard(params)
+        .then((res) => setDashboard(res.data))
+        .catch(() => toast.error("Failed to load admin dashboard."))
+        .finally(() => {
+          setLoading(false);
+          setRefreshing(false);
+        });
+    },
+    [datePreset, customFrom, customTo],
+  );
+
   useEffect(() => {
     if (role !== "super_admin") return;
+    loadDashboard("30d");
+  }, [role, loadDashboard]);
 
-    getAdminDashboard()
-      .then((res) => setDashboard(res.data))
-      .catch(() => toast.error("Failed to load admin dashboard."))
-      .finally(() => setLoading(false));
-  }, [role]);
+  const handleSelectPreset = (presetVal) => {
+    setDatePreset(presetVal);
+    setDateDropdownOpen(false);
+    if (presetVal !== "custom") {
+      loadDashboard(presetVal);
+    }
+  };
+
+  const handleApplyCustom = () => {
+    if (!customFrom || !customTo) {
+      toast.error("Please specify both a start and end date.");
+      return;
+    }
+    loadDashboard("custom", customFrom, customTo);
+  };
+
+  const activePreset = DATE_PRESETS.find((p) => p.value === datePreset) || DATE_PRESETS[2];
+  const activeLabel =
+    datePreset === "custom" && customFrom && customTo
+      ? `${customFrom} to ${customTo}`
+      : activePreset.label;
 
   const stats = dashboard?.stats ?? {};
   const trends = dashboard?.trends ?? {};
@@ -125,6 +181,13 @@ function AdminDashboardPage() {
   const topClients = dashboard?.top_clients ?? [];
   const platform = dashboard?.platform ?? {};
 
+  const filteredRevenue = stats.revenue_filtered ?? trends.revenue ?? trends.revenue_30d ?? 0;
+  const revenueBreakdown = dashboard?.revenue_breakdown ?? [
+    { label: "Subscription Plans", amount: stats.revenue_subscriptions ?? 0, percentage: 0, color: "#6366f1" },
+    { label: "Wallet Deposits", amount: stats.revenue_wallet_deposits ?? 0, percentage: 0, color: "#10b981" },
+    { label: "Direct / Order Payments", amount: stats.revenue_other ?? 0, percentage: 0, color: "#f59e0b" },
+  ];
+
   const kpiCards = useMemo(
     () => [
       {
@@ -133,23 +196,32 @@ function AdminDashboardPage() {
         value: stats.clients_active ?? 0,
         sub: `${stats.clients_total ?? 0} total · ${stats.clients_inactive ?? 0} inactive`,
         icon: LuUsers,
-        trend: { current: trends.new_clients_30d, previous: trends.new_clients_prev_30d },
+        trend: {
+          current: trends.new_clients ?? trends.new_clients_30d,
+          previous: trends.new_clients_prev ?? trends.new_clients_prev_30d,
+        },
       },
       {
         id: "revenue",
         label: "Total Revenue",
-        value: formatMoney(trends.revenue_30d),
-        sub: `${formatMoney(stats.revenue_total)} all time`,
+        value: formatMoney(filteredRevenue),
+        sub: `${formatMoney(stats.revenue_total)} all time · ${activeLabel}`,
         icon: LuCrown,
-        trend: { current: trends.revenue_30d, previous: trends.revenue_prev_30d },
+        trend: {
+          current: trends.revenue ?? trends.revenue_30d,
+          previous: trends.revenue_prev ?? trends.revenue_prev_30d,
+        },
       },
       {
         id: "orders",
         label: "Total Orders",
-        value: trends.orders_30d ?? 0,
+        value: trends.orders ?? trends.orders_30d ?? 0,
         sub: `${stats.orders_total ?? 0} total synced`,
         icon: LuClipboardList,
-        trend: { current: trends.orders_30d, previous: trends.orders_prev_30d },
+        trend: {
+          current: trends.orders ?? trends.orders_30d,
+          previous: trends.orders_prev ?? trends.orders_prev_30d,
+        },
       },
       {
         id: "listings",
@@ -166,7 +238,7 @@ function AdminDashboardPage() {
         icon: LuUserRound,
       },
     ],
-    [stats, trends],
+    [stats, trends, filteredRevenue, activeLabel],
   );
 
   const activityTotal = useMemo(
@@ -202,7 +274,80 @@ function AdminDashboardPage() {
           <p>Live counts, growth trends, and activity across all client accounts.</p>
         </div>
 
-        <div className="ebay-dashboard__header-right">
+        <div className="ebay-dashboard__header-right" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          {/* DATE FILTER DROPDOWN */}
+          <div className="ebay-date-filter" style={{ position: "relative" }}>
+            <button
+              type="button"
+              className="ebay-date-button"
+              onClick={() => setDateDropdownOpen((prev) => !prev)}
+              aria-expanded={dateDropdownOpen}
+              title="Filter statistics by date range"
+            >
+              <LuCalendarDays />
+              <span>{activeLabel}</span>
+              <LuChevronDown className={dateDropdownOpen ? "ebay-chevron--open" : ""} />
+            </button>
+
+            {dateDropdownOpen && (
+              <div className="ebay-date-dropdown" style={{ minWidth: "190px", zIndex: 100 }}>
+                {DATE_PRESETS.map((preset) => (
+                  <button
+                    type="button"
+                    key={preset.value}
+                    className={`ebay-date-option ${datePreset === preset.value ? "ebay-date-option--active" : ""}`}
+                    onClick={() => handleSelectPreset(preset.value)}
+                  >
+                    <span>{preset.label}</span>
+                    {datePreset === preset.value && <LuCircleCheck />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CUSTOM RANGE PICKERS */}
+          {datePreset === "custom" && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="ebay-small-select"
+                style={{ height: 38, padding: "0 8px", fontSize: 12 }}
+                title="Start date"
+              />
+              <span style={{ fontSize: 12, color: "#64748b" }}>to</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="ebay-small-select"
+                style={{ height: 38, padding: "0 8px", fontSize: 12 }}
+                title="End date"
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ height: 38, padding: "0 14px", fontSize: 12, borderRadius: 8 }}
+                onClick={handleApplyCustom}
+              >
+                Apply
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="ebay-date-button"
+            onClick={() => loadDashboard(datePreset, customFrom, customTo)}
+            title="Refresh statistics"
+            disabled={refreshing}
+          >
+            <LuRefreshCw className={refreshing ? "spin-icon" : ""} />
+            <span>{refreshing ? "Syncing…" : "Refresh"}</span>
+          </button>
+
           <button
             type="button"
             className="ebay-date-button"
@@ -308,21 +453,78 @@ function AdminDashboardPage() {
 
           <div className="ebay-sales-values">
             <div>
-              <span>Revenue (30d)</span>
+              <span>Revenue ({activeLabel})</span>
 
-              <strong>{formatMoney(trends.revenue_30d)}</strong>
+              <strong>{formatMoney(filteredRevenue)}</strong>
             </div>
 
             <div>
               <span>New Clients</span>
 
-              <strong>{trends.new_clients_30d ?? 0}</strong>
+              <strong>{trends.new_clients ?? trends.new_clients_30d ?? 0}</strong>
             </div>
 
             <div>
               <span>Orders Synced</span>
 
-              <strong>{trends.orders_30d ?? 0}</strong>
+              <strong>{trends.orders ?? trends.orders_30d ?? 0}</strong>
+            </div>
+          </div>
+
+          {/* REVENUE BREAKDOWN BARS & PILLS (ITEM 16) */}
+          <div style={{ padding: "0 18px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted-color, #475569)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Revenue Breakdown by Stream
+              </span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: "#10b981" }}>
+                {formatMoney(filteredRevenue)} total in period
+              </span>
+            </div>
+
+            {/* Proportion Bar */}
+            <div style={{ display: "flex", height: "8px", borderRadius: "999px", overflow: "hidden", background: "rgba(226, 232, 240, 0.6)", gap: "2px" }}>
+              {revenueBreakdown.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    width: `${item.percentage > 0 ? item.percentage : 0}%`,
+                    backgroundColor: item.color,
+                    borderRadius: "999px",
+                    transition: "width 0.4s ease",
+                  }}
+                  title={`${item.label}: ${formatMoney(item.amount)} (${item.percentage}%)`}
+                />
+              ))}
+            </div>
+
+            {/* Stream Tiles */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "10px", marginTop: "12px" }}>
+              {revenueBreakdown.map((item) => (
+                <div
+                  key={item.label}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "9px 12px",
+                    borderRadius: "8px",
+                    background: "rgba(248, 250, 252, 0.8)",
+                    border: "1px solid rgba(226, 232, 240, 0.9)",
+                  }}
+                >
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: item.color, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "11px", color: "var(--muted-color, #64748b)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b", marginTop: "1px" }}>
+                      {formatMoney(item.amount)}{" "}
+                      <small style={{ fontWeight: 500, color: "#64748b", fontSize: "11px" }}>({item.percentage}%)</small>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

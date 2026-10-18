@@ -1,14 +1,108 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuLoader, LuPackage2, LuSearch } from "react-icons/lu";
+import { LuCheck, LuCopy, LuExternalLink, LuLoader, LuPackage2, LuSearch } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import { getAdminListings } from "../../../services/AdminService";
 import { EBAY_MARKETPLACES } from "../ConnectEbayModal";
 import { importSuppliers } from "../constants";
+import { buildSourceProductUrl } from "../helpers";
 import AdminSortableHeader from "../AdminSortableHeader";
 import AdminPagination from "../AdminPagination";
+
+function AdminCopyable({ text, url, label }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!text || text === "—") return <span style={{ color: "#94a3b8" }}>—</span>;
+
+  const handleCopy = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(url || text);
+    setCopied(true);
+    toast.success(`Copied ${label || text} to clipboard!`);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        maxWidth: 180,
+      }}
+      title={url ? `${label ? label + ": " : ""}${text}\nLink: ${url}\n(Click copy to copy link)` : `${label ? label + ": " : ""}${text}`}
+    >
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: "#2563eb",
+            fontWeight: 600,
+            fontSize: 11.5,
+            textDecoration: "none",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: 130,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+        >
+          {text}
+        </a>
+      ) : (
+        <code
+          style={{
+            fontSize: 11.5,
+            background: "#f1f5f9",
+            padding: "2px 6px",
+            borderRadius: 4,
+            color: "#334155",
+            fontWeight: 600,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            maxWidth: 130,
+          }}
+        >
+          {text}
+        </code>
+      )}
+      <button
+        type="button"
+        onClick={handleCopy}
+        style={{
+          border: "none",
+          background: "transparent",
+          cursor: "pointer",
+          padding: 2,
+          display: "inline-flex",
+          alignItems: "center",
+          color: copied ? "#16a34a" : "#94a3b8",
+        }}
+        title={`Copy ${label || text}`}
+        aria-label={`Copy ${label || text}`}
+      >
+        {copied ? <LuCheck size={12} /> : <LuCopy size={12} />}
+      </button>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#94a3b8", display: "inline-flex", alignItems: "center" }}
+          title="Open in new tab"
+        >
+          <LuExternalLink size={11} />
+        </a>
+      )}
+    </div>
+  );
+}
 
 function formatDate(value) {
   if (!value) return "—";
@@ -182,6 +276,7 @@ function AdminListingsPage() {
                 <AdminSortableHeader label="Title" sortKey="title" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Sell SKU #" sortKey="sku" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th>Buy SKU #</th>
+                <th>Source Link</th>
                 <AdminSortableHeader label="User" sortKey="user" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Marketplace" sortKey="marketplace" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Category" sortKey="category_name" sort={sort} sortDir={sortDir} onSort={handleSort} />
@@ -194,52 +289,67 @@ function AdminListingsPage() {
               </tr>
             </thead>
             <tbody>
-              {listings.length ? listings.map((listing) => (
-                <tr key={listing.id}>
-                  <td>
-                    <div className="admin-clients-page__identity">
-                      {listing.listing_url ? (
-                        <a href={listing.listing_url} target="_blank" rel="noopener noreferrer">
-                          <strong>{listing.title}</strong>
-                        </a>
-                      ) : (
-                        <strong>{listing.title}</strong>
-                      )}
-                      <span>{listing.source_platform ? listing.source_platform.toUpperCase() : "—"}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <code style={{ fontSize: 11.5, background: "#f1f5f9", padding: "2px 6px", borderRadius: 4, color: "#334155", fontWeight: 600 }}>
-                      {listing.sell_sku || listing.sku || "—"}
-                    </code>
-                  </td>
-                  <td>
-                    <code style={{ fontSize: 11.5, background: "#eff6ff", padding: "2px 6px", borderRadius: 4, color: "#1d4ed8", fontWeight: 600 }}>
-                      {listing.buy_sku || listing.source_sku_id || listing.source_product_id || "—"}
-                    </code>
-                  </td>
-                  <td>
-                    <div className="admin-clients-page__identity">
-                      <strong>{listing.user?.name ?? "—"}</strong>
-                      <span>{listing.user?.email ?? "—"}</span>
-                    </div>
-                  </td>
-                  <td>{listing.marketplace ?? "—"}</td>
-                  <td>{listing.category_name ?? "—"}</td>
-                  <td>{formatMoney(listing.price, listing.currency)}</td>
-                  <td>{formatMoney(listing.profit, listing.currency)}</td>
-                  <td>{listing.quantity ?? 0}</td>
-                  <td><strong>{listing.sold_count ?? listing.quantity_sold ?? 0}</strong></td>
-                  <td>
-                    <span className={listing.status === "active" ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
-                      {listing.status ?? "—"}
-                    </span>
-                  </td>
-                  <td>{formatDate(listing.synced_at ?? listing.created_at)}</td>
-                </tr>
-              )) : (
+              {listings.length ? listings.map((listing) => {
+                const sourceUrl = buildSourceProductUrl(listing.source_platform, listing.source_product_id, listing.source_url);
+                return (
+                  <tr key={listing.id}>
+                    <td>
+                      <div className="admin-clients-page__identity">
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          {listing.listing_url ? (
+                            <a href={listing.listing_url} target="_blank" rel="noopener noreferrer">
+                              <strong>{listing.title}</strong>
+                            </a>
+                          ) : (
+                            <strong>{listing.title}</strong>
+                          )}
+                          {listing.listing_url && (
+                            <AdminCopyable url={listing.listing_url} text="" label="eBay Listing URL" />
+                          )}
+                        </div>
+                        <span>{listing.source_platform ? listing.source_platform.toUpperCase() : "—"}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <AdminCopyable text={listing.sell_sku || listing.sku} label="Sell SKU" />
+                    </td>
+                    <td>
+                      <AdminCopyable
+                        text={listing.buy_sku || listing.source_sku_id || listing.source_product_id}
+                        url={sourceUrl}
+                        label="Buy SKU"
+                      />
+                    </td>
+                    <td>
+                      <AdminCopyable
+                        text={listing.source_product_id ? `${listing.source_platform || "Supplier"} #${listing.source_product_id}` : (sourceUrl ? "Open Source" : "—")}
+                        url={sourceUrl}
+                        label="Source Product Link"
+                      />
+                    </td>
+                    <td>
+                      <div className="admin-clients-page__identity">
+                        <strong>{listing.user?.name ?? "—"}</strong>
+                        <span>{listing.user?.email ?? "—"}</span>
+                      </div>
+                    </td>
+                    <td>{listing.marketplace ?? "—"}</td>
+                    <td>{listing.category_name ?? "—"}</td>
+                    <td>{formatMoney(listing.price, listing.currency)}</td>
+                    <td>{formatMoney(listing.profit, listing.currency)}</td>
+                    <td>{listing.quantity ?? 0}</td>
+                    <td><strong>{listing.sold_count ?? listing.quantity_sold ?? 0}</strong></td>
+                    <td>
+                      <span className={listing.status === "active" ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
+                        {listing.status ?? "—"}
+                      </span>
+                    </td>
+                    <td>{formatDate(listing.synced_at ?? listing.created_at)}</td>
+                  </tr>
+                );
+              }) : (
                 <tr>
-                  <td colSpan={12} className="admin-table__empty">No listings found.</td>
+                  <td colSpan={13} className="admin-table__empty">No listings found.</td>
                 </tr>
               )}
             </tbody>

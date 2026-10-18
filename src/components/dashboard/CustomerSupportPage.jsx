@@ -6,13 +6,20 @@ import {
   LuFilter,
   LuInbox,
   LuLoader,
+  LuMessageSquare,
   LuRefreshCcw,
+  LuSend,
   LuStar,
+  LuStore,
+  LuUser,
+  LuX,
 } from "react-icons/lu";
 import { toast } from "../../utils/toast";
 import { buildPaginationItems } from "../autods/helpers";
 import {
+  getSupportConversation,
   getSupportConversations,
+  replySupportConversation,
   syncSupportConversations,
   updateSupportConversation,
 } from "../../services/SupportService";
@@ -62,9 +69,53 @@ function CustomerSupportContent({ searchQuery = "" }) {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
+  const [activeConversation, setActiveConversation] = useState(null);
+  const [loadingConversation, setLoadingConversation] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
 
   const clearSupportFilters = () => {
     setTypeFilter("All");
+  };
+
+  const openConversation = async (row) => {
+    setActiveConversation(row);
+    setReplyText("");
+    if (row.unread) {
+      markAsRead(row);
+    }
+    setLoadingConversation(true);
+    try {
+      const res = await getSupportConversation(row.id);
+      if (res.data?.conversation) {
+        setActiveConversation(res.data.conversation);
+      }
+    } catch {
+      // Keep optimistic row preview
+    } finally {
+      setLoadingConversation(false);
+    }
+  };
+
+  const handleSendReply = async () => {
+    if (!activeConversation || !replyText.trim()) return;
+    setSendingReply(true);
+    try {
+      const res = await replySupportConversation(activeConversation.id, replyText.trim());
+      const updated = res.data?.conversation;
+      if (updated) {
+        setActiveConversation(updated);
+        setRows((current) =>
+          current.map((item) => (item.id === updated.id ? { ...item, ...updated } : item))
+        );
+      }
+      setReplyText("");
+      toast.success(res.data?.message ?? "Reply sent successfully.");
+    } catch (err) {
+      toast.error(err.response?.data?.error ?? "Failed to send reply to eBay.");
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   const loadConversations = useCallback(async () => {
@@ -285,7 +336,8 @@ function CustomerSupportContent({ searchQuery = "" }) {
                     <tr
                       key={row.id}
                       className={isSelected ? "support-table__row support-table__row--selected" : "support-table__row"}
-                      onClick={() => markAsRead(row)}
+                      onClick={() => openConversation(row)}
+                      style={{ cursor: "pointer" }}
                     >
                       <td>
                         <input
@@ -402,6 +454,107 @@ function CustomerSupportContent({ searchQuery = "" }) {
           <span>Conversations out of {totalCount}</span>
         </div>
       </footer>
+
+      {activeConversation && (
+        <div className="support-modal-overlay" onClick={() => setActiveConversation(null)}>
+          <div className="support-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="support-modal__header">
+              <div className="support-modal__title-area">
+                <h3 className="support-modal__title">
+                  <LuUser style={{ color: "var(--support-primary)" }} />
+                  <span>{activeConversation.buyer || "eBay Buyer"}</span>
+                  <span className="support-status-badge">{activeConversation.status || "Read"}</span>
+                </h3>
+                <div className="support-modal__subtitle">
+                  {activeConversation.store ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <LuStore style={{ fontSize: 13 }} /> {activeConversation.store}
+                    </span>
+                  ) : null}
+                  {activeConversation.type ? ` • ${activeConversation.type}` : ""}
+                </div>
+              </div>
+              <button
+                type="button"
+                className="support-modal__close"
+                onClick={() => setActiveConversation(null)}
+                aria-label="Close conversation"
+              >
+                <LuX style={{ fontSize: 20 }} />
+              </button>
+            </header>
+
+            <div className="support-modal__body">
+              {loadingConversation ? (
+                <div style={{ textAlign: "center", padding: "40px 16px", color: "var(--support-muted)" }}>
+                  <LuLoader className="spin-icon" style={{ fontSize: 24, marginBottom: 8 }} />
+                  <div>Loading message history…</div>
+                </div>
+              ) : (
+                <>
+                  {activeConversation.thread && activeConversation.thread.length > 0 ? (
+                    activeConversation.thread.map((msg, idx) => {
+                      const isSeller = msg.sender_type === "seller" || msg.sender === "You";
+                      return (
+                        <div
+                          key={msg.id || idx}
+                          className={`support-bubble ${isSeller ? "support-bubble--seller" : "support-bubble--buyer"}`}
+                        >
+                          <div className="support-bubble__meta">
+                            <strong>{isSeller ? "You (Seller)" : (msg.sender || activeConversation.buyer)}</strong>
+                            <span>{msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}</span>
+                          </div>
+                          <div className="support-bubble__text">{msg.message}</div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="support-bubble support-bubble--buyer">
+                      <div className="support-bubble__meta">
+                        <strong>{activeConversation.buyer || "Buyer"}</strong>
+                        <span>{activeConversation.time || ""}</span>
+                      </div>
+                      <div className="support-bubble__text">{activeConversation.message}</div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <footer className="support-modal__footer">
+              <div className="support-composer">
+                <textarea
+                  className="support-composer__input"
+                  placeholder="Type your response to the buyer on eBay…"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendReply();
+                    }
+                  }}
+                  rows={2}
+                  disabled={sendingReply}
+                />
+                <button
+                  type="button"
+                  className="support-composer__send-btn"
+                  onClick={handleSendReply}
+                  disabled={sendingReply || !replyText.trim()}
+                >
+                  {sendingReply ? (
+                    <LuLoader className="spin-icon" />
+                  ) : (
+                    <LuSend />
+                  )}
+                  <span>{sendingReply ? "Sending…" : "Send"}</span>
+                </button>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

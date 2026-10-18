@@ -1112,14 +1112,10 @@ function OrdersContent({ searchQuery }) {
 
     if (order.shippingLabelUrl && /^https?:\/\//i.test(order.shippingLabelUrl)) {
       window.open(order.shippingLabelUrl, "_blank", "noopener,noreferrer");
-    } else {
-      const ebayReprintUrl = getEbayShippingLabelUrl(order.orderId, order.siteId, true);
-      if (ebayReprintUrl) {
-        window.open(ebayReprintUrl, "_blank", "noopener,noreferrer");
-      } else {
-        openPrintableDocument("shipping-label", order);
-      }
+      return;
     }
+
+    openPrintableDocument("shipping-label", order);
   };
 
   const handleOrderAction = (orderId, action) => {
@@ -1445,15 +1441,27 @@ function OrdersContent({ searchQuery }) {
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="orders-details__link orders-shipping-label-btn--ebay"
-            title="Shipping label not generated yet. Click to redirect to eBay."
-            onClick={() => handlePrintShippingLabel(order)}
-          >
-            <span>Generate on eBay</span>
-            <LuExternalLink style={{ fontSize: "11px", marginLeft: "2px" }} />
-          </button>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              className="orders-details__link orders-details__link--action"
+              title="Print standard 4x6 shipping label"
+              onClick={() => handlePrintShippingLabel(order)}
+            >
+              <span>Print Label</span>
+            </button>
+            <button
+              type="button"
+              className="orders-shipping-label-ebay-link"
+              title="View / buy label on eBay official portal"
+              onClick={() => {
+                const url = getEbayShippingLabelUrl(order.orderId, order.siteId, true);
+                if (url) window.open(url, "_blank", "noopener,noreferrer");
+              }}
+            >
+              eBay
+            </button>
+          </div>
         );
       }
       default:

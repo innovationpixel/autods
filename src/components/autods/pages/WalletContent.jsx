@@ -317,7 +317,7 @@ function WalletContent() {
               ) : (
                 <LuCreditCard />
               )}
-              <span>{checkoutId === `stripe-${depositAmount}` ? "Redirecting…" : "Pay with Stripe"}</span>
+              <span>{checkoutId === `stripe-${depositAmount}` ? "Redirecting…" : "Pay with Credit Card/Debit Cards"}</span>
             </button>
             <button
               type="button"
@@ -337,7 +337,7 @@ function WalletContent() {
               onClick={() => setShowWireForm((current) => !current)}
             >
               <LuBanknote />
-              <span>Wire Transfer</span>
+              <span>Pay with Wire Transfer/ACH</span>
             </button>
           </div>
 
