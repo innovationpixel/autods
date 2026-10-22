@@ -18,3 +18,7 @@ export const updateAdminAiTemplate = (id, formData) => {
 
 export const deleteAdminAiTemplate = (id) =>
     axiosInstance.delete(`/admin/ai-templates/${id}`);
+
+export const generateAdminAiTemplateImage = (formData) =>
+    axiosInstance.post('/admin/ai-templates/generate-image', formData, multipart);
+

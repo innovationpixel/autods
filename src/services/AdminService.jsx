@@ -75,3 +75,13 @@ export const replyAdminSupportTicket = (id, message) =>
 
 export const updateAdminSupportTicketStatus = (id, status) =>
     axiosInstance.patch(`/admin/support-tickets/${id}/status`, { status });
+
+export const getAdminOpenAiStatus = () =>
+    axiosInstance.get('/admin/openai/status');
+
+export const updateAdminOpenAiSettings = (data) =>
+    axiosInstance.post('/admin/openai/update', data);
+
+export const testAdminOpenAiConnection = (data = {}) =>
+    axiosInstance.post('/admin/openai/test', data);
+

@@ -18,11 +18,12 @@ import ConfirmModal from "../ConfirmModal";
 import {
   createAdminAiTemplate,
   deleteAdminAiTemplate,
+  generateAdminAiTemplateImage,
   getAdminAiTemplates,
   updateAdminAiTemplate,
 } from "../../../services/AiTemplateService";
 import { MAX_PROMPTS, TEMPLATE_BADGES } from "./aiStudioConstants";
-import { newAssetId } from "./aiStudioUtils";
+import { extractMediaUrl, newAssetId } from "./aiStudioUtils";
 import ImageTemplateSections from "./ImageTemplateSections";
 import AiTemplatePreviewModal from "./AiTemplatePreviewModal";
 import { useImageTemplateForm } from "./useImageTemplateForm";
@@ -52,6 +53,8 @@ function TemplateEditor({ template, onBack, onSaved }) {
   const [isActive, setIsActive] = useState(template?.is_active ?? true);
   const [exampleImages, setExampleImages] = useState(toEditorAssets(template?.example_images));
   const [saving, setSaving] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [generatingAiIndex, setGeneratingAiIndex] = useState(0);
 
   const addExampleImages = (event) => {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
@@ -71,6 +74,66 @@ function TemplateEditor({ template, onBack, onSaved }) {
     setExampleImages((prev) => prev.filter((image) => image.id !== id));
   };
 
+  const generateAiExampleImages = async () => {
+    const trimmedPrompts = form.prompts.map((p) => p.trim());
+    if (trimmedPrompts.every((p) => !p)) {
+      toast.warn("Please write at least one prompt before generating template images.");
+      return;
+    }
+
+    setGeneratingAi(true);
+    let generatedCount = 0;
+
+    const ratioValue = form.aspectRatio === "custom"
+      ? `${form.outputWidth}:${form.outputHeight}`
+      : form.aspectRatio;
+
+    for (let i = 0; i < trimmedPrompts.length; i += 1) {
+      if (!trimmedPrompts[i]) continue;
+      setGeneratingAiIndex(i + 1);
+
+      const chosenImage = form.referenceImageIds[i]
+        ? form.inputImages.find((img) => img.id === form.referenceImageIds[i])
+        : null;
+      const referencedImage = chosenImage ?? form.inputImages[0] ?? null;
+
+      const data = new FormData();
+      data.append("prompt", trimmedPrompts[i]);
+      data.append("ratio", ratioValue);
+      data.append("width", form.outputWidth);
+      data.append("height", form.outputHeight);
+      data.append("format", form.outputFormat.toLowerCase());
+
+      if (referencedImage?.file) {
+        data.append("image", referencedImage.file);
+      } else if (referencedImage?.preview) {
+        data.append("image_url", referencedImage.preview);
+      }
+
+      try {
+        const res = await generateAdminAiTemplateImage(data);
+        const url = extractMediaUrl(res.data);
+        if (url) {
+          generatedCount += 1;
+          setExampleImages((prev) => [
+            ...prev,
+            { id: newAssetId(), remoteUrl: url, preview: url, file: null },
+          ]);
+        } else {
+          toast.error(`Prompt ${i + 1} did not return an image.`);
+        }
+      } catch (err) {
+        toast.error(err.response?.data?.message ?? `Prompt ${i + 1} failed to generate.`);
+      }
+    }
+
+    setGeneratingAi(false);
+    setGeneratingAiIndex(0);
+    if (generatedCount > 0) {
+      toast.success(`Generated ${generatedCount} template image${generatedCount > 1 ? "s" : ""} with AI!`);
+    }
+  };
+
   const saveTemplate = async () => {
     if (!name.trim()) {
       toast.warn("Enter a template name.");
@@ -81,7 +144,7 @@ function TemplateEditor({ template, onBack, onSaved }) {
       return;
     }
     if (exampleImages.length === 0) {
-      toast.warn("Add at least one example output image.");
+      toast.warn("Add at least one example output image (or generate one with AI).");
       return;
     }
 
@@ -119,6 +182,9 @@ function TemplateEditor({ template, onBack, onSaved }) {
     exampleImages
       .filter((image) => image.remoteId == null && image.file)
       .forEach((image) => data.append("example_images[]", image.file));
+    exampleImages
+      .filter((image) => image.remoteId == null && !image.file && (image.remoteUrl || image.preview))
+      .forEach((image) => data.append("example_image_urls[]", image.remoteUrl || image.preview));
 
     setSaving(true);
     try {
@@ -142,12 +208,28 @@ function TemplateEditor({ template, onBack, onSaved }) {
 
   const previewCard = (
     <article className="ai-gen-hub__result">
-      <div className="ai-gen-hub__section-head">
-        <span className="ai-gen-hub__section-badge">5</span>
-        <div>
-          <h3>Preview (Example Output)</h3>
-          <p>Upload example images users will see for this template. The first one is the cover.</p>
+      <div className="ai-gen-hub__section-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", gap: 12 }}>
+          <span className="ai-gen-hub__section-badge">5</span>
+          <div>
+            <h3>Preview (Example Output)</h3>
+            <p>Generate or upload example images users will see. The first is the cover.</p>
+          </div>
         </div>
+        <button
+          type="button"
+          className="ai-gen-hub__btn ai-gen-hub__btn--primary"
+          style={{ padding: "8px 14px", fontSize: 13, gap: 6 }}
+          disabled={generatingAi || saving}
+          onClick={generateAiExampleImages}
+        >
+          {generatingAi ? <LuLoader className="spin-icon" /> : <LuSparkles />}
+          <span>
+            {generatingAi
+              ? `Generating prompt ${generatingAiIndex}…`
+              : "Generate Template Images with AI"}
+          </span>
+        </button>
       </div>
 
       <div className="ai-gen-hub__image-grid ai-gen-hub__image-grid--large">
@@ -155,16 +237,24 @@ function TemplateEditor({ template, onBack, onSaved }) {
           <div className="ai-gen-hub__image-thumb" key={image.id}>
             <span className="ai-gen-hub__preview-badge">{index + 1}</span>
             <img src={image.preview} alt={`Example ${index + 1}`} />
-            <button type="button" onClick={() => removeExampleImage(image.id)}>
+            <button type="button" onClick={() => removeExampleImage(image.id)} disabled={generatingAi || saving}>
               <LuX />
             </button>
           </div>
         ))}
+        {generatingAi && (
+          <div
+            className="ai-gen-hub__image-thumb ai-gen-hub__preview-loading"
+            style={{ minHeight: 120, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.04)", borderRadius: 8 }}
+          >
+            <LuLoader className="spin-icon" />
+          </div>
+        )}
         {exampleImages.length < MAX_PROMPTS && (
           <label className="ai-gen-hub__image-add-tile">
             <LuPlus />
             <span>Add Example</span>
-            <input type="file" accept="image/*" multiple onChange={addExampleImages} />
+            <input type="file" accept="image/*" multiple onChange={addExampleImages} disabled={generatingAi || saving} />
           </label>
         )}
       </div>
