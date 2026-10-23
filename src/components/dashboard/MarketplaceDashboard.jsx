@@ -1715,7 +1715,7 @@ const MarketplaceDashboard = () => {
                       })}
                     </div>
 
-                    <div className="profile-dropdown__theme" aria-label="Theme preference">
+                    {/* <div className="profile-dropdown__theme" aria-label="Theme preference">
                       <button
                         type="button"
                         className={profileTheme === "light" ? "profile-dropdown__theme-btn profile-dropdown__theme-btn--active" : "profile-dropdown__theme-btn"}
@@ -1732,7 +1732,7 @@ const MarketplaceDashboard = () => {
                         <LuMoon />
                         <span>Dark</span>
                       </button>
-                    </div>
+                    </div> */}
                   </div>
                 ) : null}
               </div>

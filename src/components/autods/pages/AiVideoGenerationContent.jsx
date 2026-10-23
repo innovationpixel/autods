@@ -85,7 +85,7 @@ function AiVideoGenerationContent() {
         </div>
       </header>
 
-      <div className="ai-gen-hub__tabs">
+      {/* <div className="ai-gen-hub__tabs">
         <button
           type="button"
           className={`ai-gen-hub__tab ${mode === "image" ? "ai-gen-hub__tab--active" : ""}`}
@@ -100,7 +100,7 @@ function AiVideoGenerationContent() {
         >
           <LuVideo /> Generate Video
         </button>
-      </div>
+      </div> */}
 
       {mode === "image" ? (
         selectedTemplate ? (
