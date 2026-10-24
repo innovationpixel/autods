@@ -27,7 +27,7 @@ function AdminSettingsPage() {
   const [googleConnecting, setGoogleConnecting] = useState(false);
   const [openAiStatus, setOpenAiStatus] = useState({ loading: true, configured: false });
   const [openAiKey, setOpenAiKey] = useState("");
-  const [openAiImageModel, setOpenAiImageModel] = useState("dall-e-3");
+  const [openAiImageModel, setOpenAiImageModel] = useState("dall-e-2");
   const [openAiVisionModel, setOpenAiVisionModel] = useState("gpt-4o");
   const [showKey, setShowKey] = useState(false);
   const [openAiSaving, setOpenAiSaving] = useState(false);
@@ -421,8 +421,8 @@ function AdminSettingsPage() {
                 <label className="ai-gen-hub__field" style={{ margin: 0 }}>
                   <span className="ai-gen-hub__field-label">Image Model</span>
                   <select value={openAiImageModel} onChange={(e) => setOpenAiImageModel(e.target.value)}>
-                    <option value="dall-e-3">DALL-E 3 (Recommended - HD)</option>
-                    <option value="dall-e-2">DALL-E 2</option>
+                    <option value="dall-e-2">DALL-E 2 (Standard - Normal)</option>
+                    <option value="dall-e-3">DALL-E 3 (HD)</option>
                   </select>
                 </label>
 

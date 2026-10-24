@@ -52,6 +52,7 @@ function buildVariantsFromItem(item) {
         profit: variant.profit,
         price: variant.price,
         ebaySku: variant.ebaySku ?? null,
+        properties: Array.isArray(variant.properties) ? variant.properties : (variant.properties ?? null),
       },
       fallback,
     );
@@ -96,8 +97,9 @@ function buildVariantsFromItem(item) {
           listingPrice: Number(sku.listing_price ?? sku.listingPrice ?? sku.listPrice ?? 0),
           profit: Number(sku.profit ?? 0),
           quantity: Number(sku.stock ?? sku.quantity ?? item.quantity ?? 1),
-          image: normalizeImageUrl(sku.properties?.find((p) => p.image)?.image) ?? null,
-          selected: true,
+          image: normalizeImageUrl(sku.properties?.find((p) => p.image)?.image ?? sku.image) ?? null,
+          selected: sku.selected !== false,
+          properties: Array.isArray(sku.properties) ? sku.properties : null,
         },
         fallback,
       ),
@@ -265,6 +267,8 @@ export function buildDraftFormState(item) {
     },
     sourceInput: saved.sourceInput ?? item.source_url ?? item.source_product_id ?? "",
     sourcePlatform: saved.sourcePlatform ?? item.source_platform ?? "aliexpress",
+    template_id: saved.template_id ?? saved.templateId ?? null,
+    templateId: saved.template_id ?? saved.templateId ?? null,
   };
 }
 
@@ -329,7 +333,9 @@ export function serializeDraftFormForApi(form) {
       },
       sourceInput: form.sourceInput ?? "",
       sourcePlatform: source.source_platform,
+      template_id: form.template_id || form.templateId || null,
     },
+    template_id: form.template_id || form.templateId || null,
     variants: normalizedVariants,
     specifics: form.specifics,
   };

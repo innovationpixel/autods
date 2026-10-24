@@ -721,16 +721,23 @@ function OrderProcessingContent() {
 
   const handleSaveAddress = async (addressData) => {
     if (!addressModalOrder) return;
+    const shouldResume = Boolean(addressModalOrder._autoResumeProcess);
     setAddressModalSaving(true);
     try {
       const res = await updateOrderShippingAddress(addressModalOrder.id, addressData);
       toast.success("Shipping address updated.");
       const updatedOrder = res.data?.order;
+      let mapped = null;
       if (updatedOrder) {
-        const mapped = mapProcessingOrder(updatedOrder);
+        mapped = mapProcessingOrder(updatedOrder);
         setOrders((current) => current.map((item) => (item.id === mapped.id ? mapped : item)));
       }
       setAddressModalOrder(null);
+
+      // If the address was edited as part of address validation, re-validate and continue
+      if (shouldResume && mapped) {
+        handleProcessOrder(mapped);
+      }
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Could not update shipping address."));
     } finally {
@@ -1751,8 +1758,25 @@ function OrderProcessingContent() {
         onAcceptRecommended={handleAcceptRecommendedAddress}
         onEditManual={() => {
           const ord = addressRecommendationModal.order;
+          const val = addressRecommendationModal.validation;
           setAddressRecommendationModal({ open: false, order: null, validation: null });
-          if (ord) setAddressModalOrder(ord);
+          if (ord) {
+            const bestAddress = val?.recommended_address || val?.original_address || {};
+            setAddressModalOrder({
+              ...ord,
+              _autoResumeProcess: true,
+              rawAddress: {
+                fullName: ord.rawAddress?.fullName || bestAddress.fullName || ord.buyerName || "",
+                addressLine1: ord.rawAddress?.addressLine1 || bestAddress.addressLine1 || "",
+                addressLine2: ord.rawAddress?.addressLine2 || bestAddress.addressLine2 || "",
+                city: ord.rawAddress?.city || bestAddress.city || "",
+                stateOrProvince: ord.rawAddress?.stateOrProvince || bestAddress.stateOrProvince || "",
+                postalCode: ord.rawAddress?.postalCode || bestAddress.postalCode || "",
+                countryCode: ord.rawAddress?.countryCode || bestAddress.countryCode || "US",
+                phone: ord.rawAddress?.phone || bestAddress.phone || (ord.buyerPhone !== "—" ? ord.buyerPhone : "") || "",
+              },
+            });
+          }
         }}
       />
 

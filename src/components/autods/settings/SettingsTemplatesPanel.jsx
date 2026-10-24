@@ -245,13 +245,48 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
       {previewTemplate ? (
         <div className="marketplace-settings__modal">
           <button type="button" className="marketplace-settings__modal-backdrop" onClick={() => setPreviewTemplate(null)} aria-label="Close preview" />
-          <div className="templates-settings__preview-modal">
+          <div className="templates-settings__preview-modal" style={{ maxWidth: 980, width: "95%" }}>
             <button type="button" className="marketplace-settings__modal-close" onClick={() => setPreviewTemplate(null)} aria-label="Close">
               <LuX />
             </button>
-            <h3>{previewTemplate.name}</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: "#0f172a" }}>{previewTemplate.name}</h3>
+                {previewTemplate.description ? (
+                  <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>{previewTemplate.description}</p>
+                ) : null}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {defaultTemplateId !== previewTemplate.id ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAsDefault(previewTemplate.id);
+                      setPreviewTemplate(null);
+                    }}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 6,
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                      background: "#e0e7ff",
+                      color: "#4338ca",
+                      border: "1px solid #c7d2fe",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Set as Store Default
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#16a34a", padding: "4px 8px", background: "#f0fdf4", borderRadius: 4 }}>
+                    Current Store Default
+                  </span>
+                )}
+              </div>
+            </div>
             <div
               className="templates-settings__preview-frame"
+              style={{ maxHeight: "68vh", background: "#ffffff", padding: 16 }}
               dangerouslySetInnerHTML={{ __html: fillTemplatePreview(previewTemplate.html) }}
             />
           </div>

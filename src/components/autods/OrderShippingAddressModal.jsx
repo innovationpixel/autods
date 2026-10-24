@@ -26,6 +26,26 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
 
   useEffect(() => {
     if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !saving) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, saving, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
     const addr = order?.rawAddress ?? {};
     setForm({
       fullName: addr.fullName || order?.buyerName || "",
@@ -84,39 +104,87 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
   };
 
   return (
-    <div className="orders-modal-backdrop" onClick={onClose}>
+    <div
+      className="quick-edit-modal-layer"
+      role="presentation"
+      style={{
+        zIndex: 1100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px 16px",
+        overflowY: "auto",
+      }}
+    >
+      <button
+        type="button"
+        className="quick-edit-modal-layer__backdrop"
+        aria-label="Close"
+        onClick={onClose}
+      />
+
       <section
-        className="order-source-modal card-wrapper"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 560, width: "100%" }}
+        className="quick-edit-modal order-shipping-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={isBulk ? "Bulk Update Shipping Address" : "Edit Shipping Address"}
+        style={{
+          maxWidth: 580,
+          width: "100%",
+          margin: "auto",
+          position: "relative",
+          zIndex: 1,
+          background: "#ffffff",
+          borderRadius: "12px",
+          boxShadow: "0 20px 48px rgba(15, 23, 42, 0.25)",
+          border: "1px solid #e2e8f0",
+          overflow: "hidden",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        <header className="order-source-modal__header">
-          <div>
-            <h3>{isBulk ? "Bulk Update Shipping Address" : "Edit Shipping Address"}</h3>
-            <p className="order-source-modal__subtitle">
+        <button
+          type="button"
+          className="quick-edit-modal__close"
+          aria-label="Close dialog"
+          onClick={onClose}
+          disabled={saving}
+          style={{ position: "absolute", top: 14, right: 14, zIndex: 2 }}
+        >
+          <LuX />
+        </button>
+
+        <div
+          className="quick-edit-modal__head"
+          style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f1f5f9" }}
+        >
+          <span
+            className="quick-edit-modal__icon"
+            style={{ background: "#eff6ff", color: "#2563eb", borderRadius: "8px" }}
+            aria-hidden="true"
+          >
+            <LuMapPin size={20} />
+          </span>
+          <div style={{ paddingRight: 24 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#0f172a" }}>
+              {isBulk ? "Bulk Update Shipping Address" : "Edit Shipping Address"}
+            </h2>
+            <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
               {isBulk
                 ? `${bulkCount} orders selected for batch address update`
                 : `Order #${order?.ebayOrderId || order?.id} · Recipient destination`}
             </p>
           </div>
-          <button
-            type="button"
-            className="order-source-modal__close"
-            onClick={onClose}
-            aria-label="Close dialog"
-            disabled={saving}
-          >
-            <LuX />
-          </button>
-        </header>
+        </div>
 
-        <div style={{ padding: "0 20px 20px" }}>
+        <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
           <div
             style={{
               padding: "10px 14px",
               borderRadius: "6px",
-              background: "rgba(59, 130, 246, 0.08)",
-              border: "1px solid rgba(59, 130, 246, 0.2)",
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
               fontSize: "12.5px",
               color: "#1e40af",
               marginBottom: 16,
@@ -128,7 +196,7 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
           >
             <LuMapPin style={{ marginTop: 2, flexShrink: 0, fontSize: 16 }} />
             <span>
-              AliExpress validates states/provinces using full names (e.g. <strong>California</strong> instead of <strong>CA</strong>). AutoDS automatically normalizes standard abbreviations upon placing the order.
+              AliExpress validates addresses strictly. AutoDS normalizes standard abbreviations and states upon order placement.
             </span>
           </div>
 
@@ -137,8 +205,8 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
               style={{
                 padding: "8px 12px",
                 borderRadius: "6px",
-                background: "rgba(239, 68, 68, 0.1)",
-                border: "1px solid rgba(239, 68, 68, 0.3)",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
                 color: "#b91c1c",
                 fontSize: "13px",
                 marginBottom: 14,
@@ -148,8 +216,8 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
             </div>
           ) : null}
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 14 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
               Recipient Full Name *
               <input
                 type="text"
@@ -157,11 +225,19 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                 onChange={(e) => handleChange("fullName", e.target.value)}
                 placeholder="e.g. Jane Doe"
                 disabled={saving}
-                style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13.5px",
+                  color: "#0f172a",
+                  background: "#ffffff",
+                  outline: "none",
+                }}
               />
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
               Street Address (Line 1) *
               <input
                 type="text"
@@ -169,11 +245,19 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                 onChange={(e) => handleChange("addressLine1", e.target.value)}
                 placeholder="e.g. 123 Main Street"
                 disabled={saving}
-                style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13.5px",
+                  color: "#0f172a",
+                  background: "#ffffff",
+                  outline: "none",
+                }}
               />
             </label>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
               Address Line 2 (Apt / Suite / Unit)
               <input
                 type="text"
@@ -181,12 +265,20 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                 onChange={(e) => handleChange("addressLine2", e.target.value)}
                 placeholder="e.g. Apt 4B"
                 disabled={saving}
-                style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13.5px",
+                  color: "#0f172a",
+                  background: "#ffffff",
+                  outline: "none",
+                }}
               />
             </label>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
                 City *
                 <input
                   type="text"
@@ -194,11 +286,19 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                   onChange={(e) => handleChange("city", e.target.value)}
                   placeholder="e.g. Los Angeles"
                   disabled={saving}
-                  style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                  style={{
+                    padding: "9px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13.5px",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                    outline: "none",
+                  }}
                 />
               </label>
 
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
                 State / Province *
                 <input
                   type="text"
@@ -207,7 +307,15 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                   onChange={(e) => handleChange("stateOrProvince", e.target.value)}
                   placeholder="e.g. California (or CA)"
                   disabled={saving}
-                  style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                  style={{
+                    padding: "9px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13.5px",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                    outline: "none",
+                  }}
                 />
                 <datalist id="us-states-list">
                   {US_STATES.map((s) => (
@@ -218,7 +326,7 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
                 Postal / ZIP Code *
                 <input
                   type="text"
@@ -226,17 +334,34 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                   onChange={(e) => handleChange("postalCode", e.target.value)}
                   placeholder="e.g. 90001"
                   disabled={saving}
-                  style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                  style={{
+                    padding: "9px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13.5px",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                    outline: "none",
+                  }}
                 />
               </label>
 
-              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
                 Country Code
                 <select
                   value={form.countryCode}
                   onChange={(e) => handleChange("countryCode", e.target.value)}
                   disabled={saving}
-                  style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                  style={{
+                    padding: "9px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13.5px",
+                    color: "#0f172a",
+                    background: "#ffffff",
+                    outline: "none",
+                    height: "39px",
+                  }}
                 >
                   <option value="US">United States (US)</option>
                   <option value="CA">Canada (CA)</option>
@@ -252,7 +377,7 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
               </label>
             </div>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "13px", fontWeight: 500 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "12.5px", fontWeight: 600, color: "#334155" }}>
               Phone Number
               <input
                 type="text"
@@ -260,13 +385,31 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
                 onChange={(e) => handleChange("phone", e.target.value)}
                 placeholder="e.g. 555-123-4567"
                 disabled={saving}
-                style={{ padding: "8px 10px", borderRadius: "6px", border: "1px solid var(--border-color, #d1d5db)" }}
+                style={{
+                  padding: "9px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13.5px",
+                  color: "#0f172a",
+                  background: "#ffffff",
+                  outline: "none",
+                }}
               />
             </label>
           </div>
         </div>
 
-        <div className="quick-edit-modal__actions" style={{ padding: "14px 20px", borderTop: "1px solid var(--border-color, #e5e7eb)" }}>
+        <div
+          className="quick-edit-modal__actions"
+          style={{
+            padding: "16px 24px",
+            background: "#f8fafc",
+            borderTop: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+          }}
+        >
           <button
             type="button"
             className="quick-edit-modal__btn quick-edit-modal__btn--ghost"
@@ -280,6 +423,14 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
             className="quick-edit-modal__btn quick-edit-modal__btn--primary"
             onClick={handleSave}
             disabled={saving}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#4f46e5",
+              color: "#ffffff",
+              fontWeight: 600,
+            }}
           >
             {saving ? (
               <>
@@ -288,7 +439,7 @@ function OrderShippingAddressModal({ open, order, saving = false, isBulk = false
               </>
             ) : (
               <>
-                <LuCheck />
+                <LuCheck size={16} />
                 <span>{isBulk ? `Apply to ${bulkCount} Orders` : "Save Address"}</span>
               </>
             )}
