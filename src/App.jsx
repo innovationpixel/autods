@@ -37,6 +37,7 @@ import "./assets/css/autoprime-orders-final-theme.css";
 import "./assets/css/autoprime-legacy-orange-cleanup.css";
 import "./assets/css/autoprime-profile-settings-fix.css";
 import "./assets/css/autoprime-profile-overlay-final.css";
+import "./assets/css/autoprime-help-settings-layout.css";
 import "./assets/css/autoprime-notifications-v2.css";
 
 function App() {
