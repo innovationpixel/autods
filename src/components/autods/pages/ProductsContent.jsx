@@ -308,9 +308,9 @@ function ProductsContent({ searchQuery }) {
       }
       const rect = tableScrollRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-      const hasHorizontalOverflow = tableScrollRef.current.scrollWidth > tableScrollRef.current.clientWidth + 10;
-      const isTopVisibleOrAbove = rect.top < viewportHeight - 80;
-      const isBottomBelowViewport = rect.bottom > viewportHeight + 30;
+      const hasHorizontalOverflow = tableScrollRef.current.scrollWidth > tableScrollRef.current.clientWidth + 5;
+      const isTopVisibleOrAbove = rect.top < viewportHeight - 40;
+      const isBottomBelowViewport = rect.bottom > viewportHeight + 10;
 
       if (hasHorizontalOverflow && isTopVisibleOrAbove && isBottomBelowViewport) {
         setShowStickyScroll(true);
@@ -323,15 +323,26 @@ function ProductsContent({ searchQuery }) {
       }
     };
 
-    window.addEventListener("scroll", checkStickyVisibility, { passive: true });
+    window.addEventListener("scroll", checkStickyVisibility, { passive: true, capture: true });
     window.addEventListener("resize", checkStickyVisibility, { passive: true });
+    document.addEventListener("scroll", checkStickyVisibility, { passive: true, capture: true });
+
     checkStickyVisibility();
+    const timer = setTimeout(checkStickyVisibility, 150);
 
     return () => {
-      window.removeEventListener("scroll", checkStickyVisibility);
+      window.removeEventListener("scroll", checkStickyVisibility, { capture: true });
       window.removeEventListener("resize", checkStickyVisibility);
+      document.removeEventListener("scroll", checkStickyVisibility, { capture: true });
+      clearTimeout(timer);
     };
-  }, [tableMinWidth]);
+  }, [tableMinWidth, loading, sortedRows.length, pageSize]);
+
+  useEffect(() => {
+    if (showStickyScroll && stickyScrollRef.current && tableScrollRef.current) {
+      stickyScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+    }
+  }, [showStickyScroll]);
 
   useEffect(() => {
     const node = tableScrollRef.current;
@@ -1061,6 +1072,8 @@ function ProductsContent({ searchQuery }) {
 
   const getProductCellClassName = (columnId) => {
     switch (columnId) {
+      case "name":
+        return "products-table__name-col";
       case "uploaded":
         return "products-table__date";
       case "store":
@@ -1338,6 +1351,7 @@ function ProductsContent({ searchQuery }) {
                   return (
                     <th
                       key={column.id}
+                      className={column.id === "name" ? "products-table__name-col" : undefined}
                       rowSpan={hasStockGroup ? 2 : 1}
                       style={{ minWidth: column.minWidth, cursor: "pointer" }}
                       onClick={() => handleSort(column.id)}

@@ -922,3 +922,126 @@
   border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
+
+/* Shipping Label Upload Area */
+.rd-upload-zone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.rd-upload-zone:hover {
+  border-color: #3b82f6;
+  background: #f0f7ff;
+}
+
+.rd-upload-zone--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.rd-upload-zone__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.rd-upload-zone__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.rd-upload-zone__hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.rd-file-preview-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  gap: 12px;
+}
+
+.rd-file-preview-card__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rd-file-preview-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rd-file-preview-card__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rd-file-preview-card__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rd-file-preview-card__size {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.rd-file-preview-card__remove {
+  background: #fee2e2;
+  border: none;
+  color: #dc2626;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.rd-file-preview-card__remove:hover {
+  background: #fecaca;
+}
+

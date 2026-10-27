@@ -2,6 +2,12 @@ import axiosInstance from './AxiosInstance';
 
 const multipart = { headers: { 'Content-Type': 'multipart/form-data' } };
 
+export const getAiConfig = () =>
+    axiosInstance.get('/ai/config');
+
+export const buyAiCredits = (packageId) =>
+    axiosInstance.post('/ai/credits/buy', { package_id: String(packageId) });
+
 export const getAiTemplates = () =>
     axiosInstance.get('/ai/templates');
 

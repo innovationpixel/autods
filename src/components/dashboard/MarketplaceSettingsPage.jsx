@@ -29,6 +29,10 @@ import {
   LuPackageSearch,
   LuZap,
   LuExternalLink,
+  LuClock,
+  LuPackage,
+  LuShoppingCart,
+  LuChevronRight,
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
@@ -66,6 +70,7 @@ import {
 } from "../../services/BuyerAccountService";
 import SettingsTemplatesPanel from "../autods/settings/SettingsTemplatesPanel";
 import { allTemplates } from "../autods/settings/settingsTemplates";
+import BuyAiCreditsModal from "../autods/pages/BuyAiCreditsModal";
 
 const settingsPrimaryTabs = [
   "Store Settings",
@@ -142,6 +147,8 @@ function PlanPlatformLogo({ logo, name }) {
         return <FaWix aria-hidden="true" />;
       case "woo":
         return <FaWordpress aria-hidden="true" />;
+      case "hub":
+        return <LuPackageSearch aria-hidden="true" />;
       default:
         return name?.slice(0, 2)?.toUpperCase() ?? "?";
     }
@@ -204,6 +211,7 @@ const staticPlanCards = [
 const addOnIconMap = {
   "finding-hub": LuPackageSearch,
   "orders-processor": LuZap,
+  "ai-credits": LuSparkles,
 };
 
 const settingsAddOns = [
@@ -228,6 +236,16 @@ const settingsAddOns = [
     tag: "Active",
     active: true,
     accent: "green",
+  },
+  {
+    id: "ai-credits",
+    title: "AI Credits",
+    copy: "Generate studio-grade product photos, lifestyle images, and marketing content powered by OpenAI.",
+    linkLabel: "Open AI Studio",
+    actionLabel: "Buy Credits",
+    footerLink: "View packages",
+    accent: "purple",
+    isAiCredits: true,
   },
 ];
 
@@ -668,6 +686,7 @@ export default function MarketplaceSettingsPage() {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [addOns, setAddOns] = useState(settingsAddOns);
   const [addOnTermsTarget, setAddOnTermsTarget] = useState(null);
+  const [aiCreditsModalOpen, setAiCreditsModalOpen] = useState(false);
   const [paypalEmail, setPaypalEmail] = useState("");
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
@@ -776,6 +795,30 @@ export default function MarketplaceSettingsPage() {
                     remote.pricing.include_shipping_price ?? supplier.settings.pricing.includeShippingPrice,
                   defaultAutomation:
                     remote.pricing.default_automation ?? supplier.settings.pricing.defaultAutomation,
+                },
+              },
+            })),
+          );
+        }
+        if (remote.orders) {
+          setSuppliers((prev) =>
+            prev.map((supplier) => ({
+              ...supplier,
+              settings: {
+                ...supplier.settings,
+                orders: {
+                  ...supplier.settings.orders,
+                  autoDeliver: remote.orders.auto_deliver ?? supplier.settings.orders.autoDeliver,
+                  shippedStatus: remote.orders.shipped_status ?? supplier.settings.orders.shippedStatus,
+                  maximumPurchasePrice: String(
+                    remote.orders.maximum_purchase_price ?? supplier.settings.orders.maximumPurchasePrice,
+                  ),
+                  maximumLoss: String(
+                    remote.orders.maximum_loss ?? supplier.settings.orders.maximumLoss,
+                  ),
+                  messages: Array.isArray(remote.orders.messages) && remote.orders.messages.length > 0
+                    ? remote.orders.messages
+                    : supplier.settings.orders.messages,
                 },
               },
             })),
@@ -1426,45 +1469,82 @@ export default function MarketplaceSettingsPage() {
     setMessageDraft(message?.message || "");
   };
 
-  const saveMessageDraft = () => {
+  const saveMessageDraft = async () => {
     if (!editingMessageId) {
       return;
     }
 
+    const updatedMessages = currentSettings.orders.messages.map((message) =>
+      message.id === editingMessageId
+        ? {
+            ...message,
+            message: messageDraft.trim() || message.message,
+          }
+        : message,
+    );
+
     updateActiveSupplierSettings((settings) => ({
       ...settings,
       orders: {
         ...settings.orders,
-        messages: settings.orders.messages.map((message) =>
-          message.id === editingMessageId
-            ? {
-                ...message,
-                message: messageDraft.trim() || message.message,
-              }
-            : message,
-        ),
+        messages: updatedMessages,
       },
     }));
 
+    const target = currentSettings.orders.messages.find((m) => m.id === editingMessageId);
     setEditingMessageId("");
     setMessageDraft("");
+
+    try {
+      await updateAccountSettings({
+        orders: {
+          auto_deliver: currentSettings.orders.autoDeliver,
+          shipped_status: currentSettings.orders.shippedStatus,
+          maximum_purchase_price: currentSettings.orders.maximumPurchasePrice,
+          maximum_loss: currentSettings.orders.maximumLoss,
+          messages: updatedMessages,
+        },
+      });
+      toast.success(`"${target?.title || "Automatic message"}" template saved.`);
+    } catch {
+      // Local state is preserved
+    }
   };
 
-  const toggleMessageEnabled = (messageId, value) => {
+  const toggleMessageEnabled = async (messageId, value) => {
+    const updatedMessages = currentSettings.orders.messages.map((message) =>
+      message.id === messageId
+        ? {
+            ...message,
+            enabled: value,
+          }
+        : message,
+    );
+
     updateActiveSupplierSettings((settings) => ({
       ...settings,
       orders: {
         ...settings.orders,
-        messages: settings.orders.messages.map((message) =>
-          message.id === messageId
-            ? {
-                ...message,
-                enabled: value,
-              }
-            : message,
-        ),
+        messages: updatedMessages,
       },
     }));
+
+    const target = currentSettings.orders.messages.find((m) => m.id === messageId);
+
+    try {
+      await updateAccountSettings({
+        orders: {
+          auto_deliver: currentSettings.orders.autoDeliver,
+          shipped_status: currentSettings.orders.shippedStatus,
+          maximum_purchase_price: currentSettings.orders.maximumPurchasePrice,
+          maximum_loss: currentSettings.orders.maximumLoss,
+          messages: updatedMessages,
+        },
+      });
+      toast.success(`"${target?.title || "Automatic message"}" ${value ? "enabled" : "disabled"}.`);
+    } catch {
+      // Local state is preserved
+    }
   };
 
   const saveCurrentTab = async () => {
@@ -1500,6 +1580,9 @@ export default function MarketplaceSettingsPage() {
         orders: {
           auto_deliver: currentSettings.orders.autoDeliver,
           shipped_status: currentSettings.orders.shippedStatus,
+          maximum_purchase_price: currentSettings.orders.maximumPurchasePrice,
+          maximum_loss: currentSettings.orders.maximumLoss,
+          messages: currentSettings.orders.messages,
         },
         general: {
           weight_unit: currentSettings.general.defaultWeightUnit,
@@ -2379,259 +2462,420 @@ export default function MarketplaceSettingsPage() {
 
   const renderPlansAddOnsTab = () => {
     const ebayConnected = ebayConnections.length > 0;
-    const activePlan = currentSubscription?.current_plan;
-    const planExpires = currentSubscription?.plan_expires_at;
-    const activeAddOnCount = addOns.filter((addOn) => addOn.active).length;
+    const plan = currentSubscription?.current_plan;
+    const usage = currentSubscription?.usage ?? {};
+    const planExpires = currentSubscription?.plan_expires_at || currentSubscription?.subscription?.current_period_end;
 
-    const ebayCard = ebayConnected
-      ? {
-          id: "ebay-plan",
-          name: "eBay",
-          logo: "ebay",
-          current: true,
-          summary: ebayConnections.length === 1
-            ? (primaryEbayConnection?.ebay_username ? `@${primaryEbayConnection.ebay_username}` : "Account connected")
-            : `${ebayConnections.length} accounts linked`,
-          metrics: [
-            { label: "Accounts", value: String(ebayConnections.length) },
-            { label: "Primary store", value: primaryEbayConnection?.ebay_username ?? "—" },
-            { label: "Marketplace", value: primaryEbayConnection?.site_id ?? "eBay" },
-          ],
-          secondaryAction: "Manage in Store Settings",
-          primaryAction: "Add Account",
-        }
-      : {
-          id: "ebay-plan",
-          name: "eBay",
-          logo: "ebay",
-          current: false,
-          copy: "Connect your eBay seller account to sync listings, manage products, and track orders in real time.",
-          primaryAction: "Connect eBay",
-        };
+    const listingsLimit = plan?.limits?.listings ?? plan?.listings_limit ?? 50;
+    const listingsUsed = usage.listings_count ?? 0;
+    const listingsPct = listingsLimit > 0 ? Math.min(100, Math.round((listingsUsed / listingsLimit) * 100)) : 0;
 
-    const integrationPlans = [ebayCard, ...staticPlanCards];
+    const ordersLimit = plan?.limits?.orders ?? plan?.orders_limit ?? 100;
+    const ordersUsed = usage.orders_count ?? 0;
+    const ordersPct = ordersLimit > 0 ? Math.min(100, Math.round((ordersUsed / ordersLimit) * 100)) : 0;
+
+    const storesLimit = plan?.limits?.stores ?? plan?.stores_limit ?? 1;
+    const storesUsed = usage.connections_count ?? (ebayConnections.length > 0 ? ebayConnections.length : 0);
+    const storesPct = storesLimit > 0 ? Math.min(100, Math.round((storesUsed / storesLimit) * 100)) : 0;
+
+    const aiCredits = user?.ai_credits ?? 0;
 
     return (
-      <section className="plans-settings card-wrapper">
-        <header className="plans-settings__hero">
-          <div className="plans-settings__hero-copy">
-            <span className="plans-settings__eyebrow"><LuSparkles /> Plans &amp; Add-ons</span>
-            <h2>Subscriptions, channels &amp; power-ups</h2>
-            <p>
-              Connect marketplaces, manage your Auto DS subscription, and enable add-ons
-              that automate product research, ads, and order processing.
+      <section className="plans-settings card-wrapper" style={{ padding: "24px" }}>
+        {/* Hero / Subscription Overview */}
+        <header
+          className="plans-settings__hero"
+          style={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+            borderRadius: "14px",
+            padding: "24px 28px",
+            color: "#ffffff",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "16px",
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "rgba(59, 130, 246, 0.2)",
+                  color: "#60a5fa",
+                  padding: "3px 10px",
+                  borderRadius: "999px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  border: "1px solid rgba(96, 165, 250, 0.3)",
+                }}
+              >
+                <LuCrown /> ACTIVE PLAN
+              </span>
+              {planExpires && (
+                <span style={{ fontSize: "12px", color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <LuClock /> Renews {formatBillingDate(planExpires)}
+                </span>
+              )}
+            </div>
+            <h2 style={{ fontSize: "24px", fontWeight: 800, margin: "0 0 4px 0", color: "#f8fafc" }}>
+              {plan?.title ?? plan?.name ?? "Starter Plan"}
+            </h2>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: "13px", maxWidth: "560px" }}>
+              Manage your plan limits, connected marketplace channels, AI generation credits, and automation power-ups.
             </p>
           </div>
-          {activePlan ? (
-            <div className="plans-settings__active-chip">
-              <span className="plans-settings__active-chip-icon"><LuCrown /></span>
-              <div>
-                <span className="plans-settings__active-chip-label">Current subscription</span>
-                <strong>{activePlan.title}</strong>
-                <span>{planExpires ? `Renews ${formatBillingDate(planExpires)}` : "Active plan"}</span>
-              </div>
-            </div>
-          ) : (
-            <button type="button" className="plans-settings__hero-cta" onClick={() => navigate("/plans")}>
-              <LuArrowUpRight />
-              <span>View subscription plans</span>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => setAiCreditsModalOpen(true)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "rgba(168, 85, 247, 0.15)",
+                color: "#d8b4fe",
+                border: "1px solid rgba(168, 85, 247, 0.35)",
+                borderRadius: "8px",
+                padding: "10px 16px",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <LuSparkles />
+              <span>Buy AI Credits ({aiCredits.toLocaleString()})</span>
             </button>
-          )}
+
+            <button
+              type="button"
+              onClick={() => navigate("/plans")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "8px",
+                padding: "10px 18px",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: "pointer",
+                boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+              }}
+            >
+              <LuArrowUpRight />
+              <span>Upgrade Plan</span>
+            </button>
+          </div>
         </header>
 
-        <div className="plans-settings__stats">
-          <article className="plans-settings__stat">
-            <span className="plans-settings__stat-icon plans-settings__stat-icon--plan"><LuCrown /></span>
+        {/* Live Usage & Quotas Dashboard */}
+        <div style={{ marginTop: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
             <div>
-              <span className="plans-settings__stat-label">Subscription</span>
-              <strong>{activePlan?.title ?? "No active plan"}</strong>
+              <h3 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#1e293b" }}>
+                Plan Usage &amp; Quotas
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#64748b" }}>
+                Real-time usage for your current subscription cycle.
+              </p>
             </div>
-          </article>
-          <article className="plans-settings__stat">
-            <span className="plans-settings__stat-icon plans-settings__stat-icon--stores"><LuStore /></span>
-            <div>
-              <span className="plans-settings__stat-label">Connected channels</span>
-              <strong>{ebayConnected ? `${ebayConnections.length} eBay` : "None connected"}</strong>
-            </div>
-          </article>
-          <article className="plans-settings__stat">
-            <span className="plans-settings__stat-icon plans-settings__stat-icon--addons"><LuZap /></span>
-            <div>
-              <span className="plans-settings__stat-label">Active add-ons</span>
-              <strong>{activeAddOnCount} enabled</strong>
-            </div>
-          </article>
-          <article className="plans-settings__stat">
-            <span className="plans-settings__stat-icon plans-settings__stat-icon--renewal"><LuCalendar /></span>
-            <div>
-              <span className="plans-settings__stat-label">Next renewal</span>
-              <strong>{planExpires ? formatBillingDate(planExpires) : "—"}</strong>
-            </div>
-          </article>
-        </div>
-
-        <div className="plans-settings__layout">
-          <div className="plans-settings__main">
-            <div className="plans-settings__section-head">
-              <div>
-                <h3>Marketplace integrations</h3>
-                <p>Connect sales channels and unlock platform-specific automation plans.</p>
-              </div>
-              <button type="button" className="plans-settings__link-btn" onClick={() => navigate("/plans")}>
-                Compare all plans
-                <LuArrowUpRight />
-              </button>
-            </div>
-
-            <div className="plans-settings__integrations">
-              {integrationPlans.map((plan) => (
-                <article
-                  className={`plans-settings__integration ${plan.current ? "plans-settings__integration--connected" : ""}`}
-                  key={plan.id}
-                >
-                  <div className="plans-settings__integration-top">
-                    <div className="plans-settings__integration-brand">
-                      <PlanPlatformLogo logo={plan.logo} name={plan.name} />
-                      <div>
-                        <h4>{plan.name}</h4>
-                        {plan.summary ? (
-                          <span className="plans-settings__integration-summary">{plan.summary}</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    <span className={`plans-settings__status ${plan.current ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>
-                      {plan.current ? "Connected" : "Not connected"}
-                    </span>
-                  </div>
-
-                  {plan.metrics ? (
-                    <dl className="plans-settings__metrics">
-                      {plan.metrics.map((metric) => (
-                        <div className="plans-settings__metric" key={`${plan.id}-${metric.label}`}>
-                          <dt>{metric.label}</dt>
-                          <dd>{metric.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : (
-                    <>
-                      <p className="plans-settings__integration-copy">{plan.copy}</p>
-                      {plan.features ? (
-                        <ul className="plans-settings__feature-list">
-                          {plan.features.map((feature) => (
-                            <li key={`${plan.id}-${feature}`}>
-                              <LuCheck />
-                              <span>{feature}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </>
-                  )}
-
-                  <div className="plans-settings__integration-foot">
-                    {plan.secondaryAction ? (
-                      <button
-                        type="button"
-                        className="plans-settings__ghost-btn"
-                        onClick={() => setActivePrimaryTab("Store Settings")}
-                      >
-                        {plan.secondaryAction}
-                      </button>
-                    ) : (
-                      <span />
-                    )}
-                    <button
-                      type="button"
-                      className={plan.current ? "plans-settings__btn plans-settings__btn--secondary" : "plans-settings__btn plans-settings__btn--primary"}
-                      onClick={
-                        plan.id === "ebay-plan"
-                          ? connectEbay
-                          : () => navigate("/plans")
-                      }
-                      disabled={plan.id === "ebay-plan" && ebayConnecting}
-                    >
-                      {plan.id === "ebay-plan" && ebayConnecting ? "Opening eBay…" : plan.primaryAction}
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <button
+              type="button"
+              className="plans-settings__link-btn"
+              onClick={() => navigate("/plans")}
+              style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}
+            >
+              Compare all plans <LuArrowUpRight />
+            </button>
           </div>
 
-          <aside className="plans-settings__sidebar">
-            <div className="plans-settings__section-head">
-              <div>
-                <h3>Add-ons</h3>
-                <p>Optional tools to research products, create ads, and automate orders.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+            {/* Products / Listings Quota */}
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#475569", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <LuPackage style={{ color: "#3b82f6" }} /> Products / Listings
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: listingsPct > 90 ? "#ef4444" : "#1e293b" }}>
+                  {listingsUsed} / {listingsLimit}
+                </span>
               </div>
+              <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                <div style={{ width: `${listingsPct}%`, height: "100%", background: listingsPct > 90 ? "#ef4444" : "#3b82f6", borderRadius: "999px" }} />
+              </div>
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
+                {listingsLimit - listingsUsed > 0 ? `${listingsLimit - listingsUsed} listings available` : "Quota reached"}
+              </span>
             </div>
 
-            <div className="plans-settings__addons">
-              {addOns.map((addOn) => {
-                const AddOnIcon = addOnIconMap[addOn.id] ?? LuZap;
-
-                return (
-                  <article
-                    className={`plans-settings__addon ${addOn.active ? "plans-settings__addon--active" : ""}`}
-                    key={addOn.id}
-                  >
-                    <div className="plans-settings__addon-head">
-                      <span className={`plans-settings__addon-icon plans-settings__addon-icon--${addOn.accent ?? "amber"}`}>
-                        <AddOnIcon />
-                      </span>
-                      {addOn.tag ? (
-                        <span className={`plans-settings__addon-tag ${addOn.active ? "plans-settings__addon-tag--active" : ""}`}>
-                          {addOn.tag}
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <h4>{addOn.title}</h4>
-                    <p>
-                      {addOn.copy}{" "}
-                      <button type="button" className="plans-settings__inline-link">{addOn.linkLabel}</button>
-                    </p>
-
-                    {addOn.startedOn || addOn.price ? (
-                      <div className="plans-settings__addon-meta">
-                        {addOn.startedOn ? <span>{addOn.startedOn}</span> : null}
-                        {addOn.price ? <strong>{addOn.price}</strong> : null}
-                      </div>
-                    ) : null}
-
-                    <div className="plans-settings__addon-foot">
-                      {addOn.footerLink ? (
-                        <button type="button" className="plans-settings__inline-link">{addOn.footerLink}</button>
-                      ) : (
-                        <span />
-                      )}
-                      <button
-                        type="button"
-                        className={addOn.active ? "plans-settings__btn plans-settings__btn--muted" : "plans-settings__btn plans-settings__btn--primary"}
-                        onClick={() => (addOn.active ? handleCancelAddOn(addOn) : openAddOnTerms(addOn))}
-                      >
-                        {addOn.actionLabel}
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
+            {/* Auto-Orders Quota */}
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#475569", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <LuShoppingCart style={{ color: "#10b981" }} /> Auto-Orders
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: ordersPct > 90 ? "#ef4444" : "#1e293b" }}>
+                  {ordersUsed} / {ordersLimit}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                <div style={{ width: `${ordersPct}%`, height: "100%", background: ordersPct > 90 ? "#ef4444" : "#10b981", borderRadius: "999px" }} />
+              </div>
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
+                {ordersLimit - ordersUsed > 0 ? `${ordersLimit - ordersUsed} orders available` : "Quota reached"}
+              </span>
             </div>
 
-            <article className="plans-settings__promo">
-              <span className="plans-settings__promo-icon"><LuCrown /></span>
-              <div>
-                <strong>Upgrade your subscription</strong>
-                <p>Unlock higher limits, faster sync, and priority support on paid plans.</p>
+            {/* Connected Stores Quota */}
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#475569", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <LuStore style={{ color: "#f59e0b" }} /> Stores / Channels
+                </span>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+                  {storesUsed} / {storesLimit}
+                </span>
               </div>
-              <button type="button" className="plans-settings__btn plans-settings__btn--primary" onClick={() => navigate("/plans")}>
-                Browse plans
-                <LuExternalLink />
-              </button>
-            </article>
-          </aside>
+              <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
+                <div style={{ width: `${storesPct}%`, height: "100%", background: "#f59e0b", borderRadius: "999px" }} />
+              </div>
+              <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
+                {ebayConnected ? `${ebayConnections.length} eBay store linked` : "Connect an eBay store"}
+              </span>
+            </div>
+
+            {/* AI Credits Balance Card */}
+            <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: "#475569", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <LuSparkles style={{ color: "#8b5cf6" }} /> AI Studio Credits
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAiCreditsModalOpen(true)}
+                  style={{
+                    background: "#f3e8ff",
+                    color: "#7e22ce",
+                    border: "none",
+                    borderRadius: "4px",
+                    padding: "2px 8px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  + Buy
+                </button>
+              </div>
+              <div style={{ marginTop: "8px" }}>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: "#1e293b" }}>
+                  {aiCredits.toLocaleString()} <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>Credits</span>
+                </div>
+                <span style={{ fontSize: "11px", color: "#64748b" }}>
+                  Ready for AI photo &amp; vision generation
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Active Channels & Add-ons Grid */}
+        <div style={{ marginTop: "24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+          {/* eBay Active Integration Card */}
+          <article className="plans-settings__integration plans-settings__integration--connected" style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <PlanPlatformLogo logo="ebay" name="eBay" />
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>eBay Store Integration</h4>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>
+                    {ebayConnected
+                      ? (primaryEbayConnection?.ebay_username ? `@${primaryEbayConnection.ebay_username} (${primaryEbayConnection.site_id ?? "eBay US"})` : `${ebayConnections.length} accounts linked`)
+                      : "Direct API Integration"}
+                  </span>
+                </div>
+              </div>
+              <span className={`plans-settings__status ${ebayConnected ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>
+                {ebayConnected ? "Connected" : "Not connected"}
+              </span>
+            </div>
+
+            <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+              Sync active listings, automate price &amp; stock monitoring, and push tracking numbers directly to eBay buyers.
+            </p>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+              <button
+                type="button"
+                className="plans-settings__ghost-btn"
+                onClick={() => setActivePrimaryTab("Store Settings")}
+              >
+                Manage in Store Settings
+              </button>
+              <button
+                type="button"
+                className={ebayConnected ? "plans-settings__btn plans-settings__btn--secondary" : "plans-settings__btn plans-settings__btn--primary"}
+                onClick={connectEbay}
+                disabled={ebayConnecting}
+              >
+                {ebayConnecting ? "Opening eBay…" : ebayConnected ? "Add Another Account" : "Connect eBay"}
+              </button>
+            </div>
+          </article>
+
+          {/* AI Credits Power-Up Card */}
+          <article style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <span className="plans-settings__addon-icon plans-settings__addon-icon--violet">
+                    <LuSparkles />
+                  </span>
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>AI Studio Credits</h4>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>Powered by OpenAI Image &amp; Vision</span>
+                  </div>
+                </div>
+                <span className="plans-settings__addon-tag plans-settings__addon-tag--active">
+                  Active
+                </span>
+              </div>
+
+              <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 12px 0", lineHeight: "1.5" }}>
+                Generate studio-grade product photos, lifestyle images, and ad creatives. Your current balance is <strong>{aiCredits.toLocaleString()} Credits</strong>.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+              <button
+                type="button"
+                className="plans-settings__inline-link"
+                onClick={() => navigate("/ai-video-generation")}
+              >
+                Open AI Studio
+              </button>
+              <button
+                type="button"
+                className="plans-settings__btn plans-settings__btn--primary"
+                onClick={() => setAiCreditsModalOpen(true)}
+              >
+                <LuSparkles />
+                <span>Buy AI Credits</span>
+              </button>
+            </div>
+          </article>
+        </div>
+
+        {/* Summarized Upcoming Marketplaces & Add-ons (Coming Soon) */}
+        <div style={{ marginTop: "24px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "18px 20px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+            <div>
+              <h4 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#1e293b" }}>
+                Upcoming Marketplace Channels &amp; Power-ups
+              </h4>
+              <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" }}>
+                Multi-channel expansion and additional research tools are in active development.
+              </p>
+            </div>
+            <span style={{ background: "#ede9fe", color: "#6d28d9", fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "999px" }}>
+              Coming Soon
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "10px" }}>
+            {[
+              { name: "Shopify", logo: "shop", note: "Direct store sync & automation" },
+              { name: "Amazon", logo: "a", note: "FBA & merchant listing sync" },
+              { name: "Facebook", logo: "f", note: "Marketplace listings & messages" },
+              { name: "Wix", logo: "wix", note: "One-click product import" },
+              { name: "WooCommerce", logo: "woo", note: "WordPress store automation" },
+              { name: "Product Finding Hub", logo: "hub", note: "Best-seller research & analytics" },
+            ].map((item) => (
+              <div
+                key={item.name}
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "8px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <PlanPlatformLogo logo={item.logo} name={item.name} />
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ fontSize: "12px", color: "#1e293b", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.name}
+                    </strong>
+                    <span style={{ fontSize: "10px", color: "#64748b", display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {item.note}
+                    </span>
+                  </div>
+                </div>
+                <span
+                  style={{
+                    background: "#f1f5f9",
+                    color: "#64748b",
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                  }}
+                >
+                  Soon
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Upgrade Callout Banner */}
+        <article
+          style={{
+            marginTop: "20px",
+            background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 100%)",
+            border: "1px solid #bfdbfe",
+            borderRadius: "12px",
+            padding: "18px 24px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "14px",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <span style={{ width: "36px", height: "36px", borderRadius: "8px", background: "#dbeafe", color: "#2563eb", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+              <LuCrown />
+            </span>
+            <div>
+              <strong style={{ fontSize: "14px", color: "#1e293b", display: "block" }}>Ready to scale your store?</strong>
+              <span style={{ fontSize: "12px", color: "#64748b" }}>Unlock higher listing limits, faster price/stock sync intervals, and multi-store automation.</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="plans-settings__btn plans-settings__btn--primary"
+            onClick={() => navigate("/plans")}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}
+          >
+            <span>Browse All Plans</span>
+            <LuArrowUpRight />
+          </button>
+        </article>
 
         <ConfirmModal
           open={Boolean(addOnTermsTarget)}
@@ -2651,6 +2895,11 @@ export default function MarketplaceSettingsPage() {
           }
           onConfirm={confirmEnableAddOn}
           onClose={() => setAddOnTermsTarget(null)}
+        />
+
+        <BuyAiCreditsModal
+          open={aiCreditsModalOpen}
+          onClose={() => setAiCreditsModalOpen(false)}
         />
       </section>
     );
@@ -3186,12 +3435,78 @@ export default function MarketplaceSettingsPage() {
 
             <h3>Edit {editingMessage.title}</h3>
             <p>Customize the automatic message before it is sent to your customers.</p>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "12px" }}>
+              {[
+                { label: "Buyer First Name", tag: "{{ buyer_first_name }}" },
+                { label: "Buyer Name", tag: "{{ buyer_name }}" },
+                { label: "Carrier", tag: "{{ shipping_carrier }}" },
+                { label: "Tracking #", tag: "{{ tracking_number }}" },
+                { label: "Item Title", tag: "{{ item_title }}" },
+                { label: "Order ID", tag: "{{ order_id }}" },
+              ].map((v) => (
+                <button
+                  type="button"
+                  key={v.tag}
+                  style={{
+                    background: "#f1f5f9",
+                    border: "1px solid #cbd5e1",
+                    borderRadius: "4px",
+                    padding: "3px 8px",
+                    fontSize: "11px",
+                    cursor: "pointer",
+                    color: "#0f172a",
+                    fontWeight: 600,
+                  }}
+                  onClick={() => setMessageDraft((prev) => `${prev} ${v.tag}`.trim())}
+                  title={`Click to insert ${v.tag}`}
+                >
+                  + {v.label}
+                </button>
+              ))}
+            </div>
+
             <textarea
               className="marketplace-settings__textarea"
-              rows="8"
+              rows="6"
               value={messageDraft}
               onChange={(event) => setMessageDraft(event.target.value)}
+              placeholder="Enter message template..."
             />
+
+            <div
+              style={{
+                marginTop: "12px",
+                padding: "10px 12px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "6px",
+                fontSize: "12px",
+                color: "#334155",
+                lineHeight: "1.5",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px", color: "#64748b", marginBottom: "4px" }}>
+                Preview (Sample Data)
+              </div>
+              <div style={{ whiteSpace: "pre-wrap" }}>
+                {messageDraft
+                  ? messageDraft
+                      .replaceAll("{{ buyer_first_name }}", "John")
+                      .replaceAll("{{buyer_first_name}}", "John")
+                      .replaceAll("{{ buyer_name }}", "John Doe")
+                      .replaceAll("{{buyer_name}}", "John Doe")
+                      .replaceAll("{{ shipping_carrier }}", "USPS")
+                      .replaceAll("{{shipping_carrier}}", "USPS")
+                      .replaceAll("{{ tracking_number }}", "9400111899562537621124")
+                      .replaceAll("{{tracking_number}}", "9400111899562537621124")
+                      .replaceAll("{{ item_title }}", "Wireless Bluetooth Noise-Cancelling Earbuds")
+                      .replaceAll("{{item_title}}", "Wireless Bluetooth Noise-Cancelling Earbuds")
+                      .replaceAll("{{ order_id }}", "14-09823-74521")
+                      .replaceAll("{{order_id}}", "14-09823-74521")
+                  : "Message preview will appear here..."}
+              </div>
+            </div>
 
             <div className="marketplace-settings__modal-actions">
               <button

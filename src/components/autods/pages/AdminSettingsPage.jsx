@@ -29,6 +29,7 @@ function AdminSettingsPage() {
   const [openAiKey, setOpenAiKey] = useState("");
   const [openAiImageModel, setOpenAiImageModel] = useState("dall-e-2");
   const [openAiVisionModel, setOpenAiVisionModel] = useState("gpt-4o");
+  const [openAiCreditsPerImage, setOpenAiCreditsPerImage] = useState(1);
   const [showKey, setShowKey] = useState(false);
   const [openAiSaving, setOpenAiSaving] = useState(false);
   const [openAiTesting, setOpenAiTesting] = useState(false);
@@ -60,6 +61,7 @@ function AdminSettingsPage() {
         setOpenAiStatus({ ...res.data, loading: false });
         if (res.data?.image_model) setOpenAiImageModel(res.data.image_model);
         if (res.data?.vision_model) setOpenAiVisionModel(res.data.vision_model);
+        if (res.data?.credits_per_image !== undefined) setOpenAiCreditsPerImage(res.data.credits_per_image);
       })
       .catch(() => setOpenAiStatus({ loading: false, configured: false }));
   };
@@ -70,6 +72,7 @@ function AdminSettingsPage() {
       const payload = {
         image_model: openAiImageModel,
         vision_model: openAiVisionModel,
+        credits_per_image: Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1),
       };
       if (openAiKey.trim()) {
         payload.api_key = openAiKey.trim();
@@ -434,6 +437,22 @@ function AdminSettingsPage() {
                   </select>
                 </label>
               </div>
+
+              <label className="ai-gen-hub__field" style={{ margin: 0 }}>
+                <span className="ai-gen-hub__field-label">AI Credits Cost Per Image</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={openAiCreditsPerImage}
+                  onChange={(e) => setOpenAiCreditsPerImage(e.target.value)}
+                  placeholder="1"
+                  style={{ width: "100%" }}
+                />
+                <small style={{ color: "#64748b", marginTop: 4, display: "block" }}>
+                  Number of AI credits deducted from a user's balance for each generated image (e.g. 1 credit = 1 image).
+                </small>
+              </label>
 
               <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
                 <button

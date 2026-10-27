@@ -236,28 +236,6 @@ function HelpCenterContent() {
         )}
       </section>
 
-      <section className="help-center-mentorship">
-        <div className="help-center-mentorship__visual" aria-hidden="true">
-          <div className="help-center-mentorship__photo help-center-mentorship__photo--top" />
-          <div className="help-center-mentorship__photo help-center-mentorship__photo--bottom" />
-          <div className="help-center-mentorship__chat">
-            <strong>AUTO-DS</strong>
-            <span>Hey John, do you find the right products for you?</span>
-            <em>Yes! You always helped me a lot!</em>
-            <span>Great, we are here for you.</span>
-          </div>
-        </div>
-
-        <div className="help-center-mentorship__copy">
-          <h2>AutoDS` 1-on-1<br />Dropshipping Mentorships</h2>
-          <p>Get personal help from expert dropshippers</p>
-        </div>
-
-        <button type="button" className="help-center-mentorship__cta">
-          START NOW
-        </button>
-      </section>
-
       <div className="help-center-links">
         <button type="button">
           <LuPlay />

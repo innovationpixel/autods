@@ -106,7 +106,8 @@ function loadStoredStoreOverrides() {
   }
 }
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
-import { logoutAction } from '../../store/actions/AuthActions';
+import { logoutAction, updateProfileAction } from '../../store/actions/AuthActions';
+import { buyAiCredits } from '../../services/AiGenerationService';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
 import EbayOAuthSetupBanner from '../autods/EbayOAuthSetupBanner';
@@ -265,6 +266,38 @@ const MarketplaceDashboard = () => {
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [selectedLoadAmount, setSelectedLoadAmount] = useState(15);
   const [selectedAiPackage, setSelectedAiPackage] = useState("5000");
+  const [buyingAiCredits, setBuyingAiCredits] = useState(false);
+
+  const handleBuyAiCredits = async () => {
+    const pkg = aiCreditPackages.find((p) => p.id === selectedAiPackage) || aiCreditPackages[1];
+    const userWalletBalance = parseFloat(authUser?.wallet_balance ?? 0);
+    const cost = pkg.amount || 20;
+
+    if (userWalletBalance < cost) {
+      toast.error(
+        `Insufficient wallet balance ($${userWalletBalance.toFixed(2)}). You need $${cost.toFixed(2)}. Please load your AutoDS wallet first.`
+      );
+      return;
+    }
+
+    setBuyingAiCredits(true);
+    try {
+      const res = await buyAiCredits(pkg.id);
+      const data = res.data;
+      toast.success(data.message || `Purchased ${pkg.credits} successfully!`);
+      dispatch(
+        updateProfileAction({
+          ai_credits: data.ai_credits,
+          wallet_balance: data.wallet_balance,
+        })
+      );
+      setAiCreditsModalOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to purchase AI credits.");
+    } finally {
+      setBuyingAiCredits(false);
+    }
+  };
   const [addProductUrl, setAddProductUrl] = useState("");
   const [importSupplier, setImportSupplier] = useState("aliexpress");
   const [importWarehouse, setImportWarehouse] = useState("CN");
@@ -1405,7 +1438,7 @@ const MarketplaceDashboard = () => {
                   }}
                 >
                   <LuWalletCards />
-                  <span>$0 AI:30</span>
+                  <span>${parseFloat(authUser?.wallet_balance ?? 0).toFixed(0)} AI:{authUser?.ai_credits ?? 0}</span>
                 </button>
 
                 {balanceMenuOpen ? (
@@ -1481,7 +1514,7 @@ const MarketplaceDashboard = () => {
                       </div>
                     ) : (
                       <div className="balance-popover__ai">
-                        <strong>Balance: AI 30</strong>
+                        <strong>Balance: AI {authUser?.ai_credits ?? 0}</strong>
                         <button type="button" onClick={() => setAiCreditsModalOpen(true)}>
                           Buy Credits
                         </button>
@@ -2099,7 +2132,9 @@ const MarketplaceDashboard = () => {
                   <h2>
                     Add AI Credits <span>?</span>
                   </h2>
-                  <strong className="ai-credits-modal__price">$29.90</strong>
+                  <strong className="ai-credits-modal__price">
+                    {aiCreditPackages.find((item) => item.id === selectedAiPackage)?.cost || "$30.00"}
+                  </strong>
 
                   <div className="ai-credits-modal__options">
                     {aiCreditPackages.map((item) => (
@@ -2113,7 +2148,7 @@ const MarketplaceDashboard = () => {
                         />
                         <span>{item.credits}</span>
                         {item.badge ? <em>{item.badge}</em> : null}
-                        <strong>{item.price}</strong>
+                        <strong>{item.cost || item.price}</strong>
                       </label>
                     ))}
                   </div>
@@ -2121,8 +2156,13 @@ const MarketplaceDashboard = () => {
                   <button type="button" className="ai-credits-modal__coupon">
                     I have a coupon!
                   </button>
-                  <button type="button" className="ai-credits-modal__buy">
-                    Buy Now
+                  <button
+                    type="button"
+                    className="ai-credits-modal__buy"
+                    disabled={buyingAiCredits}
+                    onClick={handleBuyAiCredits}
+                  >
+                    {buyingAiCredits ? "Processing…" : "Buy Now"}
                   </button>
                   <div className="ai-credits-modal__links">
                     <a href="/" onClick={(event) => event.preventDefault()}>

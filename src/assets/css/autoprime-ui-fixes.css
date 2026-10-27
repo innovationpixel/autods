@@ -203,9 +203,9 @@
    Existing order-processing grids are excluded because they already own scroll.
    -------------------------------------------------------------------------- */
 .marketplace-dashboard-page
-  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))),
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))),
 .marketplace-dashboard-page
-  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))) {
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))) {
   max-width: 100% !important;
   overflow-x: auto !important;
   overflow-y: hidden;
@@ -215,7 +215,7 @@
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)) {
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7)) {
   width: 100% !important;
   min-width: 1120px !important;
   table-layout: auto !important;
@@ -224,10 +224,10 @@
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   th,
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   td {
   padding: 13px 16px !important;
   vertical-align: middle !important;
@@ -236,66 +236,66 @@
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   th {
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(1) {
   min-width: 190px !important;
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(2),
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(3) {
   min-width: 130px !important;
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(4) {
   min-width: 105px !important;
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(5) {
   min-width: 190px !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(6) {
   min-width: 105px !important;
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7))
+  table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7))
   :is(th, td):nth-child(7) {
   min-width: 120px !important;
   white-space: nowrap !important;
 }
 
 .marketplace-dashboard-page
-  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar,
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7)))::-webkit-scrollbar,
 .marketplace-dashboard-page
-  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar {
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7)))::-webkit-scrollbar {
   height: 9px;
 }
 
 .marketplace-dashboard-page
-  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb,
+  .card-wrapper:has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb,
 .marketplace-dashboard-page
-  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb {
+  :is([class*="table-wrap"], [class*="table-container"], [class*="table-shell"], [class*="table-scroll"]):has(table:not(.orders-table):not(.calculations-table):not(.products-table):has(thead th:nth-child(7)))::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: #cfc3e3;

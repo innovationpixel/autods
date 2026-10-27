@@ -689,10 +689,10 @@ export const whatsNewItems = [
 export const loadBalanceAmounts = [15, 50, 100, 200, 500, 1000];
 
 export const aiCreditPackages = [
-  { id: "1000", credits: "1000 Credits", price: "$0.20/10 credits" },
-  { id: "5000", credits: "5000 Credits", price: "$0.06/10 credits", badge: "Most Popular" },
-  { id: "10000", credits: "10000 Credits", price: "$0.05/10 credits" },
-  { id: "20000", credits: "20000 Credits", price: "$0.04/10 credits" },
+  { id: "1000", credits: "1000 Credits", price: "$0.20/10 credits", cost: "$20.00", amount: 20 },
+  { id: "5000", credits: "5000 Credits", price: "$0.06/10 credits", cost: "$30.00", amount: 30, badge: "Most Popular" },
+  { id: "10000", credits: "10000 Credits", price: "$0.05/10 credits", cost: "$50.00", amount: 50 },
+  { id: "20000", credits: "20000 Credits", price: "$0.04/10 credits", cost: "$80.00", amount: 80 },
 ];
 
 export const orderRowsSeed = [

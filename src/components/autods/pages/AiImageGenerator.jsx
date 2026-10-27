@@ -1,12 +1,28 @@
 import { useEffect, useState } from "react";
-import { LuArrowLeft, LuDownload, LuImage, LuLoader, LuSparkles } from "react-icons/lu";
+import { useSelector } from "react-redux";
+import {
+  LuArrowLeft,
+  LuDownload,
+  LuExternalLink,
+  LuEye,
+  LuImage,
+  LuLoader,
+  LuPlus,
+  LuSparkles,
+  LuX,
+  LuZap,
+} from "react-icons/lu";
 import { toast } from "../../../utils/toast";
-import { generateAiImage } from "../../../services/AiGenerationService";
+import { generateAiImage, getAiConfig } from "../../../services/AiGenerationService";
+import aiBackgroundQueue from "../../../services/AiBackgroundQueue";
+import { selectUser } from "../../../store/selectors/AuthSelectors";
 import { composeImageWithBranding, extractMediaUrl } from "./aiStudioUtils";
 import ImageTemplateSections from "./ImageTemplateSections";
 import { useImageTemplateForm } from "./useImageTemplateForm";
+import BuyAiCreditsModal from "./BuyAiCreditsModal";
 
-function AiImageGenerator({ template, onBack }) {
+function AiImageGenerator({ template, onBack, onViewMyImages }) {
+  const authUser = useSelector(selectUser);
   const form = useImageTemplateForm({
     aspectRatio: template.aspect_ratio,
     outputWidth: template.width,
@@ -34,11 +50,94 @@ function AiImageGenerator({ template, onBack }) {
     referenceImageIds,
   } = form;
 
-  const [imageGenerating, setImageGenerating] = useState(false);
-  const [generatingIndex, setGeneratingIndex] = useState(0);
+  const [queueState, setQueueState] = useState(aiBackgroundQueue.getState());
   const [outputs, setOutputs] = useState([]);
   const [composedOutputs, setComposedOutputs] = useState([]);
   const [composeFailed, setComposeFailed] = useState(false);
+  const [creditsPerImage, setCreditsPerImage] = useState(1);
+  const [userCredits, setUserCredits] = useState(authUser?.ai_credits ?? 0);
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [viewingImage, setViewingImage] = useState(null);
+
+  useEffect(() => {
+    return aiBackgroundQueue.subscribe(setQueueState);
+  }, []);
+
+  const handleDownloadImage = async (url, filename = "ai-generated-image.png") => {
+    if (!url) return;
+    try {
+      if (url.startsWith("data:")) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      const a = document.createElement("a");
+      a.href = url;
+      a.target = "_blank";
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    const validOutputs = composedOutputs.length > 0 ? composedOutputs : outputs;
+    const items = validOutputs.filter((item) => item?.finalUrl || item?.url);
+    if (items.length === 0) {
+      toast.warn("No generated images to download yet.");
+      return;
+    }
+    toast.info(`Downloading ${items.length} image${items.length > 1 ? "s" : ""}…`);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const url = item.finalUrl || item.url;
+      await handleDownloadImage(url, `ai-generated-image-${item.index || i + 1}.png`);
+      await new Promise((r) => setTimeout(r, 300));
+    }
+  };
+
+  useEffect(() => {
+    getAiConfig()
+      .then((res) => {
+        if (res.data?.credits_per_image) setCreditsPerImage(res.data.credits_per_image);
+        if (res.data?.ai_credits !== undefined) setUserCredits(res.data.ai_credits);
+      })
+      .catch(() => {});
+  }, []);
+
+  const isGenerating = queueState.isGenerating;
+  const currentTask = queueState.activeTask;
+  const generatingIndex = currentTask?.current || 0;
+
+  useEffect(() => {
+    if (currentTask?.completedImages?.length) {
+      setOutputs(
+        currentTask.completedImages.map((img, idx) => ({
+          index: idx + 1,
+          prompt: img.prompt,
+          url: img.image_url,
+        }))
+      );
+    }
+  }, [currentTask?.completedImages]);
+
+  const totalCost = prompts.length * creditsPerImage;
 
   const handleGenerateAllImages = async () => {
     const trimmedPrompts = prompts.map((prompt) => prompt.trim());
@@ -51,44 +150,39 @@ function AiImageGenerator({ template, onBack }) {
       return;
     }
 
-    setImageGenerating(true);
-    setOutputs([]);
-
-    const ratioValue = aspectRatio === "custom" ? `${outputWidth}:${outputHeight}` : aspectRatio;
-
-    for (let i = 0; i < trimmedPrompts.length; i += 1) {
-      setGeneratingIndex(i + 1);
-
-      const chosenImage = referenceImageIds[i]
-        ? inputImages.find((image) => image.id === referenceImageIds[i])
-        : null;
-      const templateSlot = template.prompts?.[i]?.reference_index;
-      const referencedImage = chosenImage ?? (templateSlot != null ? inputImages[templateSlot] : null);
-
-      const formData = new FormData();
-      formData.append("prompt", trimmedPrompts[i]);
-      formData.append("ratio", ratioValue);
-      formData.append("width", outputWidth);
-      formData.append("height", outputHeight);
-      formData.append("format", outputFormat.toLowerCase());
-      if (!template.is_sample) formData.append("template_id", template.id);
-      inputImages.forEach(({ file }) => formData.append("images", file));
-      formData.append("image", (referencedImage ?? inputImages[0]).file);
-
-      try {
-        const res = await generateAiImage(formData);
-        const url = extractMediaUrl(res.data);
-        setOutputs((prev) => [...prev, { index: i + 1, prompt: trimmedPrompts[i], url }]);
-        if (!url) toast.error(`Prompt ${i + 1} didn't return an image.`);
-      } catch (err) {
-        setOutputs((prev) => [...prev, { index: i + 1, prompt: trimmedPrompts[i], url: null }]);
-        toast.error(err.response?.data?.message ?? `Prompt ${i + 1} failed to generate.`);
-      }
+    if (userCredits < totalCost && authUser?.role !== "super_admin") {
+      toast.error(
+        `Insufficient AI Credits: Generating ${prompts.length} images requires ${totalCost} credits, but you have ${userCredits}. Please purchase more credits.`
+      );
+      setBuyModalOpen(true);
+      return;
     }
 
-    setImageGenerating(false);
-    setGeneratingIndex(0);
-    toast.success("Finished generating your images!");
+    setOutputs([]);
+    const ratioValue = aspectRatio === "custom" ? `${outputWidth}:${outputHeight}` : aspectRatio;
+
+    await aiBackgroundQueue.startGeneration({
+      template,
+      prompts: trimmedPrompts,
+      inputImages,
+      referenceImageIds,
+      ratio: ratioValue,
+      outputWidth,
+      outputHeight,
+      outputFormat,
+      watermark: watermarkEnabled && watermarkText.trim() ? {
+        enabled: true,
+        text: watermarkText.trim(),
+        size: watermarkSize,
+        position: watermarkPosition,
+      } : null,
+      logo: logoPreview ? {
+        preview: logoPreview,
+        sizePercent: logoSizePercent,
+        position: logoPosition,
+      } : null,
+      navigateToMyImages: onViewMyImages,
+    });
   };
 
   useEffect(() => {
@@ -146,17 +240,47 @@ function AiImageGenerator({ template, onBack }) {
     }
   }, [composeFailed]);
 
+  const hasGeneratedOutputs =
+    composedOutputs.some((o) => o?.finalUrl || o?.url) || outputs.some((o) => o?.url);
+
   const previewCard = (
     <article className="ai-gen-hub__result">
-      <div className="ai-gen-hub__section-head">
-        <span className="ai-gen-hub__section-badge">5</span>
-        <div>
-          <h3>Preview</h3>
-          <p>Your generated output images will appear here.</p>
+      <div
+        className="ai-gen-hub__section-head"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="ai-gen-hub__section-badge">5</span>
+          <div>
+            <h3>Preview</h3>
+            <p>Your generated output images will appear here.</p>
+          </div>
         </div>
+        {hasGeneratedOutputs && (
+          <button
+            type="button"
+            onClick={handleDownloadAll}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              borderRadius: 8,
+              backgroundColor: "#ffffff",
+              border: "1px solid #cbd5e1",
+              fontSize: 12,
+              fontWeight: 650,
+              color: "#334155",
+              cursor: "pointer",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+            }}
+          >
+            <LuDownload /> Download All
+          </button>
+        )}
       </div>
 
-      {composedOutputs.length === 0 && !imageGenerating ? (
+      {composedOutputs.length === 0 && !isGenerating ? (
         <div className="ai-gen-hub__empty">
           <LuImage />
           <strong>No images yet</strong>
@@ -167,7 +291,7 @@ function AiImageGenerator({ template, onBack }) {
           {prompts.map((_, index) => {
             const result = composedOutputs[index] ?? outputs[index];
             const url = result?.finalUrl ?? result?.url;
-            const isCurrentlyGenerating = imageGenerating && generatingIndex === index + 1;
+            const isCurrentlyGenerating = isGenerating && generatingIndex === index + 1;
             return (
               <div className="ai-gen-hub__preview-item" key={index}>
                 <span className="ai-gen-hub__preview-badge">{index + 1}</span>
@@ -177,16 +301,43 @@ function AiImageGenerator({ template, onBack }) {
                   </div>
                 ) : url ? (
                   <>
-                    <img src={url} alt={`Output ${index + 1}`} />
-                    <a
-                      className="ai-gen-hub__preview-download"
-                      href={url}
-                      target={result.finalUrl ? undefined : "_blank"}
-                      rel="noreferrer"
-                      download={`ai-output-${index + 1}.png`}
-                    >
-                      <LuDownload />
-                    </a>
+                    <img
+                      src={url}
+                      alt={`Output ${index + 1}`}
+                      onClick={() =>
+                        setViewingImage({
+                          url,
+                          index: index + 1,
+                          prompt: result?.prompt || prompts[index],
+                        })
+                      }
+                      style={{ cursor: "pointer", width: "100%", height: "100%", objectFit: "cover" }}
+                      title="Click to view full image"
+                    />
+                    <div className="ai-gen-hub__preview-actions">
+                      <button
+                        type="button"
+                        className="ai-gen-hub__preview-btn ai-gen-hub__preview-btn--view"
+                        onClick={() =>
+                          setViewingImage({
+                            url,
+                            index: index + 1,
+                            prompt: result?.prompt || prompts[index],
+                          })
+                        }
+                        title="View full generated image"
+                      >
+                        <LuEye /> View
+                      </button>
+                      <button
+                        type="button"
+                        className="ai-gen-hub__preview-btn ai-gen-hub__preview-btn--download"
+                        onClick={() => handleDownloadImage(url, `ai-output-${index + 1}.png`)}
+                        title="Download generated image"
+                      >
+                        <LuDownload /> Download
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <div className="ai-gen-hub__preview-placeholder">
@@ -206,12 +357,14 @@ function AiImageGenerator({ template, onBack }) {
       <button
         type="button"
         className="ai-gen-hub__btn ai-gen-hub__btn--primary"
-        disabled={imageGenerating}
+        disabled={isGenerating}
         onClick={handleGenerateAllImages}
       >
-        {imageGenerating ? <LuLoader className="spin-icon" /> : <LuSparkles />}
+        {isGenerating ? <LuLoader className="spin-icon" /> : <LuSparkles />}
         <span>
-          {imageGenerating ? `Generating image ${generatingIndex} of ${prompts.length}…` : "Generate All Images"}
+          {isGenerating
+            ? `Generating image ${generatingIndex || 1} of ${prompts.length} in background…`
+            : `Generate All Images (${totalCost} AI Credits)`}
         </span>
       </button>
     </div>
@@ -224,12 +377,231 @@ function AiImageGenerator({ template, onBack }) {
           <h2>{template.name}</h2>
           <p>Upload your product images and logo, then generate your images from this template.</p>
         </div>
-        <button type="button" className="ai-gen-hub__back-btn" onClick={onBack} disabled={imageGenerating}>
-          <LuArrowLeft /> Back to Templates
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              backgroundColor: "#f8fafc",
+              padding: "6px 14px",
+              borderRadius: 20,
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <span style={{ fontSize: 13, color: "#475569", display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <LuZap style={{ color: "#f59e0b" }} />
+              <strong>{userCredits.toLocaleString()}</strong> AI Credits
+            </span>
+            <button
+              type="button"
+              onClick={() => setBuyModalOpen(true)}
+              style={{
+                background: "#4f46e5",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: 14,
+                padding: "3px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+              }}
+            >
+              <LuPlus style={{ fontSize: 12 }} /> Buy Credits
+            </button>
+          </div>
+
+          {typeof onViewMyImages === "function" && (
+            <button
+              type="button"
+              onClick={onViewMyImages}
+              className="ai-gen-hub__btn-my-images"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: "#eff6ff",
+                color: "#1d4ed8",
+                border: "1px solid #bfdbfe",
+                borderRadius: 20,
+                padding: "6px 14px",
+                fontSize: 13,
+                fontWeight: 650,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+              title="View all your generated images"
+            >
+              <LuImage style={{ fontSize: 15 }} />
+              <span>My Images</span>
+              {queueState.unviewedCount > 0 && (
+                <span
+                  style={{
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 7px",
+                    borderRadius: 10,
+                    letterSpacing: "0.03em",
+                  }}
+                >
+                  {queueState.unviewedCount} NEW
+                </span>
+              )}
+            </button>
+          )}
+
+          <button type="button" className="ai-gen-hub__back-btn" onClick={onBack}>
+            <LuArrowLeft /> Back to Templates
+          </button>
+        </div>
       </div>
 
-      <ImageTemplateSections form={form} showWatermark previewCard={previewCard} footer={footer} />
+      <ImageTemplateSections
+        form={form}
+        showWatermark
+        previewCard={previewCard}
+        footer={footer}
+        allowAddDeletePrompts={false}
+      />
+
+      <BuyAiCreditsModal
+        open={buyModalOpen}
+        onClose={() => setBuyModalOpen(false)}
+        currentCredits={userCredits}
+        requiredCredits={totalCost}
+        onSuccess={(data) => {
+          if (data.ai_credits !== undefined) {
+            setUserCredits(data.ai_credits);
+          }
+        }}
+      />
+
+      {viewingImage && (
+        <div className="orders-modal" style={{ zIndex: 1200 }}>
+          <div className="orders-modal__backdrop" onClick={() => setViewingImage(null)} />
+          <div
+            className="orders-modal__card"
+            style={{
+              maxWidth: 760,
+              width: "95%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+              padding: 24,
+              borderRadius: 16,
+              backgroundColor: "#ffffff",
+              boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0f172a" }}>
+                  Generated Image #{viewingImage.index}
+                </h3>
+                <span style={{ fontSize: 12, color: "#64748b" }}>
+                  {template.name} ({outputFormat})
+                </span>
+              </div>
+              <button
+                type="button"
+                className="orders-icon-btn"
+                onClick={() => setViewingImage(null)}
+                aria-label="Close"
+              >
+                <LuX />
+              </button>
+            </div>
+
+            {/* Full Image Display */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: "#0f172a",
+                borderRadius: 12,
+                overflow: "hidden",
+                maxHeight: "560px",
+                position: "relative",
+              }}
+            >
+              <img
+                src={viewingImage.url}
+                alt={`Generated output ${viewingImage.index}`}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: "560px",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+
+            {/* Prompt display */}
+            {viewingImage.prompt && (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  backgroundColor: "#f8fafc",
+                  borderRadius: 8,
+                  border: "1px solid #e2e8f0",
+                  fontSize: 13,
+                  color: "#334155",
+                }}
+              >
+                <strong style={{ color: "#0f172a", display: "block", marginBottom: 2 }}>Prompt:</strong>
+                {viewingImage.prompt}
+              </div>
+            )}
+
+            {/* Modal Footer with Download, Open in Full Size and Close buttons */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+              <a
+                href={viewingImage.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 13,
+                  color: "#4f46e5",
+                  textDecoration: "none",
+                  fontWeight: 600,
+                }}
+              >
+                <LuExternalLink /> Open in full size
+              </a>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  className="admin-page__btn admin-page__btn--ghost"
+                  onClick={() => setViewingImage(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="admin-page__btn admin-page__btn--primary"
+                  onClick={() =>
+                    handleDownloadImage(viewingImage.url, `ai-generated-image-${viewingImage.index}.png`)
+                  }
+                >
+                  <LuDownload /> Download Image
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

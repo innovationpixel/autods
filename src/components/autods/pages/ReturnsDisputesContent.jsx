@@ -1,19 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import {
   LuCircleAlert,
   LuCircleCheck,
   LuClock,
+  LuDownload,
   LuExternalLink,
   LuEye,
+  LuFileText,
   LuPackage,
   LuRefreshCw,
   LuRotateCcw,
   LuSearch,
   LuShieldAlert,
   LuStore,
+  LuTrash2,
   LuTriangleAlert,
   LuUndo2,
+  LuUpload,
   LuUser,
   LuX,
 } from "react-icons/lu";
@@ -96,7 +100,7 @@ function normalizeStatus(status) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getEbayResolutionUrl(item) {
+function _getEbayResolutionUrl(item) {
   if (!item) return "https://www.ebay.com/sh/ovw";
   if (item.type === "return" && item.external_id) {
     return `https://www.ebay.com/sh/ord/returns/detail?returnId=${encodeURIComponent(item.external_id)}`;
@@ -135,38 +139,67 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
   const [resolveAction, setResolveAction] = useState("accept_return");
   const [resolveAmount, setResolveAmount] = useState("");
   const [resolveMessage, setResolveMessage] = useState("");
-  const [resolveCarrier, setResolveCarrier] = useState("");
-  const [resolveTracking, setResolveTracking] = useState("");
+  const [resolveShippingLabel, setResolveShippingLabel] = useState(null);
+  const [labelDragOver, setLabelDragOver] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  const handleLabelFileChange = (file) => {
+    if (!file) return;
+    const validExtensions = /\.(pdf|png|jpe?g|webp)$/i;
+    const validMimes = ["application/pdf", "image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!validMimes.includes(file.type) && !validExtensions.test(file.name)) {
+      toast.warn("Please upload a PDF or image file (PNG, JPG, WEBP).");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.warn("Shipping label file must be smaller than 15MB.");
+      return;
+    }
+    setResolveShippingLabel(file);
+  };
 
   const handleOpenResolve = (item) => {
     setActiveResolveItem(item);
     setResolveAction(item.type === "return" ? "accept_return" : "contest_dispute");
     setResolveAmount(item.amount ? String(item.amount) : "");
     setResolveMessage("");
-    setResolveCarrier("");
-    setResolveTracking("");
+    setResolveShippingLabel(null);
+    setLabelDragOver(false);
   };
 
   const handleSubmitResolve = async (e) => {
     if (e) e.preventDefault();
     if (!activeResolveItem) return;
 
+    if (resolveAction === "provide_label" && !resolveShippingLabel) {
+      toast.warn("Please upload a shipping label file.");
+      return;
+    }
+
     setResolving(true);
     try {
-      const payload = {
-        action: resolveAction,
-        message: resolveMessage,
-      };
-      if (resolveAction === "issue_refund" && resolveAmount) {
-        payload.amount = Number(resolveAmount);
+      const formData = new FormData();
+      formData.append("action", resolveAction);
+      if (resolveMessage) {
+        formData.append("message", resolveMessage);
       }
-      if (resolveAction === "provide_label") {
-        payload.carrier = resolveCarrier;
-        payload.tracking_number = resolveTracking;
+      if (resolveAction === "issue_refund" && resolveAmount) {
+        formData.append("amount", resolveAmount);
+      }
+      if (resolveAction === "provide_label" && resolveShippingLabel) {
+        formData.append("shipping_label", resolveShippingLabel);
       }
 
-      const res = await respondReturnDispute(activeResolveItem.id, payload);
+      const res = await respondReturnDispute(activeResolveItem.id, formData);
       const updated = res.data?.return_dispute;
 
       if (updated) {
@@ -970,6 +1003,33 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
                   </p>
                 </div>
               )}
+
+              {(selectedDetailItem.shipping_label_url || selectedDetailItem.details?.shipping_label_url) && (
+                <div className="rd-detail-card">
+                  <span className="rd-detail-label">Return Shipping Label</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8, padding: "10px 14px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <LuFileText size={22} color="#2563eb" style={{ flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: "13.5px", fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {selectedDetailItem.shipping_label_name || selectedDetailItem.details?.shipping_label_name || "Return_Shipping_Label"}
+                        </div>
+                        <span style={{ fontSize: "11.5px", color: "#64748b" }}>Uploaded seller shipping label for buyer return</span>
+                      </div>
+                    </div>
+                    <a
+                      href={selectedDetailItem.shipping_label_url || selectedDetailItem.details?.shipping_label_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rd-btn-action rd-btn-action--primary"
+                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", fontSize: "12.5px", flexShrink: 0 }}
+                    >
+                      <LuDownload size={14} />
+                      <span>Download Label</span>
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rd-modal-footer">
@@ -1053,7 +1113,7 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
                         onClick={() => setResolveAction("provide_label")}
                       >
                         <span className="rd-resolve-card__title">Provide Shipping Label</span>
-                        <span className="rd-resolve-card__desc">Attach carrier and tracking number for return.</span>
+                        <span className="rd-resolve-card__desc">Upload return shipping label (PDF or image).</span>
                       </div>
 
                       <div
@@ -1103,29 +1163,70 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
               )}
 
               {resolveAction === "provide_label" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div className="rd-form-group">
-                    <label className="rd-form-label">Shipping Carrier</label>
-                    <input
-                      type="text"
-                      className="rd-form-input"
-                      value={resolveCarrier}
-                      onChange={(e) => setResolveCarrier(e.target.value)}
-                      placeholder="e.g. USPS, FedEx, UPS"
-                      required
-                    />
-                  </div>
-                  <div className="rd-form-group">
-                    <label className="rd-form-label">Tracking Number</label>
-                    <input
-                      type="text"
-                      className="rd-form-input"
-                      value={resolveTracking}
-                      onChange={(e) => setResolveTracking(e.target.value)}
-                      placeholder="e.g. 94001000000000000000"
-                      required
-                    />
-                  </div>
+                <div className="rd-form-group">
+                  <label className="rd-form-label">Return Shipping Label (PDF, PNG, JPG, or WEBP)</label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    style={{ display: "none" }}
+                    accept=".pdf,image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) handleLabelFileChange(e.target.files[0]);
+                    }}
+                  />
+
+                  {!resolveShippingLabel ? (
+                    <div
+                      className={`rd-upload-zone ${labelDragOver ? "rd-upload-zone--active" : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setLabelDragOver(true);
+                      }}
+                      onDragLeave={() => setLabelDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setLabelDragOver(false);
+                        if (e.dataTransfer.files?.[0]) {
+                          handleLabelFileChange(e.dataTransfer.files[0]);
+                        }
+                      }}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <div className="rd-upload-zone__icon">
+                        <LuUpload size={24} />
+                      </div>
+                      <div className="rd-upload-zone__title">Click to upload or drag & drop</div>
+                      <div className="rd-upload-zone__hint">Supports PDF, PNG, JPG, WEBP (up to 15MB)</div>
+                    </div>
+                  ) : (
+                    <div className="rd-file-preview-card">
+                      <div className="rd-file-preview-card__main">
+                        <div className="rd-file-preview-card__icon">
+                          <LuFileText size={22} />
+                        </div>
+                        <div className="rd-file-preview-card__meta">
+                          <span className="rd-file-preview-card__name" title={resolveShippingLabel.name}>
+                            {resolveShippingLabel.name}
+                          </span>
+                          <span className="rd-file-preview-card__size">
+                            {formatFileSize(resolveShippingLabel.size)}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="rd-file-preview-card__remove"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResolveShippingLabel(null);
+                          if (fileInputRef.current) fileInputRef.current.value = "";
+                        }}
+                      >
+                        <LuTrash2 size={13} />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

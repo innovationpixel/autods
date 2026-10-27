@@ -30,6 +30,7 @@ import {
   LuPencil,
   LuPrinter,
   LuRefreshCcw,
+  LuSearch,
   LuSlidersHorizontal,
   LuStore,
   LuTriangleAlert,
@@ -316,7 +317,7 @@ function mapApiOrder(order) {
   };
 }
 
-function OrdersContent({ searchQuery }) {
+function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const focusedOrderParam = (searchParams.get("focus") ?? "").trim();
@@ -331,11 +332,15 @@ function OrdersContent({ searchQuery }) {
   const [buyerFilter, setBuyerFilter] = useState(defaultFilters.buyerFilter);
   const [orderIdFilter, setOrderIdFilter] = useState(defaultFilters.orderIdFilter);
   const [storeFilter, setStoreFilter] = useState(defaultFilters.storeFilter);
+  const [carrierFilter, setCarrierFilter] = useState(defaultFilters.carrierFilter ?? "All Carriers");
+  const [sourceFilter, setSourceFilter] = useState(defaultFilters.sourceFilter ?? "All Sources");
   const [dateRangePreset, setDateRangePreset] = useState(defaultFilters.dateRangePreset);
   const [fromDate, setFromDate] = useState(defaultFilters.fromDate);
   const [toDate, setToDate] = useState(defaultFilters.toDate);
   const [sortBy, setSortBy] = useState(defaultFilters.sortBy);
   const [sortDirection, setSortDirection] = useState(defaultFilters.sortDirection);
+  const [searchInput, setSearchInput] = useState(parentSearchQuery || "");
+  const [debouncedSearch, setDebouncedSearch] = useState(parentSearchQuery || "");
   const [ordersNotice, setOrdersNotice] = useState("");
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -367,6 +372,22 @@ function OrdersContent({ searchQuery }) {
   const [cancelSaving, setCancelSaving] = useState(false);
   const [invoiceInfoOpen, setInvoiceInfoOpen] = useState(false);
   const tableScrollRef = useRef(null);
+
+  // Sync external search input from parent if provided
+  useEffect(() => {
+    if (parentSearchQuery !== undefined && parentSearchQuery !== searchInput) {
+      setSearchInput(parentSearchQuery);
+      setDebouncedSearch(parentSearchQuery);
+    }
+  }, [parentSearchQuery]);
+
+  // Debounce search input typing to prevent excessive API load
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const visibleColumns = useMemo(
     () => resolveVisibleOrderColumns(visibleColumnIds),
@@ -407,6 +428,43 @@ function OrdersContent({ searchQuery }) {
     return ["All Stores", ...Array.from(stores).sort((left, right) => left.localeCompare(right))];
   }, [orders]);
 
+  const carrierOptions = useMemo(() => {
+    const carriers = new Set();
+    orders.forEach((order) => {
+      const c = order.carrierRaw || (order.carrier !== "—" ? order.carrier : null);
+      if (c && c !== "—" && c !== "-") carriers.add(c);
+      const bc = order.buyCarrier;
+      if (bc && bc !== "—" && bc !== "-") carriers.add(bc);
+    });
+    return ["All Carriers", ...Array.from(carriers).sort((a, b) => a.localeCompare(b))];
+  }, [orders]);
+
+  const sourceOptions = useMemo(() => {
+    const sources = new Set();
+    orders.forEach((order) => {
+      const s = order.sourcePlatform;
+      if (s && s !== "—" && s !== "-") sources.add(s);
+    });
+    return ["All Sources", ...Array.from(sources).sort((a, b) => a.localeCompare(b))];
+  }, [orders]);
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: orders.length,
+      Pending: 0,
+      Ordered: 0,
+      Shipped: 0,
+      Delivered: 0,
+      Canceled: 0,
+    };
+    orders.forEach((o) => {
+      if (counts[o.status] !== undefined) {
+        counts[o.status] += 1;
+      }
+    });
+    return counts;
+  }, [orders]);
+
   const boltActions = useMemo(
     () =>
       orderRowBoltActions.map((item) =>
@@ -421,9 +479,13 @@ function OrdersContent({ searchQuery }) {
     setOrdersLoading(true);
     try {
       const params = {
-        q: searchQuery,
-        status: statusFilter,
-        buyer: buyerFilter,
+        q: debouncedSearch.trim() || undefined,
+        status: statusFilter !== "All Statuses" ? statusFilter : undefined,
+        carrier: carrierFilter !== "All Carriers" ? carrierFilter : undefined,
+        store: storeFilter !== "All Stores" ? storeFilter : undefined,
+        source: sourceFilter !== "All Sources" ? sourceFilter : undefined,
+        buyer: buyerFilter.trim() || undefined,
+        order_id: orderIdFilter.trim() || undefined,
         hide_canceled: showOnlyActive ? 1 : 0,
         sort: sortDirection,
         limit: 100,
@@ -450,7 +512,20 @@ function OrdersContent({ searchQuery }) {
 
   useEffect(() => {
     loadOrders();
-  }, [searchQuery, statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection, showArchived]);
+  }, [
+    debouncedSearch,
+    statusFilter,
+    buyerFilter,
+    orderIdFilter,
+    carrierFilter,
+    storeFilter,
+    sourceFilter,
+    fromDate,
+    toDate,
+    showOnlyActive,
+    sortDirection,
+    showArchived,
+  ]);
 
   const handleSyncOrders = async () => {
     setSyncing(true);
@@ -713,7 +788,7 @@ function OrdersContent({ searchQuery }) {
   }, []);
 
   const filteredOrders = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = debouncedSearch.trim().toLowerCase();
 
     const nextOrders = orders.filter((order) => {
       if (showOnlyActive && order.status === "Canceled") {
@@ -725,7 +800,12 @@ function OrdersContent({ searchQuery }) {
       }
 
       if (buyerFilter.trim()) {
-        if (!order.buyer.toLowerCase().includes(buyerFilter.trim().toLowerCase())) {
+        const b = buyerFilter.trim().toLowerCase();
+        if (
+          !order.buyer?.toLowerCase().includes(b) &&
+          !order.buyerName?.toLowerCase().includes(b) &&
+          !order.username?.toLowerCase().includes(b)
+        ) {
           return false;
         }
       }
@@ -733,8 +813,8 @@ function OrdersContent({ searchQuery }) {
       if (orderIdFilter.trim()) {
         const orderIdQuery = orderIdFilter.trim().toLowerCase();
         if (
-          !order.orderId.toLowerCase().includes(orderIdQuery) &&
-          !order.id.toLowerCase().includes(orderIdQuery)
+          !order.orderId?.toLowerCase().includes(orderIdQuery) &&
+          !order.id?.toLowerCase().includes(orderIdQuery)
         ) {
           return false;
         }
@@ -742,6 +822,22 @@ function OrdersContent({ searchQuery }) {
 
       if (storeFilter !== "All Stores" && order.storeName !== storeFilter) {
         return false;
+      }
+
+      if (carrierFilter !== "All Carriers") {
+        const c1 = (order.carrierRaw || order.carrier || "").toLowerCase();
+        const c2 = (order.buyCarrier || "").toLowerCase();
+        const target = carrierFilter.toLowerCase();
+        if (!c1.includes(target) && !c2.includes(target)) {
+          return false;
+        }
+      }
+
+      if (sourceFilter !== "All Sources") {
+        const s = (order.sourcePlatform || "").toLowerCase();
+        if (s !== sourceFilter.toLowerCase()) {
+          return false;
+        }
       }
 
       if (fromDate && order.date < fromDate) {
@@ -760,13 +856,26 @@ function OrdersContent({ searchQuery }) {
         order.title,
         order.color,
         order.buyer,
+        order.buyerName,
+        order.username,
+        order.email,
         order.itemBuy,
         order.itemSell,
         order.orderSellId,
         order.orderId,
         order.sku,
         order.transactionId,
+        order.trackingNumber,
+        order.trackingNumberRaw,
+        order.buyTrackingNumber,
+        order.carrier,
+        order.carrierRaw,
+        order.aliexpressOrderId,
+        order.aliexpressOrderIdRaw,
+        order.storeName,
+        order.sourceVariationText,
       ]
+        .filter(Boolean)
         .join(" ")
         .toLowerCase()
         .includes(query);
@@ -809,13 +918,15 @@ function OrdersContent({ searchQuery }) {
     });
   }, [
     buyerFilter,
+    carrierFilter,
+    debouncedSearch,
     fromDate,
     orderIdFilter,
     orders,
-    searchQuery,
     showOnlyActive,
     sortBy,
     sortDirection,
+    sourceFilter,
     statusFilter,
     storeFilter,
     toDate,
@@ -860,6 +971,10 @@ function OrdersContent({ searchQuery }) {
       setBuyerFilter("");
       setOrderIdFilter("");
       setStoreFilter("All Stores");
+      setCarrierFilter("All Carriers");
+      setSourceFilter("All Sources");
+      setSearchInput("");
+      setDebouncedSearch("");
       setCurrentPage(1);
     }
 
@@ -878,6 +993,44 @@ function OrdersContent({ searchQuery }) {
   const tableColumnCount = visibleColumns.length + 2;
 
   const activeFilterChips = [
+    debouncedSearch.trim()
+      ? {
+          key: "search",
+          label: `Search: "${debouncedSearch.trim()}"`,
+          onRemove: () => {
+            setSearchInput("");
+            setDebouncedSearch("");
+          },
+        }
+      : null,
+    statusFilter !== "All Statuses"
+      ? {
+          key: "status",
+          label: `Status: ${statusFilter}`,
+          onRemove: () => setStatusFilter("All Statuses"),
+        }
+      : null,
+    storeFilter !== "All Stores"
+      ? {
+          key: "store",
+          label: `Store: ${storeFilter}`,
+          onRemove: () => setStoreFilter("All Stores"),
+        }
+      : null,
+    carrierFilter !== "All Carriers"
+      ? {
+          key: "carrier",
+          label: `Carrier: ${carrierFilter}`,
+          onRemove: () => setCarrierFilter("All Carriers"),
+        }
+      : null,
+    sourceFilter !== "All Sources"
+      ? {
+          key: "source",
+          label: `Source: ${sourceFilter}`,
+          onRemove: () => setSourceFilter("All Sources"),
+        }
+      : null,
     dateRangePreset !== DEFAULT_DATE_PRESET && dateRangePreset !== "custom"
       ? {
           key: "date-preset",
@@ -909,56 +1062,61 @@ function OrdersContent({ searchQuery }) {
           label: "Including canceled",
           onRemove: () => setShowOnlyActive(true),
         },
-    statusFilter !== "All Statuses"
-      ? {
-          key: "status",
-          label: statusFilter,
-          onRemove: () => setStatusFilter("All Statuses"),
-        }
-      : null,
     buyerFilter.trim()
       ? {
           key: "buyer",
-          label: buyerFilter.trim(),
+          label: `Buyer: ${buyerFilter.trim()}`,
           onRemove: () => setBuyerFilter(""),
         }
       : null,
     orderIdFilter.trim()
       ? {
           key: "order-id",
-          label: `Order ${orderIdFilter.trim()}`,
+          label: `Order: ${orderIdFilter.trim()}`,
           onRemove: () => setOrderIdFilter(""),
-        }
-      : null,
-    storeFilter !== "All Stores"
-      ? {
-          key: "store",
-          label: storeFilter,
-          onRemove: () => setStoreFilter("All Stores"),
         }
       : null,
   ].filter(Boolean);
 
   const clearOrderFilters = () => {
+    setSearchInput("");
+    setDebouncedSearch("");
     setShowOnlyActive(defaultFilters.showOnlyActive);
     setStatusFilter(defaultFilters.statusFilter);
     setBuyerFilter(defaultFilters.buyerFilter);
     setOrderIdFilter(defaultFilters.orderIdFilter);
     setStoreFilter(defaultFilters.storeFilter);
+    setCarrierFilter(defaultFilters.carrierFilter || "All Carriers");
+    setSourceFilter(defaultFilters.sourceFilter || "All Sources");
     setSortBy(defaultFilters.sortBy);
     setSortDirection(defaultFilters.sortDirection);
     applyDatePreset(defaultFilters.dateRangePreset);
   };
 
   const hasOrderFilters =
+    debouncedSearch.trim() !== "" ||
     dateRangePreset !== DEFAULT_DATE_PRESET ||
     sortBy !== defaultFilters.sortBy ||
     sortDirection !== defaultFilters.sortDirection ||
     !showOnlyActive ||
     statusFilter !== "All Statuses" ||
-    buyerFilter.trim() ||
-    orderIdFilter.trim() ||
-    storeFilter !== "All Stores";
+    buyerFilter.trim() !== "" ||
+    orderIdFilter.trim() !== "" ||
+    storeFilter !== "All Stores" ||
+    carrierFilter !== "All Carriers" ||
+    sourceFilter !== "All Sources";
+
+  const activeFilterCount = [
+    statusFilter !== "All Statuses",
+    carrierFilter !== "All Carriers",
+    sourceFilter !== "All Sources",
+    storeFilter !== "All Stores",
+    buyerFilter.trim() !== "",
+    orderIdFilter.trim() !== "",
+    dateRangePreset !== DEFAULT_DATE_PRESET,
+    !showOnlyActive,
+    Boolean(debouncedSearch.trim()),
+  ].filter(Boolean).length;
 
   const toggleSelectAll = () => {
     if (allVisibleSelected) {
@@ -1550,7 +1708,10 @@ function OrdersContent({ searchQuery }) {
             onClick={() => setShowFilters((current) => !current)}
           >
             <LuSlidersHorizontal />
-            <span>Add Filter</span>
+            <span>Filters</span>
+            {activeFilterCount > 0 ? (
+              <span className="orders-filter-badge">{activeFilterCount}</span>
+            ) : null}
           </button>
 
           <div className="orders-toolbar-dropdown" onClick={(event) => event.stopPropagation()}>
@@ -1624,21 +1785,36 @@ function OrdersContent({ searchQuery }) {
             {showArchived ? <LuArchiveRestore /> : <LuArchive />}
             <span>{showArchived ? "Viewing Archived" : "Archived"}</span>
           </button>
-
-          {activeFilterChips.length ? (
-            <div className="orders-filter-chips">
-              {activeFilterChips.map((chip) => (
-                <button type="button" className="orders-filter-chip" key={chip.key} onClick={chip.onRemove}>
-                  <span>x</span>
-                  <span>{chip.label}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         <div className="orders-toolbar__actions orders-toolbar__actions--search">
-          <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh orders grid">
+          <div className="orders-search-bar">
+            <LuSearch className="orders-search-bar__icon" />
+            <input
+              type="text"
+              className="orders-search-bar__input"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search order ID, buyer, product, SKU, tracking…"
+              aria-label="Search orders"
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                className="orders-search-bar__clear"
+                onClick={() => {
+                  setSearchInput("");
+                  setDebouncedSearch("");
+                }}
+                aria-label="Clear search"
+                title="Clear search"
+              >
+                <LuX />
+              </button>
+            ) : null}
+          </div>
+
+          <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh orders grid" title="Refresh">
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
           <OrderColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
@@ -1656,6 +1832,82 @@ function OrdersContent({ searchQuery }) {
       ) : null}
 
       <div className="orders-quick-filters">
+        <div className="orders-quick-filters__group orders-quick-filters__group--status">
+          <span className="orders-quick-filters__label">Status</span>
+          <div className="orders-quick-filters__pills">
+            {["All Statuses", ...orderStatusOptions].map((opt) => {
+              const count = opt === "All Statuses" ? statusCounts.all : (statusCounts[opt] ?? 0);
+              const isActive = statusFilter === opt;
+              const label = opt === "All Statuses" ? "All" : opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  className={`orders-quick-filters__pill ${isActive ? "orders-quick-filters__pill--active" : ""}`}
+                  onClick={() => setStatusFilter(opt)}
+                >
+                  <span>{label}</span>
+                  {count > 0 ? <span className="orders-quick-filters__count">({count})</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {storeOptions.length > 2 ? (
+          <div className="orders-quick-filters__group">
+            <span className="orders-quick-filters__label">Store</span>
+            <select
+              className="orders-quick-filters__select"
+              value={storeFilter}
+              onChange={(event) => setStoreFilter(event.target.value)}
+              aria-label="Filter by store"
+            >
+              {storeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {carrierOptions.length > 1 ? (
+          <div className="orders-quick-filters__group">
+            <span className="orders-quick-filters__label">Carrier</span>
+            <select
+              className="orders-quick-filters__select"
+              value={carrierFilter}
+              onChange={(event) => setCarrierFilter(event.target.value)}
+              aria-label="Filter by carrier"
+            >
+              {carrierOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {sourceOptions.length > 2 ? (
+          <div className="orders-quick-filters__group">
+            <span className="orders-quick-filters__label">Source</span>
+            <select
+              className="orders-quick-filters__select"
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              aria-label="Filter by source platform"
+            >
+              {sourceOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === "All Sources" ? "All Sources" : platformLabel(option)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div className="orders-quick-filters__group">
           <span className="orders-quick-filters__label">Date</span>
           <div className="orders-quick-filters__pills">
@@ -1703,7 +1955,35 @@ function OrdersContent({ searchQuery }) {
             </button>
           </div>
         </div>
+
+        <div className="orders-quick-filters__group">
+          <button
+            type="button"
+            className={`orders-quick-filters__pill ${showOnlyActive ? "orders-quick-filters__pill--active" : ""}`}
+            onClick={() => setShowOnlyActive((c) => !c)}
+            title={showOnlyActive ? "Canceled orders are hidden" : "Canceled orders are included"}
+          >
+            <span>{showOnlyActive ? "Hide Canceled" : "Show Canceled"}</span>
+          </button>
+        </div>
       </div>
+
+      {activeFilterChips.length ? (
+        <div className="orders-filter-chips" style={{ margin: "0 0 14px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#8b7f97", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+            Active filters:
+          </span>
+          {activeFilterChips.map((chip) => (
+            <button type="button" className="orders-filter-chip" key={chip.key} onClick={chip.onRemove}>
+              <span>×</span>
+              <span>{chip.label}</span>
+            </button>
+          ))}
+          <button type="button" className="orders-filter-chips__clear-all" onClick={clearOrderFilters}>
+            Clear all
+          </button>
+        </div>
+      ) : null}
 
       {showFilters ? (
         <PageFilterPanel layout="orders" onClear={hasOrderFilters ? clearOrderFilters : undefined}>
@@ -1720,6 +2000,22 @@ function OrdersContent({ searchQuery }) {
             {storeOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect label="Carrier" value={carrierFilter} onChange={(event) => setCarrierFilter(event.target.value)}>
+            {carrierOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </FilterSelect>
+
+          <FilterSelect label="Source" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+            {sourceOptions.map((option) => (
+              <option key={option} value={option}>
+                {option === "All Sources" ? "All Sources" : platformLabel(option)}
               </option>
             ))}
           </FilterSelect>

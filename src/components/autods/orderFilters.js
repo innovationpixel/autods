@@ -70,6 +70,8 @@ export function getDefaultOrderFilters() {
     buyerFilter: "",
     orderIdFilter: "",
     storeFilter: "All Stores",
+    carrierFilter: "All Carriers",
+    sourceFilter: "All Sources",
     showOnlyActive: true,
   };
 }

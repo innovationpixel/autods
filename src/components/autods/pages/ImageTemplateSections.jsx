@@ -22,6 +22,7 @@ function ImageTemplateSections({
   logoDescription = "Upload your brand logo and choose its position.",
   previewCard,
   footer,
+  allowAddDeletePrompts = true,
 }) {
   const {
     inputImages,
@@ -279,7 +280,11 @@ function ImageTemplateSections({
 
           <div className="ai-gen-hub__prompt-table">
             {prompts.map((prompt, index) => (
-              <div className="ai-gen-hub__prompt-row" key={index}>
+              <div
+                className={`ai-gen-hub__prompt-row ${!allowAddDeletePrompts ? "ai-gen-hub__prompt-row--no-delete" : ""}`}
+                key={index}
+                style={!allowAddDeletePrompts ? { gridTemplateColumns: "32px minmax(0, 1fr) auto" } : undefined}
+              >
                 <span className="ai-gen-hub__prompt-number">{index + 1}</span>
                 <textarea
                   rows={2}
@@ -298,14 +303,16 @@ function ImageTemplateSections({
                   onToggle={() => setOpenRefPicker((prev) => (prev === index ? null : index))}
                   onChange={(imageId) => handleReferenceImageChange(index, imageId)}
                 />
-                <button
-                  type="button"
-                  className="ai-gen-hub__prompt-delete"
-                  disabled={prompts.length <= 1}
-                  onClick={() => removePromptRow(index)}
-                >
-                  <LuTrash2 />
-                </button>
+                {allowAddDeletePrompts && (
+                  <button
+                    type="button"
+                    className="ai-gen-hub__prompt-delete"
+                    disabled={prompts.length <= 1}
+                    onClick={() => removePromptRow(index)}
+                  >
+                    <LuTrash2 />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -313,14 +320,16 @@ function ImageTemplateSections({
             Optionally pick which uploaded input image a prompt should use as its reference.
           </span>
 
-          <button
-            type="button"
-            className="ai-gen-hub__add-prompt-btn"
-            disabled={prompts.length >= MAX_PROMPTS}
-            onClick={addPromptRow}
-          >
-            <LuPlus /> Add Another Prompt
-          </button>
+          {allowAddDeletePrompts && (
+            <button
+              type="button"
+              className="ai-gen-hub__add-prompt-btn"
+              disabled={prompts.length >= MAX_PROMPTS}
+              onClick={addPromptRow}
+            >
+              <LuPlus /> Add Another Prompt
+            </button>
+          )}
         </article>
 
         {previewCard}
