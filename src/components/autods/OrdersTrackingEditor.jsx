@@ -51,7 +51,7 @@ export default function OrdersTrackingEditor({
         ) : (
           <button
             type="button"
-            className="products-tracking-btn"
+            className={`products-tracking-btn ${order.trackingNumberRaw ? "" : "orders-tracking-display__add"}`}
             onClick={() => onStartEdit(order)}
             title="Edit tracking"
           >

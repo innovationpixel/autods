@@ -1,0 +1,65 @@
+/* Calculations + Orders: the table scrolls inside its own box (both axes),
+   so the page itself doesn't have to scroll to reach rows or the horizontal bar. */
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll {
+  max-height: calc(100vh - 140px) !important;
+  min-height: 320px;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #b79add #f5f1f9 !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll::-webkit-scrollbar,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll::-webkit-scrollbar {
+  width: 9px !important;
+  height: 9px !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll::-webkit-scrollbar-track,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll::-webkit-scrollbar-track {
+  background: #f5f1f9 !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll::-webkit-scrollbar-thumb,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid #f5f1f9 !important;
+  border-radius: 999px !important;
+  background: #b79add !important;
+  background-clip: padding-box !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll::-webkit-scrollbar-thumb:hover,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #9674ca !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table-scroll::-webkit-scrollbar-corner,
+.marketplace-dashboard-page .orders-page-content .orders-table-scroll::-webkit-scrollbar-corner {
+  background: #f5f1f9 !important;
+}
+
+/* Calculations: keep the totals row and the column headers pinned while scrolling. */
+.marketplace-dashboard-page .calculations-page-content .calculations-table thead .calculations-table__totals-row td {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 6 !important;
+}
+
+.marketplace-dashboard-page .calculations-page-content .calculations-table thead tr:not(.calculations-table__totals-row) th {
+  position: sticky !important;
+  top: 42px !important;
+  z-index: 5 !important;
+}
+
+/* Orders: header stays pinned (actions column is already sticky on the right). */
+.marketplace-dashboard-page .orders-page-content .orders-table thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 6 !important;
+}
+
+.marketplace-dashboard-page .orders-page-content .orders-table thead .orders-table__actions-col {
+  z-index: 8 !important;
+}

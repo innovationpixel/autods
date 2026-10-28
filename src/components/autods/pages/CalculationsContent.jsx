@@ -5,14 +5,17 @@ import {
   LuBadgeCheck,
   LuChartLine,
   LuChevronLeft,
+  LuCheck,
   LuChevronRight,
   LuClipboardList,
   LuClock3,
+  LuCopy,
   LuExternalLink,
   LuFileSpreadsheet,
   LuLoader,
   LuPencil,
   LuRefreshCcw,
+  LuSearch,
   LuSlidersHorizontal,
   LuStore,
   LuTruck,
@@ -91,10 +94,61 @@ const editableFieldMeta = {
   },
 };
 
+function copyTextToClipboard(text) {
+  const legacyCopy = () => {
+    const field = document.createElement("textarea");
+    field.value = text;
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.appendChild(field);
+    field.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(field);
+    return ok;
+  };
+
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => {
+      if (!legacyCopy()) throw new Error("copy failed");
+    });
+  }
+
+  return legacyCopy() ? Promise.resolve() : Promise.reject(new Error("copy failed"));
+}
+
+function CopyIdButton({ value }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (event) => {
+    event.stopPropagation();
+    try {
+      await copyTextToClipboard(value);
+      setCopied(true);
+      toast.success("Order ID copied.");
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      toast.error("Couldn't copy the order ID.");
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`calculations-copy-btn ${copied ? "calculations-copy-btn--copied" : ""}`}
+      onClick={handleCopy}
+      title="Copy order ID"
+      aria-label={`Copy order ID ${value}`}
+    >
+      {copied ? <LuCheck /> : <LuCopy />}
+    </button>
+  );
+}
+
 function CalculationsContent({ searchQuery = "" }) {
   const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const tableScrollRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [localSearch, setLocalSearch] = useState("");
   const [pageSize, setPageSize] = useState(20);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -459,7 +513,7 @@ function CalculationsContent({ searchQuery = "" }) {
   }, [calculationRows]);
 
   const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = (localSearch.trim() || searchQuery.trim()).toLowerCase();
 
     const nextRows = calculationRows.filter((row) => {
       if (statusFilter !== "All Statuses" && row.status !== statusFilter) {
@@ -495,6 +549,14 @@ function CalculationsContent({ searchQuery = "" }) {
         row.title,
         row.description,
         row.ebayStatus,
+        row.status,
+        row.buyer,
+        row.storeName,
+        row.sku,
+        row.itemBuy,
+        row.itemSell,
+        row.aliexpressOrderId,
+        row.address,
         row.date,
         row.buyTrackingNumberRaw,
         row.sellTrackingNumberRaw,
@@ -543,6 +605,7 @@ function CalculationsContent({ searchQuery = "" }) {
     buyerFilter,
     calculationRows,
     fromDate,
+    localSearch,
     orderIdFilter,
     searchQuery,
     sortBy,
@@ -560,7 +623,7 @@ function CalculationsContent({ searchQuery = "" }) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filteredRows.length, pageSize, searchQuery]);
+  }, [filteredRows.length, pageSize, searchQuery, localSearch]);
 
   const activeFilterChips = [
     dateRangePreset !== DEFAULT_DATE_PRESET && dateRangePreset !== "custom"
@@ -949,6 +1012,13 @@ function CalculationsContent({ searchQuery = "" }) {
             </div>
           </div>
         );
+      case "orderId":
+        return (
+          <span className="calculations-order-id">
+            <span className="calculations-order-id__text">{row.orderId}</span>
+            <CopyIdButton value={row.orderId} />
+          </span>
+        );
       case "date":
         return formatDisplayDate(row.date);
       case "ebayStatus":
@@ -1051,6 +1121,21 @@ function CalculationsContent({ searchQuery = "" }) {
         </div>
 
         <div className="orders-toolbar__actions orders-toolbar__actions--search">
+          <label className="calculations-search">
+            <LuSearch />
+            <input
+              type="search"
+              value={localSearch}
+              onChange={(event) => setLocalSearch(event.target.value)}
+              placeholder="Search order ID, product, buyer, tracking…"
+              aria-label="Search calculations"
+            />
+            {localSearch ? (
+              <button type="button" className="calculations-search__clear" onClick={() => setLocalSearch("")} aria-label="Clear search">
+                <LuX />
+              </button>
+            ) : null}
+          </label>
           <button type="button" className="orders-icon-btn" onClick={loadOrders} aria-label="Refresh calculations grid">
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
@@ -1303,6 +1388,11 @@ function CalculationsContent({ searchQuery = "" }) {
         <div className="orders-table-shell">
           <div className="orders-table-scroll calculations-table-scroll" ref={tableScrollRef}>
             <table className="orders-table calculations-table" style={{ minWidth: tableMinWidth }}>
+              <colgroup>
+                {visibleColumns.map((column) => (
+                  <col key={column.id} style={{ width: column.minWidth, minWidth: column.minWidth }} />
+                ))}
+              </colgroup>
               <thead>
                 <tr className="calculations-table__totals-row">
                   {visibleColumns.map((column, index) => (
@@ -1434,6 +1524,7 @@ function CalculationsContent({ searchQuery = "" }) {
           </div>
         </div>
       </section>
+
     </section>
   );
 }
