@@ -1100,10 +1100,10 @@ export default function MarketplaceSettingsPage() {
       <EbayOAuthSetupBanner onContinue={startEbayOAuthFlow} show={ebayConnections.length === 0} />
       {ebayConnections.length > 0 ? <ShipFromSetupNotice settings={accountSettings} /> : null}
       <div className="marketplace-settings__store-settings-header">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <h3 style={{ margin: 0 }}>
-              <span style={{ fontWeight: 900, letterSpacing: -1, marginRight: 8 }}>
+        <div className="marketplace-settings__ebay-header">
+          <div className="marketplace-settings__ebay-header-copy">
+            <h3>
+              <span className="marketplace-settings__ebay-wordmark">
                 <span style={{ color: "#E53238" }}>e</span>
                 <span style={{ color: "#0064D2" }}>B</span>
                 <span style={{ color: "#F5AF02" }}>a</span>
@@ -1111,7 +1111,7 @@ export default function MarketplaceSettingsPage() {
               </span>
               Accounts
             </h3>
-            <p style={{ margin: "4px 0 0", color: "#6b7280", fontSize: 13 }}>
+            <p>
               Connect multiple eBay seller accounts. Use the <em>Primary</em> badge to set which account is used by default.
             </p>
           </div>
@@ -1120,7 +1120,6 @@ export default function MarketplaceSettingsPage() {
             className="marketplace-settings__ebay-btn marketplace-settings__ebay-btn--connect"
             onClick={connectEbay}
             disabled={ebayConnecting}
-            style={{ flexShrink: 0 }}
           >
             {ebayConnecting ? <LuLoader className="spin-icon" /> : <LuLink />}
             <span>{ebayConnecting ? "Opening eBay…" : "Add eBay Account"}</span>
@@ -1135,27 +1134,18 @@ export default function MarketplaceSettingsPage() {
           <span>Checking connection status…</span>
         </div>
       ) : ebayConnections.length === 0 ? (
-        <div style={{ padding: "20px 0" }}>
-          <div className="marketplace-settings__ebay-status marketplace-settings__ebay-status--disconnected">
-            <LuUnplug />
-            <span>No eBay accounts connected. Click <em>Add eBay Account</em> to get started.</span>
+        <div className="marketplace-settings__ebay-empty-wrap">
+          <div className="marketplace-settings__ebay-empty">
+            <span className="marketplace-settings__ebay-empty-icon"><LuUnplug /></span>
+            <strong>No eBay accounts connected</strong>
+            <span>Click <em>Add eBay Account</em> to get started.</span>
           </div>
 
-          <details
-            style={{
-              marginTop: 16,
-              padding: "14px 16px",
-              borderRadius: 8,
-              border: "1px solid #fde68a",
-              background: "#fffbeb",
-              fontSize: 13,
-              color: "#78350f",
-            }}
-          >
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+          <details className="marketplace-settings__ebay-help">
+            <summary>
               Stuck on eBay “Authorization successfully completed”?
             </summary>
-            <p style={{ margin: "10px 0 8px", lineHeight: 1.5 }}>
+            <p>
               eBay did not redirect to Auto DS. Copy the <strong>full address bar URL</strong> from that eBay tab and paste it here, then click Complete connection.
             </p>
             <input
@@ -1164,7 +1154,6 @@ export default function MarketplaceSettingsPage() {
               value={ebayPasteUrl}
               onChange={(e) => setEbayPasteUrl(e.target.value)}
               placeholder="https://auth2.ebay.com/oauth2/ThirdPartyAuthSucessFailure?..."
-              style={{ width: "100%", marginBottom: 8 }}
             />
             <button
               type="button"

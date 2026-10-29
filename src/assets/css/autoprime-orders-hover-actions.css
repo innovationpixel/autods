@@ -1,0 +1,68 @@
+/* Orders page: BUY / SELL badges and hover-only text actions in the tracking cell. */
+
+/* BUY green, SELL red, square corners. */
+.orders-page-content .orders-paired-values .orders-paired-values__type--buy {
+  border: 1px solid #15803d !important;
+  border-radius: 0 !important;
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+.orders-page-content .orders-paired-values .orders-paired-values__type--sell {
+  border: 1px solid #b91c1c !important;
+  border-radius: 0 !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* "Add tracking" and "Push to eBay": plain text, shown only while the row is hovered/focused. */
+.orders-page-content .orders-table .orders-tracking-display__add,
+.orders-page-content .orders-table .orders-tracking-display__push {
+  display: inline-flex !important;
+  align-items: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--ap-accent, #6d28d9) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.orders-page-content .orders-table .orders-tracking-display__add span,
+.orders-page-content .orders-table .orders-tracking-display__push span {
+  color: inherit !important;
+}
+
+.orders-page-content .orders-table .orders-tracking-display__push svg:not(.orders-tracking-panel__spin) {
+  display: none !important;
+}
+
+.orders-page-content .orders-table .orders-table__row:hover .orders-tracking-display__add,
+.orders-page-content .orders-table .orders-table__row:hover .orders-tracking-display__push,
+.orders-page-content .orders-table .orders-table__row:focus-within .orders-tracking-display__add,
+.orders-page-content .orders-table .orders-table__row:focus-within .orders-tracking-display__push,
+.orders-page-content .orders-table .orders-tracking-display__push:disabled {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.orders-page-content .orders-table .orders-tracking-display__add:hover,
+.orders-page-content .orders-table .orders-tracking-display__push:hover:not(:disabled) {
+  background: transparent !important;
+  text-decoration: underline;
+}
+
+.orders-page-content .orders-table .orders-tracking-display__push:disabled {
+  cursor: progress;
+}

@@ -1504,7 +1504,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
         return (
           <div className="orders-paired-values">
             <div>
-              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__type orders-paired-values__type--buy">BUY</span>
               <span className="orders-paired-values__platform">{platformLabel(order.sourcePlatform)}</span>
               <div className="products-source-cell">
                 {order.itemBuyUrl || (order.itemBuy && order.itemBuy !== "—") ? (
@@ -1527,7 +1527,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
               ) : null}
             </div>
             <div>
-              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__type orders-paired-values__type--sell">SELL</span>
               <span className="orders-paired-values__platform">ebay</span>
               {order.itemSellUrl ? (
                 <a href={order.itemSellUrl} target="_blank" rel="noopener noreferrer" className="products-item-id-link">

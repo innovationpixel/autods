@@ -1,0 +1,148 @@
+/* AutoPrime — Calculations page polish: order-id copy, on-page search,
+   status cell shape, Customise Grid panel layout. */
+
+/* Status cell: the badge is the pill, never the table cell itself. */
+.calculations-page-content .calculations-table td.orders-table__status-cell,
+.calculations-page-content .calculations-table td.orders-table__status-cell::before,
+.calculations-page-content .calculations-table td.orders-table__status-cell::after {
+  border-radius: 0 !important;
+}
+
+/* Order ID + copy -------------------------------------------------------- */
+.calculations-page-content .calculations-order-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.calculations-page-content .calculations-order-id__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.calculations-page-content .calculations-copy-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ap-muted, #67627a);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.calculations-page-content .calculations-copy-btn:hover {
+  border-color: var(--ap-accent-border, #ddd3ff);
+  background: var(--ap-accent-soft, #f5f1ff);
+  color: var(--ap-accent, #6d28d9);
+}
+
+.calculations-page-content .calculations-copy-btn--copied,
+.calculations-page-content .calculations-copy-btn--copied:hover {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+/* Search ----------------------------------------------------------------- */
+.calculations-page-content .orders-toolbar__actions--search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.calculations-page-content .calculations-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 340px;
+  max-width: 100%;
+  height: 38px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--ap-border-strong, #ddd3ec);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ap-muted, #67627a);
+}
+
+.calculations-page-content .calculations-search:focus-within {
+  border-color: #9e72cf;
+  box-shadow: var(--ap-focus, 0 0 0 3px rgba(109, 40, 217, 0.16));
+}
+
+.calculations-page-content .calculations-search svg {
+  flex: 0 0 auto;
+}
+
+.calculations-page-content .calculations-search input[type="search"] {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  height: 100%;
+  min-height: 0 !important;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--ap-text, #171230);
+  font-size: 13px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.calculations-page-content .calculations-search input[type="search"]::-webkit-search-cancel-button {
+  display: none;
+}
+
+.calculations-page-content .calculations-search__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ap-accent-soft, #f5f1ff);
+  color: var(--ap-accent, #6d28d9);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Customise Grid panel ---------------------------------------------------- */
+.orders-column-manager__panel > :not(.orders-column-manager__list) {
+  flex: 0 0 auto;
+}
+
+.orders-column-manager__toggle-all > span:last-child,
+.orders-column-manager__item-label > span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 720px) {
+  .calculations-page-content .calculations-search {
+    width: 100%;
+  }
+}
+
+/* Quick filters: active pill follows the purple theme. */
+.calculations-page-content .orders-quick-filters__pill--active {
+  border-color: var(--ap-accent, #6d28d9) !important;
+  background: var(--ap-accent-soft, #f5f1ff) !important;
+  color: var(--ap-accent, #6d28d9) !important;
+}

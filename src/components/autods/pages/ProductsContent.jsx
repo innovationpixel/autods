@@ -336,7 +336,7 @@ function ProductsContent({ searchQuery }) {
       document.removeEventListener("scroll", checkStickyVisibility, { capture: true });
       clearTimeout(timer);
     };
-  }, [tableMinWidth, loading, sortedRows.length, pageSize]);
+  }, [tableMinWidth, loading, listings.length, pageSize]);
 
   useEffect(() => {
     if (showStickyScroll && stickyScrollRef.current && tableScrollRef.current) {
