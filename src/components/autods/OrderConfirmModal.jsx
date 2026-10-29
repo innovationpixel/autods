@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { LuCheck, LuDollarSign, LuExternalLink, LuLoader, LuShieldAlert, LuStore, LuUserRound, LuX, LuZap } from "react-icons/lu";
+import { LuCheck, LuDollarSign, LuExternalLink, LuLayers, LuLoader, LuShieldAlert, LuStore, LuUserRound, LuX, LuZap } from "react-icons/lu";
 
 function OrderConfirmModal({
   open,
@@ -72,6 +72,14 @@ function OrderConfirmModal({
             )}
             <div className="order-confirm-product-info">
               <h4>{order.title}</h4>
+              {order.variant ? (
+                <div className="orders-product__variant-wrap" style={{ marginTop: 2, marginBottom: 4 }}>
+                  <span className="orders-product__variant-badge" title={order.variant}>
+                    <LuLayers className="orders-product__variant-icon" />
+                    <span className="orders-product__variant-text">{order.variant}</span>
+                  </span>
+                </div>
+              ) : null}
               <span>eBay Order #{order.ebayOrderId}</span>
             </div>
           </div>

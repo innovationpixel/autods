@@ -26,6 +26,7 @@ import {
   LuDownload,
   LuExternalLink,
   LuInbox,
+  LuLayers,
   LuLoader,
   LuPencil,
   LuPrinter,
@@ -38,6 +39,7 @@ import {
   LuX,
 } from "react-icons/lu";
 import PageFilterPanel from "../PageFilterPanel";
+import { resolveOrderVariant, formatVariantAspects } from "../../../utils/orderVariants";
 import { FilterCheckbox, FilterInput, FilterSelect } from "../FilterField";
 import OrderColumnManager from "../OrderColumnManager";
 import {
@@ -126,23 +128,11 @@ function mapApiOrder(order) {
   const fulfillment = raw.fulfillmentStartInstructions?.[0] ?? {};
   const shipTo = fulfillment.shippingStep?.shipTo ?? buyer.buyerRegistrationAddress ?? {};
   const delivery = raw.deliveryCost ?? {};
+  const resolvedVariant = resolveOrderVariant(order);
   const variationAspects = firstItem.lineItemFulfillmentInstructions?.variations
     ?? firstItem.variationAspects
     ?? [];
-
-  const variationText = Array.isArray(variationAspects)
-    ? variationAspects
-        .map((aspect) => {
-          if (typeof aspect === "string") {
-            return aspect;
-          }
-          const name = aspect.name ?? aspect.localizedName ?? "";
-          const value = aspect.value ?? aspect.localizedValue ?? "";
-          return [name, value].filter(Boolean).join(": ");
-        })
-        .filter(Boolean)
-        .join(", ")
-    : "";
+  const variationText = resolvedVariant || formatVariantAspects(variationAspects);
 
   const totalQuantity = lineItems.reduce((sum, item) => sum + Number(item.quantity ?? 1), 0);
   const sellPrice = order.sell_price ?? pricing.total?.value ?? firstItem.lineItemCost?.value ?? 0;
@@ -165,9 +155,7 @@ function mapApiOrder(order) {
   const sourceUrl = order.source_url ?? null;
   const sourceSkuId = order.source_sku_id ?? null;
   const sourceVariation = Array.isArray(order.source_variation) ? order.source_variation : null;
-  const sourceVariationText = sourceVariation?.length
-    ? sourceVariation.map((entry) => [entry.name, entry.value].filter(Boolean).join(": ")).join(", ")
-    : "";
+  const sourceVariationText = formatVariantAspects(order.source_variation ?? raw.source_variation);
   const itemBuy = sourceProductId ?? "—";
   const itemBuyUrl = buildSourceProductUrl(sourcePlatform, sourceProductId, sourceUrl);
   const itemSellUrl = buildEbayListingProductUrl({ ebay_item_id: order.item_sell_id ?? firstItem.legacyItemId });
@@ -214,11 +202,13 @@ function mapApiOrder(order) {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
     image: order.image_url ?? order.listing_image_url ?? firstItem.image?.imageUrl ?? null,
-    color: variationText || "—",
+    variant: resolvedVariant,
+    variantTitle: resolvedVariant,
+    color: resolvedVariant || variationText || "—",
     pickStatus: raw.pickStatus ?? "—",
     itemId: order.item_sell_id ?? firstItem.legacyItemId ?? firstItem.lineItemId ?? "—",
     sku: firstItem.sku ?? "—",
-    variationSpecifics: variationText || "—",
+    variationSpecifics: resolvedVariant || variationText || "—",
     bundleDetails: firstItem.bundleDetails ?? "—",
     listingsTags: firstItem.listingTags ?? "—",
     orderId: order.ebay_order_id ?? raw.orderId ?? "—",
@@ -854,6 +844,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
 
       return [
         order.title,
+        order.variant,
         order.color,
         order.buyer,
         order.buyerName,
@@ -1414,7 +1405,14 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
             )}
             <div className="orders-product__copy">
               <h3>{order.title}</h3>
-              <p>{order.color}</p>
+              {order.variant ? (
+                <div className="orders-product__variant-wrap">
+                  <span className="orders-product__variant-badge" title={order.variant}>
+                    <LuLayers className="orders-product__variant-icon" />
+                    <span className="orders-product__variant-text">{order.variant}</span>
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
         );

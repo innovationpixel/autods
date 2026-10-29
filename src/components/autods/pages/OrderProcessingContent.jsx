@@ -8,6 +8,7 @@ import {
   LuClipboardList,
   LuCopy,
   LuExternalLink,
+  LuLayers,
   LuLoader,
   LuMapPin,
   LuPackageCheck,
@@ -57,6 +58,7 @@ import ExternalOrderModal from "../ExternalOrderModal";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
 import OrderShippingAddressModal from "../OrderShippingAddressModal";
 import AddressRecommendationModal from "../AddressRecommendationModal";
+import { resolveOrderVariant, formatVariantAspects } from "../../../utils/orderVariants";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
@@ -115,11 +117,18 @@ function mapProcessingOrder(order) {
   const sourceProductId = order.source_product_id ?? order.item_buy_id ?? null;
   const sourcePlatform = order.source_platform ?? "aliexpress";
   const sourceUrl = order.source_url ?? null;
+  const resolvedVariant = resolveOrderVariant(order);
+  const sourceVariation = Array.isArray(order.source_variation) ? order.source_variation : null;
+  const sourceVariationText = formatVariantAspects(order.source_variation ?? raw.source_variation);
 
   return {
     id: String(order.id),
     title: order.item_title ?? firstItem.title ?? "Order item",
     image: order.image_url ?? order.listing_image_url ?? firstItem.image?.imageUrl ?? null,
+    variant: resolvedVariant,
+    variantTitle: resolvedVariant,
+    sourceVariation,
+    sourceVariationText,
     ebayOrderId: order.ebay_order_id ?? raw.orderId ?? "—",
     orderDetailUrl: getEbayOrderDetailUrl(order.ebay_order_id ?? raw.orderId, order.connection?.site_id),
     siteId: order.connection?.site_id ?? null,
@@ -1364,6 +1373,14 @@ function OrderProcessingContent() {
                           )}
                           <div className="orders-product__copy calculations-product__copy">
                             <h3>{order.title}</h3>
+                            {order.variant ? (
+                              <div className="orders-product__variant-wrap">
+                                <span className="orders-product__variant-badge" title={order.variant}>
+                                  <LuLayers className="orders-product__variant-icon" />
+                                  <span className="orders-product__variant-text">{order.variant}</span>
+                                </span>
+                              </div>
+                            ) : null}
                             <p className="calculations-product__description">
                               {order.orderDetailUrl ? (
                                 <a
@@ -1465,6 +1482,11 @@ function OrderProcessingContent() {
                               <LuPencil />
                             </button>
                           </div>
+                          {order.sourceVariationText ? (
+                            <span className="orders-source-cell__variation" title={order.sourceVariationText}>
+                              {order.sourceVariationText}
+                            </span>
+                          ) : null}
                           {order.sourcePlatform ? (
                             <span
                               className={`orders-source-badge orders-source-badge--${order.sourcePlatform.toLowerCase()}`}

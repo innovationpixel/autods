@@ -536,3 +536,48 @@
     flex-wrap: wrap !important;
   }
 }
+
+/* Product variant badges on Orders and Orders Processing pages */
+.orders-product__variant-wrap {
+  display: flex !important;
+  align-items: center !important;
+  margin-top: 4px !important;
+  margin-bottom: 2px !important;
+  max-width: 100% !important;
+}
+
+.orders-product__variant-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  max-width: 100% !important;
+  padding: 2.5px 8px !important;
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  color: #334155 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  text-align: left !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.orders-product__variant-badge:hover {
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.orders-product__variant-icon {
+  flex-shrink: 0 !important;
+  font-size: 11.5px !important;
+  color: #64748b !important;
+}
+
+.orders-product__variant-text {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  max-width: 260px !important;
+}
+

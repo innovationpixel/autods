@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LuCheck, LuCopy, LuExternalLink, LuPackageCheck, LuPencil, LuStore, LuX } from "react-icons/lu";
+import { LuCheck, LuCopy, LuExternalLink, LuLayers, LuPackageCheck, LuPencil, LuStore, LuX } from "react-icons/lu";
 import { toast } from "../../utils/toast";
 
 function ExternalOrderModal({
@@ -89,6 +89,14 @@ function ExternalOrderModal({
             )}
             <div className="order-confirm-product-info">
               <h4>{order.title}</h4>
+              {order.variant ? (
+                <div className="orders-product__variant-wrap" style={{ marginTop: 2, marginBottom: 4 }}>
+                  <span className="orders-product__variant-badge" title={order.variant}>
+                    <LuLayers className="orders-product__variant-icon" />
+                    <span className="orders-product__variant-text">{order.variant}</span>
+                  </span>
+                </div>
+              ) : null}
               <span>Order #{order.ebayOrderId}</span>
             </div>
           </div>
