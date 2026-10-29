@@ -174,6 +174,7 @@ export function useImageTemplateForm(initial = {}) {
 
     prompts,
     referenceImageIds,
+    setReferenceImageIds,
     openRefPicker,
     setOpenRefPicker,
     handlePromptChange,

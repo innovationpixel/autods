@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuBadgeCheck, LuEye, LuEyeOff, LuKey, LuLink, LuLoader, LuPlug, LuSettings2, LuSheet, LuSparkles, LuUnplug } from "react-icons/lu";
+import { LuBadgeCheck, LuChevronDown, LuEye, LuEyeOff, LuKey, LuLink, LuLoader, LuPlug, LuSettings2, LuSheet, LuSparkles, LuUnplug, LuZap } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import {
@@ -385,81 +385,150 @@ function AdminSettingsPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 16, marginTop: 12, maxWidth: 640 }}>
-              <label className="ai-gen-hub__field" style={{ margin: 0 }}>
-                <span className="ai-gen-hub__field-label" style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>OpenAI API Key (ChatGPT)</span>
-                  {openAiStatus.configured && (
-                    <small style={{ color: "#10b981" }}>Current key active</small>
+            <div className="admin-settings-ai-form">
+              {/* Field 1: OpenAI API Key */}
+              <div className="admin-settings-ai-field">
+                <div className="admin-settings-ai-label-row">
+                  <label htmlFor="openai-key-input" className="admin-settings-ai-label">
+                    OpenAI API Key (ChatGPT)
+                  </label>
+                  {openAiStatus.configured ? (
+                    <span className="admin-settings-ai-badge admin-settings-ai-badge--active">
+                      <LuBadgeCheck /> Current key active
+                    </span>
+                  ) : (
+                    <span className="admin-settings-ai-badge admin-settings-ai-badge--inactive">
+                      Key required
+                    </span>
                   )}
-                </span>
-                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                </div>
+                <div className="admin-settings-ai-input-wrap">
+                  <span className="admin-settings-ai-input-icon">
+                    <LuKey />
+                  </span>
                   <input
+                    id="openai-key-input"
+                    className="admin-settings-ai-input"
                     type={showKey ? "text" : "password"}
                     placeholder={openAiStatus.configured ? "Enter new key to update..." : "sk-..."}
                     value={openAiKey}
                     onChange={(e) => setOpenAiKey(e.target.value)}
-                    style={{ paddingRight: 40, width: "100%" }}
+                    style={{ paddingRight: 44 }}
                   />
                   <button
                     type="button"
+                    className="admin-settings-ai-eye-btn"
                     onClick={() => setShowKey(!showKey)}
-                    style={{
-                      position: "absolute",
-                      right: 10,
-                      background: "none",
-                      border: "none",
-                      color: "#64748b",
-                      cursor: "pointer",
-                      padding: 4,
-                    }}
                     title={showKey ? "Hide key" : "Show key"}
+                    aria-label={showKey ? "Hide key" : "Show key"}
                   >
                     {showKey ? <LuEyeOff /> : <LuEye />}
                   </button>
                 </div>
-              </label>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <label className="ai-gen-hub__field" style={{ margin: 0 }}>
-                  <span className="ai-gen-hub__field-label">Image Model</span>
-                  <select value={openAiImageModel} onChange={(e) => setOpenAiImageModel(e.target.value)}>
-                    <option value="dall-e-2">DALL-E 2 (Standard - Normal)</option>
-                    <option value="dall-e-3">DALL-E 3 (HD)</option>
-                  </select>
-                </label>
-
-                <label className="ai-gen-hub__field" style={{ margin: 0 }}>
-                  <span className="ai-gen-hub__field-label">Vision Enhancement Model</span>
-                  <select value={openAiVisionModel} onChange={(e) => setOpenAiVisionModel(e.target.value)}>
-                    <option value="gpt-4o">GPT-4o (Recommended)</option>
-                    <option value="gpt-4o-mini">GPT-4o Mini</option>
-                  </select>
-                </label>
+                <p className="admin-settings-ai-help">
+                  {openAiStatus.configured
+                    ? `Current active key: ${openAiStatus.masked_key || "Stored securely"}. Enter a new key above only if you wish to change it.`
+                    : "Enter your OpenAI secret API key (starts with sk-...). It will be stored securely on the server."}
+                </p>
               </div>
 
-              <label className="ai-gen-hub__field" style={{ margin: 0 }}>
-                <span className="ai-gen-hub__field-label">AI Credits Cost Per Image</span>
-                <input
-                  type="number"
-                  min="1"
-                  max="1000"
-                  value={openAiCreditsPerImage}
-                  onChange={(e) => setOpenAiCreditsPerImage(e.target.value)}
-                  placeholder="1"
-                  style={{ width: "100%" }}
-                />
-                <small style={{ color: "#64748b", marginTop: 4, display: "block" }}>
-                  Number of AI credits deducted from a user's balance for each generated image (e.g. 1 credit = 1 image).
-                </small>
-              </label>
+              {/* Fields 2 & 3: Model Selectors */}
+              <div className="admin-settings-ai-grid">
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-image-model" className="admin-settings-ai-label">
+                    Image Model
+                  </label>
+                  <div className="admin-settings-ai-select-wrap">
+                    <select
+                      id="openai-image-model"
+                      className="admin-settings-ai-select"
+                      value={openAiImageModel}
+                      onChange={(e) => setOpenAiImageModel(e.target.value)}
+                    >
+                      <option value="dall-e-2">DALL-E 2 (Standard - Normal)</option>
+                      <option value="dall-e-3">DALL-E 3 (HD - High Definition)</option>
+                    </select>
+                    <span className="admin-settings-ai-select-arrow">
+                      <LuChevronDown />
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Generates output images from your product prompts.
+                  </p>
+                </div>
 
-              <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-vision-model" className="admin-settings-ai-label">
+                    Vision Enhancement Model
+                  </label>
+                  <div className="admin-settings-ai-select-wrap">
+                    <select
+                      id="openai-vision-model"
+                      className="admin-settings-ai-select"
+                      value={openAiVisionModel}
+                      onChange={(e) => setOpenAiVisionModel(e.target.value)}
+                    >
+                      <option value="gpt-4o">GPT-4o (Recommended)</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini</option>
+                    </select>
+                    <span className="admin-settings-ai-select-arrow">
+                      <LuChevronDown />
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Analyzes input photos to optimize prompt details.
+                  </p>
+                </div>
+              </div>
+
+              {/* Field 4: Credits Cost Per Image */}
+              <div className="admin-settings-ai-field">
+                <label htmlFor="openai-credits-input" className="admin-settings-ai-label">
+                  AI Credits Cost Per Image
+                </label>
+                <div className="admin-settings-ai-input-wrap">
+                  <span className="admin-settings-ai-input-icon">
+                    <LuZap style={{ color: "#f59e0b" }} />
+                  </span>
+                  <input
+                    id="openai-credits-input"
+                    className="admin-settings-ai-input"
+                    type="number"
+                    min="1"
+                    max="1000"
+                    value={openAiCreditsPerImage}
+                    onChange={(e) => setOpenAiCreditsPerImage(e.target.value)}
+                    placeholder="1"
+                    style={{ paddingRight: 96 }}
+                  />
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: 12,
+                      fontSize: 12,
+                      fontWeight: 650,
+                      color: "#64748b",
+                      backgroundColor: "#f1f5f9",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    Credits / img
+                  </span>
+                </div>
+                <p className="admin-settings-ai-help">
+                  Number of AI credits deducted from a user&apos;s balance for each generated output image (default: 1).
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="admin-settings-ai-actions">
                 <button
                   type="button"
                   className="admin-page__btn admin-page__btn--primary"
                   onClick={handleSaveOpenAi}
                   disabled={openAiSaving || openAiTesting}
+                  style={{ minHeight: 42, padding: "0 20px" }}
                 >
                   {openAiSaving ? <LuLoader className="spin-icon" /> : <LuSparkles />}
                   <span>{openAiSaving ? "Saving…" : "Save OpenAI Settings"}</span>
@@ -470,6 +539,7 @@ function AdminSettingsPage() {
                   className="admin-page__btn admin-page__btn--ghost"
                   onClick={handleTestOpenAi}
                   disabled={openAiSaving || openAiTesting}
+                  style={{ minHeight: 42, padding: "0 18px" }}
                 >
                   {openAiTesting ? <LuLoader className="spin-icon" /> : <LuKey />}
                   <span>{openAiTesting ? "Testing…" : "Test Connection"}</span>

@@ -55,6 +55,7 @@ function TemplateEditor({ template, onBack, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [generatingAiIndex, setGeneratingAiIndex] = useState(0);
+  const [missingRefIndices, setMissingRefIndices] = useState([]);
 
   const addExampleImages = (event) => {
     const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith("image/"));
@@ -80,6 +81,28 @@ function TemplateEditor({ template, onBack, onSaved }) {
       toast.warn("Please write at least one prompt before generating template images.");
       return;
     }
+    if (form.inputImages.length === 0) {
+      toast.warn("Upload at least one sample input image first.");
+      return;
+    }
+
+    const missingRefs = form.prompts
+      .map((p, idx) => {
+        if (!p.trim()) return null;
+        const refId = form.referenceImageIds[idx];
+        const exists = refId && form.inputImages.some((img) => img.id === refId);
+        return exists ? null : idx + 1;
+      })
+      .filter(Boolean);
+
+    if (missingRefs.length > 0) {
+      setMissingRefIndices(missingRefs);
+      toast.warn(
+        `Please select a reference image for prompt${missingRefs.length > 1 ? "s" : ""} #${missingRefs.join(", #")}.`
+      );
+      return;
+    }
+    setMissingRefIndices([]);
 
     setGeneratingAi(true);
     let generatedCount = 0;
@@ -115,10 +138,11 @@ function TemplateEditor({ template, onBack, onSaved }) {
         const url = extractMediaUrl(res.data);
         if (url) {
           generatedCount += 1;
-          setExampleImages((prev) => [
-            ...prev,
-            { id: newAssetId(), remoteUrl: url, preview: url, file: null },
-          ]);
+          setExampleImages((prev) => {
+            const updated = [...prev];
+            updated[i] = { id: newAssetId(), remoteUrl: url, preview: url, file: null };
+            return updated.slice(0, trimmedPrompts.length);
+          });
         } else {
           toast.error(`Prompt ${i + 1} did not return an image.`);
         }
@@ -313,6 +337,10 @@ function TemplateEditor({ template, onBack, onSaved }) {
         logoDescription="Default logo placement for users of this template."
         previewCard={previewCard}
         footer={footer}
+        missingRefIndices={missingRefIndices}
+        onClearMissingRef={(idx) =>
+          setMissingRefIndices((prev) => prev.filter((item) => item !== idx + 1))
+        }
       />
     </section>
   );

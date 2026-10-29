@@ -483,21 +483,26 @@ function AiMyImagesGallery({ onExploreTemplates }) {
                 )}
 
                 <div className="ai-image-popup-meta-grid">
-                  <div>
-                    <span>Dimensions</span>
-                    <strong>
+                  <div className="ai-image-popup-meta-item">
+                    <span className="ai-image-popup-meta-label">Dimensions</span>
+                    <strong className="ai-image-popup-meta-value">
                       {currentPopupImage.width && currentPopupImage.height
                         ? `${currentPopupImage.width} × ${currentPopupImage.height}px`
                         : "1024 × 1024px"}
                     </strong>
                   </div>
-                  <div>
-                    <span>Format</span>
-                    <strong>{String(currentPopupImage.format || "PNG").toUpperCase()}</strong>
+                  <div className="ai-image-popup-meta-item">
+                    <span className="ai-image-popup-meta-label">Format</span>
+                    <strong className="ai-image-popup-meta-value">
+                      {String(currentPopupImage.format || "PNG").toUpperCase()}
+                    </strong>
                   </div>
-                  <div>
-                    <span>Credits Used</span>
-                    <strong>{currentPopupImage.credits_used ?? 1} Credit</strong>
+                  <div className="ai-image-popup-meta-item">
+                    <span className="ai-image-popup-meta-label">Credits Used</span>
+                    <strong className="ai-image-popup-meta-value">
+                      {currentPopupImage.credits_used ?? 1}{" "}
+                      {(currentPopupImage.credits_used ?? 1) === 1 ? "Credit" : "Credits"}
+                    </strong>
                   </div>
                 </div>
 

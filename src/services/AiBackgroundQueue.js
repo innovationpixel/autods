@@ -80,9 +80,14 @@ class AiBackgroundQueueManager {
       return false;
     }
 
-    const trimmedPrompts = prompts.map((p) => (typeof p === "string" ? p.trim() : "")).filter(Boolean);
-    if (!trimmedPrompts.length) {
+    if (!Array.isArray(prompts) || prompts.length === 0) {
       toast.warn("No prompts provided for generation.");
+      return false;
+    }
+
+    const trimmedPrompts = prompts.map((p) => (typeof p === "string" ? p.trim() : ""));
+    if (trimmedPrompts.some((p) => !p)) {
+      toast.warn("Please ensure all prompts are filled out before generating.");
       return false;
     }
     if (!inputImages.length) {
@@ -90,13 +95,28 @@ class AiBackgroundQueueManager {
       return false;
     }
 
+    const missingRefs = trimmedPrompts
+      .map((_, idx) => {
+        const refId = referenceImageIds[idx];
+        const exists = refId && inputImages.some((img) => img.id === refId);
+        return exists ? null : idx + 1;
+      })
+      .filter(Boolean);
+
+    if (missingRefs.length > 0) {
+      toast.warn(
+        `Please select a reference image for prompt${missingRefs.length > 1 ? "s" : ""} #${missingRefs.join(", #")}.`
+      );
+      return false;
+    }
+
     const taskId = `ai-task-${Date.now()}`;
     this.activeTask = {
       id: taskId,
-      templateTitle: template.title || "Custom Template",
+      templateTitle: template.title || template.name || "Custom Template",
       total: trimmedPrompts.length,
       current: 0,
-      completedImages: [],
+      completedImages: new Array(trimmedPrompts.length).fill(null),
       failedCount: 0,
     };
     this.notifyListeners();
@@ -122,6 +142,7 @@ class AiBackgroundQueueManager {
           : null;
         const templateSlot = template.prompts?.[i]?.reference_index;
         const referencedImage = chosenImage ?? (templateSlot != null ? inputImages[templateSlot] : null);
+        const ref = referencedImage ?? inputImages[0];
 
         const formData = new FormData();
         formData.append("prompt", promptText);
@@ -132,8 +153,18 @@ class AiBackgroundQueueManager {
         if (template.id && !template.is_sample) {
           formData.append("template_id", template.id);
         }
-        inputImages.forEach(({ file }) => formData.append("images", file));
-        formData.append("image", (referencedImage ?? inputImages[0]).file);
+
+        inputImages.forEach((img) => {
+          if (img?.file instanceof File || img?.file instanceof Blob) {
+            formData.append("images[]", img.file);
+          }
+        });
+
+        if (ref?.file instanceof File || ref?.file instanceof Blob) {
+          formData.append("image", ref.file);
+        } else if (ref?.preview || ref?.url) {
+          formData.append("image_url", ref.preview || ref.url);
+        }
 
         try {
           const res = await generateAiImage(formData);
@@ -172,11 +203,16 @@ class AiBackgroundQueueManager {
 
           generatedImages.push(imageRecord);
           this.unviewedCount += 1;
-          this.activeTask.completedImages = [...generatedImages];
+          const nextCompleted = [...(this.activeTask.completedImages || [])];
+          nextCompleted[i] = imageRecord;
+          this.activeTask.completedImages = nextCompleted;
           this.notifyListeners();
         } catch (err) {
           failed++;
           this.activeTask.failedCount = failed;
+          const nextCompleted = [...(this.activeTask.completedImages || [])];
+          nextCompleted[i] = { error: true, prompt: promptText, image_url: null };
+          this.activeTask.completedImages = nextCompleted;
           this.notifyListeners();
           console.error("Background AI image generation prompt error:", err);
         }

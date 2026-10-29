@@ -1,3 +1,4 @@
+import { toast } from "../../../utils/toast";
 import { LuCloudUpload, LuLink, LuPlus, LuTrash2, LuType, LuX } from "react-icons/lu";
 import {
   ASPECT_RATIOS,
@@ -10,7 +11,6 @@ import {
   RatioPicker,
   ReferenceImagePicker,
   SliderField,
-  Stepper,
   UploadField,
 } from "./AiStudioControls";
 
@@ -23,6 +23,10 @@ function ImageTemplateSections({
   previewCard,
   footer,
   allowAddDeletePrompts = true,
+  allowAddPrompt = allowAddDeletePrompts,
+  allowDeletePrompt = allowAddDeletePrompts,
+  missingRefIndices = [],
+  onClearMissingRef,
 }) {
   const {
     inputImages,
@@ -63,13 +67,12 @@ function ImageTemplateSections({
     handleReferenceImageChange,
     addPromptRow,
     removePromptRow,
-    setPromptCount,
   } = form;
 
   return (
     <div className="ai-gen-hub__template">
       <div className="ai-gen-hub__template-row">
-        <article className="ai-gen-hub__card">
+        <article id="ai-section-input-images" className="ai-gen-hub__card">
           <div className="ai-gen-hub__section-head">
             <span className="ai-gen-hub__section-badge">1</span>
             <div>
@@ -254,23 +257,16 @@ function ImageTemplateSections({
             <RatioPicker options={OUTPUT_FORMATS} value={outputFormat} onChange={setOutputFormat} />
           </div>
 
-          <div className="ai-gen-hub__field">
-            <span className="ai-gen-hub__field-label">Number of Output Images</span>
-            <Stepper value={prompts.length} min={1} max={MAX_PROMPTS} onChange={setPromptCount} />
-            <span className="ai-gen-hub__hint">
-              We will generate {prompts.length} image{prompts.length > 1 ? "s" : ""} using your input images and prompts below.
-            </span>
-          </div>
         </article>
       </div>
 
       <div className="ai-gen-hub__template-row ai-gen-hub__template-row--split">
-        <article className="ai-gen-hub__card">
+        <article id="ai-section-prompts" className="ai-gen-hub__card">
           <div className="ai-gen-hub__section-head">
             <span className="ai-gen-hub__section-badge">4</span>
             <div>
               <h3>Prompts for Each Output Image</h3>
-              <p>Write a custom prompt for each image. Each prompt will generate one output image.</p>
+              <p>Write a custom prompt and select a reference image for each output image.</p>
             </div>
           </div>
 
@@ -279,31 +275,46 @@ function ImageTemplateSections({
           )}
 
           <div className="ai-gen-hub__prompt-table">
-            {prompts.map((prompt, index) => (
-              <div
-                className={`ai-gen-hub__prompt-row ${!allowAddDeletePrompts ? "ai-gen-hub__prompt-row--no-delete" : ""}`}
-                key={index}
-                style={!allowAddDeletePrompts ? { gridTemplateColumns: "32px minmax(0, 1fr) auto" } : undefined}
-              >
-                <span className="ai-gen-hub__prompt-number">{index + 1}</span>
-                <textarea
-                  rows={2}
-                  placeholder={
-                    index === 0
-                      ? "e.g. Main product image with clean white background, premium look."
-                      : `e.g. Describe output image ${index + 1}...`
-                  }
-                  value={prompt}
-                  onChange={(event) => handlePromptChange(index, event.target.value)}
-                />
-                <ReferenceImagePicker
-                  images={inputImages}
-                  valueId={referenceImageIds[index]}
-                  isOpen={openRefPicker === index}
-                  onToggle={() => setOpenRefPicker((prev) => (prev === index ? null : index))}
-                  onChange={(imageId) => handleReferenceImageChange(index, imageId)}
-                />
-                {allowAddDeletePrompts && (
+            {prompts.map((prompt, index) => {
+              const hasRefError = missingRefIndices.includes(index + 1);
+
+              return (
+                <div
+                  className={`ai-gen-hub__prompt-row ${!allowAddDeletePrompts ? "ai-gen-hub__prompt-row--no-delete" : ""} ${hasRefError ? "ai-gen-hub__prompt-row--ref-error" : ""}`}
+                  key={index}
+                  style={!allowAddDeletePrompts ? { gridTemplateColumns: "32px minmax(0, 1fr) auto" } : undefined}
+                >
+                  <span className="ai-gen-hub__prompt-number">{index + 1}</span>
+                  <textarea
+                    rows={2}
+                    placeholder={
+                      index === 0
+                        ? "e.g. Main product image with clean white background, premium look."
+                        : `e.g. Describe output image ${index + 1}...`
+                    }
+                    value={prompt}
+                    onChange={(event) => handlePromptChange(index, event.target.value)}
+                  />
+                  <ReferenceImagePicker
+                    images={inputImages}
+                    valueId={referenceImageIds[index]}
+                    isOpen={openRefPicker === index}
+                    hasError={hasRefError}
+                    onToggle={() => {
+                      if (inputImages.length === 0) {
+                        toast.warn("Upload input images in Step 1 first.");
+                        return;
+                      }
+                      setOpenRefPicker((prev) => (prev === index ? null : index));
+                    }}
+                    onChange={(imageId) => {
+                      handleReferenceImageChange(index, imageId);
+                      if (onClearMissingRef && imageId) {
+                        onClearMissingRef(index);
+                      }
+                    }}
+                  />
+                {allowDeletePrompt && (
                   <button
                     type="button"
                     className="ai-gen-hub__prompt-delete"
@@ -314,13 +325,14 @@ function ImageTemplateSections({
                   </button>
                 )}
               </div>
-            ))}
+            );
+          })}
           </div>
           <span className="ai-gen-hub__hint">
-            Optionally pick which uploaded input image a prompt should use as its reference.
+            Each prompt must have a reference image selected from your uploaded input images.
           </span>
 
-          {allowAddDeletePrompts && (
+          {allowAddPrompt && (
             <button
               type="button"
               className="ai-gen-hub__add-prompt-btn"

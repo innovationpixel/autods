@@ -128,44 +128,69 @@ export function Stepper({ value, min, max, onChange }) {
   );
 }
 
-export function ReferenceImagePicker({ images, valueId, isOpen, onToggle, onChange }) {
+export function ReferenceImagePicker({
+  images = [],
+  valueId,
+  isOpen,
+  onToggle,
+  onChange,
+  hasError = false,
+}) {
   const selected = images.find((image) => image.id === valueId) ?? null;
+  const selectedIndex = selected ? images.findIndex((image) => image.id === valueId) : -1;
 
   return (
     <div className="ai-gen-hub__ref-picker">
       <button
         type="button"
-        className="ai-gen-hub__ref-trigger"
-        title="Reference input image (optional)"
+        className={`ai-gen-hub__ref-trigger ${hasError ? "ai-gen-hub__ref-trigger--error" : ""} ${!selected ? "ai-gen-hub__ref-trigger--empty" : "ai-gen-hub__ref-trigger--selected"}`}
+        title={
+          selected
+            ? `Reference: Image ${selectedIndex + 1}`
+            : "Select reference image (required)"
+        }
         onClick={onToggle}
       >
-        {selected ? <img src={selected.preview} alt="Reference" /> : <LuImage />}
+        {selected ? (
+          <img src={selected.preview} alt={`Reference ${selectedIndex + 1}`} />
+        ) : (
+          <LuImage style={{ color: hasError ? "#ef4444" : "#f59e0b" }} />
+        )}
         <LuChevronDown />
       </button>
 
       {isOpen && (
         <div className="ai-gen-hub__ref-menu">
-          <button
-            type="button"
-            className={`ai-gen-hub__ref-option ${!valueId ? "ai-gen-hub__ref-option--active" : ""}`}
-            onClick={() => onChange(null)}
+          <div
+            style={{
+              padding: "7px 12px 6px",
+              fontSize: 10,
+              fontWeight: 700,
+              color: "#64748b",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              borderBottom: "1px solid #f1f5f9",
+            }}
           >
-            <span className="ai-gen-hub__ref-option-none">
-              <LuX />
-            </span>
-            <span>No reference</span>
-          </button>
-          {images.map((image, index) => (
-            <button
-              type="button"
-              key={image.id}
-              className={`ai-gen-hub__ref-option ${valueId === image.id ? "ai-gen-hub__ref-option--active" : ""}`}
-              onClick={() => onChange(image.id)}
-            >
-              <img src={image.preview} alt={`Input ${index + 1}`} />
-              <span>Image {index + 1}</span>
-            </button>
-          ))}
+            Select Reference Image *
+          </div>
+          {images.length === 0 ? (
+            <div style={{ padding: "12px 14px", fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+              Upload input images above first
+            </div>
+          ) : (
+            images.map((image, index) => (
+              <button
+                type="button"
+                key={image.id}
+                className={`ai-gen-hub__ref-option ${valueId === image.id ? "ai-gen-hub__ref-option--active" : ""}`}
+                onClick={() => onChange(image.id)}
+              >
+                <img src={image.preview} alt={`Input ${index + 1}`} />
+                <span>Image {index + 1}</span>
+              </button>
+            ))
+          )}
         </div>
       )}
     </div>

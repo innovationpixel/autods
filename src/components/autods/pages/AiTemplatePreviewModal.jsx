@@ -1,4 +1,4 @@
-import { LuCircleAlert, LuPlus, LuX, LuZap } from "react-icons/lu";
+import { LuCircleAlert, LuImage, LuPlus, LuX, LuZap } from "react-icons/lu";
 
 function AiTemplatePreviewModal({ template, creditsPerImage = 1, userCredits = 0, onBuyCredits, onClose, onUse }) {
   if (!template) return null;
@@ -127,12 +127,21 @@ function AiTemplatePreviewModal({ template, creditsPerImage = 1, userCredits = 0
         )}
 
         <div className="ai-gen-hub__preview-grid">
-          {(template.example_images ?? []).map((image, index) => (
-            <div className="ai-gen-hub__preview-item" key={image.id ?? image.url}>
-              <span className="ai-gen-hub__preview-badge">{index + 1}</span>
-              <img src={image.url} alt={`Example ${index + 1}`} />
-            </div>
-          ))}
+          {(template.prompts?.length ? template.prompts : (template.example_images ?? [])).map((item, index) => {
+            const image = template.example_images?.[index];
+            return (
+              <div className="ai-gen-hub__preview-item" key={image?.id ?? image?.url ?? index}>
+                <span className="ai-gen-hub__preview-badge">{index + 1}</span>
+                {image?.url ? (
+                  <img src={image.url} alt={`Example ${index + 1}`} />
+                ) : (
+                  <div className="ai-gen-hub__preview-placeholder">
+                    <LuImage />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <ol className="ai-gen-hub__tpl-prompts">

@@ -20,6 +20,7 @@ import { composeImageWithBranding, extractMediaUrl } from "./aiStudioUtils";
 import ImageTemplateSections from "./ImageTemplateSections";
 import { useImageTemplateForm } from "./useImageTemplateForm";
 import BuyAiCreditsModal from "./BuyAiCreditsModal";
+import SelectReferenceImagesModal from "./SelectReferenceImagesModal";
 
 function AiImageGenerator({ template, onBack, onViewMyImages }) {
   const authUser = useSelector(selectUser);
@@ -48,6 +49,7 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
     outputFormat,
     prompts,
     referenceImageIds,
+    setReferenceImageIds,
   } = form;
 
   const [queueState, setQueueState] = useState(aiBackgroundQueue.getState());
@@ -58,6 +60,8 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
   const [userCredits, setUserCredits] = useState(authUser?.ai_credits ?? 0);
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
+  const [missingRefIndices, setMissingRefIndices] = useState([]);
+  const [refModalOpen, setRefModalOpen] = useState(false);
 
   useEffect(() => {
     return aiBackgroundQueue.subscribe(setQueueState);
@@ -126,30 +130,24 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
   const generatingIndex = currentTask?.current || 0;
 
   useEffect(() => {
-    if (currentTask?.completedImages?.length) {
+    if (currentTask?.completedImages) {
       setOutputs(
-        currentTask.completedImages.map((img, idx) => ({
-          index: idx + 1,
-          prompt: img.prompt,
-          url: img.image_url,
-        }))
+        prompts.map((p, idx) => {
+          const img = currentTask.completedImages[idx];
+          return {
+            index: idx + 1,
+            prompt: img?.prompt || p,
+            url: img?.image_url || null,
+            error: img?.error || false,
+          };
+        })
       );
     }
-  }, [currentTask?.completedImages]);
+  }, [currentTask?.completedImages, prompts]);
 
   const totalCost = prompts.length * creditsPerImage;
 
-  const handleGenerateAllImages = async () => {
-    const trimmedPrompts = prompts.map((prompt) => prompt.trim());
-    if (trimmedPrompts.some((prompt) => !prompt)) {
-      toast.warn(`Fill in all ${prompts.length} prompt${prompts.length > 1 ? "s" : ""} before generating.`);
-      return;
-    }
-    if (inputImages.length === 0) {
-      toast.warn("Upload at least one input image first.");
-      return;
-    }
-
+  const executeGeneration = async (finalRefIds = referenceImageIds) => {
     if (userCredits < totalCost && authUser?.role !== "super_admin") {
       toast.error(
         `Insufficient AI Credits: Generating ${prompts.length} images requires ${totalCost} credits, but you have ${userCredits}. Please purchase more credits.`
@@ -163,9 +161,9 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
 
     await aiBackgroundQueue.startGeneration({
       template,
-      prompts: trimmedPrompts,
+      prompts: prompts.map((p) => p.trim()),
       inputImages,
-      referenceImageIds,
+      referenceImageIds: finalRefIds,
       ratio: ratioValue,
       outputWidth,
       outputHeight,
@@ -183,6 +181,48 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
       } : null,
       navigateToMyImages: onViewMyImages,
     });
+  };
+
+  const handleGenerateAllImages = async () => {
+    const trimmedPrompts = prompts.map((prompt) => prompt.trim());
+    if (trimmedPrompts.some((prompt) => !prompt)) {
+      toast.warn(`Fill in all ${prompts.length} prompt${prompts.length > 1 ? "s" : ""} before generating.`);
+      return;
+    }
+    if (inputImages.length === 0) {
+      toast.warn("Upload at least one input image in Step 1 first.");
+      document.getElementById("ai-section-input-images")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    const missingRefs = prompts
+      .map((_, index) => {
+        const refId = referenceImageIds[index];
+        const isValid = refId && inputImages.some((img) => img.id === refId);
+        return isValid ? null : index + 1;
+      })
+      .filter(Boolean);
+
+    if (missingRefs.length > 0) {
+      setMissingRefIndices(missingRefs);
+      setRefModalOpen(true);
+      return;
+    }
+
+    setMissingRefIndices([]);
+    await executeGeneration(referenceImageIds);
+  };
+
+  const handleConfirmReferenceImages = async (newRefIds) => {
+    setReferenceImageIds(newRefIds);
+    setMissingRefIndices([]);
+    setRefModalOpen(false);
+    await executeGeneration(newRefIds);
+  };
+
+  const handleCloseRefModal = () => {
+    setRefModalOpen(false);
+    document.getElementById("ai-section-prompts")?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -364,7 +404,7 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
         <span>
           {isGenerating
             ? `Generating image ${generatingIndex || 1} of ${prompts.length} in background…`
-            : `Generate All Images (${totalCost} AI Credits)`}
+            : `Generate All ${prompts.length} Image${prompts.length > 1 ? "s" : ""} (${totalCost} AI Credits)`}
         </span>
       </button>
     </div>
@@ -467,6 +507,21 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
         previewCard={previewCard}
         footer={footer}
         allowAddDeletePrompts={false}
+        allowAddPrompt={false}
+        missingRefIndices={missingRefIndices}
+        onClearMissingRef={(idx) =>
+          setMissingRefIndices((prev) => prev.filter((item) => item !== idx + 1))
+        }
+      />
+
+      <SelectReferenceImagesModal
+        open={refModalOpen}
+        onClose={handleCloseRefModal}
+        prompts={prompts}
+        inputImages={inputImages}
+        currentReferenceIds={referenceImageIds}
+        onConfirm={handleConfirmReferenceImages}
+        totalCost={totalCost}
       />
 
       <BuyAiCreditsModal
