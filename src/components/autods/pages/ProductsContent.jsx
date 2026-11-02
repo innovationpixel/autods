@@ -880,23 +880,29 @@ function ProductsContent({ searchQuery }) {
     );
   };
 
-  const renderProductCell = (item, columnId, imageUrl) => {
+  const renderProductCell = (item, columnId, imageUrl, isBottomRow = false) => {
     switch (columnId) {
-      case "actions":
+      case "actions": {
+        const isMenuOpen = openMenuId === item.id;
         return (
-          <div className="products-row-actions" onClick={(e) => e.stopPropagation()}>
+          <div className={`products-row-actions ${isMenuOpen ? "is-open" : ""}`} onClick={(e) => e.stopPropagation()}>
             {item.listing_url ? (
               <a href={item.listing_url} target="_blank" rel="noopener noreferrer" className="orders-row-actions__icon" aria-label="View on eBay" title="View on eBay">
                 <LuExternalLink />
               </a>
             ) : null}
-            <button type="button" className="orders-row-actions__icon" onClick={() => setOpenMenuId((c) => (c === item.id ? "" : item.id))} aria-label="Open product menu">
+            <button
+              type="button"
+              className={`orders-row-actions__icon ${isMenuOpen ? "is-active" : ""}`}
+              onClick={() => setOpenMenuId((c) => (c === item.id ? "" : item.id))}
+              aria-label="Open product menu"
+            >
               <LuEllipsisVertical />
             </button>
 
-            {openMenuId === item.id ? (
-              <div className="products-actions-menu">
-                <button type="button" onClick={() => openProductEditor(item)}>
+            {isMenuOpen ? (
+              <div className={`products-actions-menu ${isBottomRow ? "products-actions-menu--up" : ""}`}>
+                <button type="button" onClick={() => { openProductEditor(item); setOpenMenuId(""); }}>
                   <LuPencil />
                   <span>Edit Product</span>
                 </button>
@@ -926,6 +932,7 @@ function ProductsContent({ searchQuery }) {
                 </button>
                 <button
                   type="button"
+                  className="products-actions-menu__delete"
                   onClick={() => {
                     setDeleteConfirm({ type: "single", id: item.id });
                     setOpenMenuId("");
@@ -938,6 +945,7 @@ function ProductsContent({ searchQuery }) {
             ) : null}
           </div>
         );
+      }
       case "name":
         return (
           <div className="products-item">
@@ -951,7 +959,7 @@ function ProductsContent({ searchQuery }) {
               </div>
             )}
             <div className="products-item__copy">
-              <h3>{item.title}</h3>
+              <h3 title={item.title}>{item.title}</h3>
               {publishingIds.includes(item.id) ? (
                 <div className="products-item__processing" role="status">
                   <LuLoader className="spin-icon" />
@@ -1353,7 +1361,11 @@ function ProductsContent({ searchQuery }) {
                       key={column.id}
                       className={column.id === "name" ? "products-table__name-col" : undefined}
                       rowSpan={hasStockGroup ? 2 : 1}
-                      style={{ minWidth: column.minWidth, cursor: "pointer" }}
+                      style={{
+                        minWidth: column.minWidth,
+                        width: column.id === "name" ? column.minWidth : undefined,
+                        cursor: "pointer",
+                      }}
                       onClick={() => handleSort(column.id)}
                     >
                       {renderProductColumnHeader(column)}
@@ -1392,11 +1404,17 @@ function ProductsContent({ searchQuery }) {
                   </td>
                 </tr>
               ) : sortedRows.length ? (
-                sortedRows.map((item) => {
+                sortedRows.map((item, rowIndex) => {
                   const imageUrl = getListingImageUrl(item);
+                  const isMenuOpen = openMenuId === item.id;
+                  const isBottomRow = sortedRows.length > 3 && rowIndex >= sortedRows.length - 2;
 
                   return (
-                    <tr className={`products-table__row ${item.warning ? "products-table__row--warning" : ""}`} key={item.id}>
+                    <tr
+                      className={`products-table__row ${item.warning ? "products-table__row--warning" : ""} ${isMenuOpen ? "products-table__row--active-menu" : ""}`}
+                      key={item.id}
+                      style={isMenuOpen ? { zIndex: 10000, position: "relative" } : undefined}
+                    >
                       <td className="products-table__checkbox-col">
                         <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleSelectOne(item.id)} />
                       </td>
@@ -1406,9 +1424,13 @@ function ProductsContent({ searchQuery }) {
                           key={column.id}
                           className={getProductCellClassName(column.id)}
                           data-column={column.id}
-                          style={{ minWidth: column.minWidth }}
+                          style={{
+                            minWidth: column.minWidth,
+                            width: column.id === "name" ? column.minWidth : undefined,
+                            ...(column.id === "actions" && isMenuOpen ? { zIndex: 10001 } : {}),
+                          }}
                         >
-                          {renderProductCell(item, column.id, imageUrl)}
+                          {renderProductCell(item, column.id, imageUrl, isBottomRow)}
                         </td>
                       ))}
                     </tr>

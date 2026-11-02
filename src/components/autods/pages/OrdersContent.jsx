@@ -2117,15 +2117,21 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
                   </td>
                 </tr>
               ) : visibleOrders.length ? (
-                visibleOrders.map((order) => {
+                visibleOrders.map((order, index) => {
                   const meta = statusMeta[order.status];
                   const StatusIcon = meta.icon;
+                  const isMenuOpen = openRowBoltId === order.id || openRowPrintId === order.id;
+                  const isBottomRow = visibleOrders.length > 3 && index >= visibleOrders.length - 2;
 
                   return (
                     <tr
                       id={`orders-row-${order.id}`}
-                      className={openDetailsId === order.id ? "orders-table__row orders-table__row--active" : "orders-table__row"}
+                      className={[
+                        openDetailsId === order.id ? "orders-table__row orders-table__row--active" : "orders-table__row",
+                        isMenuOpen ? "orders-table__row--active-menu" : "",
+                      ].filter(Boolean).join(" ")}
                       key={order.id}
+                      style={isMenuOpen ? { position: "relative", zIndex: 10000 } : undefined}
                     >
                       <td className="orders-table__checkbox-col">
                         <input
@@ -2152,8 +2158,14 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
                         </td>
                       ))}
 
-                      <td className="orders-table__actions-col">
-                        <div className="orders-row-actions" onClick={(event) => event.stopPropagation()}>
+                      <td
+                        className="orders-table__actions-col"
+                        style={isMenuOpen ? { zIndex: 10001 } : undefined}
+                      >
+                        <div
+                          className={`orders-row-actions ${isMenuOpen ? "is-open" : ""}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
                           <div className="orders-row-actions__item">
                             <button
                               type="button"
@@ -2164,7 +2176,13 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
                             >
                               <LuPrinter />
                             </button>
-                            {openRowPrintId === order.id ? renderRowActionMenu(order.id, orderRowPrintActions) : null}
+                            {openRowPrintId === order.id
+                              ? renderRowActionMenu(
+                                  order.id,
+                                  orderRowPrintActions,
+                                  isBottomRow ? "orders-actions-menu--up" : ""
+                                )
+                              : null}
                           </div>
 
                           <div className="orders-row-actions__item">
@@ -2179,7 +2197,11 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
                               {archivingId === order.id ? <LuLoader className="spin-icon" /> : <LuBolt />}
                             </button>
                             {openRowBoltId === order.id
-                              ? renderRowActionMenu(order.id, boltActions, "orders-actions-menu--wide")
+                              ? renderRowActionMenu(
+                                  order.id,
+                                  boltActions,
+                                  `orders-actions-menu--wide ${isBottomRow ? "orders-actions-menu--up" : ""}`
+                                )
                               : null}
                           </div>
                         </div>

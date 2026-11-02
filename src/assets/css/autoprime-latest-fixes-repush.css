@@ -36,9 +36,29 @@
 }
 
 .products-page-content .products-table tbody td:nth-child(2),
-.products-page-content .products-table thead tr:last-child th:nth-child(2) {
-  width: 320px !important;
-  min-width: 320px !important;
+.products-page-content .products-table thead tr:first-child th:nth-child(2),
+.products-page-content .products-table thead tr:last-child th:nth-child(2),
+.products-page-content .products-table th.products-table__name-col,
+.products-page-content .products-table td.products-table__name-col {
+  width: 500px !important;
+  min-width: 500px !important;
+}
+
+.products-page-content .products-item {
+  width: 100% !important;
+  min-width: 460px !important;
+}
+
+.products-page-content .products-item__copy h3,
+.products-page-content .products-table td.products-table__name-col h3 {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  line-height: 1.4 !important;
 }
 
 /* =========================
@@ -275,4 +295,213 @@
 
 .returns-disputes-page .rd-btn-action--primary {
   min-width: 78px !important;
+}
+
+/* Products actions dropdown menu styling */
+.products-page-content .products-table tbody td:last-child > div > button,
+.products-page-content .products-table tbody td:last-child > div > a,
+.products-page-content .products-table tbody td:last-child .orders-row-actions__icon {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+}
+
+.products-page-content .products-table tbody tr.products-table__row--active-menu {
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+.products-page-content .products-table tbody tr.products-table__row--active-menu td:last-child {
+  z-index: 10001 !important;
+}
+
+.products-page-content .products-row-actions {
+  position: relative !important;
+}
+
+.products-page-content .products-row-actions.is-open {
+  z-index: 10001 !important;
+}
+
+.products-page-content .products-actions-menu {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: auto !important;
+  z-index: 10002 !important;
+  min-width: 200px !important;
+  width: max-content !important;
+  padding: 6px 0 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.08) !important;
+}
+
+.products-page-content .products-actions-menu.products-actions-menu--up {
+  top: auto !important;
+  bottom: calc(100% + 6px) !important;
+}
+
+.products-page-content .products-actions-menu button {
+  width: 100% !important;
+  min-width: 100% !important;
+  height: auto !important;
+  min-height: 36px !important;
+  padding: 8px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #334155 !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+}
+
+.products-page-content .products-actions-menu button:hover:not(:disabled) {
+  background: #f8fafc !important;
+  color: #6d28d9 !important;
+}
+
+.products-page-content .products-actions-menu button svg {
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  flex-shrink: 0 !important;
+  color: #64748b !important;
+}
+
+.products-page-content .products-actions-menu button:hover:not(:disabled) svg {
+  color: #6d28d9 !important;
+}
+
+.products-page-content .products-actions-menu button.products-actions-menu__delete,
+.products-page-content .products-actions-menu button:last-child {
+  color: #dc2626 !important;
+  border-top: 1px solid #f1f5f9 !important;
+  margin-top: 2px !important;
+  padding-top: 9px !important;
+}
+
+.products-page-content .products-actions-menu button.products-actions-menu__delete svg,
+.products-page-content .products-actions-menu button:last-child svg {
+  color: #dc2626 !important;
+}
+
+.products-page-content .products-actions-menu button.products-actions-menu__delete:hover,
+.products-page-content .products-actions-menu button:last-child:hover {
+  background: #fef2f2 !important;
+  color: #b91c1c !important;
+}
+
+/* =========================================================================
+   ORDERS PAGE: Actions Dropdown Menu Elevation & Visibility Fix
+   Prevents .orders-actions-menu from hiding behind grid columns or headers.
+   ========================================================================= */
+.orders-page-content .orders-table-shell {
+  overflow: visible !important;
+}
+
+.orders-page-content .orders-table-scroll {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+}
+
+.orders-page-content .orders-table tbody tr.orders-table__row--active-menu {
+  position: relative !important;
+  z-index: 10000 !important;
+}
+
+.orders-page-content .orders-table tbody tr.orders-table__row--active-menu td.orders-table__actions-col,
+.orders-page-content .orders-table tbody td.orders-table__actions-col:has(.orders-actions-menu) {
+  position: sticky !important;
+  right: 0 !important;
+  z-index: 10001 !important;
+}
+
+.orders-page-content .orders-row-actions {
+  position: relative !important;
+}
+
+.orders-page-content .orders-row-actions.is-open,
+.orders-page-content .orders-row-actions__item:has(.orders-actions-menu) {
+  position: relative !important;
+  z-index: 10002 !important;
+}
+
+.orders-page-content .orders-actions-menu,
+.orders-page-content .orders-actions-menu--row,
+.orders-page-content .orders-actions-menu--wide {
+  position: absolute !important;
+  z-index: 10003 !important;
+  top: calc(100% + 6px) !important;
+  bottom: auto !important;
+  right: 0 !important;
+  left: auto !important;
+  min-width: 240px !important;
+  width: max-content !important;
+  max-width: 320px !important;
+  max-height: min(380px, 60vh) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.22), 0 8px 14px -6px rgba(15, 23, 42, 0.12) !important;
+}
+
+.orders-page-content .orders-actions-menu.orders-actions-menu--up,
+.orders-page-content .orders-actions-menu--row.orders-actions-menu--up {
+  top: auto !important;
+  bottom: calc(100% + 6px) !important;
+}
+
+.orders-page-content .orders-actions-menu__item,
+.orders-page-content .orders-actions-menu button {
+  width: 100% !important;
+  min-width: 100% !important;
+  height: auto !important;
+  min-height: 36px !important;
+  padding: 8px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  border: none !important;
+  border-top: 1px solid #f1f5f9 !important;
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  color: #334155 !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  transition: background 0.12s ease, color 0.12s ease !important;
+}
+
+.orders-page-content .orders-actions-menu__item:first-child,
+.orders-page-content .orders-actions-menu button:first-child {
+  border-top: none !important;
+}
+
+.orders-page-content .orders-actions-menu__item:hover:not(:disabled),
+.orders-page-content .orders-actions-menu button:hover:not(:disabled) {
+  background: #f8fafc !important;
+  color: #6d28d9 !important;
+}
+
+.orders-page-content .orders-actions-menu__item--disabled,
+.orders-page-content .orders-actions-menu__item:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
 }

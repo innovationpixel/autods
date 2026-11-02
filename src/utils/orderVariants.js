@@ -104,3 +104,85 @@ export function resolveOrderVariant(order) {
   return "";
 }
 
+/**
+ * Automatically match and score the best AliExpress SKU for an order
+ * based on order variation aspects, color, and title keywords.
+ */
+export function resolveBestSku(order, skus) {
+  if (!Array.isArray(skus) || !skus.length) return null;
+  if (skus.length === 1) return skus[0];
+
+  const searchTerms = new Set();
+
+  const variantStr = order.variant || order.variantTitle || order.color || "";
+  if (variantStr && variantStr !== "—") {
+    variantStr.split(/[,;\/|]/).forEach((part) => {
+      const trimmed = part.trim();
+      if (trimmed) {
+        if (trimmed.includes(":")) {
+          searchTerms.add(trimmed.split(":")[1].trim().toLowerCase());
+        } else {
+          searchTerms.add(trimmed.toLowerCase());
+        }
+      }
+    });
+  }
+
+  const raw = order.raw_data ?? {};
+  const firstItem = raw.lineItems?.[0] ?? {};
+  const aspects =
+    firstItem.lineItemFulfillmentInstructions?.variations ??
+    firstItem.variationAspects ??
+    firstItem.itemVariation?.variationAspects ??
+    order.source_variation ??
+    raw.source_variation ??
+    [];
+
+  if (Array.isArray(aspects)) {
+    aspects.forEach((a) => {
+      if (typeof a === "string" && a.trim()) {
+        searchTerms.add(a.trim().toLowerCase());
+      } else if (a && typeof a === "object") {
+        const val = a.value ?? a.localizedValue ?? a.skuPropertyValue ?? a.property_value;
+        if (val) searchTerms.add(String(val).trim().toLowerCase());
+      }
+    });
+  }
+
+  const titleWords = String(order.title ?? firstItem.title ?? "").toLowerCase().split(/\s+/);
+
+  let bestCandidate = null;
+  let bestScore = -1;
+
+  for (const sku of skus) {
+    const stock = Number(sku.stock ?? sku.inventory ?? 1);
+    let score = stock > 0 ? 1 : 0;
+
+    const props = Array.isArray(sku.properties) ? sku.properties : [];
+    for (const prop of props) {
+      const val = String(prop.value ?? prop.property_value ?? "").trim().toLowerCase();
+      if (!val) continue;
+
+      if (searchTerms.has(val)) {
+        score += 10;
+      } else {
+        for (const term of searchTerms) {
+          if (term && (term.includes(val) || val.includes(term))) {
+            score += 5;
+            break;
+          }
+        }
+        if (titleWords.includes(val)) {
+          score += 3;
+        }
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestCandidate = sku;
+    }
+  }
+
+  return bestCandidate || skus.find((s) => Number(s.stock ?? s.inventory ?? 1) > 0) || skus[0];
+}

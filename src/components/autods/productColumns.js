@@ -1,7 +1,7 @@
 export const PRODUCT_COLUMN_STORAGE_KEY = "autods_products_visible_columns_v1";
 
 const COLUMN_MIN_WIDTHS = {
-  name: 320,
+  name: 500,
   uploaded: 118,
   store: 120,
   stockAvailable: 110,

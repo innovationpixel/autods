@@ -58,7 +58,9 @@ import ExternalOrderModal from "../ExternalOrderModal";
 import OrdersTrackingEditor from "../OrdersTrackingEditor";
 import OrderShippingAddressModal from "../OrderShippingAddressModal";
 import AddressRecommendationModal from "../AddressRecommendationModal";
-import { resolveOrderVariant, formatVariantAspects } from "../../../utils/orderVariants";
+import BulkOrderFixationModal from "../BulkOrderFixationModal";
+import { getAliExpressProduct } from "../../../services/AliExpressService";
+import { resolveOrderVariant, formatVariantAspects, resolveBestSku } from "../../../utils/orderVariants";
 
 const PROCESSING_TABS = [
   { key: "new", label: "New Orders" },
@@ -222,6 +224,7 @@ function OrderProcessingContent() {
 
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
   const [sortBy, setSortBy] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
 
@@ -262,7 +265,10 @@ function OrderProcessingContent() {
   const [addressModalOrder, setAddressModalOrder] = useState(null);
   const [addressModalSaving, setAddressModalSaving] = useState(false);
   const [bulkAddressModalOpen, setBulkAddressModalOpen] = useState(false);
+  const [bulkSourceModalOpen, setBulkSourceModalOpen] = useState(false);
   const [bulkAction, setBulkAction] = useState("");
+  const [fixationModalOpen, setFixationModalOpen] = useState(false);
+  const [fixationOrders, setFixationOrders] = useState([]);
   const tableScrollRef = useRef(null);
 
   const selectedOrders = useMemo(() => {
@@ -664,12 +670,15 @@ function OrderProcessingContent() {
 
   const executeProcessOrder = async (order) => {
     setProcessingId(order.id);
+    const placePayload = {
+      processing_method: processingMethod,
+      buyer_account_id:
+        processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
+      auto_accept_recommended_address: true,
+    };
+
     try {
-      const res = await placeAliExpressOrder(order.id, {
-        processing_method: processingMethod,
-        buyer_account_id:
-          processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
-      });
+      const res = await placeAliExpressOrder(order.id, placePayload);
       toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
       setConfirmOrder(null);
       if (processingMethod === "autods") {
@@ -677,23 +686,63 @@ function OrderProcessingContent() {
       }
       setActiveTab("processed");
     } catch (err) {
-      setConfirmOrder(null);
-      const message = getApiErrorMessage(err, "Could not process this order.");
-      const lower = message.toLowerCase();
+      let message = getApiErrorMessage(err, "Could not process this order.");
+      let lower = message.toLowerCase();
 
-      if (lower.includes("insufficient") || lower.includes("balance") || lower.includes("wallet")) {
-        setTransferModalOpen(true);
-      } else if (
-        lower.includes("source") ||
-        lower.includes("link") ||
-        lower.includes("product") ||
-        lower.includes("sku") ||
-        lower.includes("variation")
+      // If address blockage, auto-fix and retry
+      if (
+        lower.includes("formatting rules") ||
+        lower.includes("recommended address") ||
+        lower.includes("state/province") ||
+        (lower.includes("address") && lower.includes("aliexpress"))
       ) {
-        startEditSource(order);
+        try {
+          await acceptRecommendedAddress(order.id);
+          const res = await placeAliExpressOrder(order.id, placePayload);
+          toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
+          setConfirmOrder(null);
+          if (processingMethod === "autods") {
+            loadWallet();
+          }
+          setActiveTab("processed");
+          return;
+        } catch (retryErr) {
+          message = getApiErrorMessage(retryErr, message);
+          lower = message.toLowerCase();
+        }
       }
 
-      toast.error(message, { autoClose: 9000 });
+      setConfirmOrder(null);
+      if (lower.includes("insufficient") || lower.includes("balance") || lower.includes("wallet")) {
+        setTransferModalOpen(true);
+        toast.error("Failed due to insufficient wallet balance.", { autoClose: 9000 });
+      } else {
+        const isAddress =
+          lower.includes("address") ||
+          lower.includes("city") ||
+          lower.includes("zip") ||
+          lower.includes("postal") ||
+          lower.includes("state") ||
+          lower.includes("province") ||
+          lower.includes("formatting rules") ||
+          lower.includes("delivery address");
+        const isVariation =
+          lower.includes("source") ||
+          lower.includes("link") ||
+          lower.includes("product") ||
+          lower.includes("sku") ||
+          lower.includes("variation");
+
+        if (isAddress) {
+          toast.error("1 Failed due to address.", { autoClose: 8000 });
+          setAddressModalOrder(order);
+        } else if (isVariation) {
+          toast.error("1 have 0 source link or defined variant.", { autoClose: 8000 });
+          startEditSource(order);
+        } else {
+          toast.error(message, { autoClose: 9000 });
+        }
+      }
     } finally {
       setProcessingId("");
     }
@@ -821,6 +870,11 @@ function OrderProcessingContent() {
   };
 
   const handleBulkProcess = async () => {
+    if (!selectedIds.length) {
+      toast.warn("Please select at least one order to process.");
+      return;
+    }
+
     const selected = orders.filter(
       (order) =>
         selectedIds.includes(order.id) &&
@@ -835,8 +889,14 @@ function OrderProcessingContent() {
         (!order.hasSource || order.sourcePlatform?.toLowerCase() !== "aliexpress")
     ).length;
 
+    const alreadyPlacedCount = orders.filter(
+      (order) => selectedIds.includes(order.id) && order.aliexpressOrderId
+    ).length;
+
     if (!selected.length) {
-      if (nonAliExpressCount > 0) {
+      if (alreadyPlacedCount > 0) {
+        toast.info("Selected order(s) have already been placed on AliExpress.");
+      } else if (nonAliExpressCount > 0) {
         toast.warn(
           "Selected order(s) do not have a valid AliExpress source. All orders are processed with AliExpress only — please add AliExpress source links first."
         );
@@ -855,46 +915,243 @@ function OrderProcessingContent() {
       return;
     }
 
-    setBulkProcessing(true);
-    let succeeded = 0;
-    let failed = 0;
-    const failureMessages = new Set();
+    if (processingMethod === "autods") {
+      const walletBalance = Number(wallet?.processing_wallet_balance ?? 0);
+      if (walletBalance <= 0) {
+        toast.warn(
+          "Your Processing Wallet balance is $0.00. Please transfer funds from your main wallet to process orders.",
+          { autoClose: 8000 }
+        );
+        setTransferModalOpen(true);
+        return;
+      }
+    }
 
-    for (const order of eligible) {
+    setBulkProcessing(true);
+    setBulkProgress({ current: 0, total: eligible.length });
+    let succeeded = 0;
+    let failedAddress = 0;
+    let failedVariantOrSource = 0;
+    let failedOther = 0;
+    const failedOrderIds = [];
+    let walletInsufficient = false;
+
+    for (let i = 0; i < eligible.length; i++) {
+      const order = eligible[i];
+      setBulkProgress({ current: i + 1, total: eligible.length });
       setProcessingId(order.id);
+
+      const hasSource = Boolean(order.sourceProductId || order.itemBuy || order.sourceUrl);
+      if (!hasSource) {
+        failedVariantOrSource += 1;
+        failedOrderIds.push(order.id);
+        continue;
+      }
+
+      const placePayload = {
+        processing_method: processingMethod,
+        buyer_account_id:
+          processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
+        auto_accept_recommended_address: true,
+      };
+
       try {
-        await placeAliExpressOrder(order.id, {
-          processing_method: processingMethod,
-          buyer_account_id:
-            processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
-        });
+        await placeAliExpressOrder(order.id, placePayload);
         succeeded += 1;
       } catch (err) {
-        failed += 1;
-        failureMessages.add(getApiErrorMessage(err, "Could not process this order."));
+        let msg = getApiErrorMessage(err, "Could not process this order.");
+        let msgLower = msg.toLowerCase();
+        let recovered = false;
+
+        // 1. Check if error is due to address formatting blockage (e.g. ID -> Idaho)
+        const isAddressBlockage =
+          msgLower.includes("formatting rules") ||
+          msgLower.includes("recommended address") ||
+          msgLower.includes("state/province") ||
+          msgLower.includes("aliexpress formatting") ||
+          (msgLower.includes("address") && msgLower.includes("aliexpress"));
+
+        // 2. Check if error is due to variation / SKU blockage
+        const isVariationBlockage =
+          msgLower.includes("variation") ||
+          msgLower.includes("sku") ||
+          msgLower.includes("select the correct variation");
+
+        if (isAddressBlockage) {
+          try {
+            // Auto-fix address blockage by accepting recommended address
+            await acceptRecommendedAddress(order.id);
+            // Process again!
+            await placeAliExpressOrder(order.id, placePayload);
+            succeeded += 1;
+            recovered = true;
+          } catch (retryErr) {
+            msg = getApiErrorMessage(retryErr, msg);
+            msgLower = msg.toLowerCase();
+          }
+        }
+
+        if (!recovered && isVariationBlockage && (order.sourceProductId || order.itemBuy)) {
+          try {
+            // Auto-fix variation blockage by resolving SKU and updating source
+            const productId = order.sourceProductId || order.itemBuy;
+            const res = await getAliExpressProduct(productId);
+            const skus = Array.isArray(res.data?.skus) ? res.data.skus : [];
+
+            if (skus.length > 0) {
+              const matchedSku = resolveBestSku(order, skus);
+              if (matchedSku) {
+                await updateOrderSource(order.id, {
+                  source_input: order.sourceUrl || `https://www.aliexpress.com/item/${productId}.html`,
+                  source_platform: "aliexpress",
+                  source_sku_id: String(matchedSku.id ?? matchedSku.sku_id ?? ""),
+                  source_variation: Array.isArray(matchedSku.properties)
+                    ? matchedSku.properties.map((p) => ({ name: p.name, value: p.value }))
+                    : null,
+                });
+                // Process again!
+                await placeAliExpressOrder(order.id, placePayload);
+                succeeded += 1;
+                recovered = true;
+              }
+            }
+          } catch (retryErr) {
+            msg = getApiErrorMessage(retryErr, msg);
+            msgLower = msg.toLowerCase();
+          }
+        }
+
+        if (!recovered) {
+          failedOrderIds.push(order.id);
+
+          if (isAddressBlockage) {
+            failedAddress += 1;
+          } else if (isVariationBlockage) {
+            failedVariantOrSource += 1;
+          } else if (msgLower.includes("insufficient") || msgLower.includes("wallet")) {
+            walletInsufficient = true;
+            failedOther += 1;
+            for (let j = i + 1; j < eligible.length; j++) {
+              failedOrderIds.push(eligible[j].id);
+              failedOther += 1;
+            }
+            break;
+          } else {
+            failedOther += 1;
+          }
+        }
       }
     }
 
     setProcessingId("");
     setBulkProcessing(false);
-    setSelectedIds([]);
+    setBulkProgress({ current: 0, total: 0 });
+    setSelectedIds(failedOrderIds);
 
-    if (succeeded) toast.success(`${succeeded} order${succeeded === 1 ? "" : "s"} processed.`);
-    if (failed) {
-      const reasons = Array.from(failureMessages).slice(0, 2).join(" · ");
-      toast.error(`${failed} order${failed === 1 ? "" : "s"} could not be processed: ${reasons}`, { autoClose: 8000 });
+    // Build proper system message
+    const parts = [];
+    if (succeeded > 0) {
+      parts.push(`${succeeded} Processed`);
     }
-    if (skippedForBuyerAccount) {
+    if (failedAddress > 0) {
+      parts.push(`${failedAddress} Failed due to address`);
+    }
+    if (failedVariantOrSource > 0) {
+      parts.push(`${failedVariantOrSource} have 0 source link or defined variant`);
+    }
+    if (failedOther > 0) {
+      parts.push(`${failedOther} Failed`);
+    }
+
+    const summaryText = parts.length > 0 ? parts.join(", ") + "." : "Order processing completed.";
+
+    if (failedAddress > 0 || failedVariantOrSource > 0 || failedOther > 0) {
+      if (succeeded > 0) {
+        toast.warn(summaryText, { autoClose: 9000 });
+      } else {
+        toast.error(summaryText, { autoClose: 9000 });
+      }
+      if (walletInsufficient) {
+        setTransferModalOpen(true);
+      }
+    } else {
+      toast.success(summaryText);
+    }
+    if (skippedForBuyerAccount > 0) {
       toast.warn(
         `${skippedForBuyerAccount} order${skippedForBuyerAccount === 1 ? "" : "s"} skipped — no buyer account tagged for their marketplace.`,
       );
     }
+    if (nonAliExpressCount > 0 && selected.length > 0) {
+      toast.warn(
+        `${nonAliExpressCount} order${nonAliExpressCount === 1 ? "" : "s"} skipped — missing valid AliExpress source link.`,
+      );
+    }
 
-    if (succeeded) {
-      await loadOrders();
-      if (processingMethod === "autods") {
-        loadWallet();
+    await loadOrders();
+    if (processingMethod === "autods") {
+      loadWallet();
+    }
+  };
+
+  const handleBulkFixBlockages = async (andProcess = false) => {
+    if (!selectedIds.length) {
+      toast.warn("Please select at least one order to fix.");
+      return;
+    }
+
+    const selected = orders.filter((order) => selectedIds.includes(order.id));
+    if (!selected.length) return;
+
+    setBulkProcessing(true);
+    let addressFixed = 0;
+    let variationFixed = 0;
+
+    for (const order of selected) {
+      // 1. Bulk address fixation: accept recommended format (e.g. ID -> Idaho)
+      try {
+        await acceptRecommendedAddress(order.id);
+        addressFixed += 1;
+      } catch {
+        // Address might already be exact or missing required fields
       }
+
+      // 2. Bulk variation fixation: resolve missing SKU or auto-match
+      if (order.hasSource && order.sourcePlatform?.toLowerCase() === "aliexpress" && !order.aliexpressOrderId) {
+        const productId = order.sourceProductId || order.itemBuy;
+        if (productId && (!order.sourceSkuId || order.sourceSkuId === "—")) {
+          try {
+            const res = await getAliExpressProduct(productId);
+            const skus = Array.isArray(res.data?.skus) ? res.data.skus : [];
+            if (skus.length > 0) {
+              const matched = resolveBestSku(order, skus);
+              if (matched) {
+                await updateOrderSource(order.id, {
+                  source_input: order.sourceUrl || `https://www.aliexpress.com/item/${productId}.html`,
+                  source_platform: "aliexpress",
+                  source_sku_id: String(matched.id ?? matched.sku_id ?? ""),
+                  source_variation: Array.isArray(matched.properties)
+                    ? matched.properties.map((p) => ({ name: p.name, value: p.value }))
+                    : null,
+                });
+                variationFixed += 1;
+              }
+            }
+          } catch {
+            // Variation lookup error
+          }
+        }
+      }
+    }
+
+    setBulkProcessing(false);
+    toast.success(
+      `Bulk fixation complete: ${addressFixed} address(es) and ${variationFixed} variation(s) verified/updated.`
+    );
+    await loadOrders();
+
+    if (andProcess) {
+      await handleBulkProcess();
     }
   };
 
@@ -927,14 +1184,19 @@ function OrderProcessingContent() {
     }
   };
 
-  const handleBulkSaveAddress = async (addressData) => {
+  const handleBulkSaveAddress = async (payload) => {
     if (!selectedIds.length) return;
     setAddressModalSaving(true);
     let succeeded = 0;
     let failed = 0;
+
+    const isMap = typeof payload === "object" && payload !== null && !payload.fullName;
+
     for (const id of selectedIds) {
+      const data = isMap ? payload[id] : payload;
+      if (!data) continue;
       try {
-        await updateOrderShippingAddress(id, addressData);
+        await updateOrderShippingAddress(id, data);
         succeeded += 1;
       } catch {
         failed += 1;
@@ -942,13 +1204,46 @@ function OrderProcessingContent() {
     }
     setAddressModalSaving(false);
     setBulkAddressModalOpen(false);
-    setSelectedIds([]);
     if (succeeded) {
       toast.success(`Shipping address updated for ${succeeded} order${succeeded === 1 ? "" : "s"}.`);
       await loadOrders();
     }
     if (failed) {
       toast.error(`Could not update address for ${failed} order${failed === 1 ? "" : "s"}.`);
+    }
+  };
+
+  const handleBulkSaveVariants = async (payload) => {
+    if (!selectedIds.length) return;
+    setSavingSourceId("bulk");
+    let succeeded = 0;
+    let failed = 0;
+
+    const isMap = typeof payload === "object" && payload !== null && !payload.source_input;
+
+    for (const id of selectedIds) {
+      const data = isMap ? payload[id] : payload;
+      if (!data || !data.source_input) continue;
+      try {
+        await updateOrderSource(id, {
+          source_input: data.source_input,
+          source_platform: data.source_platform || "aliexpress",
+          source_sku_id: data.source_sku_id || null,
+          source_variation: data.source_variation || null,
+        });
+        succeeded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setSavingSourceId("");
+    setBulkSourceModalOpen(false);
+    if (succeeded) {
+      toast.success(`Variants updated for ${succeeded} order${succeeded === 1 ? "" : "s"}.`);
+      await loadOrders();
+    }
+    if (failed) {
+      toast.error(`Could not update variants for ${failed} order${failed === 1 ? "" : "s"}.`);
     }
   };
 
@@ -1202,49 +1497,6 @@ function OrderProcessingContent() {
                   </span>
                 )}
 
-                <select
-                  value={bulkAction}
-                  onChange={(e) => {
-                    const action = e.target.value;
-                    setBulkAction(action);
-                    if (action === "process") {
-                      handleBulkProcess();
-                      setBulkAction("");
-                    } else if (action === "address") {
-                      setBulkAddressModalOpen(true);
-                      setBulkAction("");
-                    } else if (action === "mark_processed") {
-                      handleBulkMarkProcessed();
-                      setBulkAction("");
-                    } else if (action.startsWith("move_")) {
-                      const target = action.replace("move_", "");
-                      handleBulkMoveStatus(target);
-                      setBulkAction("");
-                    }
-                  }}
-                  style={{
-                    height: 32,
-                    padding: "0 10px",
-                    borderRadius: 6,
-                    border: "1px solid #cbd5e1",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: "#fff",
-                    color: "#0f172a",
-                    cursor: "pointer",
-                  }}
-                  aria-label="Bulk actions"
-                >
-                  <option value="">Bulk operations...</option>
-                  <option value="process">⚡ Process Selected ({selectedIds.length})</option>
-                  <option value="address">📍 Update / Fix Shipping Address ({selectedIds.length})</option>
-                  <option value="mark_processed">✓ Mark as Processed</option>
-                  <option value="move_new">Move to New Orders</option>
-                  <option value="move_pending">Move to Pending Payment</option>
-                  <option value="move_shipped">Move to Shipped</option>
-                  <option value="move_cancelled">Move to Cancelled</option>
-                </select>
-
                 <button
                   type="button"
                   className="order-processing-bulk-bar__btn"
@@ -1252,7 +1504,11 @@ function OrderProcessingContent() {
                   disabled={bulkProcessing}
                 >
                   {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                  <span>{bulkProcessing ? "Processing…" : "Process selected"}</span>
+                  <span>
+                    {bulkProcessing
+                      ? `Processing (${bulkProgress.current}/${bulkProgress.total})...`
+                      : "Process selected"}
+                  </span>
                 </button>
 
                 <button
@@ -1260,10 +1516,23 @@ function OrderProcessingContent() {
                   className="order-processing-bulk-bar__btn"
                   style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
                   onClick={() => setBulkAddressModalOpen(true)}
-                  title="Update address across selected orders"
+                  title="Fix shipping addresses for selected orders"
+                  disabled={bulkProcessing}
                 >
                   <LuMapPin />
-                  <span>Fix Address</span>
+                  <span>Fix address</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="order-processing-bulk-bar__btn"
+                  style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
+                  onClick={() => setBulkSourceModalOpen(true)}
+                  title="Add or update variants across selected orders"
+                  disabled={bulkProcessing}
+                >
+                  <LuLayers />
+                  <span>Add variants</span>
                 </button>
               </div>
             ) : null}
@@ -1843,12 +2112,36 @@ function OrderProcessingContent() {
 
       <OrderShippingAddressModal
         open={bulkAddressModalOpen}
-        order={selectedOrders[0] ?? null}
-        isBulk={true}
-        bulkCount={selectedIds.length}
+        orders={selectedOrders}
         saving={addressModalSaving}
         onClose={() => setBulkAddressModalOpen(false)}
         onSave={handleBulkSaveAddress}
+      />
+
+      <OrderSourceModal
+        open={bulkSourceModalOpen}
+        orders={selectedOrders}
+        requireAliExpress={true}
+        saving={savingSourceId === "bulk"}
+        onClose={() => setBulkSourceModalOpen(false)}
+        onSave={handleBulkSaveVariants}
+      />
+
+      <BulkOrderFixationModal
+        open={fixationModalOpen}
+        failedOrders={fixationOrders}
+        processingMethod={processingMethod}
+        selectedBuyerAccountId={selectedBuyerAccountId}
+        onClose={() => {
+          setFixationModalOpen(false);
+          setFixationOrders([]);
+        }}
+        onSuccess={async () => {
+          await loadOrders();
+          if (processingMethod === "autods") {
+            loadWallet();
+          }
+        }}
       />
     </section>
   );
