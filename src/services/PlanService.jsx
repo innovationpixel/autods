@@ -40,3 +40,6 @@ export const updateAdminPlan = (id, data) =>
 
 export const deleteAdminPlan = (id) =>
     axiosInstance.delete(`/admin/plans/${id}`);
+
+export const getAddonPricing = () =>
+    axiosInstance.get('/settings/addons');

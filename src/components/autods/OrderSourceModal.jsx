@@ -387,6 +387,7 @@ function OrderSourceModal({
   saving = false,
   onClose,
   onSave,
+  onSaveAndProcess = null,
 }) {
   const ordersList = orders && orders.length > 0 ? orders : (order ? [order] : []);
   const isMultiple = ordersList.length > 1;
@@ -422,22 +423,37 @@ function OrderSourceModal({
     }));
   };
 
-  const handleSave = () => {
+  const getPayload = () => {
     if (!isMultiple) {
       const singleId = ordersList[0].id;
       const payload = itemPayloads[singleId];
       if (!payload || !payload.source_input) {
-        return;
+        return null;
       }
-      onSave({
+      return {
         source_input: payload.source_input,
         source_platform: payload.source_platform,
         source_sku_id: payload.source_sku_id,
         source_variation: payload.source_variation,
-      });
+      };
     } else {
-      // In multiple case, pass mapped payloads { [orderId]: payload }
-      onSave(itemPayloads);
+      return itemPayloads;
+    }
+  };
+
+  const handleSave = () => {
+    const payload = getPayload();
+    if (!payload) return;
+    onSave(payload);
+  };
+
+  const handleSaveAndProcess = () => {
+    const payload = getPayload();
+    if (!payload) return;
+    if (onSaveAndProcess) {
+      onSaveAndProcess(payload);
+    } else {
+      onSave(payload);
     }
   };
 
@@ -654,6 +670,33 @@ function OrderSourceModal({
               </>
             )}
           </button>
+          {onSaveAndProcess && (
+            <button
+              type="button"
+              className="quick-edit-modal__btn"
+              onClick={handleSaveAndProcess}
+              disabled={saving}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#059669",
+                color: "#ffffff",
+                fontWeight: 600,
+                border: 0,
+                borderRadius: 6,
+                padding: "8px 16px",
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? <LuLoader className="spin-icon" /> : <LuCheck size={16} />}
+              <span>
+                {isMultiple
+                  ? `Save & Process All (${ordersList.length})`
+                  : "Save & Process"}
+              </span>
+            </button>
+          )}
         </div>
       </section>
     </div>

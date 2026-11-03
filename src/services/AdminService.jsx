@@ -85,3 +85,9 @@ export const updateAdminOpenAiSettings = (data) =>
 export const testAdminOpenAiConnection = (data = {}) =>
     axiosInstance.post('/admin/openai/test', data);
 
+
+export const getAdminAddonSettings = () =>
+    axiosInstance.get('/admin/addons/status');
+
+export const updateAdminAddonSettings = (data) =>
+    axiosInstance.post('/admin/addons/update', data);

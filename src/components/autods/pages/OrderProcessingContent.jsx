@@ -16,7 +16,9 @@ import {
   LuPlus,
   LuRefreshCcw,
   LuStore,
+  LuTriangleAlert,
   LuUserRound,
+  LuX,
   LuZap,
 } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
@@ -263,6 +265,19 @@ function OrderProcessingContent() {
   const [acceptingRecommended, setAcceptingRecommended] = useState(false);
   const [externalOrder, setExternalOrder] = useState(null);
   const [addressModalOrder, setAddressModalOrder] = useState(null);
+  const [addressModalError, setAddressModalError] = useState("");
+  const [addressErrorNotice, setAddressErrorNotice] = useState(null);
+  const addressErrorTimerRef = useRef(null);
+
+  const showAddressErrorNotice = (notice) => {
+    setAddressErrorNotice(notice);
+    if (addressErrorTimerRef.current) {
+      clearTimeout(addressErrorTimerRef.current);
+    }
+    addressErrorTimerRef.current = setTimeout(() => {
+      setAddressErrorNotice(null);
+    }, 8000);
+  };
   const [addressModalSaving, setAddressModalSaving] = useState(false);
   const [bulkAddressModalOpen, setBulkAddressModalOpen] = useState(false);
   const [bulkSourceModalOpen, setBulkSourceModalOpen] = useState(false);
@@ -292,15 +307,17 @@ function OrderProcessingContent() {
     aliexpressOrderStatus: { key: "aliexpress_order_status", label: "AliExpress order status" },
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (preserveSelected = false) => {
     setLoading(true);
     try {
       const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
       setOrders(mapped);
-      setSelectedIds([]);
+      if (!preserveSelected) {
+        setSelectedIds([]);
+      }
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Failed to load orders."));
+      toast.error(getApiErrorMessage(err, "Failed to load orders."), { autoClose: 6000 });
       setOrders([]);
     } finally {
       setLoading(false);
@@ -570,10 +587,13 @@ function OrderProcessingContent() {
     // Condition 3: Missing shipping address from buyer
     const cleanAddress = (order.shippingAddress || "").trim();
     if (!cleanAddress || cleanAddress === "—") {
-      toast.error(
-        "Buyer shipping address is missing from the order data. Please enter the delivery address to proceed.",
-        { autoClose: 8000 }
-      );
+      const missingMsg = "Buyer shipping address is missing from the order data. Please enter the delivery address to proceed.";
+      toast.error(missingMsg, { autoClose: 6000 });
+      setAddressModalError(missingMsg);
+      showAddressErrorNotice({
+        order,
+        message: missingMsg,
+      });
       setAddressModalOrder(order);
       return;
     }
@@ -607,7 +627,22 @@ function OrderProcessingContent() {
       quote = res.data;
       setOrderQuote(quote);
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Could not fetch checkout quote for order."));
+      const errMsg = getApiErrorMessage(err, "Could not fetch checkout quote for order.");
+      const lowerErr = errMsg.toLowerCase();
+      const isAddr =
+        lowerErr.includes("address") ||
+        lowerErr.includes("city") ||
+        lowerErr.includes("postal") ||
+        lowerErr.includes("zip") ||
+        lowerErr.includes("state");
+      toast.error(errMsg, { autoClose: 6000 });
+      if (isAddr) {
+        setAddressModalError(errMsg);
+        showAddressErrorNotice({
+          order,
+          message: errMsg,
+        });
+      }
       setFetchingQuoteId("");
       return;
     } finally {
@@ -734,13 +769,21 @@ function OrderProcessingContent() {
           lower.includes("variation");
 
         if (isAddress) {
-          toast.error("1 Failed due to address.", { autoClose: 8000 });
+          const detailedMsg = message.includes("AliExpress")
+            ? message
+            : (message || "The buyer's delivery address could not be validated by AliExpress. Please check or edit the shipping details.");
+          toast.error(detailedMsg, { autoClose: 6000 });
+          setAddressModalError(detailedMsg);
+          showAddressErrorNotice({
+            order,
+            message: detailedMsg,
+          });
           setAddressModalOrder(order);
         } else if (isVariation) {
-          toast.error("1 have 0 source link or defined variant.", { autoClose: 8000 });
+          toast.error("1 have 0 source link or defined variant.", { autoClose: 6000 });
           startEditSource(order);
         } else {
-          toast.error(message, { autoClose: 9000 });
+          toast.error(message, { autoClose: 6000 });
         }
       }
     } finally {
@@ -784,6 +827,8 @@ function OrderProcessingContent() {
     try {
       const res = await updateOrderShippingAddress(addressModalOrder.id, addressData);
       toast.success("Shipping address updated.");
+      setAddressModalError("");
+      setAddressErrorNotice(null);
       const updatedOrder = res.data?.order;
       let mapped = null;
       if (updatedOrder) {
@@ -1067,9 +1112,17 @@ function OrderProcessingContent() {
 
     if (failedAddress > 0 || failedVariantOrSource > 0 || failedOther > 0) {
       if (succeeded > 0) {
-        toast.warn(summaryText, { autoClose: 9000 });
+        toast.warn(summaryText, { autoClose: 6000 });
       } else {
-        toast.error(summaryText, { autoClose: 9000 });
+        toast.error(summaryText, { autoClose: 6000 });
+      }
+      if (failedAddress > 0) {
+        const addrNoticeMsg = `${failedAddress} order${failedAddress === 1 ? "" : "s"} failed due to AliExpress delivery address validation.`;
+        setAddressModalError(addrNoticeMsg);
+        showAddressErrorNotice({
+          message: addrNoticeMsg,
+          isBulk: true,
+        });
       }
       if (walletInsufficient) {
         setTransferModalOpen(true);
@@ -1088,7 +1141,7 @@ function OrderProcessingContent() {
       );
     }
 
-    await loadOrders();
+    await loadOrders(true);
     if (processingMethod === "autods") {
       loadWallet();
     }
@@ -1206,6 +1259,8 @@ function OrderProcessingContent() {
     setBulkAddressModalOpen(false);
     if (succeeded) {
       toast.success(`Shipping address updated for ${succeeded} order${succeeded === 1 ? "" : "s"}.`);
+      setAddressModalError("");
+      setAddressErrorNotice(null);
       await loadOrders();
     }
     if (failed) {
@@ -1472,6 +1527,70 @@ function OrderProcessingContent() {
       </nav>
 
       <section className="calculations-table-panel card-wrapper">
+        {addressErrorNotice && (
+          <div
+            style={{
+              margin: "12px 16px 0",
+              padding: "12px 16px",
+              borderRadius: "8px",
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#991b1b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}>
+              <LuTriangleAlert size={20} style={{ color: "#dc2626", flexShrink: 0 }} />
+              <div>
+                <strong>Shipping Address Error:</strong> {addressErrorNotice.message}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {addressErrorNotice.order && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                  onClick={() => {
+                    setAddressModalOrder(addressErrorNotice.order);
+                  }}
+                >
+                  Fix Address Now
+                </button>
+              )}
+              {addressErrorNotice.isBulk && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                  onClick={() => setBulkAddressModalOpen(true)}
+                >
+                  Fix Addresses
+                </button>
+              )}
+              <button
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#991b1b",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                onClick={() => setAddressErrorNotice(null)}
+                aria-label="Dismiss error notification"
+              >
+                <LuX size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="calculations-table-toolbar">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <strong>{orders.length} orders</strong>
@@ -2105,16 +2224,28 @@ function OrderProcessingContent() {
       <OrderShippingAddressModal
         open={Boolean(addressModalOrder)}
         order={addressModalOrder}
+        errorMessage={addressModalError}
+        processingMethod={processingMethod}
+        selectedBuyerAccountId={selectedBuyerAccountId}
         saving={addressModalSaving}
-        onClose={() => setAddressModalOrder(null)}
+        onClose={() => {
+          setAddressModalOrder(null);
+          setAddressModalError("");
+        }}
         onSave={handleSaveAddress}
       />
 
       <OrderShippingAddressModal
         open={bulkAddressModalOpen}
         orders={selectedOrders}
+        errorMessage={addressModalError}
+        processingMethod={processingMethod}
+        selectedBuyerAccountId={selectedBuyerAccountId}
         saving={addressModalSaving}
-        onClose={() => setBulkAddressModalOpen(false)}
+        onClose={() => {
+          setBulkAddressModalOpen(false);
+          setAddressModalError("");
+        }}
         onSave={handleBulkSaveAddress}
       />
 

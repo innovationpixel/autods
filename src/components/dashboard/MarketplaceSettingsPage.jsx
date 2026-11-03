@@ -33,6 +33,16 @@ import {
   LuPackage,
   LuShoppingCart,
   LuChevronRight,
+  LuTruck,
+  LuSearch,
+  LuDollarSign,
+  LuBoxes,
+  LuUserPlus,
+  LuUsers,
+  LuShieldCheck,
+  LuLock,
+  LuEye,
+  LuEyeOff,
 } from "react-icons/lu";
 import { FaAmazon, FaShopify, FaWix, FaWordpress } from "react-icons/fa6";
 import { fetchEbayStatus, disconnectEbayAction, syncEbayListingsAction, setEbayPrimaryAction } from "../../store/actions/EbayActions";
@@ -51,7 +61,14 @@ import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingI
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
-import { getAccountSettings, updateAccountSettings } from "../../services/SettingsService";
+import { getAccountSettings, updateAccountSettings, getAddonPricing } from "../../services/SettingsService";
+import {
+  getVirtualAssistants,
+  createVirtualAssistant,
+  updateVirtualAssistant,
+  deleteVirtualAssistant,
+  toggleVirtualAssistantStatus,
+} from "../../services/VirtualAssistantService";
 import { getEbayPolicies } from "../../services/ProductService";
 import {
   createStripeSetupIntent,
@@ -81,11 +98,70 @@ const settingsPrimaryTabs = [
   "Keywords",
   "Plans & Add-ons",
   "Account & Billing",
-  "Users",
+  "VAs",
   "Notifications",
 ];
 
 const settingsInnerTabs = ["Lister", "Pricing", "Orders", "General"];
+const VA_MODULES = [
+  {
+    id: "products",
+    label: "Products & Listings",
+    description: "Create, edit, draft, and publish products to stores",
+    color: "#0284c7",
+    bg: "#e0f2fe",
+    border: "#bae6fd",
+  },
+  {
+    id: "orders",
+    label: "Orders & Fulfillment",
+    description: "View customer orders, 1-click AliExpress placement, and addresses",
+    color: "#059669",
+    bg: "#ecfdf5",
+    border: "#a7f3d0",
+  },
+  {
+    id: "messages",
+    label: "Customer Messages",
+    description: "Read & reply to customer inquiries, templates, and support tickets",
+    color: "#7c3aed",
+    bg: "#f5f3ff",
+    border: "#ddd6fe",
+  },
+  {
+    id: "returns",
+    label: "Returns & Disputes",
+    description: "Handle eBay return requests, dispute cases, and refund processes",
+    color: "#d97706",
+    bg: "#fffbeb",
+    border: "#fde68a",
+  },
+  {
+    id: "finder",
+    label: "Product Finder & Research",
+    description: "Browse winning products and curated bestseller recommendations",
+    color: "#0891b2",
+    bg: "#ecfeff",
+    border: "#a5f3fc",
+  },
+  {
+    id: "sourcing",
+    label: "VIP Sourcing Requests",
+    description: "Submit product sourcing requests and review factory supplier quotes",
+    color: "#c026d3",
+    bg: "#fdf4ff",
+    border: "#f5d0fe",
+  },
+  {
+    id: "settings",
+    label: "Store & Supplier Settings",
+    description: "Configure pricing markup rules, templates, and supplier policies",
+    color: "#475569",
+    bg: "#f1f5f9",
+    border: "#e2e8f0",
+  },
+];
+
 
 function getUserInitials(name, email) {
   const source = (name || email || "?").trim();
@@ -626,6 +702,13 @@ export default function MarketplaceSettingsPage() {
   const ebaySyncingIds         = useSelector(selectEbaySyncingIds);
   const user                   = useSelector(selectUser);
 
+  const visiblePrimaryTabs = useMemo(() => {
+    if (user?.role === "va" || Boolean(user?.parent_id)) {
+      return settingsPrimaryTabs.filter((t) => t !== "VAs" && t !== "Account & Billing");
+    }
+    return settingsPrimaryTabs;
+  }, [user]);
+
   const initialTab = useMemo(() => {
     const tab = new URLSearchParams(search).get("tab");
     if (tab === "store") return "Store Settings";
@@ -687,6 +770,48 @@ export default function MarketplaceSettingsPage() {
   const [addOns, setAddOns] = useState(settingsAddOns);
   const [addOnTermsTarget, setAddOnTermsTarget] = useState(null);
   const [aiCreditsModalOpen, setAiCreditsModalOpen] = useState(false);
+
+  // Platform Add-ons Pricing from Super Admin Settings
+  const [addonPricing, setAddonPricing] = useState({
+    order_processing: {
+      enabled: true,
+      price_per_order: 0.30,
+      monthly_unlimited_price: 29.99,
+      included_free_orders: 0,
+      billing_mode: "per_order",
+      description: "Automated 1-click & bulk AliExpress order fulfillment, address formatting, and tracking synchronization.",
+    },
+    sourcing_requests: {
+      enabled: true,
+      price_per_request: 1.50,
+      included_free_monthly: 5,
+      bulk_pack_5_price: 6.00,
+      bulk_pack_10_price: 10.00,
+      description: "Get dedicated agent sourcing quotes from verified factory suppliers with guaranteed 24-48h turnaround.",
+    },
+    auto_tracking: {
+      enabled: true,
+      price_per_order: 0.05,
+      description: "Automated tracking number retrieval and instant update to eBay buyers.",
+    },
+  });
+  const [addonPricingLoading, setAddonPricingLoading] = useState(false);
+
+  // Virtual Assistants (VAs) State
+  const [vas, setVas] = useState([]);
+  const [vasLoading, setVasLoading] = useState(false);
+  const [vaModalOpen, setVaModalOpen] = useState(false);
+  const [editingVa, setEditingVa] = useState(null);
+  const [vaFormData, setVaFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    modules: ["products", "orders"],
+    is_active: true,
+  });
+  const [showVaPassword, setShowVaPassword] = useState(false);
+  const [vaSaving, setVaSaving] = useState(false);
+  const [vaDeletingId, setVaDeletingId] = useState(null);
   const [paypalEmail, setPaypalEmail] = useState("");
   const [showAddPayment, setShowAddPayment] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
@@ -836,7 +961,174 @@ export default function MarketplaceSettingsPage() {
     getPaymentMethods().then((res) => setPaymentMethods(res.data?.payment_methods ?? [])).catch(() => {});
     getPaymentHistory().then((res) => setPaymentHistory(res.data?.data ?? [])).catch(() => {});
     getCurrentPlan().then((res) => setCurrentSubscription(res.data)).catch(() => {});
+    getAddonPricing()
+      .then((res) => {
+        if (res.data?.addons) {
+          setAddonPricing(res.data.addons);
+        }
+      })
+      .catch(() => {});
   }, [dispatch]);
+
+  useEffect(() => {
+    if (activePrimaryTab === "Plans & Add-ons") {
+      setAddonPricingLoading(true);
+      getAddonPricing()
+        .then((res) => {
+          if (res.data?.addons) {
+            setAddonPricing(res.data.addons);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setAddonPricingLoading(false));
+    }
+    if (activePrimaryTab === "VAs") {
+      loadVAs();
+    }
+  }, [activePrimaryTab]);
+
+  const loadVAs = () => {
+    setVasLoading(true);
+    getVirtualAssistants()
+      .then((res) => {
+        setVas(res.data?.vas ?? []);
+      })
+      .catch((err) => {
+        toast.error(err.response?.data?.message ?? "Failed to load Virtual Assistants.");
+      })
+      .finally(() => setVasLoading(false));
+  };
+
+  const handleOpenAddVa = () => {
+    setEditingVa(null);
+    setVaFormData({
+      name: "",
+      email: "",
+      password: "",
+      modules: ["products", "orders"],
+      is_active: true,
+    });
+    setShowVaPassword(false);
+    setVaModalOpen(true);
+  };
+
+  const handleOpenEditVa = (va) => {
+    setEditingVa(va);
+    setVaFormData({
+      name: va.name || "",
+      email: va.email || "",
+      password: "",
+      modules: Array.isArray(va.admin_modules) ? va.admin_modules : [],
+      is_active: Boolean(va.is_active),
+    });
+    setShowVaPassword(false);
+    setVaModalOpen(true);
+  };
+
+  const handleToggleVaModule = (moduleId) => {
+    setVaFormData((prev) => {
+      const exists = prev.modules.includes(moduleId);
+      return {
+        ...prev,
+        modules: exists
+          ? prev.modules.filter((id) => id !== moduleId)
+          : [...prev.modules, moduleId],
+      };
+    });
+  };
+
+  const handleSelectAllVaModules = () => {
+    setVaFormData((prev) => ({
+      ...prev,
+      modules: VA_MODULES.map((m) => m.id),
+    }));
+  };
+
+  const handleDeselectAllVaModules = () => {
+    setVaFormData((prev) => ({
+      ...prev,
+      modules: [],
+    }));
+  };
+
+  const handleSaveVa = async (e) => {
+    e.preventDefault();
+    if (!vaFormData.name.trim()) {
+      toast.error("Please enter the assistant's name.");
+      return;
+    }
+    if (!vaFormData.email.trim()) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    if (!editingVa && (!vaFormData.password || vaFormData.password.length < 6)) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    if (editingVa && vaFormData.password && vaFormData.password.length < 6) {
+      toast.error("Password must be at least 6 characters.");
+      return;
+    }
+    if (vaFormData.modules.length === 0) {
+      toast.error("Please select at least one module permission.");
+      return;
+    }
+
+    setVaSaving(true);
+    try {
+      const payload = {
+        name: vaFormData.name.trim(),
+        email: vaFormData.email.trim(),
+        modules: vaFormData.modules,
+        is_active: vaFormData.is_active,
+      };
+      if (vaFormData.password.trim()) {
+        payload.password = vaFormData.password.trim();
+      }
+
+      if (editingVa) {
+        await updateVirtualAssistant(editingVa.id, payload);
+        toast.success("Virtual Assistant updated successfully.");
+      } else {
+        await createVirtualAssistant(payload);
+        toast.success("Virtual Assistant created successfully.");
+      }
+      setVaModalOpen(false);
+      loadVAs();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to save Virtual Assistant.");
+    } finally {
+      setVaSaving(false);
+    }
+  };
+
+  const handleToggleVaStatus = async (va) => {
+    try {
+      await toggleVirtualAssistantStatus(va.id);
+      setVas((prev) =>
+        prev.map((item) => (item.id === va.id ? { ...item, is_active: !item.is_active } : item))
+      );
+      toast.success(`${va.name}'s account is now ${!va.is_active ? "Active" : "Disabled"}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to update status.");
+    }
+  };
+
+  const handleDeleteVa = async (va) => {
+    if (!window.confirm(`Are you sure you want to remove Virtual Assistant "${va.name}"? They will lose all access immediately.`)) {
+      return;
+    }
+    setVaDeletingId(va.id);
+    try {
+      await deleteVirtualAssistant(va.id);
+      setVas((prev) => prev.filter((item) => item.id !== va.id));
+      toast.success(`Virtual Assistant ${va.name} removed.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? "Failed to remove Virtual Assistant.");
+    } finally {
+      setVaDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(search);
@@ -2676,91 +2968,616 @@ export default function MarketplaceSettingsPage() {
           </div>
         </div>
 
-        {/* Active Channels & Add-ons Grid */}
-        <div style={{ marginTop: "24px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
-          {/* eBay Active Integration Card */}
-          <article className="plans-settings__integration plans-settings__integration--connected" style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <PlanPlatformLogo logo="ebay" name="eBay" />
-                <div>
-                  <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>eBay Store Integration</h4>
-                  <span style={{ fontSize: "12px", color: "#64748b" }}>
-                    {ebayConnected
-                      ? (primaryEbayConnection?.ebay_username ? `@${primaryEbayConnection.ebay_username} (${primaryEbayConnection.site_id ?? "eBay US"})` : `${ebayConnections.length} accounts linked`)
-                      : "Direct API Integration"}
+        {/* Platform Add-ons & Automation Power-ups */}
+        <div style={{ marginTop: "28px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "#ecfdf5",
+                    color: "#059669",
+                    padding: "3px 9px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                  }}
+                >
+                  <LuZap /> POWER-UPS &amp; ADD-ONS
+                </span>
+                {addonPricingLoading && (
+                  <span style={{ fontSize: "11px", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <LuLoader className="spin-icon" /> Syncing prices…
+                  </span>
+                )}
+              </div>
+              <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "6px 0 2px 0", color: "#0f172a" }}>
+                Automation Add-ons &amp; Power-ups
+              </h3>
+              <p style={{ margin: 0, fontSize: "13px", color: "#64748b" }}>
+                Extend your store automation with factory sourcing, 1-click order fulfillment, and AI vision tools. Live rates configured by platform settings.
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+            {/* 1. Order Processing Automation Card */}
+            <article
+              style={{
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "10px",
+                        background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)",
+                        color: "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        boxShadow: "0 4px 10px rgba(2, 132, 199, 0.25)",
+                      }}
+                    >
+                      <LuShoppingCart />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                        Order Processing
+                      </h4>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                        Automated AliExpress Fulfillment
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: "#ecfdf5",
+                      color: "#059669",
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      border: "1px solid #a7f3d0",
+                    }}
+                  >
+                    Active
                   </span>
                 </div>
+
+                {/* Pricing Banner */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    marginBottom: "14px",
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                      ${Number(addonPricing?.order_processing?.price_per_order ?? 0.30).toFixed(2)}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}> / processed order</span>
+                  </div>
+                  {addonPricing?.order_processing?.monthly_unlimited_price && (
+                    <span style={{ fontSize: "11px", color: "#0284c7", fontWeight: 700, background: "#e0f2fe", padding: "2px 8px", borderRadius: "4px" }}>
+                      Unlimited: ${Number(addonPricing.order_processing.monthly_unlimited_price).toFixed(2)}/mo
+                    </span>
+                  )}
+                </div>
+
+                <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                  {addonPricing?.order_processing?.description || "Automated 1-click & bulk AliExpress order fulfillment, address normalization, and tracking synchronization."}
+                </p>
+
+                {/* Feature Bullet Points */}
+                <ul style={{ margin: "0 0 16px 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "1-Click & bulk order placement directly to AliExpress",
+                    "Intelligent address normalization & state code matching",
+                    "Real-time stock & price sanity check prior to purchase",
+                    "Deducted seamlessly from your Processing Wallet",
+                  ].map((feat, idx) => (
+                    <li key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "12px", color: "#334155" }}>
+                      <span style={{ color: "#059669", fontSize: "14px", lineHeight: "16px", flexShrink: 0 }}>✓</span>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <span className={`plans-settings__status ${ebayConnected ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>
-                {ebayConnected ? "Connected" : "Not connected"}
-              </span>
-            </div>
 
-            <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 14px 0", lineHeight: "1.5" }}>
-              Sync active listings, automate price &amp; stock monitoring, and push tracking numbers directly to eBay buyers.
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="plans-settings__ghost-btn"
+                  onClick={() => {
+                    setActivePrimaryTab("Supplier Settings");
+                    patchInnerTab("Orders");
+                  }}
+                  style={{ fontSize: "12px", padding: "8px 12px" }}
+                >
+                  Order Settings
+                </button>
+                <button
+                  type="button"
+                  className="plans-settings__btn plans-settings__btn--primary"
+                  onClick={() => navigate("/orders")}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                >
+                  <span>Go to Orders</span>
+                  <LuArrowUpRight />
+                </button>
+              </div>
+            </article>
+
+            {/* 2. VIP Product Sourcing Requests Card */}
+            <article
+              style={{
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "10px",
+                        background: "linear-gradient(135deg, #a855f7 0%, #7e22ce 100%)",
+                        color: "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        boxShadow: "0 4px 10px rgba(168, 85, 247, 0.25)",
+                      }}
+                    >
+                      <LuSearch />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                        VIP Sourcing Requests
+                      </h4>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                        Factory Negotiation &amp; Best Quotes
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: "#f5f3ff",
+                      color: "#7c3aed",
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      border: "1px solid #ddd6fe",
+                    }}
+                  >
+                    {addonPricing?.sourcing_requests?.included_free_monthly ?? 5} Free / Mo
+                  </span>
+                </div>
+
+                {/* Pricing Banner */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    marginBottom: "14px",
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                      ${Number(addonPricing?.sourcing_requests?.price_per_request ?? 1.50).toFixed(2)}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}> / extra request</span>
+                  </div>
+                  <span style={{ fontSize: "11px", color: "#7c3aed", fontWeight: 700, background: "#ede9fe", padding: "2px 8px", borderRadius: "4px" }}>
+                    5-Pack: ${Number(addonPricing?.sourcing_requests?.bulk_pack_5_price ?? 6.00).toFixed(2)}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                  {addonPricing?.sourcing_requests?.description || "Get dedicated agent sourcing quotes from verified factory suppliers with guaranteed 24-48h turnaround."}
+                </p>
+
+                {/* Feature Bullet Points */}
+                <ul style={{ margin: "0 0 16px 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "Direct negotiation with verified AliExpress & factory suppliers",
+                    "Guaranteed 24-48h turnaround with wholesale tier pricing",
+                    "1-Click direct product import with pre-mapped variations",
+                    "Sample quality confirmation & fast track shipping routes",
+                  ].map((feat, idx) => (
+                    <li key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "12px", color: "#334155" }}>
+                      <span style={{ color: "#7c3aed", fontSize: "14px", lineHeight: "16px", flexShrink: 0 }}>✓</span>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="plans-settings__ghost-btn"
+                  onClick={() => navigate("/sourcing")}
+                  style={{ fontSize: "12px", padding: "8px 12px" }}
+                >
+                  View Sourcing Quotes
+                </button>
+                <button
+                  type="button"
+                  className="plans-settings__btn plans-settings__btn--primary"
+                  onClick={() => navigate("/sourcing")}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                >
+                  <LuPlus />
+                  <span>New Request</span>
+                </button>
+              </div>
+            </article>
+
+            {/* 3. Auto-Tracking Synchronization Card */}
+            <article
+              style={{
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "10px",
+                        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                        color: "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        boxShadow: "0 4px 10px rgba(16, 185, 129, 0.25)",
+                      }}
+                    >
+                      <LuTruck />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                        Auto-Tracking Sync
+                      </h4>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                        Carrier &amp; Tracking Auto-Upload
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: "#f0fdf4",
+                      color: "#16a34a",
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      border: "1px solid #bbf7d0",
+                    }}
+                  >
+                    Included
+                  </span>
+                </div>
+
+                {/* Pricing Banner */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    marginBottom: "14px",
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                      {Number(addonPricing?.auto_tracking?.price_per_order || 0) > 0
+                        ? `$${Number(addonPricing.auto_tracking.price_per_order).toFixed(2)}`
+                        : "Free"}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>
+                      {" "}{Number(addonPricing?.auto_tracking?.price_per_order || 0) > 0 ? "/ tracking sync" : "with your plan"}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "11px", color: "#16a34a", fontWeight: 700, background: "#dcfce7", padding: "2px 8px", borderRadius: "4px" }}>
+                    Multi-Carrier
+                  </span>
+                </div>
+
+                <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                  {addonPricing?.auto_tracking?.description || "Automated tracking number retrieval and instant update to eBay buyers."}
+                </p>
+
+                {/* Feature Bullet Points */}
+                <ul style={{ margin: "0 0 16px 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "Continuous tracking number fetching from AliExpress",
+                    "Automatic carrier detection: Cainiao, USPS, FedEx, DHL",
+                    "Instant dispatch confirmation & tracking push to eBay buyers",
+                    "Protects seller performance metrics against Late Shipment marks",
+                  ].map((feat, idx) => (
+                    <li key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "12px", color: "#334155" }}>
+                      <span style={{ color: "#16a34a", fontSize: "14px", lineHeight: "16px", flexShrink: 0 }}>✓</span>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="plans-settings__ghost-btn"
+                  onClick={() => setActivePrimaryTab("Store Settings")}
+                  style={{ fontSize: "12px", padding: "8px 12px" }}
+                >
+                  Store Settings
+                </button>
+                <button
+                  type="button"
+                  className="plans-settings__btn plans-settings__btn--primary"
+                  onClick={() => navigate("/orders")}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                >
+                  <span>View Tracked Orders</span>
+                  <LuArrowUpRight />
+                </button>
+              </div>
+            </article>
+
+            {/* 4. AI Studio Credits Power-Up Card */}
+            <article
+              style={{
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                background: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "10px",
+                        background: "linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)",
+                        color: "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "20px",
+                        boxShadow: "0 4px 10px rgba(236, 72, 153, 0.25)",
+                      }}
+                    >
+                      <LuSparkles />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                        AI Studio Credits
+                      </h4>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>
+                        OpenAI DALL-E &amp; Vision Generation
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      background: "#fdf2f8",
+                      color: "#db2777",
+                      padding: "3px 10px",
+                      borderRadius: "999px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      border: "1px solid #fbcfe8",
+                    }}
+                  >
+                    Active
+                  </span>
+                </div>
+
+                {/* Pricing / Balance Banner */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
+                    marginBottom: "14px",
+                    display: "flex",
+                    alignItems: "baseline",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "6px",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                      {aiCredits.toLocaleString()}
+                    </span>
+                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}> Available Credits</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAiCreditsModalOpen(true)}
+                    style={{
+                      background: "#fdf2f8",
+                      color: "#db2777",
+                      border: "1px solid #fbcfe8",
+                      borderRadius: "4px",
+                      padding: "2px 8px",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    + Top Up
+                  </button>
+                </div>
+
+                <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                  Generate studio-grade product photos, lifestyle mockups, and high-converting marketing creatives powered by modern generative models.
+                </p>
+
+                {/* Feature Bullet Points */}
+                <ul style={{ margin: "0 0 16px 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    "Studio-grade product photo cleanups and background replacements",
+                    "Custom lifestyle and infomercial scene generation",
+                    "Vision enhancement model optimizes prompts automatically",
+                    "Instant download & 1-click update to your active listings",
+                  ].map((feat, idx) => (
+                    <li key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "12px", color: "#334155" }}>
+                      <span style={{ color: "#db2777", fontSize: "14px", lineHeight: "16px", flexShrink: 0 }}>✓</span>
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", gap: "10px" }}>
+                <button
+                  type="button"
+                  className="plans-settings__ghost-btn"
+                  onClick={() => navigate("/ai-video-generation")}
+                  style={{ fontSize: "12px", padding: "8px 12px" }}
+                >
+                  Open AI Studio
+                </button>
+                <button
+                  type="button"
+                  className="plans-settings__btn plans-settings__btn--primary"
+                  onClick={() => setAiCreditsModalOpen(true)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                >
+                  <LuSparkles />
+                  <span>Buy Credits</span>
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        {/* Marketplace Store Channels Grid */}
+        <div style={{ marginTop: "28px" }}>
+          <div style={{ marginBottom: "14px" }}>
+            <h3 style={{ fontSize: "16px", fontWeight: 800, margin: "0 0 2px 0", color: "#0f172a" }}>
+              Connected Marketplace Channels
+            </h3>
+            <p style={{ margin: 0, fontSize: "12px", color: "#64748b" }}>
+              Manage integrated sales channels and store inventory sync.
             </p>
+          </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-              <button
-                type="button"
-                className="plans-settings__ghost-btn"
-                onClick={() => setActivePrimaryTab("Store Settings")}
-              >
-                Manage in Store Settings
-              </button>
-              <button
-                type="button"
-                className={ebayConnected ? "plans-settings__btn plans-settings__btn--secondary" : "plans-settings__btn plans-settings__btn--primary"}
-                onClick={connectEbay}
-                disabled={ebayConnecting}
-              >
-                {ebayConnecting ? "Opening eBay…" : ebayConnected ? "Add Another Account" : "Connect eBay"}
-              </button>
-            </div>
-          </article>
-
-          {/* AI Credits Power-Up Card */}
-          <article style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+            {/* eBay Active Integration Card */}
+            <article className="plans-settings__integration plans-settings__integration--connected" style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <span className="plans-settings__addon-icon plans-settings__addon-icon--violet">
-                    <LuSparkles />
-                  </span>
+                  <PlanPlatformLogo logo="ebay" name="eBay" />
                   <div>
-                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>AI Studio Credits</h4>
-                    <span style={{ fontSize: "12px", color: "#64748b" }}>Powered by OpenAI Image &amp; Vision</span>
+                    <h4 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e293b" }}>eBay Store Integration</h4>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      {ebayConnected
+                        ? (primaryEbayConnection?.ebay_username ? `@${primaryEbayConnection.ebay_username} (${primaryEbayConnection.site_id ?? "eBay US"})` : `${ebayConnections.length} accounts linked`)
+                        : "Direct API Integration"}
+                    </span>
                   </div>
                 </div>
-                <span className="plans-settings__addon-tag plans-settings__addon-tag--active">
-                  Active
+                <span className={`plans-settings__status ${ebayConnected ? "plans-settings__status--connected" : "plans-settings__status--idle"}`}>
+                  {ebayConnected ? "Connected" : "Not connected"}
                 </span>
               </div>
 
-              <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 12px 0", lineHeight: "1.5" }}>
-                Generate studio-grade product photos, lifestyle images, and ad creatives. Your current balance is <strong>{aiCredits.toLocaleString()} Credits</strong>.
+              <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                Sync active listings, automate price &amp; stock monitoring, and push tracking numbers directly to eBay buyers.
               </p>
-            </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
-              <button
-                type="button"
-                className="plans-settings__inline-link"
-                onClick={() => navigate("/ai-video-generation")}
-              >
-                Open AI Studio
-              </button>
-              <button
-                type="button"
-                className="plans-settings__btn plans-settings__btn--primary"
-                onClick={() => setAiCreditsModalOpen(true)}
-              >
-                <LuSparkles />
-                <span>Buy AI Credits</span>
-              </button>
-            </div>
-          </article>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "12px" }}>
+                <button
+                  type="button"
+                  className="plans-settings__ghost-btn"
+                  onClick={() => setActivePrimaryTab("Store Settings")}
+                >
+                  Manage in Store Settings
+                </button>
+                <button
+                  type="button"
+                  className={ebayConnected ? "plans-settings__btn plans-settings__btn--secondary" : "plans-settings__btn plans-settings__btn--primary"}
+                  onClick={connectEbay}
+                  disabled={ebayConnecting}
+                >
+                  {ebayConnecting ? "Opening eBay…" : ebayConnected ? "Add Another Account" : "Connect eBay"}
+                </button>
+              </div>
+            </article>
+          </div>
         </div>
 
         {/* Summarized Upcoming Marketplaces & Add-ons (Coming Soon) */}
@@ -3318,6 +4135,613 @@ export default function MarketplaceSettingsPage() {
     );
   };
 
+
+  const renderVAsTab = () => {
+    const activeVasCount = vas.filter((v) => v.is_active).length;
+
+    return (
+      <section className="vas-settings card-wrapper" style={{ padding: "28px" }}>
+        {/* Header Hero */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  background: "#eff6ff",
+                  color: "#2563eb",
+                  padding: "3px 10px",
+                  borderRadius: "999px",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  border: "1px solid #bfdbfe",
+                }}
+              >
+                <LuShieldCheck /> TEAM &amp; PERMISSIONS
+              </span>
+            </div>
+            <h2 style={{ fontSize: "22px", fontWeight: 800, margin: "0 0 6px 0", color: "#0f172a" }}>
+              Virtual Assistants (VAs)
+            </h2>
+            <p style={{ margin: 0, fontSize: "13px", color: "#64748b", maxWidth: "680px" }}>
+              Add team members and assistants with role-based access. Grant permissions only to the specific modules each assistant needs to handle (e.g. Products, Orders, Customer Messages, or Sourcing).
+            </p>
+          </div>
+
+          <button
+            type="button"
+            className="plans-settings__btn plans-settings__btn--primary"
+            onClick={handleOpenAddVa}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "10px 18px",
+              fontSize: "13px",
+              fontWeight: 700,
+              borderRadius: "8px",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+            }}
+          >
+            <LuUserPlus />
+            <span>Add Virtual Assistant</span>
+          </button>
+        </div>
+
+        {/* Stats Row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: "10px",
+            padding: "14px 18px",
+            marginBottom: "24px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "13px", color: "#64748b" }}>Total Assistants:</span>
+            <strong style={{ fontSize: "15px", color: "#0f172a" }}>{vas.length}</strong>
+          </div>
+          <div style={{ width: "1px", height: "18px", background: "#cbd5e1" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "13px", color: "#64748b" }}>Active:</span>
+            <strong style={{ fontSize: "15px", color: "#059669" }}>{activeVasCount}</strong>
+          </div>
+          <div style={{ width: "1px", height: "18px", background: "#cbd5e1" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#64748b", marginLeft: "auto" }}>
+            <LuLock style={{ color: "#3b82f6" }} />
+            <span>VAs log in with their own email &amp; only see store data matching assigned permissions.</span>
+          </div>
+        </div>
+
+        {/* Main List / Table */}
+        {vasLoading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: "12px", color: "#64748b" }}>
+            <LuLoader className="spin-icon" style={{ fontSize: "22px" }} />
+            <span style={{ fontSize: "14px", fontWeight: 600 }}>Loading Virtual Assistants…</span>
+          </div>
+        ) : vas.length === 0 ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "50px 20px",
+              background: "#ffffff",
+              border: "1px dashed #cbd5e1",
+              borderRadius: "14px",
+            }}
+          >
+            <div
+              style={{
+                width: "56px",
+                height: "56px",
+                borderRadius: "50%",
+                background: "#eff6ff",
+                color: "#2563eb",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "24px",
+                marginBottom: "14px",
+              }}
+            >
+              <LuUsers />
+            </div>
+            <h3 style={{ fontSize: "17px", fontWeight: 700, margin: "0 0 6px 0", color: "#0f172a" }}>
+              No Virtual Assistants Added Yet
+            </h3>
+            <p style={{ margin: "0 auto 20px auto", maxWidth: "520px", fontSize: "13px", color: "#64748b", lineHeight: "1.5" }}>
+              Scale your e-commerce operations by inviting team members with role-based access. Grant permissions to Products, Orders, Customer Messages, or Sourcing without sharing your store owner credentials.
+            </p>
+            <button
+              type="button"
+              className="plans-settings__btn plans-settings__btn--primary"
+              onClick={handleOpenAddVa}
+              style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "10px 20px", fontSize: "13px" }}
+            >
+              <LuUserPlus />
+              <span>Add Your First Virtual Assistant</span>
+            </button>
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "12px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                  <th style={{ padding: "12px 18px", fontWeight: 700, color: "#475569", fontSize: "12px" }}>ASSISTANT</th>
+                  <th style={{ padding: "12px 18px", fontWeight: 700, color: "#475569", fontSize: "12px" }}>MODULE PERMISSIONS</th>
+                  <th style={{ padding: "12px 18px", fontWeight: 700, color: "#475569", fontSize: "12px" }}>STATUS</th>
+                  <th style={{ padding: "12px 18px", fontWeight: 700, color: "#475569", fontSize: "12px" }}>CREATED</th>
+                  <th style={{ padding: "12px 18px", fontWeight: 700, color: "#475569", fontSize: "12px", textAlign: "right" }}>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vas.map((va) => {
+                  const allowedModules = Array.isArray(va.admin_modules) ? va.admin_modules : [];
+                  const initials = getUserInitials(va.name, va.email);
+
+                  return (
+                    <tr
+                      key={va.id}
+                      style={{
+                        borderBottom: "1px solid #f1f5f9",
+                        transition: "background 0.15s ease",
+                      }}
+                    >
+                      {/* Name & Email */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                              color: "#ffffff",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontWeight: 700,
+                              fontSize: "12px",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {initials}
+                          </div>
+                          <div>
+                            <strong style={{ fontSize: "14px", color: "#0f172a", display: "block" }}>
+                              {va.name}
+                            </strong>
+                            <span style={{ fontSize: "12px", color: "#64748b" }}>
+                              {va.email}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Module Permissions */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", maxWidth: "420px" }}>
+                          {allowedModules.length === 0 ? (
+                            <span style={{ fontSize: "12px", color: "#94a3b8" }}>No permissions assigned</span>
+                          ) : (
+                            allowedModules.map((modId) => {
+                              const meta = VA_MODULES.find((m) => m.id === modId) || {
+                                label: modId,
+                                color: "#475569",
+                                bg: "#f1f5f9",
+                                border: "#e2e8f0",
+                              };
+                              return (
+                                <span
+                                  key={modId}
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 650,
+                                    padding: "2px 8px",
+                                    borderRadius: "6px",
+                                    background: meta.bg,
+                                    color: meta.color,
+                                    border: `1px solid ${meta.border}`,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {meta.label}
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: "14px 18px" }}>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleVaStatus(va)}
+                          title="Click to toggle active status"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "3px 9px",
+                            borderRadius: "999px",
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            border: "none",
+                            cursor: "pointer",
+                            background: va.is_active ? "#ecfdf5" : "#f1f5f9",
+                            color: va.is_active ? "#059669" : "#64748b",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: "6px",
+                              height: "6px",
+                              borderRadius: "50%",
+                              background: va.is_active ? "#10b981" : "#94a3b8",
+                            }}
+                          />
+                          <span>{va.is_active ? "Active" : "Disabled"}</span>
+                        </button>
+                      </td>
+
+                      {/* Created */}
+                      <td style={{ padding: "14px 18px", color: "#64748b", fontSize: "12px", whiteSpace: "nowrap" }}>
+                        {va.created_at ? new Date(va.created_at).toLocaleDateString() : "—"}
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: "14px 18px", textAlign: "right" }}>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditVa(va)}
+                            title="Edit permissions & details"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "6px",
+                              border: "1px solid #e2e8f0",
+                              background: "#ffffff",
+                              color: "#334155",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            <LuPencil style={{ fontSize: "14px" }} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVa(va)}
+                            disabled={vaDeletingId === va.id}
+                            title="Remove Virtual Assistant"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "6px",
+                              border: "1px solid #fee2e2",
+                              background: "#fef2f2",
+                              color: "#dc2626",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              cursor: "pointer",
+                              transition: "all 0.15s ease",
+                            }}
+                          >
+                            {vaDeletingId === va.id ? (
+                              <LuLoader className="spin-icon" style={{ fontSize: "14px" }} />
+                            ) : (
+                              <LuTrash2 style={{ fontSize: "14px" }} />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderVaModal = () => {
+    return (
+      <div
+        className="marketplace-settings__modal"
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+        }}
+      >
+        <button
+          type="button"
+          className="marketplace-settings__modal-backdrop"
+          onClick={() => setVaModalOpen(false)}
+          aria-label="Close modal"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            border: "none",
+            cursor: "pointer",
+          }}
+        />
+
+        <div
+          className="marketplace-settings__modal-content"
+          style={{
+            position: "relative",
+            zIndex: 1,
+            background: "#ffffff",
+            borderRadius: "16px",
+            width: "100%",
+            maxWidth: "600px",
+            maxHeight: "92vh",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.2)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Modal Header */}
+          <div
+            style={{
+              padding: "20px 24px",
+              borderBottom: "1px solid #e2e8f0",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 700, color: "#0f172a" }}>
+                {editingVa ? "Edit Virtual Assistant" : "Add Virtual Assistant"}
+              </h3>
+              <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: "#64748b" }}>
+                {editingVa
+                  ? "Update login credentials and manage allowed module permissions."
+                  : "Set up login credentials and choose which modules this assistant can access."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setVaModalOpen(false)}
+              style={{
+                background: "#f1f5f9",
+                border: "none",
+                borderRadius: "8px",
+                width: "32px",
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#64748b",
+                cursor: "pointer",
+              }}
+            >
+              <LuX />
+            </button>
+          </div>
+
+          {/* Modal Body Form */}
+          <form onSubmit={handleSaveVa} style={{ display: "flex", flexDirection: "column", overflow: "hidden", flex: 1 }}>
+            <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Name Field */}
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 650, color: "#334155", marginBottom: "6px" }}>
+                  Assistant Full Name <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={vaFormData.name}
+                  onChange={(e) => setVaFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Alex Rivera"
+                  className="marketplace-settings__control"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                />
+              </div>
+
+              {/* Email Field */}
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 650, color: "#334155", marginBottom: "6px" }}>
+                  Login Email Address <span style={{ color: "#ef4444" }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={vaFormData.email}
+                  onChange={(e) => setVaFormData((prev) => ({ ...prev, email: e.target.value }))}
+                  placeholder="e.g. alex@yourstore.com"
+                  className="marketplace-settings__control"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                />
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label style={{ display: "block", fontSize: "13px", fontWeight: 650, color: "#334155", marginBottom: "6px" }}>
+                  Password {editingVa ? <span style={{ fontSize: "11px", fontWeight: 400, color: "#64748b" }}>(leave blank to keep unchanged)</span> : <span style={{ color: "#ef4444" }}>*</span>}
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showVaPassword ? "text" : "password"}
+                    required={!editingVa}
+                    value={vaFormData.password}
+                    onChange={(e) => setVaFormData((prev) => ({ ...prev, password: e.target.value }))}
+                    placeholder={editingVa ? "••••••••" : "At least 6 characters"}
+                    className="marketplace-settings__control"
+                    style={{ width: "100%", padding: "10px 40px 10px 12px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowVaPassword(!showVaPassword)}
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "none",
+                      border: "none",
+                      color: "#64748b",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {showVaPassword ? <LuEyeOff /> : <LuEye />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingTop: "2px" }}>
+                <input
+                  type="checkbox"
+                  id="va-active-checkbox"
+                  checked={vaFormData.is_active}
+                  onChange={(e) => setVaFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                  style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer" }}
+                />
+                <label htmlFor="va-active-checkbox" style={{ fontSize: "13px", fontWeight: 600, color: "#334155", cursor: "pointer" }}>
+                  Account Active (allows VA to sign in)
+                </label>
+              </div>
+
+              {/* Module Permissions Granular Selection */}
+              <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px", marginTop: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#0f172a" }}>
+                      Module Permissions <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <span style={{ fontSize: "11px", color: "#64748b" }}>
+                      Select which sections of your AutoDS store this assistant can view and operate.
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllVaModules}
+                      style={{ fontSize: "11px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 650 }}
+                    >
+                      Select All
+                    </button>
+                    <span style={{ color: "#cbd5e1" }}>•</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllVaModules}
+                      style={{ fontSize: "11px", color: "#64748b", background: "none", border: "none", cursor: "pointer", fontWeight: 650 }}
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {VA_MODULES.map((mod) => {
+                    const isChecked = vaFormData.modules.includes(mod.id);
+
+                    return (
+                      <div
+                        key={mod.id}
+                        onClick={() => handleToggleVaModule(mod.id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          padding: "10px 14px",
+                          borderRadius: "10px",
+                          border: `1px solid ${isChecked ? "#93c5fd" : "#e2e8f0"}`,
+                          background: isChecked ? "#f0f7ff" : "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // handled by div onClick
+                          style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", flexShrink: 0 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <strong style={{ fontSize: "13px", color: isChecked ? "#1e40af" : "#1e293b", display: "block" }}>
+                            {mod.label}
+                          </strong>
+                          <span style={{ fontSize: "11px", color: "#64748b", display: "block" }}>
+                            {mod.description}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+              }}
+            >
+              <button
+                type="button"
+                className="plans-settings__ghost-btn"
+                onClick={() => setVaModalOpen(false)}
+                disabled={vaSaving}
+                style={{ padding: "8px 16px", fontSize: "13px" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="plans-settings__btn plans-settings__btn--primary"
+                disabled={vaSaving}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 20px", fontSize: "13px" }}
+              >
+                {vaSaving ? <LuLoader className="spin-icon" /> : editingVa ? <LuShieldCheck /> : <LuUserPlus />}
+                <span>{vaSaving ? "Saving…" : editingVa ? "Save Changes" : "Create Assistant"}</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
   const renderInnerTab = () => {
     if (activeInnerTab === "Pricing") {
       return renderPricingTab();
@@ -3337,7 +4761,7 @@ export default function MarketplaceSettingsPage() {
   return (
     <section className="marketplace-settings-page">
       <nav className="marketplace-settings__primary-tabs" aria-label="Settings sections">
-        {settingsPrimaryTabs.map((tab) => (
+        {visiblePrimaryTabs.map((tab) => (
           <button
             type="button"
             key={tab}
@@ -3393,9 +4817,13 @@ export default function MarketplaceSettingsPage() {
         renderStoreSettingsTab()
       ) : activePrimaryTab === "Buyer Accounts" ? (
         renderBuyerAccountsTab()
+      ) : activePrimaryTab === "VAs" ? (
+        renderVAsTab()
       ) : (
         <SettingsPlaceholder title={activePrimaryTab} />
       )}
+
+      {vaModalOpen && renderVaModal()}
 
       {editingMessage ? (
         <div className="marketplace-settings__modal">

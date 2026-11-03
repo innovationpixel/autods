@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   LuCheck,
   LuLoader,
@@ -55,9 +55,13 @@ function OrderShippingAddressModal({
   open,
   order = null,
   orders = null,
+  errorMessage = "",
+  processingMethod = "autods",
+  selectedBuyerAccountId = "",
   saving = false,
   onClose,
   onSave,
+  onSaveAndProcess = null,
 }) {
   const ordersList = orders && orders.length > 0 ? orders : (order ? [order] : []);
   const isMultiple = ordersList.length > 1;
@@ -67,6 +71,7 @@ function OrderShippingAddressModal({
   const [loadingValidations, setLoadingValidations] = useState(false);
   const [errors, setErrors] = useState({});
   const [showEditManual, setShowEditManual] = useState({});
+  const [applyStates, setApplyStates] = useState({});
 
   useEffect(() => {
     if (!open) return;
@@ -102,12 +107,19 @@ function OrderShippingAddressModal({
     setForms(initialForms);
     setShowEditManual(manualToggles);
     setErrors({});
+    setApplyStates({});
     setLoadingValidations(true);
+
+    const quotePayload = {
+      processing_method: processingMethod,
+      buyer_account_id:
+        processingMethod === "buyer" && selectedBuyerAccountId ? Number(selectedBuyerAccountId) : undefined,
+    };
 
     // Fetch checkout quote / address validation for each order in parallel
     Promise.allSettled(
       ordersList.map((ord) =>
-        getOrderCheckoutQuote(ord.id)
+        getOrderCheckoutQuote(ord.id, quotePayload)
           .then((res) => ({ id: ord.id, validation: res.data?.address_validation }))
           .catch(() => ({ id: ord.id, validation: null }))
       )
@@ -121,7 +133,7 @@ function OrderShippingAddressModal({
       setValidations(valMap);
       setLoadingValidations(false);
     });
-  }, [open, orders, order]);
+  }, [open, orders, order, processingMethod, selectedBuyerAccountId]);
 
   if (!open || !ordersList.length) return null;
 
@@ -140,26 +152,8 @@ function OrderShippingAddressModal({
         return next;
       });
     }
-  };
-
-  const handleApplyRecommended = (orderId, rec) => {
-    if (!rec) return;
-    setForms((prev) => ({
-      ...prev,
-      [orderId]: {
-        fullName: rec.fullName || prev[orderId]?.fullName || "",
-        addressLine1: rec.addressLine1 || prev[orderId]?.addressLine1 || "",
-        addressLine2: rec.addressLine2 || "",
-        city: rec.city || prev[orderId]?.city || "",
-        stateOrProvince: rec.stateOrProvince || prev[orderId]?.stateOrProvince || "",
-        postalCode: rec.postalCode || prev[orderId]?.postalCode || "",
-        countryCode: (rec.countryCode || prev[orderId]?.countryCode || "US").toUpperCase(),
-        phone: rec.phone || prev[orderId]?.phone || "",
-      },
-    }));
-    setShowEditManual((prev) => ({ ...prev, [orderId]: true }));
-    if (errors[orderId]) {
-      setErrors((prev) => {
+    if (applyStates[orderId]) {
+      setApplyStates((prev) => {
         const next = { ...prev };
         delete next[orderId];
         return next;
@@ -167,7 +161,96 @@ function OrderShippingAddressModal({
     }
   };
 
-  const handleSave = () => {
+  const handleApplyRecommended = (orderId, rec) => {
+    if (!rec || applyStates[orderId] === "applying") return;
+
+    setApplyStates((prev) => ({ ...prev, [orderId]: "applying" }));
+
+    setTimeout(() => {
+      setForms((prev) => ({
+        ...prev,
+        [orderId]: {
+          fullName: rec.fullName || prev[orderId]?.fullName || "",
+          addressLine1: rec.addressLine1 || prev[orderId]?.addressLine1 || "",
+          addressLine2: rec.addressLine2 || "",
+          city: rec.city || prev[orderId]?.city || "",
+          stateOrProvince: rec.stateOrProvince || prev[orderId]?.stateOrProvince || "",
+          postalCode: rec.postalCode || prev[orderId]?.postalCode || "",
+          countryCode: (rec.countryCode || prev[orderId]?.countryCode || "US").toUpperCase(),
+          phone: rec.phone || prev[orderId]?.phone || "",
+        },
+      }));
+      setShowEditManual((prev) => ({ ...prev, [orderId]: true }));
+      if (errors[orderId]) {
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next[orderId];
+          return next;
+        });
+      }
+      setApplyStates((prev) => ({ ...prev, [orderId]: "applied" }));
+    }, 380);
+  };
+
+  const isApplyingAll = useMemo(() => {
+    return ordersList.some((ord) => applyStates[ord.id] === "applying");
+  }, [ordersList, applyStates]);
+
+  const allApplied = useMemo(() => {
+    return ordersList.length > 0 && ordersList.every((ord) => applyStates[ord.id] === "applied");
+  }, [ordersList, applyStates]);
+
+  const handleApplyAllRecommended = () => {
+    if (isApplyingAll) return;
+    const nextApplying = {};
+    ordersList.forEach((ord) => {
+      nextApplying[ord.id] = "applying";
+    });
+    setApplyStates(nextApplying);
+
+    setTimeout(() => {
+      setForms((prev) => {
+        const nextForms = { ...prev };
+        ordersList.forEach((ord) => {
+          const val = validations[ord.id];
+          const raw = ord.rawAddress ?? {};
+          const rec = val?.recommended_address || {
+            fullName: nextForms[ord.id]?.fullName || raw.fullName || ord.buyerName || "",
+            addressLine1: nextForms[ord.id]?.addressLine1 || raw.addressLine1 || "",
+            addressLine2: nextForms[ord.id]?.addressLine2 || raw.addressLine2 || "",
+            city: nextForms[ord.id]?.city || raw.city || "",
+            stateOrProvince: nextForms[ord.id]?.stateOrProvince || STATE_ABBR_MAP[(raw.stateOrProvince || "").toUpperCase()] || raw.stateOrProvince || "",
+            postalCode: nextForms[ord.id]?.postalCode || raw.postalCode || "",
+            countryCode: (nextForms[ord.id]?.countryCode || raw.countryCode || "US").toUpperCase(),
+            phone: nextForms[ord.id]?.phone || (raw.phone ? raw.phone.replace(/[^\d\-\/]/g, "") : "") || "5551234567",
+          };
+          nextForms[ord.id] = {
+            fullName: rec.fullName || nextForms[ord.id]?.fullName || "",
+            addressLine1: rec.addressLine1 || nextForms[ord.id]?.addressLine1 || "",
+            addressLine2: rec.addressLine2 || "",
+            city: rec.city || nextForms[ord.id]?.city || "",
+            stateOrProvince: rec.stateOrProvince || nextForms[ord.id]?.stateOrProvince || "",
+            postalCode: rec.postalCode || nextForms[ord.id]?.postalCode || "",
+            countryCode: (rec.countryCode || nextForms[ord.id]?.countryCode || "US").toUpperCase(),
+            phone: rec.phone || nextForms[ord.id]?.phone || "",
+          };
+        });
+        return nextForms;
+      });
+
+      const nextToggles = {};
+      const appliedStates = {};
+      ordersList.forEach((ord) => {
+        nextToggles[ord.id] = true;
+        appliedStates[ord.id] = "applied";
+      });
+      setShowEditManual(nextToggles);
+      setErrors({});
+      setApplyStates(appliedStates);
+    }, 450);
+  };
+
+  const getCleanedPayload = () => {
     const nextErrors = {};
     let hasError = false;
 
@@ -193,7 +276,7 @@ function OrderShippingAddressModal({
 
     if (hasError) {
       setErrors(nextErrors);
-      return;
+      return null;
     }
 
     setErrors({});
@@ -201,7 +284,7 @@ function OrderShippingAddressModal({
     if (!isMultiple) {
       const singleId = ordersList[0].id;
       const f = forms[singleId];
-      onSave({
+      return {
         fullName: f.fullName.trim(),
         addressLine1: f.addressLine1.trim(),
         addressLine2: (f.addressLine2 || "").trim(),
@@ -210,7 +293,7 @@ function OrderShippingAddressModal({
         postalCode: f.postalCode.trim(),
         countryCode: (f.countryCode || "US").trim().toUpperCase(),
         phone: (f.phone || "").trim(),
-      });
+      };
     } else {
       const cleaned = {};
       ordersList.forEach((ord) => {
@@ -226,7 +309,23 @@ function OrderShippingAddressModal({
           phone: (f.phone || "").trim(),
         };
       });
-      onSave(cleaned);
+      return cleaned;
+    }
+  };
+
+  const handleSave = () => {
+    const payload = getCleanedPayload();
+    if (!payload) return;
+    onSave(payload);
+  };
+
+  const handleSaveAndProcess = () => {
+    const payload = getCleanedPayload();
+    if (!payload) return;
+    if (onSaveAndProcess) {
+      onSaveAndProcess(payload);
+    } else {
+      onSave(payload);
     }
   };
 
@@ -285,28 +384,106 @@ function OrderShippingAddressModal({
         {/* Modal Header */}
         <div
           className="quick-edit-modal__head"
-          style={{ padding: "20px 24px 16px", borderBottom: "1px solid #f1f5f9" }}
+          style={{
+            padding: "20px 24px 16px",
+            borderBottom: "1px solid #f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
         >
-          <span
-            className="quick-edit-modal__icon"
-            style={{ background: "#eff6ff", color: "#2563eb", borderRadius: "8px" }}
-            aria-hidden="true"
-          >
-            <LuMapPin size={20} />
-          </span>
-          <div style={{ paddingRight: 24 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#0f172a" }}>
-              {isMultiple
-                ? `Fix Shipping Addresses (${ordersList.length} Orders)`
-                : "Address Validation & Fixation"}
-            </h2>
-            <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
-              {isMultiple
-                ? `Review the current eBay address, AliExpress recommended format, and adjust details for ${ordersList.length} orders.`
-                : `Order #${ordersList[0]?.orderId || ordersList[0]?.id} · Review current vs recommended address.`}
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span
+              className="quick-edit-modal__icon"
+              style={{ background: "#eff6ff", color: "#2563eb", borderRadius: "8px" }}
+              aria-hidden="true"
+            >
+              <LuMapPin size={20} />
+            </span>
+            <div style={{ paddingRight: 24 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "#0f172a" }}>
+                {isMultiple
+                  ? `Fix Shipping Addresses (${ordersList.length} Orders)`
+                  : "Address Validation & Fixation"}
+              </h2>
+              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 13 }}>
+                {isMultiple
+                  ? `Review the current eBay address, AliExpress recommended format, and adjust details for ${ordersList.length} orders.`
+                  : `Order #${ordersList[0]?.orderId || ordersList[0]?.id} · Review current vs recommended address.`}
+              </p>
+            </div>
           </div>
+
+          {isMultiple && (
+            <button
+              type="button"
+              onClick={handleApplyAllRecommended}
+              disabled={isApplyingAll}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                borderRadius: 6,
+                background: allApplied ? "#16a34a" : "#4f46e5",
+                color: "#ffffff",
+                fontSize: 12,
+                fontWeight: 600,
+                border: 0,
+                cursor: isApplyingAll ? "not-allowed" : "pointer",
+                marginRight: 32,
+                boxShadow: allApplied
+                  ? "0 2px 6px rgba(22, 163, 74, 0.3)"
+                  : "0 2px 6px rgba(79, 70, 229, 0.2)",
+                transition: "all 0.2s ease-in-out",
+              }}
+            >
+              {isApplyingAll ? (
+                <>
+                  <LuLoader className="spin-icon" size={13} />
+                  <span>Applying All…</span>
+                </>
+              ) : allApplied ? (
+                <>
+                  <LuCheck size={14} />
+                  <span>All Applied</span>
+                </>
+              ) : (
+                <>
+                  <LuSparkles size={13} />
+                  <span>Apply All Recommended</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
+
+        {/* Error Alert if provided */}
+        {errorMessage && (
+          <div style={{ padding: "12px 24px 0" }}>
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
+                fontSize: "13px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                lineHeight: 1.45,
+              }}
+            >
+              <LuTriangleAlert size={17} style={{ flexShrink: 0, marginTop: 1, color: "#dc2626" }} />
+              <div>
+                <strong>AliExpress Address Validation Error:</strong> {errorMessage}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Informational Banner */}
         <div style={{ padding: "12px 24px 0" }}>
@@ -639,22 +816,47 @@ function OrderShippingAddressModal({
                       <button
                         type="button"
                         onClick={() => handleApplyRecommended(ord.id, recommendedAddr)}
+                        disabled={applyStates[ord.id] === "applying"}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 5,
-                          padding: "5px 12px",
+                          gap: 6,
+                          padding: "6px 14px",
                           borderRadius: 6,
-                          background: "#4f46e5",
+                          background:
+                            applyStates[ord.id] === "applied"
+                              ? "#16a34a"
+                              : applyStates[ord.id] === "applying"
+                              ? "#6366f1"
+                              : "#4f46e5",
                           color: "#ffffff",
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: 600,
                           border: 0,
-                          cursor: "pointer",
+                          cursor: applyStates[ord.id] === "applying" ? "not-allowed" : "pointer",
+                          boxShadow:
+                            applyStates[ord.id] === "applied"
+                              ? "0 2px 6px rgba(22, 163, 74, 0.3)"
+                              : "0 2px 6px rgba(79, 70, 229, 0.2)",
+                          transition: "all 0.2s ease-in-out",
                         }}
                       >
-                        <LuSparkles size={12} />
-                        <span>Apply Recommended</span>
+                        {applyStates[ord.id] === "applying" ? (
+                          <>
+                            <LuLoader className="spin-icon" size={13} />
+                            <span>Applying…</span>
+                          </>
+                        ) : applyStates[ord.id] === "applied" ? (
+                          <>
+                            <LuCheck size={14} />
+                            <span>Applied</span>
+                          </>
+                        ) : (
+                          <>
+                            <LuSparkles size={13} />
+                            <span>Apply Recommended</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
@@ -954,6 +1156,33 @@ function OrderShippingAddressModal({
               </>
             )}
           </button>
+          {onSaveAndProcess && (
+            <button
+              type="button"
+              className="quick-edit-modal__btn"
+              onClick={handleSaveAndProcess}
+              disabled={saving}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                background: "#059669",
+                color: "#ffffff",
+                fontWeight: 600,
+                border: 0,
+                borderRadius: 6,
+                padding: "8px 16px",
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving ? <LuLoader className="spin-icon" /> : <LuCheck size={16} />}
+              <span>
+                {isMultiple
+                  ? `Save & Process All (${ordersList.length})`
+                  : "Save & Process"}
+              </span>
+            </button>
+          )}
         </div>
       </section>
     </div>

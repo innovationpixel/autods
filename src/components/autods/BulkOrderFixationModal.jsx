@@ -110,6 +110,7 @@ export default function BulkOrderFixationModal({
 }) {
   const [filterType, setFilterType] = useState("all");
   const [orderStates, setOrderStates] = useState({});
+  const [applyAddressStates, setApplyAddressStates] = useState({});
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
 
@@ -297,6 +298,13 @@ export default function BulkOrderFixationModal({
   const pendingCount = totalOrders - resolvedCount;
 
   const handleFieldChange = (orderId, field, value) => {
+    if (applyAddressStates[orderId]) {
+      setApplyAddressStates((prev) => {
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+    }
     setOrderStates((prev) => {
       const cur = prev[orderId];
       if (!cur) return prev;
@@ -314,28 +322,34 @@ export default function BulkOrderFixationModal({
   };
 
   const handleApplyRecommendation = (orderId) => {
-    setOrderStates((prev) => {
-      const cur = prev[orderId];
-      if (!cur || !cur.recommendedAddress) return prev;
-      const rec = cur.recommendedAddress;
-      return {
-        ...prev,
-        [orderId]: {
-          ...cur,
-          addressForm: {
-            ...cur.addressForm,
-            fullName: rec.fullName || cur.addressForm.fullName,
-            addressLine1: rec.addressLine1 || cur.addressForm.addressLine1,
-            addressLine2: rec.addressLine2 || "",
-            city: rec.city || cur.addressForm.city,
-            stateOrProvince: rec.stateOrProvince || cur.addressForm.stateOrProvince,
-            postalCode: rec.postalCode || cur.addressForm.postalCode,
-            countryCode: rec.countryCode || cur.addressForm.countryCode,
-            phone: rec.phone || cur.addressForm.phone,
+    if (applyAddressStates[orderId] === "applying") return;
+    setApplyAddressStates((prev) => ({ ...prev, [orderId]: "applying" }));
+
+    setTimeout(() => {
+      setOrderStates((prev) => {
+        const cur = prev[orderId];
+        if (!cur || !cur.recommendedAddress) return prev;
+        const rec = cur.recommendedAddress;
+        return {
+          ...prev,
+          [orderId]: {
+            ...cur,
+            addressForm: {
+              ...cur.addressForm,
+              fullName: rec.fullName || cur.addressForm.fullName,
+              addressLine1: rec.addressLine1 || cur.addressForm.addressLine1,
+              addressLine2: rec.addressLine2 || "",
+              city: rec.city || cur.addressForm.city,
+              stateOrProvince: rec.stateOrProvince || cur.addressForm.stateOrProvince,
+              postalCode: rec.postalCode || cur.addressForm.postalCode,
+              countryCode: rec.countryCode || cur.addressForm.countryCode,
+              phone: rec.phone || cur.addressForm.phone,
+            },
           },
-        },
-      };
-    });
+        };
+      });
+      setApplyAddressStates((prev) => ({ ...prev, [orderId]: "applied" }));
+    }, 380);
   };
 
   const handleSelectVariationProperty = (orderId, propName, value) => {
@@ -898,19 +912,44 @@ export default function BulkOrderFixationModal({
                             <button
                               type="button"
                               onClick={() => handleApplyRecommendation(order.id)}
+                              disabled={applyAddressStates[order.id] === "applying"}
                               style={{
-                                padding: "4px 10px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "4px 12px",
                                 borderRadius: 6,
-                                background: "#059669",
+                                background:
+                                  applyAddressStates[order.id] === "applied"
+                                    ? "#059669"
+                                    : applyAddressStates[order.id] === "applying"
+                                    ? "#10b981"
+                                    : "#059669",
                                 color: "#ffffff",
                                 fontSize: 11.5,
                                 fontWeight: 600,
                                 border: 0,
-                                cursor: "pointer",
+                                cursor: applyAddressStates[order.id] === "applying" ? "not-allowed" : "pointer",
                                 whiteSpace: "nowrap",
+                                transition: "all 0.2s ease-in-out",
                               }}
                             >
-                              Apply Suggestion
+                              {applyAddressStates[order.id] === "applying" ? (
+                                <>
+                                  <LuLoader className="spin-icon" size={12} />
+                                  <span>Applying…</span>
+                                </>
+                              ) : applyAddressStates[order.id] === "applied" ? (
+                                <>
+                                  <LuCheck size={13} />
+                                  <span>Applied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <LuSparkles size={12} />
+                                  <span>Apply Suggestion</span>
+                                </>
+                              )}
                             </button>
                           </div>
                         )}

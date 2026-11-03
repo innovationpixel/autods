@@ -237,6 +237,47 @@ const MarketplaceDashboard = () => {
   const listingsMeta = useSelector(selectEbayListingsMeta);
   const draftsMeta = useSelector(selectEbayDraftsMeta);
   const authUser = useSelector(selectUser);
+
+  const isVA = authUser?.role === "va" || Boolean(authUser?.parent_id);
+  const vaModules = useMemo(() => {
+    if (Array.isArray(authUser?.admin_modules)) return authUser.admin_modules;
+    if (Array.isArray(authUser?.modules)) return authUser.modules;
+    return [];
+  }, [authUser]);
+
+  const isPageAllowedForUser = (page) => {
+    if (!isVA) return true;
+    if (!page || page === "dashboard") return true;
+
+    const moduleMapping = {
+      marketplace: "finder",
+      "print-on-demand": "finder",
+      "order-processing": "orders",
+      calculations: "products",
+      orders: "orders",
+      "returns-disputes": "returns",
+      "sourcing-request": "sourcing",
+      products: "products",
+      drafts: "products",
+      "ai-image-generation": "products",
+      "customer-support": "messages",
+      tickets: "messages",
+      settings: "settings",
+      wallet: "billing",
+    };
+
+    if (page === "usage-upgrade") return false;
+    const requiredModule = moduleMapping[page];
+    if (!requiredModule) return true;
+    return vaModules.includes(requiredModule);
+  };
+
+  const filteredSidebarGroups = useMemo(() => {
+    if (!isVA) return sidebarGroups;
+    return sidebarGroups
+      .map((group) => group.filter((item) => isPageAllowedForUser(item.page)))
+      .filter((group) => group.length > 0);
+  }, [isVA, vaModules]);
   const profileShortName = useMemo(() => getUserShortName(authUser), [authUser]);
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
   const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
@@ -1303,7 +1344,7 @@ const MarketplaceDashboard = () => {
         </div>
 
         <nav className="marketplace-sidebar__nav" aria-label="Marketplace navigation">
-          {sidebarGroups.map((group, groupIndex) => (
+          {filteredSidebarGroups.map((group, groupIndex) => (
             <div className="marketplace-sidebar__group" key={`group-${groupIndex}`}>
               {group.map((item) => {
                 const navItem = {
