@@ -1083,7 +1083,7 @@ function ProductsContent({ searchQuery }) {
       case "name":
         return "products-table__name-col";
       case "uploaded":
-        return "products-table__date";
+        return "products-table__date products-table__uploaded-col";
       case "store":
         return "products-table__store";
       case "stockAvailable":
@@ -1356,10 +1356,17 @@ function ProductsContent({ searchQuery }) {
                     );
                   }
 
+                  const isUploaded = column.id === "uploaded";
+                  const thClass = [
+                    column.id === "name" ? "products-table__name-col" : "",
+                    isUploaded ? "products-table__uploaded-col" : "",
+                  ].filter(Boolean).join(" ") || undefined;
+
                   return (
                     <th
                       key={column.id}
-                      className={column.id === "name" ? "products-table__name-col" : undefined}
+                      className={thClass}
+                      data-column={column.id}
                       rowSpan={hasStockGroup ? 2 : 1}
                       style={{
                         minWidth: column.minWidth,
@@ -1476,6 +1483,7 @@ function ProductsContent({ searchQuery }) {
             </button>
           </div>
 
+          <div className="orders-table-footer__right">
           <div className="orders-table-footer__meta">
             <label>
               <span>Show</span>
@@ -1497,7 +1505,29 @@ function ProductsContent({ searchQuery }) {
               Products out of {totalCount}
             </span>
           </div>
+
+          <div className="orders-table-footer__scroll-actions">
+            <button
+              type="button"
+              className="orders-icon-btn"
+              onClick={() => scrollTable("left")}
+              aria-label="Scroll grid left"
+              title="Scroll left"
+            >
+              <LuChevronLeft />
+            </button>
+            <button
+              type="button"
+              className="orders-icon-btn"
+              onClick={() => scrollTable("right")}
+              aria-label="Scroll grid right"
+              title="Scroll right"
+            >
+              <LuChevronRight />
+            </button>
+          </div>
         </div>
+      </div>
       </div>
 
       {showStickyScroll ? (

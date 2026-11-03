@@ -2257,6 +2257,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
             </button>
           </div>
 
+          <div className="orders-table-footer__right">
           <div className="orders-table-footer__meta">
             <label>
               <span>Show</span>
@@ -2276,7 +2277,29 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
             </label>
             <span>Orders out of {orders.length}</span>
           </div>
+
+          <div className="orders-table-footer__scroll-actions">
+            <button
+              type="button"
+              className="orders-icon-btn"
+              onClick={() => scrollTable("left")}
+              aria-label="Scroll grid left"
+              title="Scroll left"
+            >
+              <LuChevronLeft />
+            </button>
+            <button
+              type="button"
+              className="orders-icon-btn"
+              onClick={() => scrollTable("right")}
+              aria-label="Scroll grid right"
+              title="Scroll right"
+            >
+              <LuChevronRight />
+            </button>
+          </div>
         </div>
+      </div>
       </div>
 
       <OrderSourceModal

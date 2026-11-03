@@ -1834,13 +1834,16 @@
 .bulk-edit-modal-layer {
   position: fixed;
   inset: 0;
-  z-index: 1050;
+  z-index: 2050;
 }
 
 .product-editor-modal-layer {
   position: fixed;
   inset: 0;
-  z-index: 95;
+  z-index: 2050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .product-editor-modal-layer__backdrop {
@@ -1852,7 +1855,7 @@
 
 .product-editor-modal {
   position: relative;
-  z-index: 1;
+  z-index: 2051;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   width: min(1120px, calc(100vw - 32px));
@@ -2182,7 +2185,7 @@
 .quick-edit-modal-layer {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 2050;
 }
 
 .quick-edit-modal-layer__backdrop {
@@ -8177,6 +8180,27 @@
 .orders-table__empty svg {
   margin-right: 8px;
   vertical-align: middle;
+}
+
+
+.orders-table-footer__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.orders-table-footer__scroll-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.products-table th.products-table__uploaded-col,
+.products-table td.products-table__uploaded-col,
+.products-table th[data-column="uploaded"],
+.products-table td[data-column="uploaded"] {
+  padding-left: 30px !important;
 }
 
 .orders-table-footer {

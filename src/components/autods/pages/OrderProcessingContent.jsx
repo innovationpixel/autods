@@ -1093,7 +1093,12 @@ function OrderProcessingContent() {
     setBulkProgress({ current: 0, total: 0 });
     setSelectedIds(failedOrderIds);
 
-    // Build proper system message
+    await loadOrders(true);
+    if (processingMethod === "autods") {
+      loadWallet();
+    }
+
+    // Build unified system message
     const parts = [];
     if (succeeded > 0) {
       parts.push(`${succeeded} Processed`);
@@ -1107,14 +1112,20 @@ function OrderProcessingContent() {
     if (failedOther > 0) {
       parts.push(`${failedOther} Failed`);
     }
+    if (skippedForBuyerAccount > 0) {
+      parts.push(`${skippedForBuyerAccount} skipped (no buyer account tagged)`);
+    }
+    if (nonAliExpressCount > 0 && selected.length > 0) {
+      parts.push(`${nonAliExpressCount} skipped (missing AliExpress source link)`);
+    }
 
     const summaryText = parts.length > 0 ? parts.join(", ") + "." : "Order processing completed.";
 
     if (failedAddress > 0 || failedVariantOrSource > 0 || failedOther > 0) {
       if (succeeded > 0) {
-        toast.warn(summaryText, { autoClose: 6000 });
+        toast.warn(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
       } else {
-        toast.error(summaryText, { autoClose: 6000 });
+        toast.error(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
       }
       if (failedAddress > 0) {
         const addrNoticeMsg = `${failedAddress} order${failedAddress === 1 ? "" : "s"} failed due to AliExpress delivery address validation.`;
@@ -1128,22 +1139,7 @@ function OrderProcessingContent() {
         setTransferModalOpen(true);
       }
     } else {
-      toast.success(summaryText);
-    }
-    if (skippedForBuyerAccount > 0) {
-      toast.warn(
-        `${skippedForBuyerAccount} order${skippedForBuyerAccount === 1 ? "" : "s"} skipped — no buyer account tagged for their marketplace.`,
-      );
-    }
-    if (nonAliExpressCount > 0 && selected.length > 0) {
-      toast.warn(
-        `${nonAliExpressCount} order${nonAliExpressCount === 1 ? "" : "s"} skipped — missing valid AliExpress source link.`,
-      );
-    }
-
-    await loadOrders(true);
-    if (processingMethod === "autods") {
-      loadWallet();
+      toast.success(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
     }
   };
 
@@ -2081,6 +2077,7 @@ function OrderProcessingContent() {
               </button>
             </div>
 
+            <div className="orders-table-footer__right">
             <div className="orders-table-footer__meta">
               <label>
                 <span>Show</span>
@@ -2100,7 +2097,29 @@ function OrderProcessingContent() {
               </label>
               <span>Orders out of {sortedOrders.length}</span>
             </div>
+
+            <div className="orders-table-footer__scroll-actions">
+              <button
+                type="button"
+                className="orders-icon-btn"
+                onClick={() => scrollTable("left")}
+                aria-label="Scroll grid left"
+                title="Scroll left"
+              >
+                <LuChevronLeft />
+              </button>
+              <button
+                type="button"
+                className="orders-icon-btn"
+                onClick={() => scrollTable("right")}
+                aria-label="Scroll grid right"
+                title="Scroll right"
+              >
+                <LuChevronRight />
+              </button>
+            </div>
           </div>
+        </div>
         </div>
       </section>
 

@@ -1,27 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { LuLoader, LuTriangleAlert, LuX } from "react-icons/lu";
 
 function ConfirmModal({
   open,
-  title = "Are you sure?",
+  title,
   description,
-  confirmLabel = "Delete",
+  confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   danger = true,
   saving = false,
-  requireAgreement = false,
-  agreementLabel = "I agree to the Terms & Conditions.",
   onConfirm,
   onClose,
 }) {
-  const [agreed, setAgreed] = useState(false);
-
   useEffect(() => {
     if (!open) {
       return undefined;
     }
 
-    setAgreed(false);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -35,10 +30,20 @@ function ConfirmModal({
   }
 
   return (
-    <div className="quick-edit-modal-layer" role="presentation">
+    <div
+      className="quick-edit-modal-layer"
+      role="presentation"
+      style={{ position: "fixed", inset: 0, zIndex: 2050 }}
+    >
       <button type="button" className="quick-edit-modal-layer__backdrop" aria-label="Close" onClick={onClose} />
 
-      <section className="quick-edit-modal confirm-modal" role="alertdialog" aria-modal="true" aria-label={title}>
+      <section
+        className="quick-edit-modal confirm-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ position: "relative", zIndex: 2051 }}
+      >
         <button type="button" className="quick-edit-modal__close" aria-label="Close" onClick={onClose} disabled={saving}>
           <LuX />
         </button>
@@ -53,22 +58,20 @@ function ConfirmModal({
           </div>
         </div>
 
-        {requireAgreement ? (
-          <label className="confirm-modal__agreement">
-            <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} disabled={saving} />
-            <span>{agreementLabel}</span>
-          </label>
-        ) : null}
-
         <div className="quick-edit-modal__actions">
-          <button type="button" className="quick-edit-modal__btn quick-edit-modal__btn--ghost" onClick={onClose} disabled={saving}>
+          <button
+            type="button"
+            className="quick-edit-modal__btn quick-edit-modal__btn--ghost"
+            onClick={onClose}
+            disabled={saving}
+          >
             {cancelLabel}
           </button>
           <button
             type="button"
-            className={danger ? "quick-edit-modal__btn confirm-modal__btn--danger" : "quick-edit-modal__btn quick-edit-modal__btn--primary"}
+            className={`quick-edit-modal__btn ${danger ? "confirm-modal__btn--danger" : "quick-edit-modal__btn--primary"}`}
             onClick={onConfirm}
-            disabled={saving || (requireAgreement && !agreed)}
+            disabled={saving}
           >
             {saving ? (
               <>

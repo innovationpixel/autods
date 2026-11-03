@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import { LuLoader, LuPencil, LuX } from "react-icons/lu";
 import DraftEditorPanel from "./DraftEditorPanel";
 import { getListingImageUrl } from "./helpers";
@@ -13,6 +14,26 @@ function ProductEditorModal({
   onSave,
   onClose,
 }) {
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && !saving) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, saving, onClose]);
+
   if (!open || !product || !form) {
     return null;
   }
@@ -20,7 +41,18 @@ function ProductEditorModal({
   const imageUrl = getListingImageUrl(product);
 
   return (
-    <div className="product-editor-modal-layer" role="presentation">
+    <div
+      className="product-editor-modal-layer"
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2050,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <button
         type="button"
         className="product-editor-modal-layer__backdrop"
@@ -28,7 +60,17 @@ function ProductEditorModal({
         onClick={onClose}
       />
 
-      <section className="product-editor-modal" role="dialog" aria-modal="true" aria-label="Edit product">
+      <section
+        className="product-editor-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit product"
+        style={{
+          position: "relative",
+          zIndex: 2051,
+          margin: "auto",
+        }}
+      >
         <header className="product-editor-modal__head">
           <div className="product-editor-modal__title">
             <span className="product-editor-modal__icon" aria-hidden="true">

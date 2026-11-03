@@ -35,10 +35,20 @@ function QuickEditModal({
   }
 
   return (
-    <div className="quick-edit-modal-layer" role="presentation">
+    <div
+      className="quick-edit-modal-layer"
+      role="presentation"
+      style={{ position: "fixed", inset: 0, zIndex: 2050 }}
+    >
       <button type="button" className="quick-edit-modal-layer__backdrop" aria-label="Close" onClick={onClose} />
 
-      <section className="quick-edit-modal" role="dialog" aria-modal="true" aria-label={title}>
+      <section
+        className="quick-edit-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{ position: "relative", zIndex: 2051 }}
+      >
         <button type="button" className="quick-edit-modal__close" aria-label="Close" onClick={onClose} disabled={saving}>
           <LuX />
         </button>

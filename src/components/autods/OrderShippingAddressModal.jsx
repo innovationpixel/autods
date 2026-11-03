@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   LuCheck,
   LuLoader,
@@ -33,11 +33,24 @@ const STATE_ABBR_MAP = {
   WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "District of Columbia", PR: "Puerto Rico",
 };
 
+function cleanPostalCode(postal, countryCode = "US") {
+  const code = (postal || "").trim();
+  const country = (countryCode || "US").toUpperCase();
+  if (country === "US") {
+    const m = code.match(/^(\d{5})(-\d{4})?$/);
+    if (m) return m[1];
+    const digits = code.replace(/[^\d]/g, "");
+    if (digits.length >= 5) return digits.slice(0, 5);
+  }
+  return code;
+}
+
 function normalizeOrderAddress(order) {
   const addr = order?.rawAddress ?? {};
   const rawState = (addr.stateOrProvince || "").trim();
   const expandedState = STATE_ABBR_MAP[rawState.toUpperCase()] || rawState;
   const buyerName = order?.buyerName !== "—" ? order?.buyerName : "";
+  const countryCode = (addr.countryCode || "US").toUpperCase();
 
   return {
     fullName: addr.fullName || buyerName || "",
@@ -45,8 +58,8 @@ function normalizeOrderAddress(order) {
     addressLine2: addr.addressLine2 || "",
     city: addr.city || "",
     stateOrProvince: expandedState,
-    postalCode: addr.postalCode || "",
-    countryCode: (addr.countryCode || "US").toUpperCase(),
+    postalCode: cleanPostalCode(addr.postalCode, countryCode),
+    countryCode,
     phone: addr.phone || (order?.buyerPhone !== "—" ? order?.buyerPhone : "") || "",
   };
 }
@@ -135,7 +148,8 @@ function OrderShippingAddressModal({
     });
   }, [open, orders, order, processingMethod, selectedBuyerAccountId]);
 
-  if (!open || !ordersList.length) return null;
+  const isApplyingAll = ordersList.some((ord) => applyStates[ord.id] === "applying");
+  const allApplied = ordersList.length > 0 && ordersList.every((ord) => applyStates[ord.id] === "applied");
 
   const handleChange = (orderId, field, value) => {
     setForms((prev) => ({
@@ -167,19 +181,22 @@ function OrderShippingAddressModal({
     setApplyStates((prev) => ({ ...prev, [orderId]: "applying" }));
 
     setTimeout(() => {
-      setForms((prev) => ({
-        ...prev,
-        [orderId]: {
-          fullName: rec.fullName || prev[orderId]?.fullName || "",
-          addressLine1: rec.addressLine1 || prev[orderId]?.addressLine1 || "",
-          addressLine2: rec.addressLine2 || "",
-          city: rec.city || prev[orderId]?.city || "",
-          stateOrProvince: rec.stateOrProvince || prev[orderId]?.stateOrProvince || "",
-          postalCode: rec.postalCode || prev[orderId]?.postalCode || "",
-          countryCode: (rec.countryCode || prev[orderId]?.countryCode || "US").toUpperCase(),
-          phone: rec.phone || prev[orderId]?.phone || "",
-        },
-      }));
+      setForms((prev) => {
+        const country = (rec.countryCode || prev[orderId]?.countryCode || "US").toUpperCase();
+        return {
+          ...prev,
+          [orderId]: {
+            fullName: rec.fullName || prev[orderId]?.fullName || "",
+            addressLine1: rec.addressLine1 || prev[orderId]?.addressLine1 || "",
+            addressLine2: rec.addressLine2 || "",
+            city: rec.city || prev[orderId]?.city || "",
+            stateOrProvince: rec.stateOrProvince || prev[orderId]?.stateOrProvince || "",
+            postalCode: cleanPostalCode(rec.postalCode || prev[orderId]?.postalCode || "", country),
+            countryCode: country,
+            phone: rec.phone || prev[orderId]?.phone || "",
+          },
+        };
+      });
       setShowEditManual((prev) => ({ ...prev, [orderId]: true }));
       if (errors[orderId]) {
         setErrors((prev) => {
@@ -191,14 +208,6 @@ function OrderShippingAddressModal({
       setApplyStates((prev) => ({ ...prev, [orderId]: "applied" }));
     }, 380);
   };
-
-  const isApplyingAll = useMemo(() => {
-    return ordersList.some((ord) => applyStates[ord.id] === "applying");
-  }, [ordersList, applyStates]);
-
-  const allApplied = useMemo(() => {
-    return ordersList.length > 0 && ordersList.every((ord) => applyStates[ord.id] === "applied");
-  }, [ordersList, applyStates]);
 
   const handleApplyAllRecommended = () => {
     if (isApplyingAll) return;
@@ -214,14 +223,15 @@ function OrderShippingAddressModal({
         ordersList.forEach((ord) => {
           const val = validations[ord.id];
           const raw = ord.rawAddress ?? {};
+          const country = (val?.recommended_address?.countryCode || nextForms[ord.id]?.countryCode || raw.countryCode || "US").toUpperCase();
           const rec = val?.recommended_address || {
             fullName: nextForms[ord.id]?.fullName || raw.fullName || ord.buyerName || "",
             addressLine1: nextForms[ord.id]?.addressLine1 || raw.addressLine1 || "",
             addressLine2: nextForms[ord.id]?.addressLine2 || raw.addressLine2 || "",
             city: nextForms[ord.id]?.city || raw.city || "",
             stateOrProvince: nextForms[ord.id]?.stateOrProvince || STATE_ABBR_MAP[(raw.stateOrProvince || "").toUpperCase()] || raw.stateOrProvince || "",
-            postalCode: nextForms[ord.id]?.postalCode || raw.postalCode || "",
-            countryCode: (nextForms[ord.id]?.countryCode || raw.countryCode || "US").toUpperCase(),
+            postalCode: cleanPostalCode(nextForms[ord.id]?.postalCode || raw.postalCode || "", country),
+            countryCode: country,
             phone: nextForms[ord.id]?.phone || (raw.phone ? raw.phone.replace(/[^\d\-\/]/g, "") : "") || "5551234567",
           };
           nextForms[ord.id] = {
@@ -230,8 +240,8 @@ function OrderShippingAddressModal({
             addressLine2: rec.addressLine2 || "",
             city: rec.city || nextForms[ord.id]?.city || "",
             stateOrProvince: rec.stateOrProvince || nextForms[ord.id]?.stateOrProvince || "",
-            postalCode: rec.postalCode || nextForms[ord.id]?.postalCode || "",
-            countryCode: (rec.countryCode || nextForms[ord.id]?.countryCode || "US").toUpperCase(),
+            postalCode: cleanPostalCode(rec.postalCode || nextForms[ord.id]?.postalCode || "", country),
+            countryCode: country,
             phone: rec.phone || nextForms[ord.id]?.phone || "",
           };
         });
@@ -283,29 +293,31 @@ function OrderShippingAddressModal({
 
     if (!isMultiple) {
       const singleId = ordersList[0].id;
-      const f = forms[singleId];
+      const f = forms[singleId] || {};
+      const country = (f.countryCode || "US").trim().toUpperCase();
       return {
-        fullName: f.fullName.trim(),
-        addressLine1: f.addressLine1.trim(),
+        fullName: (f.fullName || "").trim(),
+        addressLine1: (f.addressLine1 || "").trim(),
         addressLine2: (f.addressLine2 || "").trim(),
-        city: f.city.trim(),
-        stateOrProvince: f.stateOrProvince.trim(),
-        postalCode: f.postalCode.trim(),
-        countryCode: (f.countryCode || "US").trim().toUpperCase(),
+        city: (f.city || "").trim(),
+        stateOrProvince: (f.stateOrProvince || "").trim(),
+        postalCode: cleanPostalCode((f.postalCode || "").trim(), country),
+        countryCode: country,
         phone: (f.phone || "").trim(),
       };
     } else {
       const cleaned = {};
       ordersList.forEach((ord) => {
         const f = forms[ord.id] || {};
+        const country = (f.countryCode || "US").trim().toUpperCase();
         cleaned[ord.id] = {
           fullName: (f.fullName || "").trim(),
           addressLine1: (f.addressLine1 || "").trim(),
           addressLine2: (f.addressLine2 || "").trim(),
           city: (f.city || "").trim(),
           stateOrProvince: (f.stateOrProvince || "").trim(),
-          postalCode: (f.postalCode || "").trim(),
-          countryCode: (f.countryCode || "US").trim().toUpperCase(),
+          postalCode: cleanPostalCode((f.postalCode || "").trim(), country),
+          countryCode: country,
           phone: (f.phone || "").trim(),
         };
       });
@@ -328,6 +340,8 @@ function OrderShippingAddressModal({
       onSave(payload);
     }
   };
+
+  if (!open || !ordersList.length) return null;
 
   return (
     <div
@@ -528,13 +542,17 @@ function OrderShippingAddressModal({
               phone: raw.phone || (ord.buyerPhone !== "—" ? ord.buyerPhone : "") || "—",
             };
 
-            const recommendedAddr = val?.recommended_address || {
+            const recommendedCountry = (val?.recommended_address?.countryCode || form.countryCode || "US").toUpperCase();
+            const recommendedAddr = val?.recommended_address ? {
+              ...val.recommended_address,
+              postalCode: cleanPostalCode(val.recommended_address.postalCode, recommendedCountry),
+            } : {
               fullName: form.fullName || originalAddr.fullName,
               addressLine1: form.addressLine1 || originalAddr.addressLine1,
               addressLine2: form.addressLine2 || "",
               city: form.city || (raw.city ? raw.city : ""),
               stateOrProvince: form.stateOrProvince || STATE_ABBR_MAP[(raw.stateOrProvince || "").toUpperCase()] || raw.stateOrProvince || "",
-              postalCode: form.postalCode || raw.postalCode || "",
+              postalCode: cleanPostalCode(form.postalCode || raw.postalCode || "", form.countryCode || "US"),
               countryCode: form.countryCode || "US",
               phone: form.phone || (raw.phone ? raw.phone.replace(/[^\d\-\/]/g, "") : "") || "5551234567",
             };
