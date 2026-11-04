@@ -106,7 +106,7 @@ function loadStoredStoreOverrides() {
   }
 }
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
-import { logoutAction, updateProfileAction } from '../../store/actions/AuthActions';
+import { logoutAction, updateProfileAction, updateUserStateAction, fetchFreshUserAction } from '../../store/actions/AuthActions';
 import { buyAiCredits } from '../../services/AiGenerationService';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
@@ -136,6 +136,7 @@ import {
   isImportSupplierEnabled,
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
+import { getCurrentPlan } from '../../services/PlanService';
 import { toast } from '../../utils/toast';
 
 function Search({
@@ -308,6 +309,31 @@ const MarketplaceDashboard = () => {
   const [selectedLoadAmount, setSelectedLoadAmount] = useState(15);
   const [selectedAiPackage, setSelectedAiPackage] = useState("5000");
   const [buyingAiCredits, setBuyingAiCredits] = useState(false);
+  const [subscriptionData, setSubscriptionData] = useState(null);
+
+  const fetchPlanQuota = async () => {
+    try {
+      const res = await getCurrentPlan();
+      setSubscriptionData(res.data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchPlanQuota();
+    const handleRefreshQuota = () => fetchPlanQuota();
+    window.addEventListener("autods_refresh_drafts", handleRefreshQuota);
+    window.addEventListener("autods_refresh_quota", handleRefreshQuota);
+    return () => {
+      window.removeEventListener("autods_refresh_drafts", handleRefreshQuota);
+      window.removeEventListener("autods_refresh_quota", handleRefreshQuota);
+    };
+  }, []);
+
+  const currentPlan = subscriptionData?.current_plan;
+  const quotaUsage = subscriptionData?.usage ?? {};
+  const quotaLimit = Number(currentPlan?.products_limit ?? quotaUsage?.products_limit ?? 200);
+  const quotaUsed = Number(quotaUsage?.products_quota_used ?? quotaUsage?.listings_count ?? 0);
+  const isQuotaBreached = Boolean(quotaUsage?.products_quota_breached || (quotaLimit > 0 && quotaUsed >= quotaLimit));
 
   const handleBuyAiCredits = async () => {
     const pkg = aiCreditPackages.find((p) => p.id === selectedAiPackage) || aiCreditPackages[1];
@@ -327,7 +353,7 @@ const MarketplaceDashboard = () => {
       const data = res.data;
       toast.success(data.message || `Purchased ${pkg.credits} successfully!`);
       dispatch(
-        updateProfileAction({
+        updateUserStateAction({
           ai_credits: data.ai_credits,
           wallet_balance: data.wallet_balance,
         })
@@ -490,6 +516,26 @@ const MarketplaceDashboard = () => {
   useEffect(() => {
     dispatch(fetchEbayStatus());
     dispatch(fetchAliExpressStatus());
+    dispatch(fetchFreshUserAction());
+  }, [dispatch]);
+
+  useEffect(() => {
+    const handleCreditsUpdate = (event) => {
+      if (event?.detail?.ai_credits !== undefined) {
+        dispatch(updateUserStateAction({ ai_credits: event.detail.ai_credits }));
+      } else {
+        dispatch(fetchFreshUserAction());
+      }
+    };
+    const handleFocus = () => {
+      dispatch(fetchFreshUserAction());
+    };
+    window.addEventListener("ai_credits_updated", handleCreditsUpdate);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("ai_credits_updated", handleCreditsUpdate);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [dispatch]);
 
   useEffect(() => {
@@ -888,9 +934,15 @@ const MarketplaceDashboard = () => {
   const refreshProductData = () => {
     dispatch(fetchEbayDrafts());
     dispatch(fetchEbayListings());
+    fetchPlanQuota();
   };
 
   const handleMarketplaceCardImport = async (item) => {
+    if (isQuotaBreached) {
+      toast.error(`Product listing limit reached (${quotaUsed}/${quotaLimit} used, counting variations). Please upgrade your plan to import products.`);
+      navigate("/plans");
+      return;
+    }
     const connectionIds = getSelectedConnectionIds();
     if (!connectionIds.length) {
       toast.error("Select at least one eBay store.");
@@ -979,6 +1031,11 @@ const MarketplaceDashboard = () => {
   };
 
   const handleSingleImport = async (action) => {
+    if (isQuotaBreached) {
+      toast.error(`Product listing limit reached (${quotaUsed}/${quotaLimit} used, counting variations). Please upgrade your plan.`);
+      navigate("/plans");
+      return;
+    }
     const connectionIds = validateImportPrerequisites();
     if (!connectionIds) return;
     if (!addProductUrl.trim()) {
@@ -1011,6 +1068,11 @@ const MarketplaceDashboard = () => {
   };
 
   const handleBulkImport = async () => {
+    if (isQuotaBreached) {
+      toast.error(`Product listing limit reached (${quotaUsed}/${quotaLimit} used, counting variations). Please upgrade your plan.`);
+      navigate("/plans");
+      return;
+    }
     const connectionIds = validateImportPrerequisites();
     if (!connectionIds) return;
 
@@ -1468,9 +1530,11 @@ const MarketplaceDashboard = () => {
                 <button
                   type="button"
                   className={balanceMenuOpen ? "marketplace-header__control marketplace-header__control--active" : "marketplace-header__control"}
-                  aria-label="Open balance menu"
+                  aria-label="AI Credits"
+                  title="AI Credits"
                   aria-expanded={balanceMenuOpen}
                   onClick={() => {
+                    setBalanceTab("ai");
                     setBalanceMenuOpen((current) => !current);
                     setNotificationsOpen(false);
                     setNotificationsModalOpen(false);
@@ -1478,8 +1542,8 @@ const MarketplaceDashboard = () => {
                     setWhatsNewOpen(false);
                   }}
                 >
-                  <LuWalletCards />
-                  <span>${parseFloat(authUser?.wallet_balance ?? 0).toFixed(0)} AI:{authUser?.ai_credits ?? 0}</span>
+                  <LuZap style={{ color: "#f59e0b", width: 16, height: 16 }} />
+                  <span>AI Credits: {Number(authUser?.ai_credits ?? 0).toLocaleString()}</span>
                 </button>
 
                 {balanceMenuOpen ? (
@@ -1503,7 +1567,7 @@ const MarketplaceDashboard = () => {
 
                     {balanceTab === "managed" ? (
                       <div className="balance-popover__managed">
-                        <strong className="balance-popover__balance">Balance: $0</strong>
+                        <strong className="balance-popover__balance">Balance: ${parseFloat(authUser?.wallet_balance ?? 0).toFixed(2)}</strong>
 
                         <div className="balance-popover__video" role="img" aria-label="Managed balance video preview">
                           <div className="balance-popover__video-title">
@@ -1555,7 +1619,7 @@ const MarketplaceDashboard = () => {
                       </div>
                     ) : (
                       <div className="balance-popover__ai">
-                        <strong>Balance: AI {authUser?.ai_credits ?? 0}</strong>
+                        <strong>Balance: {Number(authUser?.ai_credits ?? 0).toLocaleString()} AI Credits</strong>
                         <button type="button" onClick={() => setAiCreditsModalOpen(true)}>
                           Buy Credits
                         </button>
@@ -2086,6 +2150,13 @@ const MarketplaceDashboard = () => {
             onSingleImport={handleSingleImport}
             onBulkImport={handleBulkImport}
             supplierEnabled={importSupplierEnabled}
+            quotaBreached={isQuotaBreached}
+            quotaUsed={quotaUsed}
+            quotaLimit={quotaLimit}
+            onUpgradePlan={() => {
+              setAddProductModalOpen(false);
+              navigate("/plans");
+            }}
           />
 
 	          {loadBalanceModalOpen || aiCreditsModalOpen ? (

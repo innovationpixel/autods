@@ -28,4 +28,5 @@ export const markAllImagesAsViewed = () =>
 export const deleteGeneratedImage = (id) =>
     axiosInstance.delete(`/ai/my-images/${id}`);
 
-
+export const getBundleZipUrl = (bundleId) =>
+    `/api/ai/my-images/bundle/${encodeURIComponent(bundleId)}/zip`;

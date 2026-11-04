@@ -90,7 +90,9 @@
 
 /* Horizontal arrows duplicated the pagination affordance and looked like paging. */
 .order-processing-page .calculations-table-toolbar__actions {
-  display: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
 }
 
 .order-processing-page .order-processing-bulk-bar {

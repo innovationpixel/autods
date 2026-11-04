@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { LuCheck, LuLoader, LuSparkles, LuWallet, LuX, LuZap } from "react-icons/lu";
 import { selectUser } from "../../../store/selectors/AuthSelectors";
-import { updateProfileAction } from "../../../store/actions/AuthActions";
+import { updateUserStateAction } from "../../../store/actions/AuthActions";
 import { buyAiCredits } from "../../../services/AiGenerationService";
 import { toast } from "../../../utils/toast";
 
@@ -42,7 +42,7 @@ function BuyAiCreditsModal({ open, onClose, onSuccess, currentCredits, requiredC
 
       // Update Redux auth user with new credits & balance
       dispatch(
-        updateProfileAction({
+        updateUserStateAction({
           ai_credits: data.ai_credits,
           wallet_balance: data.wallet_balance,
         })

@@ -1,7 +1,7 @@
 import axiosInstance from './AxiosInstance';
 
-export const getSupportTickets = () =>
-    axiosInstance.get('/support-tickets');
+export const getSupportTickets = (params = {}) =>
+    axiosInstance.get('/support-tickets', { params });
 
 export const createSupportTicket = (data) =>
     axiosInstance.post('/support-tickets', data);

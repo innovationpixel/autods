@@ -4,7 +4,9 @@ import { toast } from "../../../utils/toast";
 import {
   getOrders,
   pushOrderTracking,
+  syncAliExpressOrders,
   syncOrders,
+  syncSingleAliExpressOrder,
   updateOrderFulfillment,
   updateOrderSource,
   updateOrderTracking,
@@ -316,6 +318,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncingAliExpress, setSyncingAliExpress] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showOnlyActive, setShowOnlyActive] = useState(defaultFilters.showOnlyActive);
   const [statusFilter, setStatusFilter] = useState(defaultFilters.statusFilter);
@@ -527,6 +530,50 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
       toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSyncAliExpress = async () => {
+    setSyncingAliExpress(true);
+    try {
+      const res = await syncAliExpressOrders();
+      const updated = res.data?.updated ?? 0;
+      const shipped = res.data?.shipped ?? 0;
+      const total = res.data?.synced ?? 0;
+      toast.success(
+        res.data?.message ??
+          `AliExpress sync complete. Checked ${total} orders (${updated} updated, ${shipped} shipped).`
+      );
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "AliExpress sync failed."));
+    } finally {
+      setSyncingAliExpress(false);
+    }
+  };
+
+  const handleSyncSingleAliExpress = async (order) => {
+    if (!order.aliexpressOrderIdRaw) {
+      toast.info("This order does not have an AliExpress order ID.");
+      closeRowActionMenus();
+      return;
+    }
+    closeRowActionMenus();
+    try {
+      const res = await syncSingleAliExpressOrder(order.id);
+      const isPaid = res.data?.is_paid;
+      const isShipped = res.data?.is_shipped;
+      const tracking = res.data?.tracking_no;
+      let msg = res.data?.message || "AliExpress order status checked.";
+      if (isShipped && tracking) {
+        msg += ` Tracking: ${tracking}`;
+      } else if (isPaid) {
+        msg += " Order is paid and marked as Processed!";
+      }
+      toast.success(msg);
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to sync AliExpress order status."));
     }
   };
 
@@ -746,20 +793,45 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
     const displayValue = isNumeric ? formatMoney(order[columnId] ?? 0) : order[columnId];
 
     return (
-      <button
-        type="button"
-        className="products-tracking-btn"
-        onClick={(event) => {
-          event.stopPropagation();
-          startEditFulfillment(order, columnId);
-        }}
-        title={`Edit ${FULFILLMENT_FIELDS[columnId].label}`}
-      >
-        <span className={displayValue && displayValue !== "—" ? undefined : "products-tracking-btn__placeholder"}>
-          {displayValue || "—"}
-        </span>
-        <LuPencil className="products-tracking-btn__icon" />
-      </button>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+        <button
+          type="button"
+          className="products-tracking-btn"
+          onClick={(event) => {
+            event.stopPropagation();
+            startEditFulfillment(order, columnId);
+          }}
+          title={`Edit ${FULFILLMENT_FIELDS[columnId].label}`}
+        >
+          <span className={displayValue && displayValue !== "—" ? undefined : "products-tracking-btn__placeholder"}>
+            {displayValue || "—"}
+          </span>
+          <LuPencil className="products-tracking-btn__icon" />
+        </button>
+        {columnId === "aliexpressStatus" && order.aliexpressOrderIdRaw ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleSyncSingleAliExpress(order);
+            }}
+            title="Check AliExpress for payment and tracking updates"
+            style={{
+              background: "none",
+              border: "none",
+              color: "#ea580c",
+              cursor: "pointer",
+              padding: 2,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 4,
+            }}
+          >
+            <LuRefreshCcw size={13} />
+          </button>
+        ) : null}
+      </div>
     );
   };
 
@@ -1277,6 +1349,9 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
     }
 
     switch (action) {
+      case "sync-aliexpress":
+        handleSyncSingleAliExpress(order);
+        break;
       case "add-tracking":
         startEditTracking(order);
         break;
@@ -1694,10 +1769,22 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
             type="button"
             className="dashboard-secondary-btn dashboard-secondary-btn--orders"
             onClick={handleSyncOrders}
-            disabled={syncing}
+            disabled={syncing || syncingAliExpress}
           >
             <LuRefreshCcw className={syncing ? "spin-icon" : ""} />
             <span>{syncing ? "Syncing…" : "Sync Orders"}</span>
+          </button>
+
+          <button
+            type="button"
+            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            style={{ borderColor: "#ea580c", color: "#ea580c" }}
+            onClick={handleSyncAliExpress}
+            disabled={syncing || syncingAliExpress}
+            title="Check AliExpress directly for payment confirmation & tracking updates"
+          >
+            <LuRefreshCcw className={syncingAliExpress ? "spin-icon" : ""} />
+            <span>{syncingAliExpress ? "Checking AliExpress…" : "Sync AliExpress"}</span>
           </button>
 
           <button
@@ -1816,6 +1903,12 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
           <OrderColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("left")} aria-label="Scroll grid left" title="Scroll left">
+            <LuChevronLeft />
+          </button>
+          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("right")} aria-label="Scroll grid right" title="Scroll right">
+            <LuChevronRight />
+          </button>
         </div>
       </div>
 
@@ -2199,7 +2292,12 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
                             {openRowBoltId === order.id
                               ? renderRowActionMenu(
                                   order.id,
-                                  boltActions,
+                                  [
+                                    ...(order.aliexpressOrderIdRaw
+                                      ? [{ id: "sync-aliexpress", label: "Sync AliExpress Status" }]
+                                      : []),
+                                    ...boltActions,
+                                  ],
                                   `orders-actions-menu--wide ${isBottomRow ? "orders-actions-menu--up" : ""}`
                                 )
                               : null}

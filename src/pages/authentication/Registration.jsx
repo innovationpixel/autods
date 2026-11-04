@@ -973,7 +973,7 @@ export default function Registration() {
                     </>
                   ) : (
                     <>
-                      <span>Pay with {paymentMethod === "stripe" ? "Stripe" : "PayPal"} & Activate</span>
+                      <span>Pay with {paymentMethod === "stripe" ? "Credit Card/Debit Cards" : "PayPal"} & Activate</span>
                       <LuArrowRight />
                     </>
                   )}

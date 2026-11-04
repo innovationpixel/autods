@@ -2747,8 +2747,8 @@ export default function MarketplaceSettingsPage() {
     const usage = currentSubscription?.usage ?? {};
     const planExpires = currentSubscription?.plan_expires_at || currentSubscription?.subscription?.current_period_end;
 
-    const listingsLimit = plan?.limits?.listings ?? plan?.listings_limit ?? 50;
-    const listingsUsed = usage.listings_count ?? 0;
+    const listingsLimit = plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 50;
+    const listingsUsed = usage.products_quota_used ?? usage.listings_count ?? 0;
     const listingsPct = listingsLimit > 0 ? Math.min(100, Math.round((listingsUsed / listingsLimit) * 100)) : 0;
 
     const ordersLimit = plan?.limits?.orders ?? plan?.orders_limit ?? 100;
@@ -2883,7 +2883,7 @@ export default function MarketplaceSettingsPage() {
             <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 600, color: "#475569", display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                  <LuPackage style={{ color: "#3b82f6" }} /> Products / Listings
+                  <LuPackage style={{ color: "#3b82f6" }} /> Products & Variations Quota
                 </span>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: listingsPct > 90 ? "#ef4444" : "#1e293b" }}>
                   {listingsUsed} / {listingsLimit}
@@ -2893,7 +2893,7 @@ export default function MarketplaceSettingsPage() {
                 <div style={{ width: `${listingsPct}%`, height: "100%", background: listingsPct > 90 ? "#ef4444" : "#3b82f6", borderRadius: "999px" }} />
               </div>
               <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
-                {listingsLimit - listingsUsed > 0 ? `${listingsLimit - listingsUsed} listings available` : "Quota reached"}
+                {listingsLimit - listingsUsed > 0 ? `${listingsLimit - listingsUsed} units available` : "Quota reached (Upgrade to list more)"}
               </span>
             </div>
 

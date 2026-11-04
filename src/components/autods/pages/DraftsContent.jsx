@@ -250,6 +250,11 @@ function DraftsContent({
       await loadDrafts();
       handleBackToDrafts();
     } catch (err) {
+      if (err.response?.data?.quota_breached) {
+        toast.error(err.response.data.error || "Product listing quota reached. Please upgrade your plan.");
+        navigate("/plans");
+        return;
+      }
       if (err.response?.data?.requires_confirmation) {
         setBlockedKeywordConfirm({
           item,
@@ -275,6 +280,11 @@ function DraftsContent({
       await loadDrafts();
       handleBackToDrafts();
     } catch (err) {
+      if (err.response?.data?.quota_breached) {
+        toast.error(err.response.data.error || "Product listing quota reached. Please upgrade your plan.");
+        navigate("/plans");
+        return;
+      }
       toast.error(getApiErrorMessage(err, "Could not publish draft."));
     } finally {
       setPublishingIds((cur) => cur.filter((x) => x !== item.id));

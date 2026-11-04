@@ -74,10 +74,16 @@ export function checkAutoLogin(dispatch, navigate) {
                 fresh.name  !== user.name  ||
                 fresh.email !== user.email ||
                 fresh.role  !== user.role  ||
+                fresh.ai_credits !== user.ai_credits ||
+                fresh.wallet_balance !== user.wallet_balance ||
                 JSON.stringify(fresh.admin_modules) !== JSON.stringify(user.admin_modules)
             ) {
-                saveSession({ access_token: token, user: fresh });
-                dispatch(loginConfirmedAction({ access_token: token, user: fresh }));
+                const merged = { ...user, ...fresh };
+                saveSession({ access_token: token, user: merged });
+                dispatch(loginConfirmedAction({ access_token: token, user: merged }));
+                if (fresh.ai_credits !== undefined) {
+                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits } }));
+                }
             }
         })
         .catch(() => {
@@ -146,6 +152,39 @@ export function loginFailedAction(payload) {
     return {
         type: LOGIN_FAILED_ACTION,
         payload,
+    };
+}
+
+export function updateUserStateAction(partialUser) {
+    return (dispatch) => {
+        const stored = getStoredUser() || {};
+        const merged = { ...stored, ...partialUser };
+        const token = getStoredToken();
+        saveSession({ access_token: token, user: merged });
+        dispatch(loginConfirmedAction({ access_token: token, user: merged }));
+        if (partialUser.ai_credits !== undefined) {
+            window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: partialUser.ai_credits } }));
+        }
+    };
+}
+
+export function fetchFreshUserAction() {
+    return (dispatch) => {
+        const token = getStoredToken();
+        if (!token) return Promise.resolve(null);
+        return getMe()
+            .then((res) => {
+                const fresh = res.data;
+                const stored = getStoredUser() || {};
+                const merged = { ...stored, ...fresh };
+                saveSession({ access_token: token, user: merged });
+                dispatch(loginConfirmedAction({ access_token: token, user: merged }));
+                if (fresh.ai_credits !== undefined) {
+                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits } }));
+                }
+                return merged;
+            })
+            .catch(() => null);
     };
 }
 

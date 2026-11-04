@@ -298,6 +298,8 @@ a.text-primary,
   min-height:72px!important;
   display:flex!important;
   align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
   padding:12px 18px!important;
   border-bottom:1px solid var(--ap-border)!important;
   background:#fff!important;
@@ -308,6 +310,8 @@ a.text-primary,
   height:40px;
   max-width:194px;
   object-fit:contain;
+  margin-left:auto!important;
+  margin-right:auto!important;
 }
 .marketplace-sidebar__store-block{
   margin:14px 12px 10px!important;

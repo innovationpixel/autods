@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   LuArrowUpRight,
+  LuBanknote,
   LuCalendar,
   LuCheck,
   LuCreditCard,
@@ -87,6 +88,14 @@ function PlansPage() {
     } finally {
       setCheckoutId(null);
     }
+  };
+
+  const handleWireCheckout = (plan) => {
+    navigate(
+      `/wallet?method=wire&amount=${encodeURIComponent(
+        plan.price
+      )}&note=${encodeURIComponent(`Subscription Plan: ${plan.title}`)}`
+    );
   };
 
   if (loading) {
@@ -204,7 +213,7 @@ function PlansPage() {
                         ) : (
                           <LuCreditCard />
                         )}
-                        <span>{checkoutId === `${plan.id}-stripe` ? "Redirecting…" : "Pay with Stripe"}</span>
+                        <span>{checkoutId === `${plan.id}-stripe` ? "Redirecting…" : "Pay with Credit Card/Debit Cards"}</span>
                       </button>
                       <button
                         type="button"
@@ -217,6 +226,14 @@ function PlansPage() {
                         ) : null}
                         <span>{checkoutId === `${plan.id}-paypal` ? "Redirecting…" : "Pay with PayPal"}</span>
                         {!checkoutId || checkoutId !== `${plan.id}-paypal` ? <LuArrowUpRight /> : null}
+                      </button>
+                      <button
+                        type="button"
+                        className="plans-hub__btn plans-hub__btn--ghost"
+                        onClick={() => handleWireCheckout(plan)}
+                      >
+                        <LuBanknote />
+                        <span>Pay with Wire Transfer/ACH</span>
                       </button>
                     </>
                   )}

@@ -73,8 +73,8 @@ export const getAdminSupportTicket = (id) =>
 export const replyAdminSupportTicket = (id, message) =>
     axiosInstance.post(`/admin/support-tickets/${id}/reply`, { message });
 
-export const updateAdminSupportTicketStatus = (id, status) =>
-    axiosInstance.patch(`/admin/support-tickets/${id}/status`, { status });
+export const updateAdminSupportTicketStatus = (id, payload) =>
+    axiosInstance.patch(`/admin/support-tickets/${id}/status`, typeof payload === 'string' ? { status: payload } : payload);
 
 export const getAdminOpenAiStatus = () =>
     axiosInstance.get('/admin/openai/status');

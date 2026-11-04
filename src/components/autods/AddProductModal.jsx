@@ -58,6 +58,10 @@ function AddProductModal({
   onSingleImport,
   onBulkImport,
   supplierEnabled,
+  quotaBreached = false,
+  quotaUsed = 0,
+  quotaLimit = 200,
+  onUpgradePlan,
 }) {
   const csvFileInputRef = useRef(null);
 
@@ -98,9 +102,43 @@ function AddProductModal({
               <button type="button" aria-label="Edit publish store" onClick={onEditStores}>
                 <LuPencil />
               </button>
+              {quotaLimit > 0 ? (
+                <span
+                  className={`add-product-modal__quota-badge ${
+                    quotaBreached
+                      ? "add-product-modal__quota-badge--breached"
+                      : quotaUsed / quotaLimit >= 0.8
+                      ? "add-product-modal__quota-badge--warning"
+                      : ""
+                  }`}
+                  title="Includes all product variations"
+                >
+                  Quota: {quotaUsed.toLocaleString()} / {quotaLimit.toLocaleString()}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
+
+        {quotaBreached ? (
+          <div className="add-product-modal__quota-alert">
+            <div className="add-product-modal__quota-alert-icon">⚠️</div>
+            <div className="add-product-modal__quota-alert-content">
+              <strong>Product Listing Limit Reached ({quotaUsed.toLocaleString()} / {quotaLimit.toLocaleString()})</strong>
+              <p>
+                Your current plan allows up to {quotaLimit.toLocaleString()} products (each variation counts as 1 product towards your quota).
+                You have reached your limit and cannot list or import new products until you upgrade your plan.
+              </p>
+              <button
+                type="button"
+                className="add-product-modal__upgrade-btn"
+                onClick={onUpgradePlan}
+              >
+                Upgrade Subscription Plan
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {mode === "multiple" ? (
           <>
@@ -122,14 +160,9 @@ function AddProductModal({
             {multipleProductsTab === "urls" ? (
               <div className="add-products-modal__panel">
                 <label className="add-product-modal__field">
-                  <span>
-                    Supplier Url or Product ID (Buy)
-                    <em> (For multiple products, click &lt;enter&gt; to separate them)</em>
-                    <button type="button" className="add-products-modal__info" aria-label="Multiple product instructions">
-                      ?
-                    </button>
-                  </span>
+                  <span>Enter product URLs or product IDs (one per line)</span>
                   <textarea
+                    rows={6}
                     value={multipleProductsUrls}
                     onChange={(event) => onMultipleProductsUrlsChange(event.target.value)}
                     placeholder={supplierHint}
@@ -139,86 +172,60 @@ function AddProductModal({
             ) : null}
 
             {multipleProductsTab === "csv" ? (
-              <div className="add-products-modal__panel add-products-modal__panel--csv">
-                <input
-                  ref={csvFileInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  hidden
-                  onChange={(event) => onCsvFileChange(event.target.files?.[0] ?? null)}
-                />
-                <button
-                  type="button"
-                  className="add-products-modal__dropzone"
-                  onClick={() => csvFileInputRef.current?.click()}
-                >
-                  <span className="add-products-modal__dropzone-icon">
-                    <LuUpload />
-                  </span>
-                  <strong>{multipleProductsCsvFile || "Drop CSV file"}</strong>
-                  <span>
+              <div className="add-products-modal__panel">
+                <div className="add-products-modal__csv-box">
+                  <input
+                    ref={csvFileInputRef}
+                    type="file"
+                    accept=".csv,text/csv"
+                    style={{ display: "none" }}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      onCsvFileChange(file);
+                    }}
+                  />
+                  <LuUpload />
+                  <p>
                     {multipleProductsCsvFile
-                      ? "Ready to import into your selected store."
-                      : "Or select file from your computer"}
-                  </span>
-                </button>
-
-                <div className="add-products-modal__csv-card">
-                  <strong>CSV format</strong>
-                  <p>The file must be a CSV file with the following fields as column titles:</p>
-                  <ul>
-                    <li>BuyId (Required)</li>
-                    <li>Title (Optional)</li>
-                    <li>Price (Optional)</li>
-                  </ul>
-                  <button type="button">Download Example File</button>
+                      ? multipleProductsCsvFile
+                      : "Drag & drop a CSV file with product URLs / IDs, or click to browse"}
+                  </p>
+                  <button type="button" onClick={() => csvFileInputRef.current?.click()}>
+                    Browse file
+                  </button>
                 </div>
               </div>
             ) : null}
 
             {multipleProductsTab === "finder" ? (
-              <div className="add-products-modal__panel add-products-modal__panel--finder">
-                <div className="add-products-modal__finder-head">
-                  <strong>Let us find the perfect products for your store</strong>
-                  <span>
-                    Your Credits: 400 <button type="button">Buy more</button>
-                  </span>
-                </div>
-
-                <div className="add-products-modal__finder-grid">
-                  {finderPlans.map((plan) => {
-                    const PlanIcon = plan.icon;
-                    const quantity = finderSelections[plan.id] || 0;
-
-                    return (
-                      <article className="add-products-modal__finder-card" key={plan.id}>
-                        <span className="add-products-modal__finder-label">{plan.label}</span>
-                        <span className={`add-products-modal__finder-icon add-products-modal__finder-icon--${plan.id}`}>
-                          <PlanIcon />
-                        </span>
-                        <strong>{plan.sales}</strong>
-                        <span>{plan.credits} Credits per product</span>
-
-                        <div className="add-products-modal__finder-counter">
-                          <div>Select amount</div>
-                          <div className="add-products-modal__finder-counter-row">
-                            <button type="button" onClick={() => onAdjustFinderSelection(plan.id, -1)}>
-                              -
-                            </button>
-                            <span>{quantity}</span>
-                            <button type="button" onClick={() => onAdjustFinderSelection(plan.id, 1)}>
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
+              <div className="add-products-modal__panel">
+                <div className="add-products-modal__finder-list">
+                  {finderPlans.map((plan) => (
+                    <article key={plan.id} className="add-products-modal__finder-card">
+                      <div>
+                        <h3>{plan.title}</h3>
+                        <p>{plan.subtitle}</p>
+                      </div>
+                      <div className="add-products-modal__finder-stepper">
+                        <button
+                          type="button"
+                          onClick={() => onAdjustFinderSelection(plan.id, -1)}
+                          disabled={(finderSelections[plan.id] ?? 0) <= 0}
+                        >
+                          -
+                        </button>
+                        <span>{finderSelections[plan.id] ?? 0}</span>
+                        <button type="button" onClick={() => onAdjustFinderSelection(plan.id, 1)}>
+                          +
+                        </button>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               </div>
             ) : null}
 
-            <div className="add-products-modal__meta-footer">
+            <div className="add-products-modal__footer">
               <div className="add-product-modal__meta-row">
                 <ImportMetaDropdown
                   label="Supplier Source:"
@@ -251,15 +258,15 @@ function AddProductModal({
                   <button
                     type="button"
                     className="add-products-modal__submit-main"
-                    disabled={multipleProductsActionDisabled || !supplierEnabled}
-                    onClick={onBulkImport}
+                    disabled={quotaBreached || multipleProductsActionDisabled || !supplierEnabled}
+                    onClick={quotaBreached ? onUpgradePlan : onBulkImport}
                   >
-                    {importSubmitting ? "Importing…" : "Add As draft"}
+                    {quotaBreached ? "Quota Limit Reached (Upgrade Plan)" : importSubmitting ? "Importing…" : "Add As draft"}
                   </button>
                   <button
                     type="button"
                     className="add-products-modal__submit-toggle"
-                    disabled={multipleProductsActionDisabled || !supplierEnabled}
+                    disabled={quotaBreached || multipleProductsActionDisabled || !supplierEnabled}
                     aria-label="More add product actions"
                   >
                     <LuChevronDown />
@@ -310,17 +317,17 @@ function AddProductModal({
             <div className="add-product-modal__actions">
               <button
                 type="button"
-                disabled={!addProductUrl.trim() || importSubmitting || !supplierEnabled}
+                disabled={quotaBreached || !addProductUrl.trim() || importSubmitting || !supplierEnabled}
                 onClick={() => onSingleImport("publish")}
               >
-                {importSubmitting ? "Working…" : "Publish to Store"}
+                {quotaBreached ? "Quota Limit Reached" : importSubmitting ? "Working…" : "Publish to Store"}
               </button>
               <button
                 type="button"
-                disabled={!addProductUrl.trim() || importSubmitting || !supplierEnabled}
-                onClick={() => onSingleImport("draft")}
+                disabled={quotaBreached || !addProductUrl.trim() || importSubmitting || !supplierEnabled}
+                onClick={() => (quotaBreached ? onUpgradePlan?.() : onSingleImport("draft"))}
               >
-                {importSubmitting ? "Working…" : "Add as Draft (Simple page)"}
+                {quotaBreached ? "Upgrade Plan to Import" : importSubmitting ? "Working…" : "Add as Draft (Simple page)"}
               </button>
             </div>
           </>

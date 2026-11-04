@@ -1,8 +1,10 @@
+import JSZip from "jszip";
 import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import {
   LuArrowLeft,
   LuDownload,
+  LuFolderArchive,
   LuExternalLink,
   LuEye,
   LuImage,
@@ -107,12 +109,60 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
       toast.warn("No generated images to download yet.");
       return;
     }
-    toast.info(`Downloading ${items.length} image${items.length > 1 ? "s" : ""}…`);
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const url = item.finalUrl || item.url;
-      await handleDownloadImage(url, `ai-generated-image-${item.index || i + 1}.png`);
-      await new Promise((r) => setTimeout(r, 300));
+
+    const toastId = toast.info(`Packaging ${items.length} images into ZIP…`, { autoClose: 6000 });
+    try {
+      const zip = new JSZip();
+      const safeTitle = (template.title || template.name || "template-images")
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "bundle";
+      const folder = zip.folder(safeTitle) || zip;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const url = item.finalUrl || item.url;
+        const format = (outputFormat || "png").toLowerCase();
+        const fileName = `${safeTitle}-${String(item.index || i + 1).padStart(2, "0")}.${format}`;
+
+        if (url.startsWith("data:")) {
+          const parts = url.split(",");
+          const base64Data = parts[1];
+          if (base64Data) {
+            folder.file(fileName, base64Data, { base64: true });
+          }
+        } else {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            folder.file(fileName, blob);
+          } catch {
+            await handleDownloadImage(url, fileName);
+          }
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const blobUrl = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${safeTitle}-bundle.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+      toast.dismiss(toastId);
+      toast.success(`Bundle downloaded: ${safeTitle}-bundle.zip`);
+    } catch {
+      toast.dismiss(toastId);
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const url = item.finalUrl || item.url;
+        await handleDownloadImage(url, `ai-generated-image-${item.index || i + 1}.png`);
+        await new Promise((r) => setTimeout(r, 200));
+      }
     }
   };
 

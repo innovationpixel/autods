@@ -93,6 +93,20 @@ function WalletContent() {
   }, []);
 
   useEffect(() => {
+    if (searchParams.get("method") === "wire") {
+      setShowWireForm(true);
+      const amt = searchParams.get("amount");
+      if (amt) {
+        setCustomAmount(amt);
+      }
+      const note = searchParams.get("note");
+      if (note) {
+        setWireNote(note);
+      }
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     const success = searchParams.get("success");
     const canceled = searchParams.get("canceled");
     const provider = searchParams.get("provider");

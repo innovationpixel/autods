@@ -110,6 +110,11 @@ class AiBackgroundQueueManager {
       return false;
     }
 
+    const isTemplate = Boolean(template.id || template.title || template.name);
+    const bundleId = isTemplate
+      ? `bundle_${template.id || "tpl"}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+      : null;
+    const bundleName = template.title || template.name || "Template Bundle";
     const taskId = `ai-task-${Date.now()}`;
     this.activeTask = {
       id: taskId,
@@ -153,6 +158,10 @@ class AiBackgroundQueueManager {
         if (template.id && !template.is_sample) {
           formData.append("template_id", template.id);
         }
+        if (bundleId) {
+          formData.append("bundle_id", bundleId);
+          formData.append("bundle_name", bundleName);
+        }
 
         inputImages.forEach((img) => {
           if (img?.file instanceof File || img?.file instanceof Blob) {
@@ -168,6 +177,13 @@ class AiBackgroundQueueManager {
 
         try {
           const res = await generateAiImage(formData);
+          if (res.data?.credits_remaining !== undefined) {
+            window.dispatchEvent(
+              new CustomEvent("ai_credits_updated", {
+                detail: { ai_credits: res.data.credits_remaining },
+              })
+            );
+          }
           const rawUrl = extractMediaUrl(res.data);
           let finalUrl = rawUrl;
 
@@ -192,10 +208,17 @@ class AiBackgroundQueueManager {
             id: Date.now() + i,
             image_url: finalUrl,
             prompt: promptText,
+            template_id: template.id || null,
             template_name: template.title || null,
+            bundle_id: bundleId,
+            bundle_name: bundleName,
             created_at: new Date().toISOString(),
             is_viewed: false,
           };
+          if (!imageRecord.bundle_id && bundleId) {
+            imageRecord.bundle_id = bundleId;
+            imageRecord.bundle_name = bundleName;
+          }
 
           if (finalUrl) {
             imageRecord.image_url = finalUrl;
@@ -240,7 +263,7 @@ class AiBackgroundQueueManager {
         // Dispatch a global DOM event so any open gallery can refresh
         window.dispatchEvent(
           new CustomEvent("autods:ai-images-updated", {
-            detail: { count: totalSuccess, images: generatedImages },
+            detail: { count: totalSuccess, images: generatedImages, bundleId, bundleName },
           })
         );
       } else if (failed > 0) {

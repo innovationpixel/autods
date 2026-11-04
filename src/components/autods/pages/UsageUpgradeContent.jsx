@@ -57,8 +57,8 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
   const usage = data?.usage ?? {};
   const expiresAt = data?.plan_expires_at || subscription?.current_period_end;
 
-  const listingsLimit = plan?.limits?.listings ?? plan?.listings_limit ?? 50;
-  const listingsUsed = usage.listings_count ?? 0;
+  const listingsLimit = plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 50;
+  const listingsUsed = usage.products_quota_used ?? usage.listings_count ?? 0;
   const listingsPct = listingsLimit > 0 ? Math.min(100, Math.round((listingsUsed / listingsLimit) * 100)) : 0;
 
   const ordersLimit = plan?.limits?.orders ?? plan?.orders_limit ?? 100;
@@ -170,7 +170,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         <div className="card-wrapper" style={{ padding: "20px", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
-              <LuPackage style={{ color: "#3b82f6" }} /> Products / Listings
+              <LuPackage style={{ color: "#3b82f6" }} /> Products & Variations Quota
             </span>
             <span style={{ fontSize: 13, fontWeight: 700, color: listingsPct > 90 ? "#ef4444" : "#1e293b" }}>
               {listingsUsed} / {listingsLimit}
@@ -189,8 +189,8 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
           </div>
           <span style={{ fontSize: 12, color: "#64748b", display: "block", marginTop: 8 }}>
             {listingsLimit - listingsUsed > 0
-              ? `${listingsLimit - listingsUsed} listings remaining this cycle`
-              : "Quota reached. Upgrade to add more listings."}
+              ? `${listingsLimit - listingsUsed} product/variation units remaining`
+              : "Quota reached. Upgrade to add more products & variations."}
           </span>
         </div>
 

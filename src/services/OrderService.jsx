@@ -6,6 +6,12 @@ export const getOrders = (params = {}) =>
 export const syncOrders = () =>
     axiosInstance.post('/orders/sync');
 
+export const syncAliExpressOrders = () =>
+    axiosInstance.post('/orders/sync-aliexpress');
+
+export const syncSingleAliExpressOrder = (id) =>
+    axiosInstance.post(`/orders/${id}/sync-aliexpress`);
+
 export const updateOrderStatus = (id, status) =>
     axiosInstance.patch(`/orders/${id}/status`, { status });
 

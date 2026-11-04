@@ -29,7 +29,9 @@ import {
   getOrderCheckoutQuote,
   placeAliExpressOrder,
   pushOrderTracking,
+  syncAliExpressOrders,
   syncOrders,
+  syncSingleAliExpressOrder,
   updateOrderCost,
   updateOrderFulfillment,
   updateOrderProcessingStatus,
@@ -170,13 +172,32 @@ function mapProcessingOrder(order) {
     aliexpressOrderStatus: order.aliexpress_order_status ?? "",
     processingStatus: (() => {
       const explicit = order.processing_status ?? "new";
-      const aeStatus = String(order.aliexpress_order_status ?? "").toLowerCase();
+      const aeStatus = String(order.aliexpress_order_status ?? "").toUpperCase();
+      const isPaid =
+        aeStatus === "WAIT_SELLER_SEND_GOODS" ||
+        aeStatus === "PAY_SUCCESS" ||
+        aeStatus === "WAIT_SELLER_EXAMINE_MONEY" ||
+        aeStatus === "FUND_PROCESSING" ||
+        aeStatus === "SELLER_PART_SEND_GOODS" ||
+        aeStatus === "WAIT_BUYER_ACCEPT_GOODS" ||
+        aeStatus === "FINISH";
       const isUnpaid =
-        aeStatus === "wait_buyer_pay" ||
-        aeStatus === "payment_pending" ||
-        aeStatus === "unpaid" ||
-        aeStatus === "pending";
-      if (order.aliexpress_order_id && isUnpaid && explicit !== "cancelled") {
+        aeStatus === "WAIT_BUYER_PAY" ||
+        aeStatus === "PAYMENT_PENDING" ||
+        aeStatus === "UNPAID" ||
+        aeStatus === "PENDING";
+
+      if (order.aliexpress_order_id && isPaid && (explicit === "pending" || explicit === "new")) {
+        return "processed";
+      }
+      if (
+        order.aliexpress_order_id &&
+        isUnpaid &&
+        explicit !== "cancelled" &&
+        explicit !== "processed" &&
+        explicit !== "shipped" &&
+        explicit !== "completed"
+      ) {
         return "pending";
       }
       return explicit;
@@ -215,6 +236,8 @@ function OrderProcessingContent() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncingAliExpress, setSyncingAliExpress] = useState(false);
+  const [syncingSingleId, setSyncingSingleId] = useState("");
   const [processingId, setProcessingId] = useState("");
   const [wallet, setWallet] = useState(null);
 
@@ -392,6 +415,51 @@ function OrderProcessingContent() {
       toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSyncAliExpress = async () => {
+    setSyncingAliExpress(true);
+    try {
+      const res = await syncAliExpressOrders();
+      const updated = res.data?.updated ?? 0;
+      const shipped = res.data?.shipped ?? 0;
+      const total = res.data?.synced ?? 0;
+      toast.success(
+        res.data?.message ??
+          `AliExpress sync complete. Checked ${total} orders (${updated} updated, ${shipped} shipped).`
+      );
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "AliExpress sync failed."));
+    } finally {
+      setSyncingAliExpress(false);
+    }
+  };
+
+  const handleSyncSingleAliExpress = async (order) => {
+    if (!order.aliexpressOrderId) {
+      toast.info("This order does not have an AliExpress order ID.");
+      return;
+    }
+    setSyncingSingleId(order.id);
+    try {
+      const res = await syncSingleAliExpressOrder(order.id);
+      const isPaid = res.data?.is_paid;
+      const isShipped = res.data?.is_shipped;
+      const tracking = res.data?.tracking_no;
+      let msg = res.data?.message || "AliExpress order status checked.";
+      if (isShipped && tracking) {
+        msg += ` Tracking: ${tracking}`;
+      } else if (isPaid) {
+        msg += " Order is paid and marked as Processed!";
+      }
+      toast.success(msg);
+      await loadOrders();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to sync AliExpress order status."));
+    } finally {
+      setSyncingSingleId("");
     }
   };
 
@@ -575,12 +643,9 @@ function OrderProcessingContent() {
       return;
     }
 
-    // Condition 2: Already placed on AliExpress / supplier
+    // Condition 2: Already placed on AliExpress / supplier - sync its status!
     if (order.aliexpressOrderId) {
-      toast.info(
-        `This order has already been placed on AliExpress (Supplier Order #${order.aliexpressOrderId}). You can track shipment status or update fulfillment details directly.`,
-        { autoClose: 7000 }
-      );
+      handleSyncSingleAliExpress(order);
       return;
     }
 
@@ -1366,13 +1431,34 @@ function OrderProcessingContent() {
           </header>
 
           <div className="order-processing-hero__actions">
-            <button type="button" className="order-processing-btn order-processing-btn--primary" onClick={handleSync} disabled={syncing}>
+            <button type="button" className="order-processing-btn order-processing-btn--primary" onClick={handleSync} disabled={syncing || syncingAliExpress}>
               <span className="order-processing-btn__icon">
                 {syncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
               </span>
               <span className="order-processing-btn__copy">
                 <strong>{syncing ? "Syncing…" : "Sync Orders"}</strong>
-                <small>Pull the latest orders from eBay</small>
+                <small>Pull eBay & sync AliExpress</small>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className="order-processing-btn"
+              style={{
+                background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                borderColor: "#ea580c",
+                color: "#fff",
+              }}
+              onClick={handleSyncAliExpress}
+              disabled={syncing || syncingAliExpress}
+              title="Check AliExpress directly for payment confirmation & tracking updates"
+            >
+              <span className="order-processing-btn__icon">
+                {syncingAliExpress ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+              </span>
+              <span className="order-processing-btn__copy">
+                <strong>{syncingAliExpress ? "Checking…" : "Sync AliExpress"}</strong>
+                <small>Update paid & tracking status</small>
               </span>
             </button>
 
@@ -1909,17 +1995,40 @@ function OrderProcessingContent() {
                         </button>
                       </td>
                       <td>
-                        <button
-                          type="button"
-                          className="products-tracking-btn"
-                          onClick={() => startEditFulfillment(order, "aliexpressOrderStatus")}
-                          title="Edit AliExpress order status"
-                        >
-                          <span className={order.aliexpressOrderStatus ? undefined : "products-tracking-btn__placeholder"}>
-                            {order.aliexpressOrderStatus || "—"}
-                          </span>
-                          <LuPencil className="products-tracking-btn__icon" />
-                        </button>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <button
+                            type="button"
+                            className="products-tracking-btn"
+                            onClick={() => startEditFulfillment(order, "aliexpressOrderStatus")}
+                            title="Edit AliExpress order status"
+                          >
+                            <span className={order.aliexpressOrderStatus ? undefined : "products-tracking-btn__placeholder"}>
+                              {order.aliexpressOrderStatus || "—"}
+                            </span>
+                            <LuPencil className="products-tracking-btn__icon" />
+                          </button>
+                          {order.aliexpressOrderId ? (
+                            <button
+                              type="button"
+                              onClick={() => handleSyncSingleAliExpress(order)}
+                              disabled={syncingSingleId === order.id}
+                              title="Check AliExpress for payment and tracking updates"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#ea580c",
+                                cursor: "pointer",
+                                padding: 2,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                borderRadius: 4,
+                              }}
+                            >
+                              <LuRefreshCcw className={syncingSingleId === order.id ? "spin-icon" : ""} size={13} />
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                       <td>
                         <OrdersTrackingEditor
@@ -1972,8 +2081,8 @@ function OrderProcessingContent() {
                                   </>
                                 ) : order.aliexpressOrderId ? (
                                   <>
-                                    <LuCheck />
-                                    <span>Placed</span>
+                                    <LuRefreshCcw className={syncingSingleId === order.id ? "spin-icon" : ""} />
+                                    <span>{syncingSingleId === order.id ? "Checking…" : "Sync AliExpress"}</span>
                                   </>
                                 ) : !order.hasSource ||
                                   (order.sourcePlatform && order.sourcePlatform.toLowerCase() !== "aliexpress") ? (

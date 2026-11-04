@@ -54,6 +54,8 @@
   min-height: 68px !important;
   display: flex !important;
   align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
   padding: 12px 18px !important;
   border-bottom: 1px solid var(--ap-ui-border) !important;
   background: #fff !important;
@@ -65,6 +67,8 @@
   max-width: 176px !important;
   width: auto !important;
   object-fit: contain !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
 
 .marketplace-sidebar__store-block {
