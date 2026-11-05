@@ -655,8 +655,11 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
 
   const startEditTracking = (order) => {
     setEditingTrackingId(order.id);
-    setTrackingDraft(order.trackingNumberRaw ?? "");
-    setCarrierDraft(order.carrierRaw || "");
+    const tracking = (order.trackingNumberRaw ?? order.tracking_number ?? "").trim();
+    setTrackingDraft(tracking);
+    const detected = tracking ? detectTrackingCarrier(tracking) : null;
+    const initialCarrier = normalizeTrackingCarrier(order.carrierRaw || order.carrier || "") || detected || "";
+    setCarrierDraft(initialCarrier);
   };
 
   const cancelEditTracking = () => {
@@ -667,6 +670,10 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
 
   const handleTrackingDraftChange = (value) => {
     setTrackingDraft(value);
+    const detected = detectTrackingCarrier(value);
+    if (detected) {
+      setCarrierDraft(detected);
+    }
   };
 
   const saveTrackingNumber = async (order) => {

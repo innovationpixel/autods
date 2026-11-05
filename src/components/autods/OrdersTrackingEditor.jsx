@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { LuCheck, LuLoader, LuPencil, LuTruck, LuUpload, LuX } from "react-icons/lu";
 import { detectTrackingCarrier, TRACKING_CARRIER_OPTIONS } from "./helpers";
 
@@ -16,10 +16,28 @@ export default function OrdersTrackingEditor({
   onSave,
   onPushToEbay,
 }) {
-  const currentTracking = isEditing ? trackingDraft : (order.trackingNumberRaw || "");
+  const currentTracking = (isEditing ? trackingDraft : (order.trackingNumberRaw || "")).trim();
   const detectedCarrier = detectTrackingCarrier(currentTracking);
   const resolvedCarrier = (isEditing ? carrierDraft : "") || order.carrierRaw || detectedCarrier || "";
   const carrierLabel = order.trackingNumberRaw ? (order.carrierRaw || detectedCarrier || "") : "";
+
+  // Auto-select carrier when popup opens or when tracking is present
+  useEffect(() => {
+    if (isEditing) {
+      const autoCarrier = (carrierDraft || order.carrierRaw || detectedCarrier || "").trim();
+      if (autoCarrier && autoCarrier !== carrierDraft) {
+        onCarrierChange(autoCarrier);
+      }
+    }
+  }, [isEditing, carrierDraft, order.carrierRaw, detectedCarrier, onCarrierChange]);
+
+  const allCarrierOptions = useMemo(() => {
+    const activeCarrier = (carrierDraft || detectedCarrier || order.carrierRaw || "").trim();
+    if (activeCarrier && !TRACKING_CARRIER_OPTIONS.some((o) => o.value.toLowerCase() === activeCarrier.toLowerCase())) {
+      return [{ value: activeCarrier, label: activeCarrier }, ...TRACKING_CARRIER_OPTIONS];
+    }
+    return TRACKING_CARRIER_OPTIONS;
+  }, [carrierDraft, detectedCarrier, order.carrierRaw]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -129,7 +147,14 @@ export default function OrdersTrackingEditor({
               type="text"
               placeholder="Paste tracking number"
               value={trackingDraft}
-              onChange={(event) => onTrackingChange(event.target.value)}
+              onChange={(event) => {
+                const val = event.target.value;
+                onTrackingChange(val);
+                const detected = detectTrackingCarrier(val);
+                if (detected) {
+                  onCarrierChange(detected);
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   onSave(order);
@@ -147,12 +172,12 @@ export default function OrdersTrackingEditor({
             <span>Carrier</span>
             <select
               className="orders-tracking-panel__select"
-              value={carrierDraft}
+              value={carrierDraft || detectedCarrier || ""}
               onChange={(event) => onCarrierChange(event.target.value)}
               disabled={saving || pushing}
             >
               <option value="">Select carrier</option>
-              {TRACKING_CARRIER_OPTIONS.map((option) => (
+              {allCarrierOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

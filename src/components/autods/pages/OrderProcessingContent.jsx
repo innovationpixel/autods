@@ -17,6 +17,7 @@ import {
   LuRefreshCcw,
   LuStore,
   LuTriangleAlert,
+  LuTruck,
   LuUserRound,
   LuX,
   LuZap,
@@ -181,25 +182,21 @@ function mapProcessingOrder(order) {
         aeStatus === "SELLER_PART_SEND_GOODS" ||
         aeStatus === "WAIT_BUYER_ACCEPT_GOODS" ||
         aeStatus === "FINISH";
-      const isUnpaid =
-        aeStatus === "WAIT_BUYER_PAY" ||
-        aeStatus === "PAYMENT_PENDING" ||
-        aeStatus === "UNPAID" ||
-        aeStatus === "PENDING";
 
+      // If AliExpress reports paid and status was new or pending, it moves to processed (Paid)
       if (order.aliexpress_order_id && isPaid && (explicit === "pending" || explicit === "new")) {
         return "processed";
       }
+
+      // If order was placed on AliExpress and has not been confirmed paid or shipped, it is Pending Payment
       if (
         order.aliexpress_order_id &&
-        isUnpaid &&
-        explicit !== "cancelled" &&
-        explicit !== "processed" &&
-        explicit !== "shipped" &&
-        explicit !== "completed"
+        !isPaid &&
+        (explicit === "new" || explicit === "pending")
       ) {
         return "pending";
       }
+
       return explicit;
     })(),
     processingMethod: order.processing_method ?? "",
@@ -250,6 +247,7 @@ function OrderProcessingContent() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const [bulkSyncingAliExpress, setBulkSyncingAliExpress] = useState(false);
   const [sortBy, setSortBy] = useState("date");
   const [sortDirection, setSortDirection] = useState("desc");
 
@@ -437,6 +435,34 @@ function OrderProcessingContent() {
     }
   };
 
+  const handleBulkSyncAliExpress = async () => {
+    const selected = orders.filter((o) => selectedIds.includes(o.id));
+    const withAe = selected.filter((o) => o.aliexpressOrderId);
+    if (!withAe.length) {
+      toast.warn("None of the selected orders have an AliExpress order ID.");
+      return;
+    }
+    setBulkSyncingAliExpress(true);
+    let updatedCount = 0;
+    let paidCount = 0;
+    let shippedCount = 0;
+    for (const order of withAe) {
+      try {
+        const res = await syncSingleAliExpressOrder(order.id);
+        if (res.data?.updated) updatedCount++;
+        if (res.data?.is_paid) paidCount++;
+        if (res.data?.is_shipped) shippedCount++;
+      } catch (err) {
+        // continue
+      }
+    }
+    setBulkSyncingAliExpress(false);
+    toast.success(
+      `AliExpress sync complete for ${withAe.length} selected orders (${updatedCount} updated${shippedCount ? `, ${shippedCount} shipped` : ""}).`
+    );
+    await loadOrders();
+  };
+
   const handleSyncSingleAliExpress = async (order) => {
     if (!order.aliexpressOrderId) {
       toast.info("This order does not have an AliExpress order ID.");
@@ -450,9 +476,9 @@ function OrderProcessingContent() {
       const tracking = res.data?.tracking_no;
       let msg = res.data?.message || "AliExpress order status checked.";
       if (isShipped && tracking) {
-        msg += ` Tracking: ${tracking}`;
+        msg += ` Tracking: ${tracking}. Moved to Shipped!`;
       } else if (isPaid) {
-        msg += " Order is paid and marked as Processed!";
+        msg += " Order is paid and moved to Processed (Paid)!";
       }
       toast.success(msg);
       await loadOrders();
@@ -523,8 +549,11 @@ function OrderProcessingContent() {
 
   const startEditTracking = (order) => {
     setEditingTrackingId(order.id);
-    setTrackingDraft(order.trackingNumberRaw || "");
-    setCarrierDraft(order.carrierRaw || order.carrier || "");
+    const tracking = (order.trackingNumberRaw || order.tracking_number || "").trim();
+    setTrackingDraft(tracking);
+    const detected = tracking ? detectTrackingCarrier(tracking) : null;
+    const initialCarrier = normalizeTrackingCarrier(order.carrierRaw || order.carrier || "") || detected || "";
+    setCarrierDraft(initialCarrier);
   };
 
   const cancelEditTracking = () => {
@@ -779,12 +808,13 @@ function OrderProcessingContent() {
 
     try {
       const res = await placeAliExpressOrder(order.id, placePayload);
-      toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
+      toast.success(res.data?.message ?? "Order placed on AliExpress! Moved to Pending Payment.");
       setConfirmOrder(null);
       if (processingMethod === "autods") {
         loadWallet();
       }
-      setActiveTab("processed");
+      await loadOrders();
+      setActiveTab("pending");
     } catch (err) {
       let message = getApiErrorMessage(err, "Could not process this order.");
       let lower = message.toLowerCase();
@@ -799,12 +829,13 @@ function OrderProcessingContent() {
         try {
           await acceptRecommendedAddress(order.id);
           const res = await placeAliExpressOrder(order.id, placePayload);
-          toast.success(res.data?.message ?? "Order successfully submitted to AliExpress!");
+          toast.success(res.data?.message ?? "Order placed on AliExpress! Moved to Pending Payment.");
           setConfirmOrder(null);
           if (processingMethod === "autods") {
             loadWallet();
           }
-          setActiveTab("processed");
+          await loadOrders();
+          setActiveTab("pending");
           return;
         } catch (retryErr) {
           message = getApiErrorMessage(retryErr, message);
@@ -1161,6 +1192,9 @@ function OrderProcessingContent() {
     await loadOrders(true);
     if (processingMethod === "autods") {
       loadWallet();
+    }
+    if (succeeded > 0) {
+      setActiveTab("pending");
     }
 
     // Build unified system message
@@ -1683,58 +1717,78 @@ function OrderProcessingContent() {
               <div className="order-processing-bulk-bar" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 600 }}>{selectedIds.length} selected</span>
 
-                {addressIssueCount > 0 && (
-                  <span
+                {activeTab === "new" ? (
+                  <>
+                    {addressIssueCount > 0 && (
+                      <span
+                        style={{
+                          background: "#fee2e2",
+                          color: "#dc2626",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 12,
+                        }}
+                      >
+                        {addressIssueCount} with address issue
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      className="order-processing-bulk-bar__btn"
+                      onClick={handleBulkProcess}
+                      disabled={bulkProcessing}
+                    >
+                      {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
+                      <span>
+                        {bulkProcessing
+                          ? `Processing (${bulkProgress.current}/${bulkProgress.total})...`
+                          : "Process selected"}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="order-processing-bulk-bar__btn"
+                      style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
+                      onClick={() => setBulkAddressModalOpen(true)}
+                      title="Fix shipping addresses for selected orders"
+                      disabled={bulkProcessing}
+                    >
+                      <LuMapPin />
+                      <span>Fix address</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="order-processing-bulk-bar__btn"
+                      style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
+                      onClick={() => setBulkSourceModalOpen(true)}
+                      title="Add or update variants across selected orders"
+                      disabled={bulkProcessing}
+                    >
+                      <LuLayers />
+                      <span>Add variants</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="order-processing-bulk-bar__btn"
                     style={{
-                      background: "#fee2e2",
-                      color: "#dc2626",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "2px 8px",
-                      borderRadius: 12,
+                      background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                      borderColor: "#ea580c",
+                      color: "#fff",
                     }}
+                    onClick={handleBulkSyncAliExpress}
+                    disabled={bulkSyncingAliExpress}
+                    title="Check AliExpress for updates on selected orders"
                   >
-                    {addressIssueCount} with address issue
-                  </span>
+                    {bulkSyncingAliExpress ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
+                    <span>{bulkSyncingAliExpress ? "Checking AliExpress…" : "Sync AliExpress"}</span>
+                  </button>
                 )}
-
-                <button
-                  type="button"
-                  className="order-processing-bulk-bar__btn"
-                  onClick={handleBulkProcess}
-                  disabled={bulkProcessing}
-                >
-                  {bulkProcessing ? <LuLoader className="spin-icon" /> : <LuCheck />}
-                  <span>
-                    {bulkProcessing
-                      ? `Processing (${bulkProgress.current}/${bulkProgress.total})...`
-                      : "Process selected"}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  className="order-processing-bulk-bar__btn"
-                  style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
-                  onClick={() => setBulkAddressModalOpen(true)}
-                  title="Fix shipping addresses for selected orders"
-                  disabled={bulkProcessing}
-                >
-                  <LuMapPin />
-                  <span>Fix address</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="order-processing-bulk-bar__btn"
-                  style={{ background: "#f8fafc", color: "#334155", border: "1px solid #cbd5e1" }}
-                  onClick={() => setBulkSourceModalOpen(true)}
-                  title="Add or update variants across selected orders"
-                  disabled={bulkProcessing}
-                >
-                  <LuLayers />
-                  <span>Add variants</span>
-                </button>
               </div>
             ) : null}
 
@@ -2040,7 +2094,13 @@ function OrderProcessingContent() {
                           pushing={pushingTrackingId === order.id}
                           onStartEdit={startEditTracking}
                           onCancel={cancelEditTracking}
-                          onTrackingChange={setTrackingDraft}
+                          onTrackingChange={(val) => {
+                            setTrackingDraft(val);
+                            const detected = detectTrackingCarrier(val);
+                            if (detected) {
+                              setCarrierDraft(detected);
+                            }
+                          }}
                           onCarrierChange={setCarrierDraft}
                           onSave={saveTracking}
                           onPushToEbay={pushTrackingToEbay}
@@ -2061,10 +2121,10 @@ function OrderProcessingContent() {
                                     : "order-processing-mark-btn--primary"
                                 }`}
                                 onClick={() => handleProcessOrder(order)}
-                                disabled={processingId === order.id}
+                                disabled={processingId === order.id || syncingSingleId === order.id}
                                 title={
                                   order.aliexpressOrderId
-                                    ? `Already placed on AliExpress (#${order.aliexpressOrderId})`
+                                    ? `Already placed on AliExpress (#${order.aliexpressOrderId}). Click to check payment status.`
                                     : !order.hasSource
                                     ? "Missing AliExpress supplier link — click to add source"
                                     : order.sourcePlatform && order.sourcePlatform.toLowerCase() === "ebay"
@@ -2119,20 +2179,88 @@ function OrderProcessingContent() {
                                 </button>
                               ) : null}
                             </>
-                          ) : (
-                            <select
-                              className="order-processing-status-select"
-                              value={order.processingStatus}
-                              disabled={processingId === order.id}
-                              onChange={(e) => handleUpdateProcessingStatus(order, e.target.value)}
-                              title="Move this order to another tab"
+                          ) : activeTab === "processed" ? (
+                            <span
+                              className="order-processing-mark-btn order-processing-mark-btn--placed"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: "default",
+                                userSelect: "none",
+                              }}
+                              title="Order is paid on AliExpress and marked as Processed"
                             >
-                              {PROCESSING_TABS.map((tab) => (
-                                <option key={tab.key} value={tab.key}>
-                                  {tab.label}
-                                </option>
-                              ))}
-                            </select>
+                              <LuCheck />
+                              <span>Processed (Paid)</span>
+                            </span>
+                          ) : activeTab === "shipped" ? (
+                            <span
+                              className="order-processing-mark-btn"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: "default",
+                                userSelect: "none",
+                                background: "#eff6ff",
+                                color: "#2563eb",
+                                borderColor: "#bfdbfe",
+                              }}
+                              title="Order has shipped"
+                            >
+                              <LuTruck />
+                              <span>Shipped</span>
+                            </span>
+                          ) : activeTab === "completed" ? (
+                            <span
+                              className="order-processing-mark-btn"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: "default",
+                                userSelect: "none",
+                                background: "#f0fdf4",
+                                color: "#16a34a",
+                                borderColor: "#bbf7d0",
+                              }}
+                              title="Order is completed"
+                            >
+                              <LuPackageCheck />
+                              <span>Completed</span>
+                            </span>
+                          ) : activeTab === "cancelled" ? (
+                            <span
+                              className="order-processing-mark-btn"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: "default",
+                                userSelect: "none",
+                                background: "#fef2f2",
+                                color: "#dc2626",
+                                borderColor: "#fecaca",
+                              }}
+                              title="Order is cancelled"
+                            >
+                              <LuX />
+                              <span>Cancelled</span>
+                            </span>
+                          ) : (
+                            <span
+                              className="order-processing-mark-btn"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                cursor: "default",
+                                userSelect: "none",
+                              }}
+                            >
+                              <span>{PROCESSING_TABS.find((t) => t.key === activeTab)?.label ?? activeTab}</span>
+                            </span>
                           )}
                         </div>
                       </td>

@@ -466,6 +466,15 @@ export const TRACKING_CARRIER_OPTIONS = [
   { value: "FedEx", label: "FedEx" },
   { value: "FedExSmartPost", label: "FedEx SmartPost" },
   { value: "DHL", label: "DHL" },
+  { value: "China Post", label: "China Post" },
+  { value: "AliExpress Standard Shipping", label: "AliExpress Standard Shipping" },
+  { value: "Cainiao", label: "Cainiao" },
+  { value: "Yanwen", label: "Yanwen" },
+  { value: "YunExpress", label: "YunExpress" },
+  { value: "4PX", label: "4PX" },
+  { value: "SunYou", label: "SunYou" },
+  { value: "SpeedPAK", label: "SpeedPAK" },
+  { value: "Royal Mail", label: "Royal Mail" },
   { value: "OnTrac", label: "OnTrac" },
   { value: "LASERSHIP", label: "LaserShip" },
   { value: "Other", label: "Other" },
@@ -478,28 +487,70 @@ export function detectTrackingCarrier(trackingNumber) {
     return null;
   }
 
+  // UPS: 1Z...
   if (/^1Z[0-9A-Z]{16}$/.test(value)) {
     return "UPS";
   }
 
+  // USPS: 20-22 digits starting with 9, 92, 93, 94, 95, 96 or 420xxxxx prefix
   if (/^(94|93|92|95|96)\d{20}$/.test(value) || /^9\d{21}$/.test(value)) {
     return "USPS";
   }
-
   if (/^[A-Z]{2}\d{9}US$/.test(value)) {
     return "USPS";
   }
+  if (/^420\d{5}(9[1-6]\d{20,22})$/.test(value)) {
+    return "USPS";
+  }
 
+  // FedEx: 12 or 15 digits
   if (/^\d{12}$/.test(value) || /^\d{15}$/.test(value)) {
     return "FedEx";
   }
 
-  if (/^\d{10}$/.test(value) || /^\d{11}$/.test(value)) {
+  // DHL: 10 or 11 digits, JD/JJD, GM (eCommerce)
+  if (/^\d{10}$/.test(value) || /^\d{11}$/.test(value) || /^JD\d+/i.test(value) || /^JJD/i.test(value) || /^GM\d{16,18}$/i.test(value)) {
     return "DHL";
   }
 
-  if (/^JD\d+/i.test(value) || /^JJD/i.test(value)) {
-    return "DHL";
+  // China Post: 2 letters, 9 digits, CN
+  if (/^[A-Z]{2}\d{9}CN$/i.test(value)) {
+    return "China Post";
+  }
+
+  // Cainiao: LP + 14-18 digits, or CNA...
+  if (/^LP\d{14,18}$/i.test(value) || /^CNA\d+/i.test(value)) {
+    return "Cainiao";
+  }
+
+  // Yanwen: YT + 16 digits, or ends with YP
+  if (/^YT\d{16}$/i.test(value) || /^[A-Z]{2}\d{9}YP$/i.test(value)) {
+    return "Yanwen";
+  }
+
+  // 4PX: starts with 4PX
+  if (/^4PX\w+$/i.test(value)) {
+    return "4PX";
+  }
+
+  // SunYou: starts with SY, SYBA, SYAE
+  if (/^SY[A-Z0-9]+$/i.test(value)) {
+    return "SunYou";
+  }
+
+  // SpeedPAK: starts with EE or ES + digits
+  if (/^(EE|ES)\d{18,24}$/i.test(value)) {
+    return "SpeedPAK";
+  }
+
+  // Royal Mail: ends with GB
+  if (/^[A-Z]{2}\d{9}GB$/i.test(value)) {
+    return "Royal Mail";
+  }
+
+  // YunExpress
+  if (/^YT\w+$/i.test(value)) {
+    return "YunExpress";
   }
 
   return null;
@@ -517,10 +568,26 @@ export function normalizeTrackingCarrier(value) {
     "U.S. POSTAL SERVICE": "USPS",
     "UNITED STATES POSTAL SERVICE": "USPS",
     UPS: "UPS",
+    "UNITED PARCEL SERVICE": "UPS",
     FEDEX: "FedEx",
     "FED EX": "FedEx",
     FEDEXSMARTPOST: "FedExSmartPost",
+    "FEDEX SMARTPOST": "FedExSmartPost",
     DHL: "DHL",
+    "DHL EXPRESS": "DHL",
+    "DHL ECOMMERCE": "DHL",
+    "CHINA POST": "China Post",
+    CHINAPOST: "China Post",
+    "ALIEXPRESS STANDARD SHIPPING": "AliExpress Standard Shipping",
+    "ALIEXPRESS SHIPPING": "AliExpress Standard Shipping",
+    CAINIAO: "Cainiao",
+    YANWEN: "Yanwen",
+    YUNEXPRESS: "YunExpress",
+    "4PX": "4PX",
+    SUNYOU: "SunYou",
+    SPEEDPAK: "SpeedPAK",
+    "ROYAL MAIL": "Royal Mail",
+    ROYALMAIL: "Royal Mail",
     ONTRAC: "OnTrac",
     LASERSHIP: "LASERSHIP",
     OTHER: "Other",
