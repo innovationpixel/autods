@@ -174,6 +174,23 @@ function mapProcessingOrder(order) {
     processingStatus: (() => {
       const explicit = order.processing_status ?? "new";
       const aeStatus = String(order.aliexpress_order_status ?? "").toUpperCase();
+      const isCancelled =
+        aeStatus === "CANCELLED" ||
+        aeStatus === "CANCELED" ||
+        aeStatus === "IN_CANCEL" ||
+        aeStatus === "CLOSE" ||
+        aeStatus === "CLOSED" ||
+        aeStatus === "TRADE_CLOSED" ||
+        aeStatus === "ORDER_CANCELED" ||
+        aeStatus === "ORDER_CANCELLED" ||
+        aeStatus.includes("CANCEL") ||
+        aeStatus.includes("CLOSE");
+
+      // Cancelled AliExpress orders return to new orders ready to process again
+      if (isCancelled) {
+        return "new";
+      }
+
       const isPaid =
         aeStatus === "WAIT_SELLER_SEND_GOODS" ||
         aeStatus === "PAY_SUCCESS" ||
@@ -473,12 +490,15 @@ function OrderProcessingContent() {
       const res = await syncSingleAliExpressOrder(order.id);
       const isPaid = res.data?.is_paid;
       const isShipped = res.data?.is_shipped;
+      const isCancelled = res.data?.is_cancelled;
       const tracking = res.data?.tracking_no;
       let msg = res.data?.message || "AliExpress order status checked.";
       if (isShipped && tracking) {
         msg += ` Tracking: ${tracking}. Moved to Shipped!`;
       } else if (isPaid) {
         msg += " Order is paid and moved to Processed (Paid)!";
+      } else if (isCancelled) {
+        msg = "AliExpress order was cancelled. Moved back to New Orders ready to process again.";
       }
       toast.success(msg);
       await loadOrders();
