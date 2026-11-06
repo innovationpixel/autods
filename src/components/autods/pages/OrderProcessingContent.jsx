@@ -754,23 +754,7 @@ function OrderProcessingContent() {
       return;
     }
 
-    // Wallet balance verification with full quote total cost (Item + Shipping + Tax + 10% AutoDS Fee)
-    if (processingMethod === "autods") {
-      const walletBalance = Number(wallet?.processing_wallet_balance ?? 0);
-      const totalRequired = Number(quote?.total_cost ?? order.buyPrice ?? 0);
-      if (totalRequired > 0 && walletBalance < totalRequired) {
-        const shortfall = (totalRequired - walletBalance).toFixed(2);
-        setTransferAmountDraft(shortfall);
-        setTransferModalOpen(true);
-        toast.warn(
-          `Insufficient Processing Wallet balance ($${walletBalance.toFixed(2)}). Total order cost is $${totalRequired.toFixed(2)} ($${shortfall} more). Please transfer funds from your main wallet to proceed.`,
-          { autoClose: 8000 }
-        );
-        return;
-      }
-    }
-
-    // Condition 6: Open pre-flight confirmation modal with full cost breakdown
+    // Open pre-flight confirmation modal with full cost breakdown
     setConfirmOrder(order);
   };
 
@@ -1054,18 +1038,6 @@ function OrderProcessingContent() {
     if (!eligible.length) {
       toast.warn("None of the selected orders have a buyer account tagged for their marketplace. Tag one in Settings → Buyer Accounts.");
       return;
-    }
-
-    if (processingMethod === "autods") {
-      const walletBalance = Number(wallet?.processing_wallet_balance ?? 0);
-      if (walletBalance <= 0) {
-        toast.warn(
-          "Your Processing Wallet balance is $0.00. Please transfer funds from your main wallet to process orders.",
-          { autoClose: 8000 }
-        );
-        setTransferModalOpen(true);
-        return;
-      }
     }
 
     setBulkProcessing(true);

@@ -182,7 +182,7 @@ function OrderConfirmModal({
             <strong>+${autodsFee.toFixed(2)}</strong>
           </div>
           <div className="order-confirm-pricing-row" style={{ borderTop: "2px solid #e2e8f0", paddingTop: 8, marginTop: 4 }}>
-            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>Total to Deduct from Wallet</span>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>Estimated Total Cost</span>
             <strong style={{ fontWeight: 800, fontSize: 15, color: "#0f172a" }}>${totalCost.toFixed(2)} {quote?.currency || "USD"}</strong>
           </div>
           {estProfit != null ? (
@@ -195,10 +195,10 @@ function OrderConfirmModal({
           ) : null}
         </div>
 
-        {!hasSufficientWallet ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 6, color: "#991b1b", fontSize: 12 }}>
-            <LuShieldAlert style={{ flexShrink: 0 }} />
-            <span>Processing wallet balance is lower than estimated order cost.</span>
+        {isWallet ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, color: "#166534", fontSize: 12 }}>
+            <LuZap style={{ flexShrink: 0 }} />
+            <span>Order will be placed in Pending Payment. Wallet will be charged once the order is paid on AliExpress.</span>
           </div>
         ) : null}
 
