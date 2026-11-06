@@ -1,14 +1,18 @@
-/* Orders page: BUY / SELL badges and hover-only text actions in the tracking cell. */
+/* Orders and Calculations pages: BUY / SELL badges and hover-only text actions in the tracking cell. */
 
 /* BUY green, SELL red, square corners. */
-.orders-page-content .orders-paired-values .orders-paired-values__type--buy {
+.orders-page-content .orders-paired-values .orders-paired-values__type--buy,
+.calculations-page-content .orders-paired-values .orders-paired-values__type--buy,
+.products-page-content .products-paired-values .orders-paired-values__type--buy {
   border: 1px solid #15803d !important;
   border-radius: 0 !important;
   background: #16a34a !important;
   color: #ffffff !important;
 }
 
-.orders-page-content .orders-paired-values .orders-paired-values__type--sell {
+.orders-page-content .orders-paired-values .orders-paired-values__type--sell,
+.calculations-page-content .orders-paired-values .orders-paired-values__type--sell,
+.products-page-content .products-paired-values .orders-paired-values__type--sell {
   border: 1px solid #b91c1c !important;
   border-radius: 0 !important;
   background: #dc2626 !important;

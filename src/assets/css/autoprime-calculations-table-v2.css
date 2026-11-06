@@ -196,23 +196,35 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-width: 36px !important;
-  height: 21px !important;
-  padding: 0 7px !important;
-  border: 1px solid #d8cdf0 !important;
-  border-radius: 6px !important;
-  background: #f6f2ff !important;
-  color: #6840b6 !important;
-  font-size: 9px !important;
+  min-width: 34px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  border-radius: 0 !important;
+  font-size: 10px !important;
   font-weight: 800 !important;
   line-height: 1 !important;
-  letter-spacing: .035em !important;
+}
+
+.calculations-page-content .orders-paired-values .orders-paired-values__type--buy,
+.calculations-page-content .orders-paired-values__type--buy {
+  border: 1px solid #15803d !important;
+  border-radius: 0 !important;
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+.calculations-page-content .orders-paired-values .orders-paired-values__type--sell,
+.calculations-page-content .orders-paired-values__type--sell {
+  border: 1px solid #b91c1c !important;
+  border-radius: 0 !important;
+  background: #dc2626 !important;
+  color: #ffffff !important;
 }
 
 .calculations-page-content .orders-paired-values__platform {
-  color: #8d8797 !important;
-  font-size: 9.5px !important;
-  font-weight: 700 !important;
+  color: #81778d !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
   white-space: nowrap !important;
 }
 

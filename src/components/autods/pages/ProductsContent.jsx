@@ -995,13 +995,13 @@ function ProductsContent({ searchQuery }) {
           <div className="products-paired-values">
             {item.buy_price != null ? (
               <div>
-                <span className="orders-paired-values__type">BUY</span>
+                <span className="orders-paired-values__type orders-paired-values__type--buy">BUY</span>
                 <span className="orders-paired-values__platform">{platformLabel(item.source_platform)}</span>
                 <strong>{formatMoney(item.buy_price, item.currency)}</strong>
               </div>
             ) : null}
             <div>
-              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__type orders-paired-values__type--sell">SELL</span>
               <span className="orders-paired-values__platform">ebay</span>
               <strong>{formatMoney(item.price, item.currency)}</strong>
             </div>

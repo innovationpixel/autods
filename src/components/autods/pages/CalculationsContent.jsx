@@ -789,7 +789,7 @@ function CalculationsContent({ searchQuery = "" }) {
         return (
           <div className="orders-paired-values">
             <div>
-              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__type orders-paired-values__type--buy">BUY</span>
               <span className="orders-paired-values__platform">{platformLabel(row.sourcePlatform)}</span>
               <div className="products-source-cell">
                 {row.hasSource ? (
@@ -812,7 +812,7 @@ function CalculationsContent({ searchQuery = "" }) {
               ) : null}
             </div>
             <div>
-              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__type orders-paired-values__type--sell">SELL</span>
               <span className="orders-paired-values__platform">eBay</span>
               <ProductItemIdCell itemId={row.itemSell} sku={row.sku} url={row.itemSellUrl} />
             </div>
@@ -822,7 +822,7 @@ function CalculationsContent({ searchQuery = "" }) {
         return (
           <div className="orders-paired-values calculations-paired-tracking">
             <div>
-              <span className="orders-paired-values__type">BUY</span>
+              <span className="orders-paired-values__type orders-paired-values__type--buy">BUY</span>
               <span className="orders-paired-values__platform">{platformLabel(row.sourcePlatform)}</span>
               <div className="calculations-tracking-val">
                 {row.buyTrackingNumberRaw ? (
@@ -854,7 +854,7 @@ function CalculationsContent({ searchQuery = "" }) {
               </div>
             </div>
             <div>
-              <span className="orders-paired-values__type">SELL</span>
+              <span className="orders-paired-values__type orders-paired-values__type--sell">SELL</span>
               <span className="orders-paired-values__platform">eBay</span>
               <div className="calculations-tracking-val">
                 {row.sellTrackingNumberRaw ? (
