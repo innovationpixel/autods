@@ -174,6 +174,12 @@ function mapProcessingOrder(order) {
     processingStatus: (() => {
       const explicit = order.processing_status ?? "new";
       const aeStatus = String(order.aliexpress_order_status ?? "").toUpperCase();
+
+      // If backend explicitly marked it cancelled, keep it in cancelled tab
+      if (explicit === "cancelled") {
+        return "cancelled";
+      }
+
       const isCancelled =
         aeStatus === "CANCELLED" ||
         aeStatus === "CANCELED" ||
@@ -183,6 +189,8 @@ function mapProcessingOrder(order) {
         aeStatus === "TRADE_CLOSED" ||
         aeStatus === "ORDER_CANCELED" ||
         aeStatus === "ORDER_CANCELLED" ||
+        aeStatus === "WAIT_SELLER_EXAMINE_CANCEL_ORDER" ||
+        aeStatus === "WAIT_SELLER_CONFIRM_CANCEL" ||
         aeStatus.includes("CANCEL") ||
         aeStatus.includes("CLOSE");
 
@@ -197,8 +205,7 @@ function mapProcessingOrder(order) {
         aeStatus === "WAIT_SELLER_EXAMINE_MONEY" ||
         aeStatus === "FUND_PROCESSING" ||
         aeStatus === "SELLER_PART_SEND_GOODS" ||
-        aeStatus === "WAIT_BUYER_ACCEPT_GOODS" ||
-        aeStatus === "FINISH";
+        aeStatus === "WAIT_BUYER_ACCEPT_GOODS";
 
       // If AliExpress reports paid and status was new or pending, it moves to processed (Paid)
       if (order.aliexpress_order_id && isPaid && (explicit === "pending" || explicit === "new")) {
@@ -348,7 +355,7 @@ function OrderProcessingContent() {
   const loadOrders = async (preserveSelected = false) => {
     setLoading(true);
     try {
-      const res = await getOrders({ processing_status: activeTab, sort: "asc", limit: 100 });
+      const res = await getOrders({ processing_status: activeTab, sort: "desc", limit: 200 });
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
       setOrders(mapped);
       if (!preserveSelected) {
@@ -2223,23 +2230,36 @@ function OrderProcessingContent() {
                               <span>Completed</span>
                             </span>
                           ) : activeTab === "cancelled" ? (
-                            <span
-                              className="order-processing-mark-btn"
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                cursor: "default",
-                                userSelect: "none",
-                                background: "#fef2f2",
-                                color: "#dc2626",
-                                borderColor: "#fecaca",
-                              }}
-                              title="Order is cancelled"
-                            >
-                              <LuX />
-                              <span>Cancelled</span>
-                            </span>
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                              <span
+                                className="order-processing-mark-btn"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                  cursor: "default",
+                                  userSelect: "none",
+                                  background: "#fef2f2",
+                                  color: "#dc2626",
+                                  borderColor: "#fecaca",
+                                }}
+                                title="Order is cancelled"
+                              >
+                                <LuX />
+                                <span>Cancelled</span>
+                              </span>
+                              <button
+                                type="button"
+                                className="order-processing-mark-btn order-processing-mark-btn--primary"
+                                onClick={() => handleUpdateProcessingStatus(order, "new")}
+                                disabled={processingId === order.id}
+                                title="Move this order back to New Orders to process it again"
+                                style={{ fontSize: 11, padding: "4px 8px" }}
+                              >
+                                <LuZap />
+                                <span>Move to New</span>
+                              </button>
+                            </div>
                           ) : (
                             <span
                               className="order-processing-mark-btn"
