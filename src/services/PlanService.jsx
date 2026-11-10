@@ -36,8 +36,11 @@ export const confirmStripePlan = (payload) =>
 export const confirmPayPalPlan = (payload) =>
     axiosInstance.post('/plans/confirm-paypal', payload);
 
-export const getAdminPlans = () =>
-    axiosInstance.get('/admin/plans');
+export const getAdminPlans = (params = {}) =>
+    axiosInstance.get('/admin/plans', { params });
+
+export const getAdminPlanCustomers = (params = {}) =>
+    axiosInstance.get('/admin/plans/customers', { params });
 
 export const createAdminPlan = (data) =>
     axiosInstance.post('/admin/plans', data);

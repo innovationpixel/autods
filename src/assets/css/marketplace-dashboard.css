@@ -18962,8 +18962,8 @@
 
 .plans-hub__card {
   position: relative;
-  display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   min-height: 100%;
   padding: 22px 20px 20px;
@@ -25232,4 +25232,621 @@
 [data-theme-version="dark"] .support-ticket-closed-banner p,
 .marketplace-dashboard-page--dark .support-ticket-closed-banner p {
   color: #fecaca;
+}
+
+
+/* ==========================================================================
+   Custom Packages & Admin Update Plan Details Popup
+   ========================================================================== */
+
+.admin-plans-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-plans-page__summary--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-plans-page__tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-plans-page__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid #dbe2ee;
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-plans-page__tab:hover {
+  border-color: #818cf8;
+  color: #3730a3;
+}
+
+.admin-plans-page__tab.is-active {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.22);
+}
+
+.admin-plans-page__card--custom {
+  border: 1px solid rgba(124, 58, 237, 0.28);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.03) 0%, rgba(255, 255, 255, 0) 40%);
+}
+
+.admin-plans-page__ribbon--custom {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+}
+
+.admin-plans-page__quota-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-plans-page__mini-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+.admin-plans-page__assigned-box {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(124, 58, 237, 0.05);
+  display: grid;
+  gap: 6px;
+}
+
+.admin-plans-page__assigned-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b21b6;
+}
+
+.admin-plans-page__assigned-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-plans-page__assigned-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(124, 58, 237, 0.24);
+  color: #4c1d95;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.admin-plans-page__assigned-chip--more {
+  background: #ede9fe;
+  border-color: transparent;
+}
+
+.admin-plans-page__assigned-empty {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Admin Plans Modal Extensions */
+.admin-plans-modal__mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+
+.admin-plans-modal__mode-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin-plans-modal__mode-btn svg {
+  font-size: 18px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: #64748b;
+}
+
+.admin-plans-modal__mode-btn strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-plans-modal__mode-btn span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.admin-plans-modal__mode-btn.is-active {
+  border-color: #6366f1;
+  background: #eef2ff;
+}
+
+.admin-plans-modal__mode-btn.is-active svg {
+  color: #4f46e5;
+}
+
+.admin-plans-modal__customer-box {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  background: rgba(124, 58, 237, 0.04);
+}
+
+.admin-plans-modal__selected-customers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-plans-modal__selected-customers .admin-plans-modal__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-plans-modal__customer-list {
+  display: grid;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.admin-plans-modal__customer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-plans-modal__customer-row:hover {
+  background: #f8fafc;
+}
+
+.admin-plans-modal__customer-row.is-selected {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.admin-plans-modal__customer-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.admin-plans-modal__customer-info strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-plans-modal__customer-info span {
+  font-size: 11.5px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-plans-modal__customer-plan {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.admin-plans-modal__activate-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(124, 58, 237, 0.25);
+}
+
+.admin-plans-modal__empty-inline {
+  padding: 16px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.admin-plans-modal__quota-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-plans-modal__addon-tag,
+.admin-plans-modal__status-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
+.admin-plans-modal__addon-tag {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.admin-plans-modal__status-tag--extra {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.admin-plans-modal__status-tag--removed {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.admin-plans-modal__status-tag--plan {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.admin-plans-modal__feature-card.is-extra-assigned {
+  border-color: #34d399;
+  background: #f0fdf4;
+}
+
+/* Admin Clients Table & Update Plan Details Modal */
+.admin-clients-page__table {
+  overflow-x: auto;
+}
+
+.admin-clients-page__plan-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-clients-page__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-clients-page__pill--custom {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.admin-clients-page__pill--override {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.admin-clients-page__quota-line {
+  font-size: 12px !important;
+  color: #475569 !important;
+  margin-top: 2px;
+}
+
+.admin-clients-page__plan-btn {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: 1px solid #dbe2ee;
+  white-space: nowrap;
+}
+
+.admin-clients-page__plan-btn:hover {
+  border-color: #6366f1;
+  color: #4f46e5;
+}
+
+.admin-clients-modal__plan-shortcut {
+  margin: 14px 0 8px;
+  padding-top: 12px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.admin-clients-modal__plan-shortcut .admin-page__btn {
+  width: 100%;
+  font-size: 13px;
+}
+
+.admin-plan-details-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.admin-plan-details-modal__header h3 {
+  margin: 6px 0 4px;
+}
+
+.admin-plan-details-modal__quotas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-plan-details-modal__quota-card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-plan-details-modal__quota-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.admin-plan-details-modal__quota-head > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-plan-details-modal__quota-base {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.admin-plan-details-modal__quota-base strong {
+  color: #059669;
+}
+
+.admin-plan-details-modal__custom-pkg-box {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+/* User /plans Page Custom Package Styling */
+.plans-hub__card--custom {
+  border-color: rgba(124, 58, 237, 0.35);
+  background: linear-gradient(180deg, #faf5ff 0%, #ffffff 32%);
+}
+
+.plans-hub__card--custom .plans-hub__card-icon {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.plans-hub__ribbon--custom {
+  gap: 5px;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  color: #ffffff;
+}
+
+.plans-hub__custom-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f3e8ff;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plans-hub__quota-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plans-hub__quota-chips span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* Dark Theme Overrides */
+[data-theme-version="dark"] .admin-plans-page__tab,
+.marketplace-dashboard-page--dark .admin-plans-page__tab {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme-version="dark"] .admin-plans-page__card--custom,
+.marketplace-dashboard-page--dark .admin-plans-page__card--custom {
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.14) 0%, rgba(15, 23, 42, 0) 45%);
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
+[data-theme-version="dark"] .admin-plans-page__assigned-box,
+.marketplace-dashboard-page--dark .admin-plans-page__assigned-box {
+  background: rgba(124, 58, 237, 0.14);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+[data-theme-version="dark"] .admin-plans-page__assigned-head,
+.marketplace-dashboard-page--dark .admin-plans-page__assigned-head {
+  color: #ddd6fe;
+}
+
+[data-theme-version="dark"] .admin-plans-page__assigned-chip,
+.marketplace-dashboard-page--dark .admin-plans-page__assigned-chip {
+  background: #1e1b4b;
+  border-color: rgba(167, 139, 250, 0.35);
+  color: #e9d5ff;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__mode-btn,
+.marketplace-dashboard-page--dark .admin-plans-modal__mode-btn,
+[data-theme-version="dark"] .admin-plan-details-modal__quota-card,
+.marketplace-dashboard-page--dark .admin-plan-details-modal__quota-card {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__mode-btn strong,
+.marketplace-dashboard-page--dark .admin-plans-modal__mode-btn strong,
+[data-theme-version="dark"] .admin-plan-details-modal__quota-head,
+.marketplace-dashboard-page--dark .admin-plan-details-modal__quota-head,
+[data-theme-version="dark"] .admin-plans-modal__customer-info strong,
+.marketplace-dashboard-page--dark .admin-plans-modal__customer-info strong {
+  color: #f8fafc;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__mode-btn.is-active,
+.marketplace-dashboard-page--dark .admin-plans-modal__mode-btn.is-active {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: #818cf8;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__customer-list,
+.marketplace-dashboard-page--dark .admin-plans-modal__customer-list {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__customer-row:hover,
+.marketplace-dashboard-page--dark .admin-plans-modal__customer-row:hover {
+  background: #1e293b;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__customer-row.is-selected,
+.marketplace-dashboard-page--dark .admin-plans-modal__customer-row.is-selected {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(167, 139, 250, 0.45);
+}
+
+[data-theme-version="dark"] .admin-plans-modal__customer-plan,
+.marketplace-dashboard-page--dark .admin-plans-modal__customer-plan {
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+[data-theme-version="dark"] .admin-plans-modal__feature-card.is-extra-assigned,
+.marketplace-dashboard-page--dark .admin-plans-modal__feature-card.is-extra-assigned {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+[data-theme-version="dark"] .admin-clients-page__plan-btn,
+.marketplace-dashboard-page--dark .admin-clients-page__plan-btn {
+  border-color: #334155;
+}
+
+[data-theme-version="dark"] .admin-clients-page__quota-line,
+.marketplace-dashboard-page--dark .admin-clients-page__quota-line {
+  color: #94a3b8 !important;
+}
+
+[data-theme-version="dark"] .plans-hub__card--custom,
+.marketplace-dashboard-page--dark .plans-hub__card--custom {
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.16) 0%, rgba(15, 23, 42, 0.4) 40%);
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+[data-theme-version="dark"] .plans-hub__quota-chips span,
+.marketplace-dashboard-page--dark .plans-hub__quota-chips span {
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+}
+
+/* Responsive */
+@media (max-width: 991px) {
+  .admin-plans-page__summary--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-plans-modal__quota-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-plans-page__summary--4,
+  .admin-plans-modal__mode-switch,
+  .admin-plans-modal__quota-grid,
+  .admin-plan-details-modal__quotas {
+    grid-template-columns: 1fr;
+  }
 }

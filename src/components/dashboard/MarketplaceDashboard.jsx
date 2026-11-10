@@ -427,7 +427,7 @@ const MarketplaceDashboard = () => {
 
   const currentPlan = subscriptionData?.current_plan;
   const quotaUsage = subscriptionData?.usage ?? {};
-  const quotaLimit = Number(currentPlan?.products_limit ?? quotaUsage?.products_limit ?? 200);
+  const quotaLimit = Number(quotaUsage?.products_limit ?? currentPlan?.products_limit ?? 200);
   const quotaUsed = Number(quotaUsage?.products_quota_used ?? quotaUsage?.listings_count ?? 0);
   const isQuotaBreached = Boolean(quotaUsage?.products_quota_breached || (quotaLimit > 0 && quotaUsed >= quotaLimit));
   const [addProductUrl, setAddProductUrl] = useState("");

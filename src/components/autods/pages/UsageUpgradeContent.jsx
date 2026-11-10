@@ -23,6 +23,7 @@ import { selectUser } from "../../../store/selectors/AuthSelectors";
 import { formatAiUsd, normalizeAiConfig } from "../../../utils/aiPricing";
 import { toast } from "../../../utils/toast";
 import BuyAiCreditsModal from "./BuyAiCreditsModal";
+import { ALL_FEATURE_DEFINITIONS } from "./planFeatureDefinitions";
 
 const CURATED_ADDONS_META = [
   {
@@ -141,20 +142,50 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
   const subscription = data?.subscription;
   const usage = data?.usage ?? {};
   const expiresAt = data?.plan_expires_at || subscription?.current_period_end;
+  const isCustomPlan = Boolean(plan?.is_custom);
+  const hasCustomOverrides = Boolean(data?.custom_overrides?.has_overrides || plan?.has_custom_overrides);
 
-  const listingsLimit = plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 50;
-  const listingsUsed = usage.products_quota_used ?? usage.listings_count ?? 0;
+  const listingsLimit = Number(
+    usage.products_limit ?? plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 100
+  );
+  const listingsUsed = Number(usage.products_quota_used ?? usage.listings_count ?? 0);
   const listingsPct = listingsLimit > 0 ? Math.min(100, Math.round((listingsUsed / listingsLimit) * 100)) : 0;
 
-  const ordersLimit = plan?.limits?.orders ?? plan?.orders_limit ?? 100;
-  const ordersUsed = usage.orders_count ?? 0;
+  const ordersLimit = Number(
+    usage.orders_limit ?? plan?.limits?.orders ?? plan?.orders_limit ?? 100
+  );
+  const ordersUsed = Number(usage.orders_count ?? 0);
   const ordersPct = ordersLimit > 0 ? Math.min(100, Math.round((ordersUsed / ordersLimit) * 100)) : 0;
 
-  const storesLimit = plan?.limits?.stores ?? plan?.stores_limit ?? 1;
-  const storesUsed = usage.connections_count ?? 0;
+  const storesLimit = Number(
+    usage.stores_limit ?? plan?.limits?.stores ?? plan?.stores_limit ?? 1
+  );
+  const storesUsed = Number(usage.connections_count ?? 0);
   const storesPct = storesLimit > 0 ? Math.min(100, Math.round((storesUsed / storesLimit) * 100)) : 0;
 
-  const features = Array.isArray(plan?.features)
+  const resolvedInclusions =
+    Array.isArray(data?.effective_inclusions) && data.effective_inclusions.length > 0
+      ? data.effective_inclusions
+      : Array.isArray(plan?.inclusions) && plan.inclusions.length > 0
+      ? plan.inclusions
+      : null;
+
+  const effectiveFeatureMap =
+    data?.effective_features && typeof data.effective_features === "object" && !Array.isArray(data.effective_features)
+      ? data.effective_features
+      : plan?.features && typeof plan.features === "object" && !Array.isArray(plan.features)
+      ? plan.features
+      : null;
+
+  const mappedFeatureTitles = effectiveFeatureMap
+    ? ALL_FEATURE_DEFINITIONS.filter((def) => Boolean(effectiveFeatureMap[def.key])).map((def) => def.title)
+    : [];
+
+  const features = resolvedInclusions
+    ? resolvedInclusions
+    : mappedFeatureTitles.length > 0
+    ? mappedFeatureTitles
+    : Array.isArray(plan?.features) && plan.features.length > 0
     ? plan.features
     : [
         "Automated Price & Stock Monitoring (every 60 mins)",
@@ -184,7 +215,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
             <span
               style={{
                 display: "inline-flex",
@@ -201,6 +232,42 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
             >
               <LuCrown /> ACTIVE PLAN
             </span>
+            {isCustomPlan && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background: "rgba(168, 85, 247, 0.22)",
+                  color: "#e9d5ff",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  border: "1px solid rgba(192, 132, 252, 0.38)",
+                }}
+              >
+                <LuLock /> CUSTOM PACKAGE
+              </span>
+            )}
+            {hasCustomOverrides && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  background: "rgba(16, 185, 129, 0.2)",
+                  color: "#6ee7b7",
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  border: "1px solid rgba(52, 211, 153, 0.38)",
+                }}
+              >
+                <LuSparkles /> CUSTOM QUOTAS / FEATURES
+              </span>
+            )}
             {expiresAt && (
               <span style={{ fontSize: 13, color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <LuClock /> Renews on {new Date(expiresAt).toLocaleDateString()}
@@ -435,6 +502,10 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
               badgeLabel = "Admin Access";
               badgeBg = "#ede9fe";
               badgeColor = "#5b21b6";
+            } else if (cfg.access_source === "plan_override") {
+              badgeLabel = "Included in Plan";
+              badgeBg = "#ecfdf5";
+              badgeColor = "#059669";
             } else if (isFree) {
               badgeLabel = "Included Free";
               badgeBg = "#ecfdf5";

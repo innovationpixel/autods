@@ -10,6 +10,7 @@ import {
   LuCrown,
   LuFileText,
   LuLoader,
+  LuLock,
   LuSettings,
   LuShield,
   LuSparkles,
@@ -221,7 +222,13 @@ function PlansPage() {
           <div className="plans-hub__active-chip">
             <span className="plans-hub__active-chip-icon"><LuCrown /></span>
             <div>
-              <span className="plans-hub__active-chip-label">Your plan</span>
+              <span className="plans-hub__active-chip-label">
+                {current.current_plan.is_custom
+                  ? "Your custom package"
+                  : current?.custom_overrides?.has_overrides
+                  ? "Your plan · Custom quotas"
+                  : "Your plan"}
+              </span>
               <strong>{current.current_plan.title}</strong>
               {current.plan_expires_at ? (
                 <span>Renews {formatExpiryDate(current.plan_expires_at)}</span>
@@ -314,24 +321,37 @@ function PlansPage() {
         <div className="plans-hub__grid">
           {plans.map((plan) => {
             const isCurrent = activePlanId === plan.id;
-            const isFeatured = plan.id === featuredPlanId && !isCurrent;
+            const isCustom = Boolean(plan.is_custom);
+            const isFeatured = !isCustom && plan.id === featuredPlanId && !isCurrent;
             const interval = formatPlanInterval(plan);
             const isOneTime = plan.billing_type !== "monthly";
 
             return (
               <article
-                className={`plans-hub__card ${isCurrent ? "plans-hub__card--current" : ""} ${isFeatured ? "plans-hub__card--featured" : ""}`}
+                className={`plans-hub__card ${isCurrent ? "plans-hub__card--current" : ""} ${isFeatured ? "plans-hub__card--featured" : ""} ${isCustom ? "plans-hub__card--custom" : ""}`}
                 key={plan.id}
               >
-                {isFeatured ? <span className="plans-hub__ribbon">Most Popular</span> : null}
-                {isCurrent ? <span className="plans-hub__ribbon plans-hub__ribbon--current">Current Plan</span> : null}
+                {isCurrent ? (
+                  <span className="plans-hub__ribbon plans-hub__ribbon--current">Current Plan</span>
+                ) : isCustom ? (
+                  <span className="plans-hub__ribbon plans-hub__ribbon--custom">
+                    <LuLock /> Custom Package
+                  </span>
+                ) : isFeatured ? (
+                  <span className="plans-hub__ribbon">Most Popular</span>
+                ) : null}
 
                 <div className="plans-hub__card-head">
                   <div className="plans-hub__card-icon">
-                    {isOneTime ? <LuCalendar /> : isFeatured ? <LuCrown /> : <LuZap />}
+                    {isCustom ? <LuLock /> : isOneTime ? <LuCalendar /> : isFeatured ? <LuCrown /> : <LuZap />}
                   </div>
                   <div>
                     <h2>{plan.title}</h2>
+                    {isCustom && isCurrent ? (
+                      <span className="plans-hub__custom-badge">
+                        <LuLock /> Private Custom Package
+                      </span>
+                    ) : null}
                     <p>{plan.description}</p>
                   </div>
                 </div>
@@ -340,6 +360,22 @@ function PlansPage() {
                   <strong>${Number(plan.price).toFixed(2)}</strong>
                   <span>{plan.currency ?? "USD"} / {interval}</span>
                 </div>
+
+                {(plan.orders_limit !== null && plan.orders_limit !== undefined) ||
+                (plan.stores_limit !== null && plan.stores_limit !== undefined) ? (
+                  <div className="plans-hub__quota-chips">
+                    <span>{Number(plan.products_limit ?? 200).toLocaleString()} Products</span>
+                    {plan.orders_limit !== null && plan.orders_limit !== undefined ? (
+                      <span>{Number(plan.orders_limit).toLocaleString()} Orders</span>
+                    ) : null}
+                    {plan.stores_limit !== null && plan.stores_limit !== undefined ? (
+                      <span>
+                        {Number(plan.stores_limit).toLocaleString()}{" "}
+                        {Number(plan.stores_limit) === 1 ? "Store" : "Stores"}
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <ul className="plans-hub__features">
                   {(plan.inclusions ?? []).map((item) => (

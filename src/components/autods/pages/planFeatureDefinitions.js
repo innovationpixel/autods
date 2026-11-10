@@ -166,7 +166,28 @@ export const PLAN_FEATURE_DEFINITIONS = [
   },
 ];
 
+export const ADDON_FEATURE_DEFINITIONS = [
+  {
+    key: "trending_products",
+    title: "Trending Products",
+    description: "Unlock curated daily trending product feeds without separate add-on billing.",
+    isAddon: true,
+  },
+  {
+    key: "hand_picked_products",
+    title: "Hand-Picked Products",
+    description: "Unlock vetted high-margin hand-picked winning products vault.",
+    isAddon: true,
+  },
+];
+
+export const ALL_FEATURE_DEFINITIONS = [
+  ...PLAN_FEATURE_DEFINITIONS,
+  ...ADDON_FEATURE_DEFINITIONS,
+];
+
 export const PRODUCT_LIMIT_PRESETS = [200, 400, 800, 1000, 2500, 5000];
+export const QUOTA_INCREASE_PRESETS = [100, 250, 500, 1000, 5000];
 
 export function buildPlanInclusions(productsLimit, features = {}, customInclusions = []) {
   const result = [];
@@ -175,7 +196,7 @@ export function buildPlanInclusions(productsLimit, features = {}, customInclusio
     result.push(`${limit.toLocaleString()} Products`);
   }
 
-  PLAN_FEATURE_DEFINITIONS.forEach((item) => {
+  ALL_FEATURE_DEFINITIONS.forEach((item) => {
     if (features && features[item.key]) {
       result.push(item.title);
     }
@@ -198,7 +219,7 @@ export function parseFeaturesAndExtras(plan) {
   let extractedLimit = plan?.products_limit ? Number(plan.products_limit) : null;
 
   const titleToKey = new Map();
-  PLAN_FEATURE_DEFINITIONS.forEach((item) => {
+  ALL_FEATURE_DEFINITIONS.forEach((item) => {
     titleToKey.set(item.title.toLowerCase().trim(), item.key);
   });
 

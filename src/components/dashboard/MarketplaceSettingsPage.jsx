@@ -2909,17 +2909,27 @@ export default function MarketplaceSettingsPage() {
     const plan = currentSubscription?.current_plan;
     const usage = currentSubscription?.usage ?? {};
     const planExpires = currentSubscription?.plan_expires_at || currentSubscription?.subscription?.current_period_end;
+    const isCustomPlan = Boolean(plan?.is_custom);
+    const hasCustomOverrides = Boolean(
+      currentSubscription?.custom_overrides?.has_overrides || plan?.has_custom_overrides
+    );
 
-    const listingsLimit = plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 50;
-    const listingsUsed = usage.products_quota_used ?? usage.listings_count ?? 0;
+    const listingsLimit = Number(
+      usage.products_limit ?? plan?.products_limit ?? plan?.limits?.listings ?? plan?.listings_limit ?? 100
+    );
+    const listingsUsed = Number(usage.products_quota_used ?? usage.listings_count ?? 0);
     const listingsPct = listingsLimit > 0 ? Math.min(100, Math.round((listingsUsed / listingsLimit) * 100)) : 0;
 
-    const ordersLimit = plan?.limits?.orders ?? plan?.orders_limit ?? 100;
-    const ordersUsed = usage.orders_count ?? 0;
+    const ordersLimit = Number(
+      usage.orders_limit ?? plan?.limits?.orders ?? plan?.orders_limit ?? 100
+    );
+    const ordersUsed = Number(usage.orders_count ?? 0);
     const ordersPct = ordersLimit > 0 ? Math.min(100, Math.round((ordersUsed / ordersLimit) * 100)) : 0;
 
-    const storesLimit = plan?.limits?.stores ?? plan?.stores_limit ?? 1;
-    const storesUsed = usage.connections_count ?? (ebayConnections.length > 0 ? ebayConnections.length : 0);
+    const storesLimit = Number(
+      usage.stores_limit ?? plan?.limits?.stores ?? plan?.stores_limit ?? 1
+    );
+    const storesUsed = Number(usage.connections_count ?? (ebayConnections.length > 0 ? ebayConnections.length : 0));
     const storesPct = storesLimit > 0 ? Math.min(100, Math.round((storesUsed / storesLimit) * 100)) : 0;
 
     const aiCredits = user?.ai_credits ?? 0;
@@ -2942,7 +2952,7 @@ export default function MarketplaceSettingsPage() {
           }}
         >
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" }}>
               <span
                 style={{
                   display: "inline-flex",
@@ -2959,6 +2969,42 @@ export default function MarketplaceSettingsPage() {
               >
                 <LuCrown /> ACTIVE PLAN
               </span>
+              {isCustomPlan && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "rgba(168, 85, 247, 0.22)",
+                    color: "#e9d5ff",
+                    padding: "3px 10px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    border: "1px solid rgba(192, 132, 252, 0.38)",
+                  }}
+                >
+                  <LuLock /> CUSTOM PACKAGE
+                </span>
+              )}
+              {hasCustomOverrides && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    background: "rgba(16, 185, 129, 0.2)",
+                    color: "#6ee7b7",
+                    padding: "3px 10px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    border: "1px solid rgba(52, 211, 153, 0.38)",
+                  }}
+                >
+                  <LuSparkles /> CUSTOM QUOTAS / FEATURES
+                </span>
+              )}
               {planExpires && (
                 <span style={{ fontSize: "12px", color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                   <LuClock /> Renews {formatBillingDate(planExpires)}
@@ -3233,6 +3279,9 @@ export default function MarketplaceSettingsPage() {
               } else if (cfg.access_source === "super_admin") {
                 statusText = "Admin Access";
                 statusStyle = { background: "#ede9fe", color: "#5b21b6", border: "1px solid #ddd6fe" };
+              } else if (cfg.access_source === "plan_override") {
+                statusText = "Included in Plan";
+                statusStyle = { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" };
               } else if (isFree) {
                 statusText = "Included Free";
                 statusStyle = { background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" };
