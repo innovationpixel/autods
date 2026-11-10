@@ -18,6 +18,7 @@ import {
 function ImageTemplateSections({
   form,
   showWatermark = false,
+  sendAllReferencesWithEachPrompt = false,
   inputDescription = "Upload product images to be used for generating output images.",
   logoDescription = "Upload your brand logo and choose its position.",
   previewCard,
@@ -266,17 +267,21 @@ function ImageTemplateSections({
             <span className="ai-gen-hub__section-badge">4</span>
             <div>
               <h3>Prompts for Each Output Image</h3>
-              <p>Write a custom prompt and select a reference image for each output image.</p>
+              <p>
+                {sendAllReferencesWithEachPrompt
+                  ? "Write a custom prompt for each output image. All attached reference images are sent with every prompt."
+                  : "Write a custom prompt and select a reference image for each output image."}
+              </p>
             </div>
           </div>
 
-          {openRefPicker !== null && (
+          {!sendAllReferencesWithEachPrompt && openRefPicker !== null && (
             <div className="ai-gen-hub__ref-backdrop" onClick={() => setOpenRefPicker(null)} />
           )}
 
           <div className="ai-gen-hub__prompt-table">
             {prompts.map((prompt, index) => {
-              const hasRefError = missingRefIndices.includes(index + 1);
+              const hasRefError = !sendAllReferencesWithEachPrompt && missingRefIndices.includes(index + 1);
 
               return (
                 <div
@@ -295,25 +300,74 @@ function ImageTemplateSections({
                     value={prompt}
                     onChange={(event) => handlePromptChange(index, event.target.value)}
                   />
-                  <ReferenceImagePicker
-                    images={inputImages}
-                    valueId={referenceImageIds[index]}
-                    isOpen={openRefPicker === index}
-                    hasError={hasRefError}
-                    onToggle={() => {
-                      if (inputImages.length === 0) {
-                        toast.warn("Upload input images in Step 1 first.");
-                        return;
+                  {sendAllReferencesWithEachPrompt ? (
+                    <div
+                      title={
+                        inputImages.length > 0
+                          ? `All ${inputImages.length} attached reference image${inputImages.length > 1 ? "s" : ""} will be sent with this prompt`
+                          : "Attach or upload reference images in Step 1"
                       }
-                      setOpenRefPicker((prev) => (prev === index ? null : index));
-                    }}
-                    onChange={(imageId) => {
-                      handleReferenceImageChange(index, imageId);
-                      if (onClearMissingRef && imageId) {
-                        onClearMissingRef(index);
-                      }
-                    }}
-                  />
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                        border: "1px solid #e2e8f0",
+                        backgroundColor: inputImages.length > 0 ? "#f8fafc" : "#fffbeb",
+                        color: inputImages.length > 0 ? "#334155" : "#92400e",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        whiteSpace: "nowrap",
+                        minHeight: 36,
+                      }}
+                    >
+                      {inputImages.length > 0 && (
+                        <span style={{ display: "inline-flex", alignItems: "center" }}>
+                          {inputImages.slice(0, 3).map((img, thumbIdx) => (
+                            <img
+                              key={img.id}
+                              src={img.preview}
+                              alt=""
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 4,
+                                objectFit: "cover",
+                                border: "1px solid #ffffff",
+                                marginLeft: thumbIdx > 0 ? -6 : 0,
+                              }}
+                            />
+                          ))}
+                        </span>
+                      )}
+                      <span>
+                        {inputImages.length > 0
+                          ? `All ${inputImages.length} ref${inputImages.length > 1 ? "s" : ""}`
+                          : "0 refs"}
+                      </span>
+                    </div>
+                  ) : (
+                    <ReferenceImagePicker
+                      images={inputImages}
+                      valueId={referenceImageIds[index]}
+                      isOpen={openRefPicker === index}
+                      hasError={hasRefError}
+                      onToggle={() => {
+                        if (inputImages.length === 0) {
+                          toast.warn("Upload input images in Step 1 first.");
+                          return;
+                        }
+                        setOpenRefPicker((prev) => (prev === index ? null : index));
+                      }}
+                      onChange={(imageId) => {
+                        handleReferenceImageChange(index, imageId);
+                        if (onClearMissingRef && imageId) {
+                          onClearMissingRef(index);
+                        }
+                      }}
+                    />
+                  )}
                 {allowDeletePrompt && (
                   <button
                     type="button"
@@ -329,7 +383,11 @@ function ImageTemplateSections({
           })}
           </div>
           <span className="ai-gen-hub__hint">
-            Each prompt must have a reference image selected from your uploaded input images.
+            {sendAllReferencesWithEachPrompt
+              ? inputImages.length > 0
+                ? `All ${inputImages.length} attached reference image${inputImages.length > 1 ? "s" : ""} will be sent automatically with each prompt.`
+                : "Upload or attach at least one reference image in Step 1 — all attached references will be sent with each prompt."
+              : "Each prompt must have a reference image selected from your uploaded input images."}
           </span>
 
           {allowAddPrompt && (

@@ -76,13 +76,16 @@ export function checkAutoLogin(dispatch, navigate) {
                 fresh.role  !== user.role  ||
                 fresh.ai_credits !== user.ai_credits ||
                 fresh.wallet_balance !== user.wallet_balance ||
+                fresh.legal_accepted !== user.legal_accepted ||
+                fresh.terms_accepted_at !== user.terms_accepted_at ||
+                fresh.privacy_accepted_at !== user.privacy_accepted_at ||
                 JSON.stringify(fresh.admin_modules) !== JSON.stringify(user.admin_modules)
             ) {
                 const merged = { ...user, ...fresh };
                 saveSession({ access_token: token, user: merged });
                 dispatch(loginConfirmedAction({ access_token: token, user: merged }));
                 if (fresh.ai_credits !== undefined) {
-                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits } }));
+                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits, fromAuthAction: true } }));
                 }
             }
         })
@@ -163,7 +166,7 @@ export function updateUserStateAction(partialUser) {
         saveSession({ access_token: token, user: merged });
         dispatch(loginConfirmedAction({ access_token: token, user: merged }));
         if (partialUser.ai_credits !== undefined) {
-            window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: partialUser.ai_credits } }));
+            window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: partialUser.ai_credits, fromAuthAction: true } }));
         }
     };
 }
@@ -180,7 +183,7 @@ export function fetchFreshUserAction() {
                 saveSession({ access_token: token, user: merged });
                 dispatch(loginConfirmedAction({ access_token: token, user: merged }));
                 if (fresh.ai_credits !== undefined) {
-                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits } }));
+                    window.dispatchEvent(new CustomEvent('ai_credits_updated', { detail: { ai_credits: fresh.ai_credits, fromAuthAction: true } }));
                 }
                 return merged;
             })

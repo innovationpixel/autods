@@ -37,9 +37,11 @@ import {
   syncEbayListingsAction,
 } from "../../../store/actions/EbayActions";
 import { bulkDeleteProducts, deleteProduct, getImportHistory, monitorProductPriceStock, publishProduct, syncProductToStore, updateProduct } from "../../../services/ProductService";
+import { triggerNotificationsRefresh } from "../../../services/NotificationService";
 import BulkEditDraftsModal, { applyBulkEditToForm } from "../BulkEditDraftsModal";
 import ProductEditorModal from "../ProductEditorModal";
 import QuickEditModal from "../QuickEditModal";
+import VariantStockModal from "../VariantStockModal";
 import OrderSourceModal from "../OrderSourceModal";
 import ConfirmModal from "../ConfirmModal";
 import { buildDraftFormState, serializeDraftFormForApi } from "../../../utils/draftEditorState";
@@ -237,6 +239,9 @@ function ProductsContent({ searchQuery }) {
   const [editingStockId, setEditingStockId] = useState("");
   const [stockDraft, setStockDraft] = useState("");
   const [savingStockId, setSavingStockId] = useState("");
+  const [editingVariantStockItem, setEditingVariantStockItem] = useState(null);
+  const [variantStockForm, setVariantStockForm] = useState(null);
+  const [savingVariantStock, setSavingVariantStock] = useState(false);
   const [editingBuySourceItem, setEditingBuySourceItem] = useState(null);
   const [savingBuySourceId, setSavingBuySourceId] = useState("");
   const [editingSellIdId, setEditingSellIdId] = useState("");
@@ -385,14 +390,28 @@ function ProductsContent({ searchQuery }) {
     );
 
   const startEditStock = (item) => {
+    const formState = buildDraftFormState(item);
+    setOpenMenuId("");
+    if (Array.isArray(formState.variants) && formState.variants.length > 1) {
+      setEditingVariantStockItem(item);
+      setVariantStockForm(formState);
+      return;
+    }
     setEditingStockId(item.id);
     setStockDraft(String(item.available));
-    setOpenMenuId("");
   };
 
   const cancelEditStock = () => {
     setEditingStockId("");
     setStockDraft("");
+  };
+
+  const closeVariantStockModal = () => {
+    if (savingVariantStock) {
+      return;
+    }
+    setEditingVariantStockItem(null);
+    setVariantStockForm(null);
   };
 
   const saveStockQty = async (item) => {
@@ -405,13 +424,41 @@ function ProductsContent({ searchQuery }) {
     setSavingStockId(item.id);
     try {
       const res = await updateProduct(item.id, { quantity: qty });
-      toast.success(res.data?.message ?? "Stock quantity updated.");
+      if (res.data?.synced === false) {
+        toast.warn(res.data?.message ?? res.data?.ebay_error ?? "Saved locally, but eBay sync failed.");
+      } else {
+        toast.success(res.data?.message ?? "Stock quantity updated.");
+      }
       cancelEditStock();
       loadListings();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Could not update stock quantity.");
     } finally {
       setSavingStockId("");
+    }
+  };
+
+  const saveVariantStock = async () => {
+    if (!editingVariantStockItem || !variantStockForm) {
+      return;
+    }
+
+    setSavingVariantStock(true);
+    try {
+      const payload = serializeDraftFormForApi(variantStockForm);
+      const res = await updateProduct(editingVariantStockItem.id, payload);
+      if (res.data?.synced === false) {
+        toast.warn(res.data?.message ?? res.data?.ebay_error ?? "Saved locally, but eBay sync failed.");
+      } else {
+        toast.success(res.data?.message ?? "Variant stock quantities updated.");
+      }
+      setEditingVariantStockItem(null);
+      setVariantStockForm(null);
+      loadListings();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not update variant stock quantities."));
+    } finally {
+      setSavingVariantStock(false);
     }
   };
 
@@ -694,14 +741,18 @@ function ProductsContent({ searchQuery }) {
 
     setBulkEditing(true);
     let updated = 0;
+    let syncWarnings = 0;
     let failed = 0;
 
     for (const item of bulkEditTargets) {
       try {
         const baseForm = buildDraftFormState(item);
         const nextForm = applyBulkEditToForm(baseForm, changes);
-        await updateProduct(item.id, serializeDraftFormForApi(nextForm));
+        const res = await updateProduct(item.id, serializeDraftFormForApi(nextForm));
         updated += 1;
+        if (res.data?.synced === false) {
+          syncWarnings += 1;
+        }
       } catch {
         failed += 1;
       }
@@ -711,8 +762,12 @@ function ProductsContent({ searchQuery }) {
     setBulkEditTargets([]);
     await loadListings();
 
-    if (updated) {
+    if (updated && syncWarnings === 0) {
       toast.success(`Bulk edit applied to ${updated} product${updated === 1 ? "" : "s"}.`);
+    } else if (updated && syncWarnings > 0) {
+      toast.warn(
+        `Bulk edit saved on ${updated} product${updated === 1 ? "" : "s"}, but eBay reported sync errors on ${syncWarnings}.`,
+      );
     }
     if (failed) {
       toast.error(`${failed} product${failed === 1 ? "" : "s"} could not be updated.`);
@@ -770,7 +825,11 @@ function ProductsContent({ searchQuery }) {
     setEditorSaving(true);
     try {
       const res = await updateProduct(editorProduct.id, serializeDraftFormForApi(editorForm));
-      toast.success(res.data?.message ?? "Product updated.");
+      if (res.data?.synced === false) {
+        toast.warn(res.data?.message ?? res.data?.ebay_error ?? "Saved locally, but eBay sync failed.");
+      } else {
+        toast.success(res.data?.message ?? "Product updated.");
+      }
       setEditorProduct(null);
       setEditorForm(null);
       loadListings();
@@ -815,6 +874,7 @@ function ProductsContent({ searchQuery }) {
           msg = `Stock quantity updated to ${result.details?.stock?.new_quantity}`;
         }
         toast.success(msg);
+        triggerNotificationsRefresh();
         loadListings();
       }
     } catch (err) {
@@ -1597,6 +1657,16 @@ function ProductsContent({ searchQuery }) {
         onClose={cancelEditStock}
         saving={savingStockId === editingStockId}
         placeholder="0"
+      />
+
+      <VariantStockModal
+        open={Boolean(editingVariantStockItem && variantStockForm)}
+        item={editingVariantStockItem}
+        form={variantStockForm}
+        onChange={setVariantStockForm}
+        onSave={saveVariantStock}
+        onClose={closeVariantStockModal}
+        saving={savingVariantStock}
       />
 
       <ConfirmModal

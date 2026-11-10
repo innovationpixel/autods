@@ -35,6 +35,10 @@ export function updateProfile(payload) {
     return axiosInstance.put('/auth/profile', payload);
 }
 
+export function acceptLegalConsent(payload) {
+    return axiosInstance.post('/auth/legal-consent', payload);
+}
+
 export function saveSession(data) {
     const expiresIn = data.expires_in ?? null;
     const session = {

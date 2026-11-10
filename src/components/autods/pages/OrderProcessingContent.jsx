@@ -372,7 +372,18 @@ function OrderProcessingContent() {
   const loadWallet = async () => {
     try {
       const res = await getWalletSummary();
-      setWallet(res.data ?? null);
+      const nextWallet = res.data ?? null;
+      setWallet(nextWallet);
+      if (nextWallet?.balance !== undefined) {
+        window.dispatchEvent(
+          new CustomEvent("wallet_balance_updated", {
+            detail: {
+              wallet_balance: Number(nextWallet.balance),
+              wallet_currency: nextWallet.currency || "USD",
+            },
+          }),
+        );
+      }
     } catch {
       setWallet(null);
     }
@@ -1426,7 +1437,18 @@ function OrderProcessingContent() {
     try {
       const res = await transferToProcessingWallet(Number(parsed.toFixed(2)));
       toast.success(res.data?.message ?? "Funds transferred to your processing wallet.");
-      setWallet(res.data?.summary ?? wallet);
+      const nextSummary = res.data?.summary ?? wallet;
+      setWallet(nextSummary);
+      if (res.data?.summary?.balance !== undefined) {
+        window.dispatchEvent(
+          new CustomEvent("wallet_balance_updated", {
+            detail: {
+              wallet_balance: Number(res.data.summary.balance),
+              wallet_currency: res.data.summary.currency || "USD",
+            },
+          }),
+        );
+      }
       setTransferModalOpen(false);
       setTransferAmountDraft("");
     } catch (err) {

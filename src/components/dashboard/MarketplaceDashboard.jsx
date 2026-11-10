@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LuBadgeCheck,
-  LuBell,
   LuBox,
   LuBriefcaseBusiness,
   LuCar,
@@ -12,7 +11,6 @@ import {
   LuChevronLeft,
   LuChevronRight,
   LuClipboardList,
-  LuClock3,
   LuDribbble,
   LuEllipsisVertical,
   LuExternalLink,
@@ -32,13 +30,11 @@ import {
   LuPackageSearch,
   LuPawPrint,
   LuPencil,
-  LuPlay,
   LuPlus,
   LuRefreshCcw,
   LuSearch,
   LuSettings2,
   LuShirt,
-  LuShoppingCart,
   LuSlidersHorizontal,
   LuStore,
   LuSun,
@@ -48,7 +44,7 @@ import {
   LuUpload,
   LuUserRound,
   LuVolume2,
-  LuWalletCards,
+  LuWallet,
   LuChartLine,
   LuWrench,
   LuTrash2,
@@ -63,7 +59,8 @@ import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
 import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
-import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, headerNotifications, NOTIFICATION_PREVIEW_LIMIT, whatsNewItems, loadBalanceAmounts, aiCreditPackages, importSuppliers } from '../autods/constants';
+import HeaderNotifications from '../autods/HeaderNotifications';
+import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, whatsNewItems, importSuppliers } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
 import { mapAliItemToCard } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
@@ -107,7 +104,14 @@ function loadStoredStoreOverrides() {
 }
 import { searchAliExpressAction, fetchAliExpressStatus } from '../../store/actions/AliExpressActions';
 import { logoutAction, updateProfileAction, updateUserStateAction, fetchFreshUserAction } from '../../store/actions/AuthActions';
-import { buyAiCredits } from '../../services/AiGenerationService';
+import { getStoredToken, getStoredUser } from '../../services/AuthService';
+import {
+  ORDERS_NEW_COUNT_EVENT,
+  ORDERS_NEW_COUNT_STORAGE_KEY,
+  dispatchNewOrdersCount,
+  getNewOrdersCount,
+  markOrdersSeen,
+} from '../../services/OrderService';
 import { getAccountAlert } from '../../services/BillingService';
 import { useOAuthHandler } from '../../hooks/useOAuthHandler';
 import EbayOAuthSetupBanner from '../autods/EbayOAuthSetupBanner';
@@ -136,7 +140,7 @@ import {
   isImportSupplierEnabled,
 } from '../../utils/detectImportSupplier';
 import PlansPage from '../autods/pages/PlansPage';
-import { getCurrentPlan } from '../../services/PlanService';
+import { getAddonPricing, getCurrentPlan } from '../../services/PlanService';
 import { toast } from '../../utils/toast';
 
 function Search({
@@ -218,6 +222,21 @@ const ALIEXPRESS_SORT_MAP = {
   "Lowest Price":     "priceAsc",
 };
 
+function formatHeaderWalletBalance(amount, currency = "USD") {
+  const numericAmount = Number(amount);
+  const safeAmount = Number.isFinite(numericAmount) ? numericAmount : 0;
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(safeAmount);
+  } catch {
+    return `$${safeAmount.toFixed(2)}`;
+  }
+}
+
 const MarketplaceDashboard = () => {
   const { background, changeBackground } = useContext(ThemeContext);
   const dispatch   = useDispatch();
@@ -246,46 +265,130 @@ const MarketplaceDashboard = () => {
     return [];
   }, [authUser]);
 
-  const isPageAllowedForUser = (page) => {
-    if (!isVA) return true;
-    if (!page || page === "dashboard") return true;
+  const [addonCatalog, setAddonCatalog] = useState(null);
+  const canAccessOrders = !isVA || vaModules.includes("orders");
+  const [newOrdersCount, setNewOrdersCount] = useState(() => {
+    const initial = Number(getStoredUser()?.new_orders_count ?? 0);
+    return Number.isFinite(initial) ? Math.max(0, Math.floor(initial)) : 0;
+  });
 
-    const moduleMapping = {
-      marketplace: "finder",
-      "print-on-demand": "finder",
-      "order-processing": "orders",
-      calculations: "products",
-      orders: "orders",
-      "returns-disputes": "returns",
-      "sourcing-request": "sourcing",
-      products: "products",
-      drafts: "products",
-      "ai-image-generation": "products",
-      "customer-support": "messages",
-      tickets: "messages",
-      settings: "settings",
-      wallet: "billing",
-    };
-
-    if (page === "usage-upgrade") return false;
-    const requiredModule = moduleMapping[page];
-    if (!requiredModule) return true;
-    return vaModules.includes(requiredModule);
+  const fetchAddonCatalog = async () => {
+    try {
+      const res = await getAddonPricing();
+      if (res.data?.addons) {
+        setAddonCatalog(res.data.addons);
+      }
+    } catch {
+      // Fallback to page-level gated responses
+    }
   };
 
+  useEffect(() => {
+    fetchAddonCatalog();
+    const handleRefreshAddons = () => fetchAddonCatalog();
+    const handleStorage = (event) => {
+      if (event.key === "autods_addon_updated_at") {
+        fetchAddonCatalog();
+      }
+    };
+    window.addEventListener("autods_refresh_addons", handleRefreshAddons);
+    window.addEventListener("focus", handleRefreshAddons);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("autods_refresh_addons", handleRefreshAddons);
+      window.removeEventListener("focus", handleRefreshAddons);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
   const filteredSidebarGroups = useMemo(() => {
-    if (!isVA) return sidebarGroups;
-    return sidebarGroups
-      .map((group) => group.filter((item) => isPageAllowedForUser(item.page)))
-      .filter((group) => group.length > 0);
-  }, [isVA, vaModules]);
+    const checkPageAllowed = (page) => {
+      if (!isVA) return true;
+      if (!page || page === "dashboard") return true;
+
+      const moduleMapping = {
+        marketplace: "finder",
+        "print-on-demand": "finder",
+        "order-processing": "orders",
+        calculations: "products",
+        orders: "orders",
+        "returns-disputes": "returns",
+        "sourcing-request": "sourcing",
+        products: "products",
+        drafts: "products",
+        "ai-image-generation": "products",
+        "customer-support": "messages",
+        tickets: "messages",
+        settings: "settings",
+        wallet: "billing",
+      };
+
+      if (page === "usage-upgrade") return false;
+      const requiredModule = moduleMapping[page];
+      if (!requiredModule) return true;
+      return vaModules.includes(requiredModule);
+    };
+
+    const getCuratedChildBadge = (curatedKey) => {
+      if (!addonCatalog || authUser?.role === "super_admin") {
+        return undefined;
+      }
+      const addonKey = curatedKey === "trending" ? "trending_products" : "hand_picked_products";
+      const cfg = addonCatalog[addonKey];
+      if (!cfg) return undefined;
+
+      const enabled = cfg.enabled !== false;
+      const price = Math.max(0, Number(cfg.price ?? 0));
+      const isFree = enabled && price <= 0;
+      const entitled = Boolean(cfg.entitled) || isFree;
+
+      if (!enabled && !entitled) {
+        return "Off";
+      }
+      if (!entitled) {
+        return `$${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}`;
+      }
+      return undefined;
+    };
+
+    const groups = !isVA
+      ? sidebarGroups
+      : sidebarGroups
+          .map((group) => group.filter((item) => checkPageAllowed(item.page)))
+          .filter((group) => group.length > 0);
+
+    return groups.map((group) =>
+      group.map((item) => {
+        let updatedItem = item;
+        if (item.page === "orders" && newOrdersCount > 0) {
+          updatedItem = {
+            ...updatedItem,
+            badge: newOrdersCount > 99 ? "99+" : String(newOrdersCount),
+            badgeTone: "counter",
+          };
+        }
+
+        if (!Array.isArray(updatedItem.children) || updatedItem.children.length === 0) {
+          return updatedItem;
+        }
+        return {
+          ...updatedItem,
+          children: updatedItem.children.map((child) => {
+            if (!child.curatedType) return child;
+            const dynamicBadge = getCuratedChildBadge(child.curatedType);
+            return dynamicBadge ? { ...child, badge: dynamicBadge } : child;
+          }),
+        };
+      }),
+    );
+  }, [isVA, vaModules, addonCatalog, authUser?.role, newOrdersCount]);
   const profileShortName = useMemo(() => getUserShortName(authUser), [authUser]);
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
   const profileEmail = useMemo(() => getUserEmail(authUser), [authUser]);
   const [ebayConnecting, setEbayConnecting] = useState(false);
   const [storeOverrides, setStoreOverrides] = useState(loadStoredStoreOverrides);
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const activePage = pathname === "/" ? "dashboard" : pathname.slice(1);
   const isUnknownPage = !marketplacePages.includes(activePage);
   const setActivePage = (page) => navigate(page === "dashboard" ? "/" : `/${page}`);
@@ -300,15 +403,8 @@ const MarketplaceDashboard = () => {
   const [ebaySiteId, setEbaySiteId] = useState("EBAY_US");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  const [balanceMenuOpen, setBalanceMenuOpen] = useState(false);
-  const [balanceTab, setBalanceTab] = useState("managed");
-  const [loadBalanceModalOpen, setLoadBalanceModalOpen] = useState(false);
-  const [aiCreditsModalOpen, setAiCreditsModalOpen] = useState(false);
   const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-  const [selectedLoadAmount, setSelectedLoadAmount] = useState(15);
-  const [selectedAiPackage, setSelectedAiPackage] = useState("5000");
-  const [buyingAiCredits, setBuyingAiCredits] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState(null);
 
   const fetchPlanQuota = async () => {
@@ -334,37 +430,6 @@ const MarketplaceDashboard = () => {
   const quotaLimit = Number(currentPlan?.products_limit ?? quotaUsage?.products_limit ?? 200);
   const quotaUsed = Number(quotaUsage?.products_quota_used ?? quotaUsage?.listings_count ?? 0);
   const isQuotaBreached = Boolean(quotaUsage?.products_quota_breached || (quotaLimit > 0 && quotaUsed >= quotaLimit));
-
-  const handleBuyAiCredits = async () => {
-    const pkg = aiCreditPackages.find((p) => p.id === selectedAiPackage) || aiCreditPackages[1];
-    const userWalletBalance = parseFloat(authUser?.wallet_balance ?? 0);
-    const cost = pkg.amount || 20;
-
-    if (userWalletBalance < cost) {
-      toast.error(
-        `Insufficient wallet balance ($${userWalletBalance.toFixed(2)}). You need $${cost.toFixed(2)}. Please load your AutoDS wallet first.`
-      );
-      return;
-    }
-
-    setBuyingAiCredits(true);
-    try {
-      const res = await buyAiCredits(pkg.id);
-      const data = res.data;
-      toast.success(data.message || `Purchased ${pkg.credits} successfully!`);
-      dispatch(
-        updateUserStateAction({
-          ai_credits: data.ai_credits,
-          wallet_balance: data.wallet_balance,
-        })
-      );
-      setAiCreditsModalOpen(false);
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to purchase AI credits.");
-    } finally {
-      setBuyingAiCredits(false);
-    }
-  };
   const [addProductUrl, setAddProductUrl] = useState("");
   const [importSupplier, setImportSupplier] = useState("aliexpress");
   const [importWarehouse, setImportWarehouse] = useState("CN");
@@ -399,7 +464,22 @@ const MarketplaceDashboard = () => {
   const [activeSubfilter, setActiveSubfilter] = useState("");
   const [expandedProductsTitle, setExpandedProductsTitle] = useState("");
   const [selectedPill, setSelectedPill] = useState("");
-  const [curatedType, setCuratedType] = useState(null);
+  const [curatedType, setCuratedType] = useState(() => {
+    const param = new URLSearchParams(search).get("curated");
+    return param === "trending" || param === "hand_picked" ? param : null;
+  });
+
+  useEffect(() => {
+    if (activePage !== "marketplace") {
+      return;
+    }
+    const param = new URLSearchParams(search).get("curated");
+    if (param === "trending" || param === "hand_picked") {
+      setCuratedType(param);
+    } else {
+      setCuratedType(null);
+    }
+  }, [activePage, search]);
   const [sortBy, setSortBy] = useState("By Relevance");
   const [openMenus, setOpenMenus] = useState({
     Marketplace: true,
@@ -407,7 +487,6 @@ const MarketplaceDashboard = () => {
   const profileMenuRef = useRef(null);
   const addProductsMenuRef = useRef(null);
   const notificationsRef = useRef(null);
-  const balanceMenuRef = useRef(null);
   const aliSearchTimer = useRef(null);
 
   useEffect(() => {
@@ -424,15 +503,6 @@ const MarketplaceDashboard = () => {
         setNotificationsOpen(false);
       }
 
-      if (
-        balanceMenuRef.current &&
-        !balanceMenuRef.current.contains(event.target) &&
-        !loadBalanceModalOpen &&
-        !aiCreditsModalOpen
-      ) {
-        setBalanceMenuOpen(false);
-      }
-
       if (!event.target.closest(".store-switcher-modal__menu-wrap")) {
         setStoreSwitcherMenuId("");
       }
@@ -441,7 +511,7 @@ const MarketplaceDashboard = () => {
     document.addEventListener("mousedown", closeHeaderPopovers);
 
     return () => document.removeEventListener("mousedown", closeHeaderPopovers);
-  }, [aiCreditsModalOpen, loadBalanceModalOpen]);
+  }, []);
 
   useEffect(() => {
     const closeSidebarOnDesktop = () => {
@@ -482,15 +552,11 @@ const MarketplaceDashboard = () => {
   }, []);
 
   useEffect(() => {
-    const notificationsAvailable = headerNotifications.length > 0;
     const shouldLockScroll =
       addProductModalOpen ||
       storeSwitcherOpen ||
       connectEbayModalOpen ||
-      notificationsModalOpen ||
-      loadBalanceModalOpen ||
-      aiCreditsModalOpen ||
-      (notificationsOpen && !notificationsAvailable);
+      notificationsModalOpen;
 
     const { body, documentElement } = document;
     const previousBodyOverflow = body.style.overflow;
@@ -511,7 +577,7 @@ const MarketplaceDashboard = () => {
       documentElement.style.overflow = previousHtmlOverflow;
       documentElement.style.touchAction = previousHtmlTouchAction;
     };
-  }, [addProductModalOpen, aiCreditsModalOpen, connectEbayModalOpen, loadBalanceModalOpen, notificationsModalOpen, notificationsOpen, storeSwitcherOpen]);
+  }, [addProductModalOpen, connectEbayModalOpen, notificationsModalOpen, storeSwitcherOpen]);
 
   useEffect(() => {
     dispatch(fetchEbayStatus());
@@ -520,23 +586,135 @@ const MarketplaceDashboard = () => {
   }, [dispatch]);
 
   useEffect(() => {
+    const applyBalancePatch = (detail) => {
+      const stored = getStoredUser() || {};
+      const patch = {};
+
+      if (
+        detail?.ai_credits !== undefined &&
+        Number.isFinite(Number(detail.ai_credits)) &&
+        Number(stored.ai_credits) !== Number(detail.ai_credits)
+      ) {
+        patch.ai_credits = Number(detail.ai_credits);
+      }
+
+      if (
+        detail?.wallet_balance !== undefined &&
+        Number.isFinite(Number(detail.wallet_balance)) &&
+        Number(stored.wallet_balance) !== Number(detail.wallet_balance)
+      ) {
+        patch.wallet_balance = Number(detail.wallet_balance);
+      }
+
+      if (detail?.wallet_currency && stored.wallet_currency !== detail.wallet_currency) {
+        patch.wallet_currency = detail.wallet_currency;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        dispatch(updateUserStateAction(patch));
+      }
+    };
+
     const handleCreditsUpdate = (event) => {
-      if (event?.detail?.ai_credits !== undefined) {
-        dispatch(updateUserStateAction({ ai_credits: event.detail.ai_credits }));
+      const detail = event?.detail;
+      if (detail?.fromAuthAction) {
+        return;
+      }
+      if (detail?.ai_credits !== undefined || detail?.wallet_balance !== undefined) {
+        applyBalancePatch(detail);
       } else {
         dispatch(fetchFreshUserAction());
       }
     };
+
+    const handleWalletUpdate = (event) => {
+      const detail = event?.detail;
+      if (detail?.wallet_balance !== undefined) {
+        applyBalancePatch(detail);
+      } else {
+        dispatch(fetchFreshUserAction());
+      }
+    };
+
     const handleFocus = () => {
       dispatch(fetchFreshUserAction());
     };
+
     window.addEventListener("ai_credits_updated", handleCreditsUpdate);
+    window.addEventListener("wallet_balance_updated", handleWalletUpdate);
     window.addEventListener("focus", handleFocus);
     return () => {
       window.removeEventListener("ai_credits_updated", handleCreditsUpdate);
+      window.removeEventListener("wallet_balance_updated", handleWalletUpdate);
       window.removeEventListener("focus", handleFocus);
     };
   }, [dispatch]);
+
+  useEffect(() => {
+    if (!canAccessOrders) {
+      setNewOrdersCount(0);
+      return;
+    }
+
+    if (authUser?.new_orders_count !== undefined && Number.isFinite(Number(authUser.new_orders_count))) {
+      setNewOrdersCount(Math.max(0, Math.floor(Number(authUser.new_orders_count))));
+    }
+  }, [authUser?.new_orders_count, canAccessOrders]);
+
+  useEffect(() => {
+    if (!canAccessOrders || !getStoredToken()) {
+      setNewOrdersCount(0);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const refreshNewOrdersCount = () => {
+      getNewOrdersCount()
+        .then((res) => {
+          if (cancelled) return;
+          const next = Number(res.data?.new_orders_count ?? 0);
+          setNewOrdersCount(Number.isFinite(next) ? Math.max(0, Math.floor(next)) : 0);
+        })
+        .catch(() => {});
+    };
+
+    if (activePage !== "orders") {
+      refreshNewOrdersCount();
+    }
+
+    const handleNewOrdersEvent = (event) => {
+      const next = Number(event?.detail?.new_orders_count ?? 0);
+      if (Number.isFinite(next)) {
+        setNewOrdersCount(Math.max(0, Math.floor(next)));
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === ORDERS_NEW_COUNT_STORAGE_KEY && event.newValue !== null) {
+        const next = Number(event.newValue);
+        if (Number.isFinite(next)) {
+          setNewOrdersCount(Math.max(0, Math.floor(next)));
+        }
+      }
+    };
+
+    const handleFocus = () => {
+      if (activePage !== "orders") {
+        refreshNewOrdersCount();
+      }
+    };
+
+    window.addEventListener(ORDERS_NEW_COUNT_EVENT, handleNewOrdersEvent);
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ORDERS_NEW_COUNT_EVENT, handleNewOrdersEvent);
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [canAccessOrders, activePage]);
 
   useEffect(() => {
     if (!authUser) {
@@ -643,6 +821,7 @@ const MarketplaceDashboard = () => {
   // AliExpress browse — uses the platform account connected by super admin
   useEffect(() => {
     if (activePage !== "marketplace") return;
+    if (curatedType) return;
     if (!aliCredentialsConfigured) return;
     if (aliConnectionLoading) return;
     if (!aliPlatformReady) return;
@@ -695,6 +874,7 @@ const MarketplaceDashboard = () => {
     aliPlatformReady,
     keywordSearch,
     aliPage,
+    curatedType,
   ]);
 
   // Jump back to page 1 whenever the active filters change (a new filter combo is a new result set).
@@ -705,9 +885,6 @@ const MarketplaceDashboard = () => {
   const currentSubfilters = subfilterOptions[activeCategory] || [];
   const profileTheme = background.value;
   const isDarkTheme = profileTheme === "dark";
-  const hasNotifications = headerNotifications.length > 0;
-  const previewNotifications = headerNotifications.slice(0, NOTIFICATION_PREVIEW_LIMIT);
-  const hasMoreNotifications = headerNotifications.length > NOTIFICATION_PREVIEW_LIMIT;
   const activeSidebarStore = useMemo(() => {
     if (stores.length === 0) {
       return {
@@ -780,11 +957,14 @@ const MarketplaceDashboard = () => {
     setKeywordSearch("");
     setMarketplaceSearchInput("");
     setCuratedType(null);
+    if (activePage === "marketplace" && new URLSearchParams(search).get("curated")) {
+      navigate("/marketplace", { replace: true });
+    }
   };
 
   const openMarketplacePage = () => {
-    setActivePage("marketplace");
     resetMarketplaceView();
+    navigate("/marketplace");
   };
 
   const openPrintOnDemandPage = () => {
@@ -810,6 +990,9 @@ const MarketplaceDashboard = () => {
   };
 
   const openOrdersPage = () => {
+    setNewOrdersCount(0);
+    dispatchNewOrdersCount(0);
+    markOrdersSeen().catch(() => {});
     setActivePage("orders");
     setSearchAnything("");
   };
@@ -1332,6 +1515,13 @@ const MarketplaceDashboard = () => {
     navigate(target.startsWith("/") ? target : `/${target}`);
   };
 
+  const rawAiCredits = Number(authUser?.ai_credits ?? 0);
+  const formattedAiCredits = (Number.isFinite(rawAiCredits) ? rawAiCredits : 0).toLocaleString("en-US");
+  const formattedWalletBalance = formatHeaderWalletBalance(
+    authUser?.wallet_balance ?? 0,
+    authUser?.wallet_currency || "USD",
+  );
+
   return (
     <div className={isDarkTheme ? "marketplace-dashboard-page marketplace-dashboard-page--dark" : "marketplace-dashboard-page"}>
       {sidebarMobileOpen ? (
@@ -1453,9 +1643,9 @@ const MarketplaceDashboard = () => {
                         return;
                       }
 
-                      setActivePage("marketplace");
-                      setCuratedType(child.curatedType);
                       setSearchAnything("");
+                      setCuratedType(child.curatedType);
+                      navigate(`/marketplace?curated=${child.curatedType}`);
                     }}
                     onToggle={() =>
                       setOpenMenus((current) => ({
@@ -1526,108 +1716,40 @@ const MarketplaceDashboard = () => {
             </div>
 
             <div className="marketplace-header__controls">
-              <div className="marketplace-header__balance" ref={balanceMenuRef}>
-                <button
-                  type="button"
-                  className={balanceMenuOpen ? "marketplace-header__control marketplace-header__control--active" : "marketplace-header__control"}
-                  aria-label="AI Credits"
-                  title="AI Credits"
-                  aria-expanded={balanceMenuOpen}
-                  onClick={() => {
-                    setBalanceTab("ai");
-                    setBalanceMenuOpen((current) => !current);
-                    setNotificationsOpen(false);
-                    setNotificationsModalOpen(false);
-                    setProfileMenuOpen(false);
-                    setWhatsNewOpen(false);
-                  }}
-                >
-                  <LuZap style={{ color: "#f59e0b", width: 16, height: 16 }} />
-                  <span>AI Credits: {Number(authUser?.ai_credits ?? 0).toLocaleString()}</span>
-                </button>
-
-                {balanceMenuOpen ? (
-                  <div className={balanceTab === "ai" ? "balance-popover balance-popover--ai" : "balance-popover"} role="dialog" aria-label="Balance">
-                    <div className="balance-popover__tabs">
-                      <button
-                        type="button"
-                        className={balanceTab === "managed" ? "balance-popover__tab balance-popover__tab--active" : "balance-popover__tab"}
-                        onClick={() => setBalanceTab("managed")}
-                      >
-                        Managed Balance
-                      </button>
-                      <button
-                        type="button"
-                        className={balanceTab === "ai" ? "balance-popover__tab balance-popover__tab--active" : "balance-popover__tab"}
-                        onClick={() => setBalanceTab("ai")}
-                      >
-                        AI Credits
-                      </button>
-                    </div>
-
-                    {balanceTab === "managed" ? (
-                      <div className="balance-popover__managed">
-                        <strong className="balance-popover__balance">Balance: ${parseFloat(authUser?.wallet_balance ?? 0).toFixed(2)}</strong>
-
-                        <div className="balance-popover__video" role="img" aria-label="Managed balance video preview">
-                          <div className="balance-popover__video-title">
-                            <span>DS</span>
-                            <div>
-                              <strong>Fulfilled By AutoDS Quick-Load Demo</strong>
-                              <em>AutoDS - Build Your Online Income</em>
-                            </div>
-                          </div>
-                          <button type="button" className="balance-popover__play" aria-label="Play managed balance video">
-                            <LuPlay />
-                          </button>
-                          <div className="balance-popover__video-bottom">
-                            <span>
-                              Watch on <strong>YouTube</strong>
-                            </span>
-                          </div>
-                        </div>
-
-                        <p>
-                          Save hours on manual work by activating the Fulfilled by AutoDS service. Load balance and
-                          let your dropshipping orders and returns be fully automated and managed from AutoDS' own
-                          accounts.
-                        </p>
-
-                        <div className="balance-popover__actions">
-                          <button
-                            type="button"
-                            className="balance-popover__primary"
-                            onClick={() => setLoadBalanceModalOpen(true)}
-                          >
-                            Load Balance
-                          </button>
-                          <button type="button" className="balance-popover__link">
-                            Learn More
-                          </button>
-                        </div>
-
-                        <div className="balance-popover__footer">
-                          <button type="button">
-                            <LuClock3 />
-                            <span>View Purchase History</span>
-                          </button>
-                          <button type="button">
-                            <LuExternalLink />
-                            <span>Download Invoices</span>
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="balance-popover__ai">
-                        <strong>Balance: {Number(authUser?.ai_credits ?? 0).toLocaleString()} AI Credits</strong>
-                        <button type="button" onClick={() => setAiCreditsModalOpen(true)}>
-                          Buy Credits
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
+              <button
+                type="button"
+                className={activePage === "wallet" ? "marketplace-header__wallet-box marketplace-header__wallet-box--active" : "marketplace-header__wallet-box"}
+                aria-label={`Open Wallet — AI Credits: ${formattedAiCredits}, Wallet Balance: ${formattedWalletBalance}`}
+                title={`Open Wallet (AI Credits: ${formattedAiCredits} | Wallet Balance: ${formattedWalletBalance})`}
+                aria-current={activePage === "wallet" ? "page" : undefined}
+                onClick={() => {
+                  setNotificationsOpen(false);
+                  setNotificationsModalOpen(false);
+                  setProfileMenuOpen(false);
+                  setWhatsNewOpen(false);
+                  openWalletPage();
+                }}
+              >
+                <span className="marketplace-header__wallet-segment marketplace-header__wallet-segment--credits">
+                  <LuZap className="marketplace-header__wallet-icon marketplace-header__wallet-icon--credits" aria-hidden="true" />
+                  <span className="marketplace-header__wallet-copy">
+                    <span className="marketplace-header__wallet-label">
+                      AI<span className="marketplace-header__wallet-label-extra"> Credits</span>
+                    </span>
+                    <strong className="marketplace-header__wallet-value">{formattedAiCredits}</strong>
+                  </span>
+                </span>
+                <span className="marketplace-header__wallet-divider" aria-hidden="true" />
+                <span className="marketplace-header__wallet-segment marketplace-header__wallet-segment--balance">
+                  <LuWallet className="marketplace-header__wallet-icon marketplace-header__wallet-icon--wallet" aria-hidden="true" />
+                  <span className="marketplace-header__wallet-copy">
+                    <span className="marketplace-header__wallet-label marketplace-header__wallet-label--wallet">
+                      Wallet
+                    </span>
+                    <strong className="marketplace-header__wallet-value">{formattedWalletBalance}</strong>
+                  </span>
+                </span>
+              </button>
               <button
                 type="button"
                 className={whatsNewOpen ? "marketplace-header__icon-btn marketplace-header__icon-btn--active" : "marketplace-header__icon-btn"}
@@ -1638,144 +1760,22 @@ const MarketplaceDashboard = () => {
                   setNotificationsOpen(false);
                   setNotificationsModalOpen(false);
                   setProfileMenuOpen(false);
-                  setBalanceMenuOpen(false);
                 }}
               >
                 <LuVolume2 />
               </button>
-              <div className="marketplace-header__notifications" ref={notificationsRef}>
-                <button
-                  type="button"
-                  className={hasNotifications ? "marketplace-header__icon-btn marketplace-header__icon-btn--bell" : "marketplace-header__icon-btn"}
-                  aria-label="Open notifications"
-                  aria-expanded={notificationsOpen}
-                  onClick={() => {
-                    setNotificationsOpen((current) => !current);
-                    setNotificationsModalOpen(false);
-                    setProfileMenuOpen(false);
-                    setWhatsNewOpen(false);
-                    setBalanceMenuOpen(false);
-                  }}
-                >
-                  <LuBell />
-                </button>
-
-                {notificationsOpen ? (
-                  hasNotifications ? (
-                    <div className="notification-popover" role="dialog" aria-label="Notifications">
-                      <div className="notification-popover__head">
-                        <div className="notification-popover__title">
-                          <LuBell />
-                          <h2>Notifications</h2>
-                          <span>{headerNotifications.length}</span>
-                        </div>
-                        <button
-                          type="button"
-                          className="notification-popover__close"
-                          aria-label="Close notifications"
-                          onClick={() => setNotificationsOpen(false)}
-                        >
-                          <LuX />
-                        </button>
-                      </div>
-
-                      <div className="notification-popover__list">
-                        {previewNotifications.map((notification) => (
-                          <button type="button" className="notification-popover__item" key={notification.id}>
-                            <span className="notification-popover__dot" />
-                            <span className="notification-popover__copy">
-                              <strong>{notification.title}</strong>
-                              <span>{notification.message}</span>
-                            </span>
-                            <span className="notification-popover__time">{notification.time}</span>
-                          </button>
-                        ))}
-                      </div>
-
-                      {hasMoreNotifications ? (
-                        <div className="notification-popover__footer">
-                          <button
-                            type="button"
-                            className="notification-popover__see-more"
-                            onClick={() => {
-                              setNotificationsOpen(false);
-                              setNotificationsModalOpen(true);
-                            }}
-                          >
-                            See more
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="notification-empty-backdrop"
-                        aria-label="Close notifications"
-                        onClick={() => setNotificationsOpen(false)}
-                      />
-                      <section className="notification-empty-modal" role="dialog" aria-label="Notifications">
-                        <div className="notification-empty-modal__head">
-                          <div className="notification-popover__title">
-                            <LuBell />
-                            <h2>Notifications</h2>
-                            <span>0</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="notification-popover__close"
-                            aria-label="Close notifications"
-                            onClick={() => setNotificationsOpen(false)}
-                          >
-                            <LuX />
-                          </button>
-                        </div>
-                      </section>
-                    </>
-                  )
-                ) : null}
-              </div>
-              {notificationsModalOpen ? (
-                <div className="notification-modal-layer" role="dialog" aria-label="All notifications">
-                  <button
-                    type="button"
-                    className="notification-modal-layer__backdrop"
-                    aria-label="Close notifications modal"
-                    onClick={() => setNotificationsModalOpen(false)}
-                  />
-                  <section className="notification-modal">
-                    <div className="notification-modal__head">
-                      <div className="notification-popover__title">
-                        <LuBell />
-                        <h2>Notifications</h2>
-                        <span>{headerNotifications.length}</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="notification-popover__close"
-                        aria-label="Close all notifications"
-                        onClick={() => setNotificationsModalOpen(false)}
-                      >
-                        <LuX />
-                      </button>
-                    </div>
-
-                    <div className="notification-modal__body">
-                      {headerNotifications.map((notification) => (
-                        <button type="button" className="notification-popover__item" key={`modal-${notification.id}`}>
-                          <span className="notification-popover__dot" />
-                          <span className="notification-popover__copy">
-                            <strong>{notification.title}</strong>
-                            <span>{notification.message}</span>
-                          </span>
-                          <span className="notification-popover__time">{notification.time}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                </div>
-              ) : null}
+              <HeaderNotifications
+                notificationsRef={notificationsRef}
+                open={notificationsOpen}
+                setOpen={setNotificationsOpen}
+                modalOpen={notificationsModalOpen}
+                setModalOpen={setNotificationsModalOpen}
+                onBeforeOpen={() => {
+                  setProfileMenuOpen(false);
+                  setWhatsNewOpen(false);
+                }}
+                onNavigate={(targetPath) => navigate(targetPath)}
+              />
               <div className="marketplace-header__profile-wrap" ref={profileMenuRef}>
                 <button
                   type="button"
@@ -1787,7 +1787,6 @@ const MarketplaceDashboard = () => {
                     setNotificationsOpen(false);
                     setNotificationsModalOpen(false);
                     setWhatsNewOpen(false);
-                    setBalanceMenuOpen(false);
                   }}
                 >
                   <span>{profileShortName}</span>
@@ -2158,136 +2157,6 @@ const MarketplaceDashboard = () => {
               navigate("/plans");
             }}
           />
-
-	          {loadBalanceModalOpen || aiCreditsModalOpen ? (
-            <div className="balance-modal-layer" role="presentation">
-              <button
-                type="button"
-                className="balance-modal-layer__backdrop"
-                aria-label="Close balance modal"
-                onClick={() => {
-                  setLoadBalanceModalOpen(false);
-                  setAiCreditsModalOpen(false);
-                }}
-              />
-
-              {loadBalanceModalOpen ? (
-                <section className="load-balance-modal" role="dialog" aria-modal="true" aria-label="Load AutoDS Managed Order Balance">
-                  <button
-                    type="button"
-                    className="balance-modal__close"
-                    aria-label="Close load balance modal"
-                    onClick={() => setLoadBalanceModalOpen(false)}
-                  >
-                    <LuX />
-                  </button>
-                  <h2>Load AutoDS Managed Order Balance</h2>
-                  <p>Add balance to be able to use the Fulfilled by AutoDS managed orders service.</p>
-
-                  <div className="load-balance-modal__amount-head">
-                    <span>Choose amount:</span>
-                    <strong>Current balance: $0.00</strong>
-                  </div>
-
-                  <div className="load-balance-modal__amount-grid">
-                    {loadBalanceAmounts.map((amount) => (
-                      <button
-                        type="button"
-                        key={amount}
-                        className={selectedLoadAmount === amount ? "load-balance-modal__amount load-balance-modal__amount--active" : "load-balance-modal__amount"}
-                        onClick={() => setSelectedLoadAmount(amount)}
-                      >
-                        {amount === 15 ? <span>First load offer!</span> : null}
-                        <strong>${amount}</strong>
-                      </button>
-                    ))}
-                  </div>
-
-                  <label className="load-balance-modal__label">Select Payment Method:</label>
-                  <div className="load-balance-modal__payment-row">
-                    <button type="button" className="load-balance-modal__payment-select">
-                      <LuWalletCards />
-                      <span>Credit Card</span>
-                      <LuChevronDown />
-                    </button>
-                    <span className="load-balance-modal__fee-note">
-                      <span>i</span>
-                      Credit cards charge a non-refundable 5% fee
-                    </span>
-                  </div>
-
-                  <button type="button" className="load-balance-modal__add-account">
-                    <LuPlus />
-                    <span>Add account</span>
-                  </button>
-
-                  <div className="load-balance-modal__footer">
-                    <button type="button">Add Account</button>
-                  </div>
-                </section>
-              ) : null}
-
-              {aiCreditsModalOpen ? (
-                <section className="ai-credits-modal" role="dialog" aria-modal="true" aria-label="Add AI Credits">
-                  <button
-                    type="button"
-                    className="balance-modal__close"
-                    aria-label="Close AI credits modal"
-                    onClick={() => setAiCreditsModalOpen(false)}
-                  >
-                    <LuX />
-                  </button>
-
-                  <div className="ai-credits-modal__icon">
-                    <LuShoppingCart />
-                  </div>
-                  <h2>
-                    Add AI Credits <span>?</span>
-                  </h2>
-                  <strong className="ai-credits-modal__price">
-                    {aiCreditPackages.find((item) => item.id === selectedAiPackage)?.cost || "$30.00"}
-                  </strong>
-
-                  <div className="ai-credits-modal__options">
-                    {aiCreditPackages.map((item) => (
-                      <label className="ai-credits-modal__option" key={item.id}>
-                        <input
-                          type="radio"
-                          name="aiCredits"
-                          value={item.id}
-                          checked={selectedAiPackage === item.id}
-                          onChange={() => setSelectedAiPackage(item.id)}
-                        />
-                        <span>{item.credits}</span>
-                        {item.badge ? <em>{item.badge}</em> : null}
-                        <strong>{item.cost || item.price}</strong>
-                      </label>
-                    ))}
-                  </div>
-
-                  <button type="button" className="ai-credits-modal__coupon">
-                    I have a coupon!
-                  </button>
-                  <button
-                    type="button"
-                    className="ai-credits-modal__buy"
-                    disabled={buyingAiCredits}
-                    onClick={handleBuyAiCredits}
-                  >
-                    {buyingAiCredits ? "Processing…" : "Buy Now"}
-                  </button>
-                  <div className="ai-credits-modal__links">
-                    <a href="/" onClick={(event) => event.preventDefault()}>
-                      Terms &amp; Conditions
-                    </a>
-                    <a href="/" onClick={(event) => event.preventDefault()}>
-                      Privacy Policy
-                    </a>
-                  </div>
-                </section>
-              ) : null}
-            </div>
-          ) : null}
 
           <main className="dashboard-container marketplace-content-wrapper">
             {isUnknownPage ? (

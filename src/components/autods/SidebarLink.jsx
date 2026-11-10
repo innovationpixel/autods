@@ -23,7 +23,13 @@ function SidebarLink({ item, isOpen, onSelect, onToggle, onSelectChild }) {
           <Icon />
         </span>
         <span className="marketplace-sidebar__label">{item.label}</span>
-        {item.badge ? <span className="marketplace-sidebar__badge">{item.badge}</span> : null}
+        {item.badge ? (
+          <span
+            className={`marketplace-sidebar__badge ${item.badgeTone ? `marketplace-sidebar__badge--${item.badgeTone}` : ""}`}
+          >
+            {item.badge}
+          </span>
+        ) : null}
         {hasChildren ? (
           <span className={`marketplace-sidebar__caret ${isOpen ? "marketplace-sidebar__caret--open" : ""}`}>
             <LuChevronDown />

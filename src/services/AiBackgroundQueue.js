@@ -95,21 +95,6 @@ class AiBackgroundQueueManager {
       return false;
     }
 
-    const missingRefs = trimmedPrompts
-      .map((_, idx) => {
-        const refId = referenceImageIds[idx];
-        const exists = refId && inputImages.some((img) => img.id === refId);
-        return exists ? null : idx + 1;
-      })
-      .filter(Boolean);
-
-    if (missingRefs.length > 0) {
-      toast.warn(
-        `Please select a reference image for prompt${missingRefs.length > 1 ? "s" : ""} #${missingRefs.join(", #")}.`
-      );
-      return false;
-    }
-
     const isTemplate = Boolean(template.id || template.title || template.name);
     const bundleId = isTemplate
       ? `bundle_${template.id || "tpl"}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -146,8 +131,10 @@ class AiBackgroundQueueManager {
           ? inputImages.find((img) => img.id === referenceImageIds[i])
           : null;
         const templateSlot = template.prompts?.[i]?.reference_index;
-        const referencedImage = chosenImage ?? (templateSlot != null ? inputImages[templateSlot] : null);
-        const ref = referencedImage ?? inputImages[0];
+        const primaryImage = chosenImage ?? (templateSlot != null ? inputImages[templateSlot] : null) ?? inputImages[0];
+        const orderedRefs = primaryImage
+          ? [primaryImage, ...inputImages.filter((img) => img !== primaryImage)]
+          : [...inputImages];
 
         const formData = new FormData();
         formData.append("prompt", promptText);
@@ -163,16 +150,20 @@ class AiBackgroundQueueManager {
           formData.append("bundle_name", bundleName);
         }
 
-        inputImages.forEach((img) => {
+        // Send all attached reference images (both uploaded files and template-attached URLs) with every prompt
+        orderedRefs.forEach((img) => {
           if (img?.file instanceof File || img?.file instanceof Blob) {
             formData.append("images[]", img.file);
+          } else if (img?.url || img?.preview) {
+            formData.append("image_urls[]", img.url || img.preview);
           }
         });
 
-        if (ref?.file instanceof File || ref?.file instanceof Blob) {
-          formData.append("image", ref.file);
-        } else if (ref?.preview || ref?.url) {
-          formData.append("image_url", ref.preview || ref.url);
+        const firstRef = orderedRefs[0] ?? null;
+        if (firstRef?.file instanceof File || firstRef?.file instanceof Blob) {
+          formData.append("image", firstRef.file);
+        } else if (firstRef?.url || firstRef?.preview) {
+          formData.append("image_url", firstRef.url || firstRef.preview);
         }
 
         try {

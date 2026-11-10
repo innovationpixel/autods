@@ -23,6 +23,7 @@ import {
   syncSupportConversations,
   updateSupportConversation,
 } from "../../services/SupportService";
+import { triggerNotificationsRefresh } from "../../services/NotificationService";
 import "../../assets/css/customer-support.css";
 import PageFilterPanel from "../autods/PageFilterPanel";
 import { FilterSelect } from "../autods/FilterField";
@@ -110,6 +111,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
         );
       }
       setReplyText("");
+      triggerNotificationsRefresh();
       toast.success(res.data?.message ?? "Reply sent successfully.");
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to send reply to eBay.");
@@ -167,6 +169,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
     try {
       const res = await syncSupportConversations();
       toast.success(res.data?.message ?? "Conversations synced.");
+      triggerNotificationsRefresh();
       await loadConversations();
     } catch (err) {
       toast.error(err.response?.data?.error ?? "Failed to sync conversations.");
@@ -200,6 +203,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
       setRows((current) =>
         current.map((item) => (item.id === row.id ? { ...item, ...updated } : item)),
       );
+      triggerNotificationsRefresh();
     } catch {
       // Non-blocking — row still displays if mark-read fails.
     }

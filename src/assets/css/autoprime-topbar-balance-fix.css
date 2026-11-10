@@ -1,5 +1,5 @@
-/* AutoPrime — final topbar balance/alignment fix
-   Keeps wallet + AI credits on one row and locks all utility controls to a shared baseline. */
+/* AutoPrime — topbar AI Credits & Wallet Balance box + baseline alignment
+   Displays live AI credits and wallet balance side by side and opens Wallet on click. */
 
 .marketplace-dashboard-page .marketplace-header__controls {
   display: flex !important;
@@ -12,7 +12,7 @@
   align-self: center !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control,
+.marketplace-dashboard-page .marketplace-header__wallet-box,
 .marketplace-dashboard-page .marketplace-header__icon-btn,
 .marketplace-dashboard-page .marketplace-header__profile {
   box-sizing: border-box !important;
@@ -23,84 +23,153 @@
   vertical-align: middle !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control {
+.marketplace-dashboard-page .marketplace-header__wallet-box {
   display: inline-flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  justify-content: flex-start !important;
-  gap: 8px !important;
-  min-width: 126px !important;
+  justify-content: center !important;
+  gap: 10px !important;
   width: auto !important;
-  padding: 0 11px !important;
-  overflow: hidden !important;
+  min-width: 0 !important;
+  padding: 0 12px !important;
+  border: 1px solid #e6dff0 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  color: #3d3846 !important;
+  box-shadow: 0 1px 2px rgba(36, 32, 46, 0.03) !important;
+  cursor: pointer !important;
   white-space: nowrap !important;
+  line-height: 1 !important;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .14s ease !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-box:hover {
+  border-color: #cbb8ea !important;
+  background: #faf8ff !important;
+  box-shadow: 0 3px 10px rgba(109, 40, 217, 0.08) !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-box:focus-visible {
+  outline: none !important;
+  border-color: #6d28d9 !important;
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.16) !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-box--active {
+  border-color: #c2aee7 !important;
+  background: #f5f0ff !important;
+  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.08) !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-segment {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-icon {
+  flex: 0 0 auto !important;
+  width: 15px !important;
+  height: 15px !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-icon--credits {
+  color: #d97706 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-icon--wallet {
+  color: #6d28d9 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-copy {
+  display: inline-flex !important;
+  align-items: baseline !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-label {
+  color: #777083 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
   line-height: 1 !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control > svg {
-  flex: 0 0 16px !important;
-  width: 16px !important;
-  height: 16px !important;
-  margin: 0 !important;
-  align-self: center !important;
-}
-
-/* Force the cash / AI text onto exactly one horizontal line. */
-.marketplace-dashboard-page .marketplace-header__control > span {
-  display: inline-flex !important;
-  flex: 0 0 auto !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  align-self: center !important;
-  gap: 0 !important;
-  width: auto !important;
-  min-width: 0 !important;
-  height: 24px !important;
-  min-height: 24px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-  white-space: nowrap !important;
-  line-height: 24px !important;
-  font-size: 0 !important;
-  color: transparent !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span::before,
-.marketplace-dashboard-page .marketplace-header__control > span::after {
-  position: static !important;
-  display: inline-flex !important;
-  flex: 0 0 auto !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: center !important;
-  width: auto !important;
-  height: 24px !important;
-  min-height: 24px !important;
-  margin: 0 !important;
-  transform: none !important;
-  white-space: nowrap !important;
-  line-height: 24px !important;
-  font-size: 11.5px !important;
+.marketplace-dashboard-page .marketplace-header__wallet-value {
+  font-size: 12.5px !important;
   font-weight: 750 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control > span::before {
-  content: "$0" !important;
-  padding: 0 8px 0 0 !important;
-  border: 0 !important;
-  color: #3d3846 !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span::after {
-  content: "AI 30" !important;
-  padding: 0 0 0 8px !important;
-  border: 0 !important;
-  border-left: 1px solid #e3ddec !important;
+.marketplace-dashboard-page .marketplace-header__wallet-segment--credits .marketplace-header__wallet-value {
   color: #6d28d9 !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-segment--balance .marketplace-header__wallet-value {
+  color: #24202e !important;
+}
+
+.marketplace-dashboard-page .marketplace-header__wallet-divider {
+  display: inline-block !important;
+  flex: 0 0 1px !important;
+  width: 1px !important;
+  height: 18px !important;
+  background: #e3ddec !important;
+}
+
+/* Dark theme parity */
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-box,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-box {
+  border-color: #403452 !important;
+  background: #241c35 !important;
+  color: #f7f4ff !important;
+  box-shadow: none !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-box:hover,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-box:hover {
+  border-color: #6d5596 !important;
+  background: #2d2342 !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-box--active,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-box--active {
+  border-color: #8b5cf6 !important;
+  background: #31234d !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-icon--credits,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-icon--credits {
+  color: #fbbf24 !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-icon--wallet,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-icon--wallet {
+  color: #c4b5fd !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-label,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-label {
+  color: #b4abc3 !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-segment--credits .marketplace-header__wallet-value,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-segment--credits .marketplace-header__wallet-value {
+  color: #c4b5fd !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-segment--balance .marketplace-header__wallet-value,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-segment--balance .marketplace-header__wallet-value {
+  color: #f7f4ff !important;
+}
+
+[data-theme-version="dark"] .marketplace-dashboard-page .marketplace-header__wallet-divider,
+.marketplace-dashboard-page--dark .marketplace-header__wallet-divider {
+  background: #403452 !important;
 }
 
 .marketplace-dashboard-page .marketplace-header__icon-btn {
@@ -122,15 +191,89 @@
   gap: 8px !important;
 }
 
-@media (max-width: 900px) {
-  .marketplace-dashboard-page .marketplace-header__control {
-    min-width: 40px !important;
-    width: 40px !important;
-    padding: 0 !important;
-    justify-content: center !important;
+@media (max-width: 1340px) {
+  .marketplace-dashboard-page .marketplace-header__wallet-box {
+    gap: 8px !important;
+    padding: 0 10px !important;
   }
 
-  .marketplace-dashboard-page .marketplace-header__control > span {
+  .marketplace-dashboard-page .marketplace-header__wallet-label-extra,
+  .marketplace-dashboard-page .marketplace-header__wallet-label--wallet {
     display: none !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .marketplace-dashboard-page .marketplace-header__wallet-box {
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+    gap: 7px !important;
+    padding: 0 8px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-segment {
+    gap: 4px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-label {
+    display: none !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-icon {
+    width: 13px !important;
+    height: 13px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-value {
+    font-size: 11.5px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__icon-btn,
+  .marketplace-dashboard-page .marketplace-header__profile,
+  .marketplace-dashboard-page .marketplace-header__menu-toggle {
+    height: 38px !important;
+    min-height: 38px !important;
+    max-height: 38px !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .marketplace-dashboard-page .marketplace-header {
+    padding: 0 10px !important;
+    gap: 8px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__title {
+    font-size: 16.5px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__controls {
+    gap: 4px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-box {
+    gap: 6px !important;
+    padding: 0 7px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-value {
+    font-size: 11px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__icon-btn,
+  .marketplace-dashboard-page .marketplace-header__profile,
+  .marketplace-dashboard-page .marketplace-header__menu-toggle {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
+  }
+
+  .marketplace-dashboard-page .marketplace-header__wallet-box {
+    height: 34px !important;
+    min-height: 34px !important;
+    max-height: 34px !important;
   }
 }

@@ -15,9 +15,9 @@
 /* Balanced 3-part shell: title / search / utility cluster */
 .marketplace-dashboard-page .marketplace-header {
   display: grid !important;
-  grid-template-columns: minmax(190px, 1fr) minmax(320px, 440px) auto !important;
+  grid-template-columns: minmax(150px, 1fr) minmax(220px, 420px) auto !important;
   align-items: center !important;
-  gap: 22px !important;
+  gap: 20px !important;
   min-height: var(--ap-topbar-h) !important;
   height: var(--ap-topbar-h) !important;
   padding: 0 24px !important;
@@ -123,14 +123,13 @@
   min-width: 0 !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__balance,
 .marketplace-dashboard-page .marketplace-header__notifications,
 .marketplace-dashboard-page .marketplace-header__profile-wrap {
   position: relative !important;
   flex: 0 0 auto !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control,
+.marketplace-dashboard-page .marketplace-header__wallet-box,
 .marketplace-dashboard-page .marketplace-header__icon-btn,
 .marketplace-dashboard-page .marketplace-header__profile,
 .marketplace-dashboard-page .marketplace-header__menu-toggle {
@@ -145,7 +144,7 @@
   transition: background .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control:hover,
+.marketplace-dashboard-page .marketplace-header__wallet-box:hover,
 .marketplace-dashboard-page .marketplace-header__icon-btn:hover,
 .marketplace-dashboard-page .marketplace-header__profile:hover,
 .marketplace-dashboard-page .marketplace-header__menu-toggle:hover {
@@ -154,63 +153,13 @@
   color: var(--ap-topbar-purple) !important;
 }
 
-.marketplace-dashboard-page .marketplace-header__control--active,
+.marketplace-dashboard-page .marketplace-header__wallet-box--active,
 .marketplace-dashboard-page .marketplace-header__icon-btn--active,
 .marketplace-dashboard-page .marketplace-header__profile[aria-expanded="true"] {
   border-color: #c7b6e5 !important;
   background: var(--ap-topbar-purple-soft) !important;
   color: var(--ap-topbar-purple-deep) !important;
   box-shadow: 0 0 0 2px rgba(109,40,217,.055) !important;
-}
-
-/* Balance: compact wallet chip with visually separated cash / AI credits. */
-.marketplace-dashboard-page .marketplace-header__control {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 8px !important;
-  min-width: 118px !important;
-  padding: 0 10px !important;
-  white-space: nowrap !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > svg {
-  flex: 0 0 auto !important;
-  width: 16px !important;
-  height: 16px !important;
-  color: #777181 !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span {
-  display: inline-grid !important;
-  grid-template-columns: auto auto !important;
-  align-items: center !important;
-  gap: 0 !important;
-  font-size: 0 !important;
-  color: transparent !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span::before,
-.marketplace-dashboard-page .marketplace-header__control > span::after {
-  display: inline-flex !important;
-  align-items: center !important;
-  height: 24px !important;
-  font-size: 11.5px !important;
-  font-weight: 750 !important;
-  line-height: 1 !important;
-  letter-spacing: 0 !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span::before {
-  content: "$0" !important;
-  padding-right: 8px !important;
-  color: #3d3846 !important;
-}
-
-.marketplace-dashboard-page .marketplace-header__control > span::after {
-  content: "AI 30" !important;
-  padding-left: 8px !important;
-  border-left: 1px solid #e3ddec !important;
-  color: var(--ap-topbar-purple) !important;
 }
 
 /* Icon actions */
@@ -331,13 +280,6 @@
     font-size: 19px !important;
     text-overflow: ellipsis !important;
   }
-  .marketplace-dashboard-page .marketplace-header__control {
-    min-width: 40px !important;
-    width: 40px !important;
-    padding: 0 !important;
-    justify-content: center !important;
-  }
-  .marketplace-dashboard-page .marketplace-header__control > span { display: none !important; }
 }
 
 @media (max-width: 620px) {

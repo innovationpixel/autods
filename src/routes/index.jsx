@@ -20,6 +20,7 @@ import EmptyPage from '../pages/error/emptypage';
 import Login from '../pages/authentication/Login';
 import Registration from '../pages/authentication/Registration';
 import OAuthCallback from '../pages/OAuthCallback';
+import LegalDocumentPage from '../pages/legal/LegalDocumentPage';
 
 // Feature route arrays
 import { dashboardRoutes } from './dashboard.routes';
@@ -46,11 +47,13 @@ const Markup = () => {
     return (
         <>
             <Routes>
-                {/* Public auth routes — no layout */}
+                {/* Public auth & legal routes — no layout */}
                 <Route path="/user/login" element={<Login />} />
                 <Route path="/user/register" element={<Registration />} />
                 <Route path="/onboarding" element={<Registration />} />
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
+                <Route path="/terms-and-conditions" element={<LegalDocumentPage type="terms" />} />
+                <Route path="/privacy-policy" element={<LegalDocumentPage type="privacy" />} />
 
                 {/* Standalone error pages — no layout */}
                 <Route path="/page-error-400" element={<Error400 />} />

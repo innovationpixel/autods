@@ -63,7 +63,7 @@ function BulkEditVariantsModal({
       setFeesPercent(String(initialFees));
 
       const first = targetVariants && targetVariants[0];
-      const initialQty = first ? Math.max(1, Number(first.quantity) || 1) : 1;
+      const initialQty = first ? Math.max(0, Math.floor(Number(first.quantity ?? 1) || 0)) : 1;
       setQuantity(String(initialQty));
 
       setProfitPercent("");
@@ -116,7 +116,7 @@ function BulkEditVariantsModal({
   };
 
   const parsedQty = Number(quantity);
-  const isValidQty = !isNaN(parsedQty) && parsedQty >= 1;
+  const isValidQty = quantity !== "" && !isNaN(parsedQty) && parsedQty >= 0;
   const isFeesValid = feesPercent === "" || (!isNaN(Number(feesPercent)) && Number(feesPercent) >= 0);
   const isSellPriceValid = sellPrice === "" || (!isNaN(Number(sellPrice)) && Number(sellPrice) >= 0);
   const isProfitPercentValid = profitPercent === "" || !isNaN(Number(profitPercent));
@@ -129,7 +129,7 @@ function BulkEditVariantsModal({
     onApply({
       mode: pricingMode,
       feesPercent: Number(feesPercent) || 0,
-      quantity: Math.max(1, Number(quantity) || 1),
+      quantity: Math.max(0, Math.floor(Number(quantity) || 0)),
       profitPercent: profitPercent !== "" ? Number(profitPercent) : null,
       profitAmount: profitAmount !== "" ? Number(profitAmount) : null,
       sellPrice: sellPrice !== "" ? Number(sellPrice) : null,
@@ -189,9 +189,9 @@ function BulkEditVariantsModal({
           <BulkFieldRow label="Default Quantity">
             <input
               type="number"
-              min="1"
+              min="0"
               step="1"
-              placeholder="1"
+              placeholder="0"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
             />
@@ -273,7 +273,7 @@ function BulkEditVariantsModal({
 
         {!isValidQty ? (
           <p className="bulk-edit-modal__hint" style={{ color: "#e05252" }}>
-            Default quantity must be at least 1.
+            Quantity cannot be negative (0 or more).
           </p>
         ) : null}
 
@@ -299,7 +299,7 @@ export function applyBulkEditToVariant(variant, changes) {
   const next = { ...variant };
 
   if (changes.quantity != null) {
-    next.quantity = Math.max(1, Number(changes.quantity) || 1);
+    next.quantity = Math.max(0, Math.floor(Number(changes.quantity) || 0));
   }
 
   const cost = Math.max(0, Number(next.buyPrice ?? next.price ?? 0));

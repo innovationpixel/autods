@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import {
   LuArrowUpRight,
   LuBanknote,
@@ -7,6 +8,7 @@ import {
   LuCheck,
   LuCreditCard,
   LuCrown,
+  LuFileText,
   LuLoader,
   LuSettings,
   LuShield,
@@ -16,6 +18,12 @@ import {
 import { toast } from "../../../utils/toast";
 import { openPaymentCheckout } from "../../../utils/paymentCheckout";
 import { checkoutPayPal, checkoutStripe, getCurrentPlan, getPlans } from "../../../services/PlanService";
+import { acceptLegalConsent } from "../../../services/AuthService";
+import { getLegalDocuments } from "../../../services/LegalService";
+import { selectUser } from "../../../store/selectors/AuthSelectors";
+import { updateUserStateAction } from "../../../store/actions/AuthActions";
+import LegalDocumentModal from "../../legal/LegalDocumentModal";
+import "../../../assets/css/legal-documents.css";
 
 function formatPlanInterval(plan) {
   if (plan.billing_type === "monthly") {
@@ -35,14 +43,50 @@ function formatExpiryDate(value) {
 
 function PlansPage() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const user = useSelector(selectUser);
   const [searchParams, setSearchParams] = useSearchParams();
   const [plans, setPlans] = useState([]);
   const [current, setCurrent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checkoutId, setCheckoutId] = useState(null);
 
+  const hasStoredLegalConsent = Boolean(
+    user?.legal_accepted || (user?.terms_accepted_at && user?.privacy_accepted_at)
+  );
+  const [termsAgreed, setTermsAgreed] = useState(hasStoredLegalConsent);
+  const [privacyAgreed, setPrivacyAgreed] = useState(hasStoredLegalConsent);
+  const [legalError, setLegalError] = useState(false);
+  const [legalDocs, setLegalDocs] = useState({
+    terms_and_conditions: null,
+    privacy_policy: null,
+  });
+  const [legalLoading, setLegalLoading] = useState(false);
+  const [legalModalType, setLegalModalType] = useState(null);
+
   const checkoutSuccess = searchParams.get("success");
   const checkoutCanceled = searchParams.get("canceled");
+
+  useEffect(() => {
+    if (hasStoredLegalConsent) {
+      setTermsAgreed(true);
+      setPrivacyAgreed(true);
+      setLegalError(false);
+    }
+  }, [hasStoredLegalConsent]);
+
+  useEffect(() => {
+    setLegalLoading(true);
+    getLegalDocuments()
+      .then((res) => {
+        setLegalDocs({
+          terms_and_conditions: res.data?.terms_and_conditions ?? null,
+          privacy_policy: res.data?.privacy_policy ?? null,
+        });
+      })
+      .catch(() => {})
+      .finally(() => setLegalLoading(false));
+  }, []);
 
   useEffect(() => {
     if (checkoutSuccess) {
@@ -74,23 +118,71 @@ function PlansPage() {
     return plans[1]?.id ?? plans[0]?.id;
   }, [plans]);
 
+  const validateLegalAgreementBeforePayment = () => {
+    if (hasStoredLegalConsent || (termsAgreed && privacyAgreed)) {
+      setLegalError(false);
+      return true;
+    }
+    setLegalError(true);
+    toast.error("Please agree to both the Terms & Conditions and Privacy Policy before proceeding to payment.");
+    return false;
+  };
+
   const handleCheckout = async (planId, provider) => {
+    if (!validateLegalAgreementBeforePayment()) {
+      return;
+    }
+
     setCheckoutId(`${planId}-${provider}`);
     try {
+      const options = {
+        terms_accepted: true,
+        privacy_accepted: true,
+      };
       const res = provider === "stripe"
-        ? await checkoutStripe(planId)
-        : await checkoutPayPal(planId);
+        ? await checkoutStripe(planId, options)
+        : await checkoutPayPal(planId, options);
+      if (!hasStoredLegalConsent) {
+        const nowIso = new Date().toISOString();
+        dispatch(
+          updateUserStateAction({
+            terms_accepted_at: user?.terms_accepted_at || nowIso,
+            privacy_accepted_at: user?.privacy_accepted_at || nowIso,
+            legal_accepted: true,
+          })
+        );
+      }
       if (res.data?.url) {
         openPaymentCheckout(res.data.url);
       }
     } catch (err) {
-      toast.error(err.response?.data?.error ?? "Checkout failed.");
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        setLegalError(true);
+      }
+      toast.error(err.response?.data?.error ?? err.response?.data?.message ?? "Checkout failed.");
     } finally {
       setCheckoutId(null);
     }
   };
 
-  const handleWireCheckout = (plan) => {
+  const handleWireCheckout = async (plan) => {
+    if (!validateLegalAgreementBeforePayment()) {
+      return;
+    }
+
+    if (!hasStoredLegalConsent) {
+      try {
+        const consentRes = await acceptLegalConsent({
+          terms_accepted: true,
+          privacy_accepted: true,
+        });
+        dispatch(updateUserStateAction(consentRes.data));
+      } catch (err) {
+        toast.error(err.response?.data?.message ?? "Failed to record agreement consent.");
+        return;
+      }
+    }
+
     navigate(
       `/wallet?method=wire&amount=${encodeURIComponent(
         plan.price
@@ -151,6 +243,70 @@ function PlansPage() {
       {checkoutCanceled ? (
         <div className="plans-hub__banner plans-hub__banner--info">
           <span>Checkout was canceled. You can try again anytime.</span>
+        </div>
+      ) : null}
+
+      {!hasStoredLegalConsent ? (
+        <div
+          className={`auth-page__legal-box ${legalError ? "auth-page__legal-box--error" : ""}`}
+          style={{ marginBottom: "20px" }}
+        >
+          <div className="auth-page__legal-header">
+            <LuFileText />
+            <span>Agreement Required Before Plan Payment</span>
+          </div>
+
+          <div className="auth-page__legal-item">
+            <label className="auth-page__checkbox">
+              <input
+                type="checkbox"
+                checked={termsAgreed}
+                onChange={(e) => {
+                  setTermsAgreed(e.target.checked);
+                  if (e.target.checked && privacyAgreed) setLegalError(false);
+                }}
+              />
+              <span>
+                I have read and agree to the{" "}
+                <button
+                  type="button"
+                  className="auth-page__legal-link"
+                  onClick={() => setLegalModalType("terms")}
+                >
+                  Terms &amp; Conditions
+                </button>
+              </span>
+            </label>
+          </div>
+
+          <div className="auth-page__legal-item">
+            <label className="auth-page__checkbox">
+              <input
+                type="checkbox"
+                checked={privacyAgreed}
+                onChange={(e) => {
+                  setPrivacyAgreed(e.target.checked);
+                  if (termsAgreed && e.target.checked) setLegalError(false);
+                }}
+              />
+              <span>
+                I have read and agree to the{" "}
+                <button
+                  type="button"
+                  className="auth-page__legal-link"
+                  onClick={() => setLegalModalType("privacy")}
+                >
+                  Privacy Policy
+                </button>
+              </span>
+            </label>
+          </div>
+
+          {legalError ? (
+            <span className="auth-page__field-error">
+              You must agree to both the Terms &amp; Conditions and Privacy Policy before completing payment.
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -263,7 +419,16 @@ function PlansPage() {
             <LuCreditCard />
             <div>
               <strong>Flexible billing</strong>
-              <span>Manage cards and PayPal in settings</span>
+              <span>
+                By paying you agree to our{" "}
+                <Link to="/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="auth-page__legal-link">
+                  Terms &amp; Conditions
+                </Link>{" "}
+                &amp;{" "}
+                <Link to="/privacy-policy" target="_blank" rel="noopener noreferrer" className="auth-page__legal-link">
+                  Privacy Policy
+                </Link>
+              </span>
             </div>
           </div>
         </div>
@@ -277,6 +442,31 @@ function PlansPage() {
           <LuArrowUpRight />
         </button>
       </footer>
+
+      <LegalDocumentModal
+        open={Boolean(legalModalType)}
+        type={legalModalType || "terms"}
+        documentData={
+          legalModalType === "privacy"
+            ? legalDocs.privacy_policy
+            : legalDocs.terms_and_conditions
+        }
+        loading={legalLoading}
+        onAgree={
+          !hasStoredLegalConsent
+            ? () => {
+                if (legalModalType === "privacy") {
+                  setPrivacyAgreed(true);
+                  if (termsAgreed) setLegalError(false);
+                } else {
+                  setTermsAgreed(true);
+                  if (privacyAgreed) setLegalError(false);
+                }
+              }
+            : undefined
+        }
+        onClose={() => setLegalModalType(null)}
+      />
     </section>
   );
 }

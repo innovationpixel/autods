@@ -91,3 +91,12 @@ export const getAdminAddonSettings = () =>
 
 export const updateAdminAddonSettings = (data) =>
     axiosInstance.post('/admin/addons/update', data);
+
+export const getAdminLegalDocuments = () =>
+    axiosInstance.get('/admin/legal');
+
+export const updateAdminLegalDocuments = (data) =>
+    axiosInstance.put('/admin/legal', data);
+
+export const resetAdminLegalDocuments = (type = 'all') =>
+    axiosInstance.post('/admin/legal/reset', { type });

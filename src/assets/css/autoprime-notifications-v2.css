@@ -1,4 +1,4 @@
-/* AutoDrop Prime notification surface polish.
+/* AutoDrop Prime real-time eBay notification surface & counter badge.
    Scoped to the marketplace shell so legacy/global dropdown rules cannot leak in. */
 
 .autoprime-portal .marketplace-header__notifications {
@@ -7,19 +7,52 @@
 
 .autoprime-portal .marketplace-header__icon-btn--bell {
   position: relative !important;
+  overflow: visible !important;
 }
 
+/* Disable legacy pseudo-dot badge in favor of the real numeric unread counter */
 .autoprime-portal .marketplace-header__icon-btn--bell::after {
-  content: "" !important;
+  content: none !important;
+  display: none !important;
+}
+
+.autoprime-portal .marketplace-header__bell-badge {
   position: absolute !important;
-  top: 7px !important;
-  right: 7px !important;
-  width: 7px !important;
-  height: 7px !important;
-  border: 2px solid #fff !important;
+  top: -4px !important;
+  right: -5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border: 2px solid #ffffff !important;
   border-radius: 999px !important;
-  background: #6d28d9 !important;
-  box-shadow: 0 0 0 2px rgba(109, 40, 217, 0.08) !important;
+  background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%) !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  letter-spacing: -0.02em !important;
+  box-shadow: 0 3px 10px rgba(109, 40, 217, 0.34) !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+}
+
+@keyframes apBellPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(109, 40, 217, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(109, 40, 217, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(109, 40, 217, 0);
+  }
+}
+
+.autoprime-portal .marketplace-header__icon-btn--pulse {
+  animation: apBellPulse 0.9s ease-out 2 !important;
 }
 
 .autoprime-portal .notification-popover {
@@ -27,7 +60,7 @@
   top: calc(100% + 12px) !important;
   right: 0 !important;
   z-index: 1200 !important;
-  width: min(440px, calc(100vw - 24px)) !important;
+  width: min(450px, calc(100vw - 24px)) !important;
   overflow: hidden !important;
   border: 1px solid #e8def7 !important;
   border-radius: 18px !important;
@@ -36,14 +69,13 @@
 }
 
 .autoprime-portal .notification-popover__head,
-.autoprime-portal .notification-modal__head,
-.autoprime-portal .notification-empty-modal__head {
+.autoprime-portal .notification-modal__head {
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  gap: 16px !important;
-  min-height: 68px !important;
-  padding: 14px 16px !important;
+  gap: 12px !important;
+  min-height: 64px !important;
+  padding: 13px 16px !important;
   border-bottom: 1px solid #eee8f5 !important;
   background: linear-gradient(180deg, #ffffff 0%, #fbf9ff 100%) !important;
 }
@@ -52,13 +84,13 @@
   display: flex !important;
   align-items: center !important;
   min-width: 0 !important;
-  gap: 10px !important;
+  gap: 9px !important;
 }
 
 .autoprime-portal .notification-popover__title > svg {
-  width: 21px !important;
-  height: 21px !important;
-  flex: 0 0 21px !important;
+  width: 20px !important;
+  height: 20px !important;
+  flex: 0 0 20px !important;
   color: #6d28d9 !important;
   stroke-width: 2 !important;
 }
@@ -66,7 +98,7 @@
 .autoprime-portal .notification-popover__title h2 {
   margin: 0 !important;
   color: #241a31 !important;
-  font-size: 18px !important;
+  font-size: 17px !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
   letter-spacing: -0.02em !important;
@@ -76,34 +108,44 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-width: 28px !important;
-  height: 28px !important;
-  padding: 0 8px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 7px !important;
   border-radius: 999px !important;
   background: linear-gradient(135deg, #6d28d9 0%, #8b5cf6 100%) !important;
   color: #fff !important;
-  font-size: 12px !important;
+  font-size: 11.5px !important;
   font-weight: 800 !important;
   line-height: 1 !important;
-  box-shadow: 0 5px 14px rgba(109, 40, 217, 0.2) !important;
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.22) !important;
 }
 
+.autoprime-portal .notification-popover__actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex-shrink: 0 !important;
+}
+
+.autoprime-portal .notification-popover__action-btn,
 .autoprime-portal .notification-popover__close {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  flex: 0 0 36px !important;
-  width: 36px !important;
-  height: 36px !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
   padding: 0 !important;
   border: 1px solid #e8e1ef !important;
   border-radius: 10px !important;
   background: #fff !important;
-  color: #72677e !important;
+  color: #6c6078 !important;
   box-shadow: none !important;
+  cursor: pointer !important;
   transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
 }
 
+.autoprime-portal .notification-popover__action-btn:hover:not(:disabled),
 .autoprime-portal .notification-popover__close:hover {
   border-color: #cdb7eb !important;
   background: #f7f2ff !important;
@@ -111,11 +153,117 @@
   transform: translateY(-1px) !important;
 }
 
-.autoprime-portal .notification-popover__close svg {
-  width: 18px !important;
-  height: 18px !important;
+.autoprime-portal .notification-popover__action-btn:disabled {
+  opacity: 0.45 !important;
+  cursor: default !important;
 }
 
+.autoprime-portal .notification-popover__action-btn svg,
+.autoprime-portal .notification-popover__close svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.autoprime-portal .notification-popover__action-text-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 34px !important;
+  padding: 0 11px !important;
+  border: 1px solid #e4daf2 !important;
+  border-radius: 10px !important;
+  background: #fff !important;
+  color: #5b4c6b !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease !important;
+}
+
+.autoprime-portal .notification-popover__action-text-btn:hover:not(:disabled) {
+  border-color: #cdb7eb !important;
+  background: #f7f2ff !important;
+  color: #6d28d9 !important;
+}
+
+.autoprime-portal .notification-popover__action-text-btn:disabled {
+  opacity: 0.45 !important;
+  cursor: default !important;
+}
+
+.autoprime-portal .notification-popover__action-text-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Filter Tabs */
+.autoprime-portal .notification-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 9px 12px !important;
+  border-bottom: 1px solid #f0eaf7 !important;
+  background: #fcfaff !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+.autoprime-portal .notification-tabs::-webkit-scrollbar {
+  display: none !important;
+}
+
+.autoprime-portal .notification-tab {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex-shrink: 0 !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  border: 1px solid #e9e1f4 !important;
+  border-radius: 999px !important;
+  background: #fff !important;
+  color: #6f647c !important;
+  font-size: 11.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.autoprime-portal .notification-tab:hover {
+  border-color: #cdb7eb !important;
+  color: #5c21b6 !important;
+}
+
+.autoprime-portal .notification-tab--active {
+  border-color: #6d28d9 !important;
+  background: #6d28d9 !important;
+  color: #ffffff !important;
+}
+
+.autoprime-portal .notification-tab--active:hover {
+  color: #ffffff !important;
+}
+
+.autoprime-portal .notification-tab__count {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  padding: 0 4px !important;
+  border-radius: 999px !important;
+  background: rgba(109, 40, 217, 0.1) !important;
+  color: #6d28d9 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+.autoprime-portal .notification-tab--active .notification-tab__count {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #ffffff !important;
+}
+
+/* Notification Lists & Rows */
 .autoprime-portal .notification-popover__list,
 .autoprime-portal .notification-modal__body {
   display: flex !important;
@@ -126,7 +274,7 @@
 }
 
 .autoprime-portal .notification-popover__list {
-  max-height: 356px !important;
+  max-height: 368px !important;
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
 }
@@ -147,60 +295,109 @@
   background: #d9c9ef !important;
 }
 
+.autoprime-portal .notification-item-wrap {
+  position: relative !important;
+  display: flex !important;
+  align-items: stretch !important;
+  border: 1px solid transparent !important;
+  border-radius: 12px !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease !important;
+}
+
+.autoprime-portal .notification-item-wrap--unread {
+  border-color: #ede4fa !important;
+  background: #faf6ff !important;
+}
+
+.autoprime-portal .notification-item-wrap:hover {
+  border-color: #dfd0f5 !important;
+  background: #f5eeff !important;
+}
+
+.autoprime-portal .notification-item-wrap--read {
+  opacity: 0.84 !important;
+}
+
+.autoprime-portal .notification-item-wrap--read:hover {
+  opacity: 1 !important;
+}
+
 .autoprime-portal .notification-popover__item {
   display: grid !important;
-  grid-template-columns: 40px minmax(0, 1fr) auto !important;
+  grid-template-columns: 38px minmax(0, 1fr) auto !important;
   align-items: start !important;
-  width: 100% !important;
+  flex: 1 1 auto !important;
   min-width: 0 !important;
   gap: 11px !important;
-  padding: 12px !important;
-  border: 1px solid transparent !important;
+  padding: 11px 32px 11px 11px !important;
+  border: 0 !important;
   border-radius: 12px !important;
   background: transparent !important;
   color: inherit !important;
   text-align: left !important;
   box-shadow: none !important;
-  transition: background-color 0.16s ease, border-color 0.16s ease, transform 0.16s ease !important;
-}
-
-.autoprime-portal .notification-popover__item:hover {
-  border-color: #e7dbf6 !important;
-  background: #faf7ff !important;
-  transform: translateY(-1px) !important;
+  cursor: pointer !important;
 }
 
 .autoprime-portal .notification-popover__dot {
-  position: relative !important;
-  display: block !important;
-  width: 40px !important;
-  height: 40px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 38px !important;
+  height: 38px !important;
   margin: 0 !important;
   border: 1px solid #e5d8f7 !important;
-  border-radius: 12px !important;
-  background: linear-gradient(145deg, #f7f2ff 0%, #eee6ff 100%) !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.75) !important;
+  border-radius: 11px !important;
+  background: #f7f2ff !important;
+  color: #6d28d9 !important;
+}
+
+.autoprime-portal .notification-popover__dot svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.autoprime-portal .notification-popover__dot--success {
+  border-color: #c6eed9 !important;
+  background: #ecfdf3 !important;
+  color: #0f766e !important;
+}
+
+.autoprime-portal .notification-popover__dot--warning {
+  border-color: #fde6b4 !important;
+  background: #fffbeb !important;
+  color: #b45309 !important;
+}
+
+.autoprime-portal .notification-popover__dot--danger {
+  border-color: #fecaca !important;
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+}
+
+.autoprime-portal .notification-popover__dot--info {
+  border-color: #e2d5f7 !important;
+  background: #f5f0ff !important;
+  color: #6d28d9 !important;
 }
 
 .autoprime-portal .notification-popover__dot::after {
-  content: "" !important;
-  position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  width: 8px !important;
-  height: 8px !important;
-  border-radius: 999px !important;
-  background: #6d28d9 !important;
-  box-shadow: 0 0 0 5px rgba(109, 40, 217, 0.1) !important;
-  transform: translate(-50%, -50%) !important;
+  content: none !important;
+  display: none !important;
 }
 
 .autoprime-portal .notification-popover__copy {
   display: flex !important;
   min-width: 0 !important;
   flex-direction: column !important;
-  gap: 4px !important;
-  padding-top: 1px !important;
+  gap: 3px !important;
+}
+
+.autoprime-portal .notification-popover__headline-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
 }
 
 .autoprime-portal .notification-popover__copy strong {
@@ -208,67 +405,232 @@
   min-width: 0 !important;
   margin: 0 !important;
   overflow: hidden !important;
-  color: #30253b !important;
-  font-size: 13.5px !important;
+  color: #271d33 !important;
+  font-size: 13px !important;
   font-weight: 750 !important;
   line-height: 1.35 !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
 }
 
-.autoprime-portal .notification-popover__copy > span {
+.autoprime-portal .notification-item-wrap--read .notification-popover__copy strong {
+  font-weight: 600 !important;
+}
+
+.autoprime-portal .notification-popover__unread-pip {
+  width: 7px !important;
+  height: 7px !important;
+  flex: 0 0 7px !important;
+  border-radius: 999px !important;
+  background: #6d28d9 !important;
+}
+
+.autoprime-portal .notification-popover__copy > span:nth-child(2) {
   display: -webkit-box !important;
   min-width: 0 !important;
   overflow: hidden !important;
-  color: #82778d !important;
-  font-size: 12.5px !important;
+  color: #746982 !important;
+  font-size: 12px !important;
   font-weight: 500 !important;
-  line-height: 1.45 !important;
+  line-height: 1.42 !important;
   -webkit-box-orient: vertical !important;
   -webkit-line-clamp: 2 !important;
+}
+
+.autoprime-portal .notification-popover__meta-row {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin-top: 2px !important;
+}
+
+.autoprime-portal .notification-popover__store-tag,
+.autoprime-portal .notification-popover__cat-tag {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.autoprime-portal .notification-popover__store-tag {
+  background: rgba(109, 40, 217, 0.08) !important;
+  color: #5b21b6 !important;
+}
+
+.autoprime-portal .notification-popover__store-tag svg {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+.autoprime-portal .notification-popover__cat-tag {
+  background: #f1edf6 !important;
+  color: #736880 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.03em !important;
 }
 
 .autoprime-portal .notification-popover__time {
   align-self: start !important;
   padding-top: 2px !important;
-  color: #9d94a5 !important;
-  font-size: 11.5px !important;
+  color: #988fa3 !important;
+  font-size: 11px !important;
   font-weight: 650 !important;
   line-height: 1.35 !important;
   white-space: nowrap !important;
 }
 
-.autoprime-portal .notification-popover__footer {
-  padding: 10px 12px 12px !important;
-  border-top: 1px solid #eee8f5 !important;
+.autoprime-portal .notification-item__dismiss {
+  position: absolute !important;
+  top: 8px !important;
+  right: 7px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: #9c91a8 !important;
+  cursor: pointer !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.autoprime-portal .notification-item-wrap:hover .notification-item__dismiss,
+.autoprime-portal .notification-item__dismiss:focus-visible {
+  opacity: 1 !important;
+}
+
+.autoprime-portal .notification-item__dismiss:hover {
+  background: rgba(220, 38, 38, 0.1) !important;
+  color: #dc2626 !important;
+}
+
+.autoprime-portal .notification-item__dismiss svg {
+  width: 13px !important;
+  height: 13px !important;
+}
+
+/* Inline Empty State */
+.autoprime-portal .notification-empty-state {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 34px 24px !important;
+  text-align: center !important;
   background: #fff !important;
+}
+
+.autoprime-portal .notification-empty-state--modal {
+  padding: 56px 24px !important;
+}
+
+.autoprime-portal .notification-empty-state__icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 46px !important;
+  height: 46px !important;
+  border-radius: 14px !important;
+  border: 1px solid #e6dbf5 !important;
+  background: #f8f4ff !important;
+  color: #6d28d9 !important;
+  margin-bottom: 2px !important;
+}
+
+.autoprime-portal .notification-empty-state__icon svg {
+  width: 21px !important;
+  height: 21px !important;
+}
+
+.autoprime-portal .notification-empty-state strong {
+  color: #271d33 !important;
+  font-size: 14.5px !important;
+  font-weight: 800 !important;
+}
+
+.autoprime-portal .notification-empty-state p {
+  max-width: 300px !important;
+  margin: 0 !important;
+  color: #7c7189 !important;
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+}
+
+.autoprime-portal .notification-empty-state__cta {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 34px !important;
+  margin-top: 6px !important;
+  padding: 0 14px !important;
+  border: 1px solid #d9c9f2 !important;
+  border-radius: 10px !important;
+  background: #f7f2ff !important;
+  color: #5f23c3 !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+  transition: all 0.16s ease !important;
+}
+
+.autoprime-portal .notification-empty-state__cta:hover:not(:disabled) {
+  border-color: #6d28d9 !important;
+  background: #6d28d9 !important;
+  color: #ffffff !important;
+}
+
+/* Footer */
+.autoprime-portal .notification-popover__footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  padding: 10px 14px !important;
+  border-top: 1px solid #eee8f5 !important;
+  background: #fcfaff !important;
+}
+
+.autoprime-portal .notification-popover__sync-note {
+  color: #8f849c !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
 }
 
 .autoprime-portal .notification-popover__see-more {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 100% !important;
-  height: 42px !important;
-  padding: 0 16px !important;
+  height: 32px !important;
+  padding: 0 13px !important;
   border: 1px solid #ddcef3 !important;
-  border-radius: 11px !important;
+  border-radius: 9px !important;
   background: #f7f2ff !important;
   color: #6124c8 !important;
-  font-size: 13px !important;
+  font-size: 12px !important;
   font-weight: 800 !important;
   box-shadow: none !important;
-  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, transform 0.16s ease !important;
+  cursor: pointer !important;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease !important;
 }
 
 .autoprime-portal .notification-popover__see-more:hover {
   border-color: #6d28d9 !important;
   background: #6d28d9 !important;
   color: #fff !important;
-  transform: translateY(-1px) !important;
 }
 
-/* Full notification modal opened from See more. */
+/* Full notification modal opened from footer button */
 .autoprime-portal .notification-modal-layer {
   position: fixed !important;
   inset: 0 !important;
@@ -285,80 +647,105 @@
   height: 100% !important;
   padding: 0 !important;
   border: 0 !important;
-  background: rgba(31, 22, 43, 0.42) !important;
+  background: rgba(31, 22, 43, 0.44) !important;
   backdrop-filter: blur(3px) !important;
 }
 
 .autoprime-portal .notification-modal {
   position: relative !important;
   z-index: 1 !important;
-  width: min(620px, calc(100vw - 32px)) !important;
-  max-height: min(76vh, 720px) !important;
+  width: min(640px, calc(100vw - 32px)) !important;
+  max-height: min(80vh, 740px) !important;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden !important;
   border: 1px solid #e6dcf3 !important;
   border-radius: 20px !important;
   background: #fff !important;
-  box-shadow: 0 28px 80px rgba(31, 22, 43, 0.26) !important;
+  box-shadow: 0 28px 80px rgba(31, 22, 43, 0.28) !important;
 }
 
 .autoprime-portal .notification-modal__body {
-  max-height: calc(min(76vh, 720px) - 68px) !important;
+  flex: 1 1 auto !important;
   overflow-y: auto !important;
   padding: 10px !important;
 }
 
-.autoprime-portal .notification-empty-modal {
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  z-index: 2001 !important;
-  width: min(420px, calc(100vw - 32px)) !important;
-  overflow: hidden !important;
-  border: 1px solid #e6dcf3 !important;
-  border-radius: 18px !important;
-  background: #fff !important;
-  box-shadow: 0 24px 70px rgba(31, 22, 43, 0.22) !important;
-  transform: translate(-50%, -50%) !important;
+/* Dark theme parity */
+.autoprime-portal .marketplace-dashboard-page--dark .marketplace-header__bell-badge {
+  border-color: #18131f !important;
 }
 
-/* Dark theme parity. */
 .autoprime-portal .marketplace-dashboard-page--dark .notification-popover,
 .autoprime-portal .marketplace-dashboard-page--dark .notification-modal,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-modal,
 .autoprime-portal .marketplace-dashboard-page--dark .notification-popover__list,
 .autoprime-portal .marketplace-dashboard-page--dark .notification-modal__body,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__footer {
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-state {
   border-color: #352c44 !important;
   background: #18131f !important;
 }
 
 .autoprime-portal .marketplace-dashboard-page--dark .notification-popover__head,
 .autoprime-portal .marketplace-dashboard-page--dark .notification-modal__head,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-modal__head {
+.autoprime-portal .marketplace-dashboard-page--dark .notification-tabs,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__footer {
   border-color: #352c44 !important;
-  background: linear-gradient(180deg, #1c1624 0%, #18131f 100%) !important;
+  background: #1c1624 !important;
 }
 
 .autoprime-portal .marketplace-dashboard-page--dark .notification-popover__title h2,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy strong {
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy strong,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-state strong {
   color: #f7f3fb !important;
 }
 
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy > span,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__time {
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__copy > span:nth-child(2),
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__time,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-state p,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__sync-note {
   color: #aaa0b7 !important;
 }
 
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__item:hover {
-  border-color: #4b3a60 !important;
-  background: #221a2c !important;
+.autoprime-portal .marketplace-dashboard-page--dark .notification-tab {
+  border-color: #392e49 !important;
+  background: #21192b !important;
+  color: #b7acc4 !important;
 }
 
+.autoprime-portal .marketplace-dashboard-page--dark .notification-tab--active {
+  border-color: #7c3aed !important;
+  background: #7c3aed !important;
+  color: #ffffff !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-item-wrap--unread {
+  border-color: #41325a !important;
+  background: #231a30 !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-item-wrap:hover {
+  border-color: #534073 !important;
+  background: #2a2039 !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__action-btn,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__action-text-btn,
 .autoprime-portal .marketplace-dashboard-page--dark .notification-popover__close,
-.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__see-more {
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__see-more,
+.autoprime-portal .marketplace-dashboard-page--dark .notification-empty-state__cta {
   border-color: #453852 !important;
   background: #211927 !important;
   color: #cbb4f3 !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__cat-tag {
+  background: #282034 !important;
+  color: #ada2ba !important;
+}
+
+.autoprime-portal .marketplace-dashboard-page--dark .notification-popover__store-tag {
+  background: rgba(139, 92, 246, 0.16) !important;
+  color: #c8b2f8 !important;
 }
 
 @media (max-width: 760px) {
@@ -372,17 +759,17 @@
   }
 
   .autoprime-portal .notification-popover__list {
-    max-height: calc(100vh - 226px) !important;
+    max-height: calc(100vh - 250px) !important;
   }
 
   .autoprime-portal .notification-popover__item {
-    grid-template-columns: 36px minmax(0, 1fr) !important;
+    grid-template-columns: 34px minmax(0, 1fr) !important;
     gap: 10px !important;
   }
 
   .autoprime-portal .notification-popover__dot {
-    width: 36px !important;
-    height: 36px !important;
+    width: 34px !important;
+    height: 34px !important;
   }
 
   .autoprime-portal .notification-popover__time {
@@ -398,8 +785,35 @@
     width: calc(100vw - 24px) !important;
     max-height: calc(100vh - 24px) !important;
   }
+}
 
-  .autoprime-portal .notification-modal__body {
-    max-height: calc(100vh - 92px) !important;
-  }
+/* Left sidebar unseen new-orders counter badge */
+.marketplace-sidebar__badge--counter {
+  min-width: 22px !important;
+  height: 20px !important;
+  padding: 0 7px !important;
+  border-radius: 999px !important;
+  background: var(--ap-ui-purple, #6d28d9) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  font-variant-numeric: tabular-nums !important;
+  box-shadow: 0 2px 6px rgba(109, 40, 217, 0.25) !important;
+}
+
+.sidebar-link-active .marketplace-sidebar__badge--counter {
+  background: var(--ap-ui-purple-deep, #5b21b6) !important;
+  color: #ffffff !important;
+}
+
+.marketplace-dashboard-page--dark .marketplace-sidebar__badge {
+  background: #2c2142 !important;
+  color: #d6c4fb !important;
+}
+
+.marketplace-dashboard-page--dark .marketplace-sidebar__badge--counter {
+  background: #8b5cf6 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35) !important;
 }

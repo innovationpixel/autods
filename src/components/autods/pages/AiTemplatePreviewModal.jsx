@@ -1,10 +1,12 @@
 import { LuCircleAlert, LuImage, LuPlus, LuX, LuZap } from "react-icons/lu";
+import { formatAiUsd } from "../../../utils/aiPricing";
 
-function AiTemplatePreviewModal({ template, creditsPerImage = 1, userCredits = 0, onBuyCredits, onClose, onUse }) {
+function AiTemplatePreviewModal({ template, creditsPerImage = 1, pricePerCredit = 0.02, userCredits = 0, onBuyCredits, onClose, onUse }) {
   if (!template) return null;
 
   const imageCount = template.prompts?.length || 1;
   const totalCost = imageCount * (creditsPerImage || 1);
+  const totalCostUsd = totalCost * (pricePerCredit || 0.02);
   const isInsufficient = userCredits < totalCost;
 
   return (
@@ -42,9 +44,9 @@ function AiTemplatePreviewModal({ template, creditsPerImage = 1, userCredits = 0
             </span>
             <strong style={{ fontSize: 15, color: "#4f46e5", display: "inline-flex", alignItems: "center", gap: 5 }}>
               <LuZap style={{ color: "#f59e0b" }} />
-              {totalCost} AI {totalCost === 1 ? "Credit" : "Credits"}
+              {totalCost} AI {totalCost === 1 ? "Credit" : "Credits"} ({formatAiUsd(totalCostUsd)})
               <small style={{ color: "#64748b", fontWeight: 400, fontSize: 12 }}>
-                ({creditsPerImage} credit{creditsPerImage > 1 ? "s" : ""}/img × {imageCount} img{imageCount > 1 ? "s" : ""})
+                ({creditsPerImage} credit{creditsPerImage > 1 ? "s" : ""} / {formatAiUsd(creditsPerImage * pricePerCredit)} img × {imageCount})
               </small>
             </strong>
           </div>

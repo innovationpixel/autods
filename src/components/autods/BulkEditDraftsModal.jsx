@@ -143,7 +143,8 @@ function BulkEditDraftsModal({
           >
             <input
               type="number"
-              min="1"
+              min="0"
+              step="1"
               value={fields.quantity}
               disabled={!fields.quantityEnabled}
               onChange={(event) => patch({ quantity: event.target.value })}
@@ -303,7 +304,16 @@ export function applyBulkEditToForm(form, changes) {
   const next = { ...form };
 
   if (changes.quantityEnabled) {
-    next.quantity = Math.max(1, Number(changes.quantity) || 1);
+    const qty = Math.max(0, Math.floor(Number(changes.quantity) || 0));
+    if (Array.isArray(next.variants) && next.variants.length) {
+      next.variants = next.variants.map((v) =>
+        v.selected !== false ? { ...v, quantity: qty } : { ...v, quantity: 0 },
+      );
+      const activeCount = next.variants.filter((v) => v.selected !== false).length;
+      next.quantity = activeCount > 0 ? qty * activeCount : 0;
+    } else {
+      next.quantity = qty;
+    }
   }
 
   if (changes.conditionEnabled) {

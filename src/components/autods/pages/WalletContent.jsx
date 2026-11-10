@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   LuArrowDownLeft,
@@ -17,6 +18,8 @@ import {
 } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
 import { openPaymentCheckout } from "../../../utils/paymentCheckout";
+import { updateUserStateAction } from "../../../store/actions/AuthActions";
+import { getStoredUser } from "../../../services/AuthService";
 import { loadBalanceAmounts } from "../constants";
 import {
   confirmWalletDeposit,
@@ -47,6 +50,7 @@ function formatDateTime(value) {
 }
 
 function WalletContent() {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -81,6 +85,23 @@ function WalletContent() {
       setSummary(summaryRes.data);
       setTransactions(txRes.data?.data ?? []);
       setMeta(txRes.data?.meta ?? {});
+      if (summaryRes.data?.balance !== undefined) {
+        const nextBalance = Number(summaryRes.data.balance);
+        const nextCurrency = summaryRes.data.currency || "USD";
+        const stored = getStoredUser() || {};
+        if (
+          Number.isFinite(nextBalance) &&
+          (Number(stored.wallet_balance) !== nextBalance ||
+            (nextCurrency && stored.wallet_currency !== nextCurrency))
+        ) {
+          dispatch(
+            updateUserStateAction({
+              wallet_balance: nextBalance,
+              wallet_currency: nextCurrency,
+            }),
+          );
+        }
+      }
     } catch {
       toast.error("Failed to load wallet.");
     } finally {

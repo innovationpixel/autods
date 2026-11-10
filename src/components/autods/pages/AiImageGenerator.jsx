@@ -18,6 +18,7 @@ import { toast } from "../../../utils/toast";
 import { generateAiImage, getAiConfig } from "../../../services/AiGenerationService";
 import aiBackgroundQueue from "../../../services/AiBackgroundQueue";
 import { selectUser } from "../../../store/selectors/AuthSelectors";
+import { formatAiUsd } from "../../../utils/aiPricing";
 import { composeImageWithBranding, extractMediaUrl } from "./aiStudioUtils";
 import ImageTemplateSections from "./ImageTemplateSections";
 import { useImageTemplateForm } from "./useImageTemplateForm";
@@ -26,7 +27,19 @@ import SelectReferenceImagesModal from "./SelectReferenceImagesModal";
 
 function AiImageGenerator({ template, onBack, onViewMyImages }) {
   const authUser = useSelector(selectUser);
+  const templateInputImages = (template.input_images ?? [])
+    .filter((item) => item?.url)
+    .map((item, idx) => ({
+      id: `tpl-ref-${item.id ?? idx}`,
+      remoteId: item.id ?? null,
+      file: null,
+      preview: item.url,
+      url: item.url,
+      isTemplateRef: true,
+    }));
+
   const form = useImageTemplateForm({
+    inputImages: templateInputImages,
     aspectRatio: template.aspect_ratio,
     outputWidth: template.width,
     outputHeight: template.height,
@@ -59,6 +72,7 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
   const [composedOutputs, setComposedOutputs] = useState([]);
   const [composeFailed, setComposeFailed] = useState(false);
   const [creditsPerImage, setCreditsPerImage] = useState(1);
+  const [pricePerCredit, setPricePerCredit] = useState(0.02);
   const [userCredits, setUserCredits] = useState(authUser?.ai_credits ?? 0);
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [viewingImage, setViewingImage] = useState(null);
@@ -167,13 +181,38 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
   };
 
   useEffect(() => {
-    getAiConfig()
-      .then((res) => {
-        if (res.data?.credits_per_image) setCreditsPerImage(res.data.credits_per_image);
-        if (res.data?.ai_credits !== undefined) setUserCredits(res.data.ai_credits);
-      })
-      .catch(() => {});
+    const loadAiConfig = () => {
+      getAiConfig()
+        .then((res) => {
+          if (res.data?.credits_per_image) setCreditsPerImage(res.data.credits_per_image);
+          if (res.data?.price_per_credit !== undefined) setPricePerCredit(Number(res.data.price_per_credit) || 0.02);
+          if (res.data?.ai_credits !== undefined) setUserCredits(res.data.ai_credits);
+        })
+        .catch(() => {});
+    };
+    const handleCreditsUpdated = (event) => {
+      if (event?.detail?.ai_credits !== undefined) {
+        setUserCredits(event.detail.ai_credits);
+      } else {
+        loadAiConfig();
+      }
+    };
+    loadAiConfig();
+    window.addEventListener("autods_refresh_ai_config", loadAiConfig);
+    window.addEventListener("ai_credits_updated", handleCreditsUpdated);
+    window.addEventListener("focus", loadAiConfig);
+    return () => {
+      window.removeEventListener("autods_refresh_ai_config", loadAiConfig);
+      window.removeEventListener("ai_credits_updated", handleCreditsUpdated);
+      window.removeEventListener("focus", loadAiConfig);
+    };
   }, []);
+
+  useEffect(() => {
+    if (authUser?.ai_credits !== undefined) {
+      setUserCredits(authUser.ai_credits);
+    }
+  }, [authUser?.ai_credits]);
 
   const isGenerating = queueState.isGenerating;
   const currentTask = queueState.activeTask;
@@ -242,20 +281,6 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
     if (inputImages.length === 0) {
       toast.warn("Upload at least one input image in Step 1 first.");
       document.getElementById("ai-section-input-images")?.scrollIntoView({ behavior: "smooth" });
-      return;
-    }
-
-    const missingRefs = prompts
-      .map((_, index) => {
-        const refId = referenceImageIds[index];
-        const isValid = refId && inputImages.some((img) => img.id === refId);
-        return isValid ? null : index + 1;
-      })
-      .filter(Boolean);
-
-    if (missingRefs.length > 0) {
-      setMissingRefIndices(missingRefs);
-      setRefModalOpen(true);
       return;
     }
 
@@ -454,7 +479,7 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
         <span>
           {isGenerating
             ? `Generating image ${generatingIndex || 1} of ${prompts.length} in background…`
-            : `Generate All ${prompts.length} Image${prompts.length > 1 ? "s" : ""} (${totalCost} AI Credits)`}
+            : `Generate All ${prompts.length} Image${prompts.length > 1 ? "s" : ""} (${totalCost} AI Credits · ${formatAiUsd(totalCost * pricePerCredit)})`}
         </span>
       </button>
     </div>
@@ -481,7 +506,7 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
           >
             <span style={{ fontSize: 13, color: "#475569", display: "inline-flex", alignItems: "center", gap: 5 }}>
               <LuZap style={{ color: "#f59e0b" }} />
-              <strong>{userCredits.toLocaleString()}</strong> AI Credits
+              <strong>{userCredits.toLocaleString()}</strong> AI Credits · {formatAiUsd(pricePerCredit)}/credit ({creditsPerImage}⚡ / {formatAiUsd(creditsPerImage * pricePerCredit)} img)
             </span>
             <button
               type="button"
@@ -554,6 +579,8 @@ function AiImageGenerator({ template, onBack, onViewMyImages }) {
       <ImageTemplateSections
         form={form}
         showWatermark
+        sendAllReferencesWithEachPrompt
+        inputDescription="Attached template references and your uploaded product images — all references are sent with each prompt."
         previewCard={previewCard}
         footer={footer}
         allowAddDeletePrompts={false}

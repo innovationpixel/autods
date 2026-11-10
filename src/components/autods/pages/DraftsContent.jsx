@@ -493,7 +493,11 @@ function DraftsContent({
         }));
       }
 
-      toast.success(res.data?.message ?? "Draft saved.");
+      if (res.data?.synced === false) {
+        toast.warn(res.data?.message ?? res.data?.ebay_error ?? "Saved locally, but eBay sync failed.");
+      } else {
+        toast.success(res.data?.message ?? "Draft saved.");
+      }
       return true;
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to save draft."));

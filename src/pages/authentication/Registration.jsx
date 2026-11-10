@@ -12,6 +12,7 @@ import {
   LuCrown,
   LuEye,
   LuEyeOff,
+  LuFileText,
   LuGlobe,
   LuLoader,
   LuLock,
@@ -26,7 +27,9 @@ import {
 import {
   clearAuthErrorsAction,
   loginConfirmedAction,
+  LOGOUT_ACTION,
   signupAction,
+  updateUserStateAction,
 } from "../../store/actions/AuthActions";
 import {
   activatePlan,
@@ -36,9 +39,18 @@ import {
   confirmStripePlan,
   getPlans,
 } from "../../services/PlanService";
-import { getStoredToken, getStoredUser, saveSession } from "../../services/AuthService";
+import {
+  acceptLegalConsent,
+  clearSession,
+  getStoredToken,
+  getStoredUser,
+  saveSession,
+} from "../../services/AuthService";
+import { getLegalDocuments } from "../../services/LegalService";
+import LegalDocumentModal from "../../components/legal/LegalDocumentModal";
 import { openPaymentCheckout } from "../../utils/paymentCheckout";
 import { toast } from "../../utils/toast";
+import "../../assets/css/legal-documents.css";
 
 const COUNTRIES = [
   { code: "US", name: "United States" },
@@ -72,6 +84,7 @@ export default function Registration() {
   const authState = useSelector((state) => state.auth);
   const showLoading = authState.showLoading;
   const apiErrorMessage = authState.errorMessage;
+  const reduxUser = authState.auth?.user || null;
 
   // Stepper state: 1 = User Info, 2 = Select Plan, 3 = Payment & Activation, 4 = Success
   const [step, setStep] = useState(1);
@@ -87,6 +100,15 @@ export default function Registration() {
   const [primaryMarketplace, setPrimaryMarketplace] = useState("eBay");
   const [country, setCountry] = useState("US");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+
+  // Legal documents state
+  const [legalDocs, setLegalDocs] = useState({
+    terms_and_conditions: null,
+    privacy_policy: null,
+  });
+  const [legalLoading, setLegalLoading] = useState(true);
+  const [legalModalType, setLegalModalType] = useState(null); // "terms" | "privacy" | null
 
   // Field validation & errors
   const [clientErrors, setClientErrors] = useState({});
@@ -101,19 +123,64 @@ export default function Registration() {
   const [countdown, setCountdown] = useState(4);
   const [activatedPlan, setActivatedPlan] = useState(null);
 
+  const hasUserLegalConsent = (user) =>
+    Boolean(user?.legal_accepted || (user?.terms_accepted_at && user?.privacy_accepted_at));
+
+  const sessionUser = reduxUser || getStoredUser();
+  const sessionToken = getStoredToken();
+  const isResumingSession = Boolean(
+    sessionUser &&
+      sessionToken &&
+      !sessionUser.current_plan_id &&
+      sessionUser.email &&
+      sessionUser.email.toLowerCase() === email.trim().toLowerCase()
+  );
+
+  // Fetch legal agreements on mount
+  useEffect(() => {
+    let active = true;
+    setLegalLoading(true);
+    getLegalDocuments()
+      .then((res) => {
+        if (!active) return;
+        setLegalDocs({
+          terms_and_conditions: res.data?.terms_and_conditions ?? null,
+          privacy_policy: res.data?.privacy_policy ?? null,
+        });
+      })
+      .catch(() => {
+        // Fallback handled in modal/error messages if server unreachable
+      })
+      .finally(() => {
+        if (active) setLegalLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Check if user is already logged in (e.g. resumes onboarding)
   useEffect(() => {
     const storedUser = getStoredUser();
     const storedToken = getStoredToken();
-    if (storedUser && storedToken) {
-      if (storedUser.current_plan_id) {
-        // Already subscribed! Can redirect or show success
-      } else {
-        // Move to step 2 directly
-        if (step === 1) {
-          setName(storedUser.name || "");
-          setEmail(storedUser.email || "");
-          setStep(2);
+    const params = new URLSearchParams(window.location.search);
+    const hasPaymentReturn =
+      params.get("success") === "1" &&
+      Boolean(
+        params.get("session_id") ||
+          params.get("provider") ||
+          params.get("token")
+      );
+
+    if (storedUser && storedToken && !storedUser.current_plan_id) {
+      const storedHasLegal = hasUserLegalConsent(storedUser);
+      setName((prev) => prev || storedUser.name || "");
+      setEmail((prev) => prev || storedUser.email || "");
+      if (storedHasLegal) {
+        setTermsAccepted(true);
+        setPrivacyAccepted(true);
+        if (!hasPaymentReturn) {
+          setStep((prev) => (prev === 1 ? 2 : prev));
         }
       }
     }
@@ -220,34 +287,40 @@ export default function Registration() {
   // Client validation for Step 1
   const validateStep1 = () => {
     const errors = {};
-    if (!name.trim()) {
-      errors.name = "Full name is required";
-    } else if (name.trim().length < 2) {
-      errors.name = "Name must be at least 2 characters";
-    }
+    if (!isResumingSession) {
+      if (!name.trim()) {
+        errors.name = "Full name is required";
+      } else if (name.trim().length < 2) {
+        errors.name = "Name must be at least 2 characters";
+      }
 
-    if (!email.trim()) {
-      errors.email = "Email address is required";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = "Please enter a valid email address";
-    }
+      if (!email.trim()) {
+        errors.email = "Email address is required";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        errors.email = "Please enter a valid email address";
+      }
 
-    if (!password) {
-      errors.password = "Password is required";
-    } else if (password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
-    } else if (!passwordCriteria.numberOrSpecial) {
-      errors.password = "Password must contain a number or special character";
-    }
+      if (!password) {
+        errors.password = "Password is required";
+      } else if (password.length < 8) {
+        errors.password = "Password must be at least 8 characters";
+      } else if (!passwordCriteria.numberOrSpecial) {
+        errors.password = "Password must contain a number or special character";
+      }
 
-    if (!passwordConfirmation) {
-      errors.passwordConfirmation = "Please confirm your password";
-    } else if (password !== passwordConfirmation) {
-      errors.passwordConfirmation = "Passwords do not match";
+      if (!passwordConfirmation) {
+        errors.passwordConfirmation = "Please confirm your password";
+      } else if (password !== passwordConfirmation) {
+        errors.passwordConfirmation = "Passwords do not match";
+      }
     }
 
     if (!termsAccepted) {
-      errors.terms = "You must agree to the Terms of Service and Privacy Policy";
+      errors.terms = "You must agree to the Terms & Conditions before signing up";
+    }
+
+    if (!privacyAccepted) {
+      errors.privacy = "You must agree to the Privacy Policy before signing up";
     }
 
     setClientErrors(errors);
@@ -256,6 +329,33 @@ export default function Registration() {
 
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const ensureLegalAgreementsBeforePayment = () => {
+    const currentStoredUser = getStoredUser();
+    if (termsAccepted && privacyAccepted) {
+      return true;
+    }
+    if (hasUserLegalConsent(currentStoredUser)) {
+      return true;
+    }
+    toast.error("Please agree to both the Terms & Conditions and Privacy Policy before payment.");
+    setStep(1);
+    return false;
+  };
+
+  const handleSwitchSignupAccount = () => {
+    clearSession();
+    dispatch({ type: LOGOUT_ACTION });
+    dispatch(clearAuthErrorsAction());
+    setName("");
+    setEmail("");
+    setPassword("");
+    setPasswordConfirmation("");
+    setTermsAccepted(false);
+    setPrivacyAccepted(false);
+    setClientErrors({});
+    setTouched({});
   };
 
   // Submit Step 1: Sign up user & navigate to Step 2
@@ -267,17 +367,29 @@ export default function Registration() {
       password: true,
       passwordConfirmation: true,
       terms: true,
+      privacy: true,
     });
 
     if (!validateStep1()) {
-      toast.error("Please resolve the validation errors before proceeding.");
+      toast.error("Please agree to our Terms & Conditions and Privacy Policy and resolve any form errors.");
       return;
     }
 
-    const storedUser = getStoredUser();
-    // If user already signed up during this session, advance to step 2 directly
-    if (storedUser && storedUser.email === email.trim()) {
-      setStep(2);
+    // If user already created an unsubscribed account in this session, record consent if needed and advance
+    if (isResumingSession) {
+      try {
+        if (!hasUserLegalConsent(sessionUser)) {
+          const consentRes = await acceptLegalConsent({
+            terms_accepted: true,
+            privacy_accepted: true,
+          });
+          dispatch(updateUserStateAction(consentRes.data));
+        }
+        toast.success("Legal agreements confirmed! Choose your subscription plan.");
+        setStep(2);
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to record legal agreement consent.");
+      }
       return;
     }
 
@@ -291,11 +403,13 @@ export default function Registration() {
           store_name: storeName.trim(),
           country,
           primary_marketplace: primaryMarketplace,
+          terms_accepted: true,
+          privacy_accepted: true,
         })
       );
       toast.success("Account created! Now choose your subscription plan.");
       setStep(2);
-    } catch (err) {
+    } catch {
       // API error handled in action and toast
     }
   };
@@ -303,6 +417,9 @@ export default function Registration() {
   // Submit Step 2: Plan selected, proceed to Step 3
   const handleStep2Submit = (e) => {
     e.preventDefault();
+    if (!ensureLegalAgreementsBeforePayment()) {
+      return;
+    }
     if (!selectedPlanId) {
       toast.error("Please select a plan to continue.");
       return;
@@ -312,6 +429,9 @@ export default function Registration() {
 
   // Submit Step 3: Checkout or Direct Activation
   const handlePaymentAndActivation = async (provider) => {
+    if (!ensureLegalAgreementsBeforePayment()) {
+      return;
+    }
     if (!selectedPlan) {
       toast.error("No plan selected.");
       return;
@@ -326,6 +446,8 @@ export default function Registration() {
         const res = await checkoutStripe(selectedPlan.id, {
           return_origin: origin,
           return_path: `${returnPath}&provider=stripe`,
+          terms_accepted: true,
+          privacy_accepted: true,
         });
         if (res.data?.url) {
           openPaymentCheckout(res.data.url);
@@ -335,6 +457,8 @@ export default function Registration() {
         const res = await checkoutPayPal(selectedPlan.id, {
           return_origin: origin,
           return_path: `${returnPath}&provider=paypal`,
+          terms_accepted: true,
+          privacy_accepted: true,
         });
         if (res.data?.url) {
           openPaymentCheckout(res.data.url);
@@ -345,6 +469,11 @@ export default function Registration() {
       // Fallback or direct activation if gateway checkout URL is not returned
       await handleDirectActivation();
     } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        toast.error(err.response?.data?.error || "You must agree to the Terms & Conditions and Privacy Policy before payment.");
+        setStep(1);
+        return;
+      }
       const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
       toast.warning(`${errMsg} — Activating via sandbox provision...`);
       // Fallback: activate directly so user onboarding isn't blocked by unconfigured sandbox credentials
@@ -356,12 +485,17 @@ export default function Registration() {
 
   // Direct package activation
   const handleDirectActivation = async () => {
+    if (!ensureLegalAgreementsBeforePayment()) {
+      return;
+    }
     if (!selectedPlan) return;
     try {
       setActivating(true);
       const res = await activatePlan(selectedPlan.id, {
         provider: paymentMethod,
         reference_id: `onboarding_${Date.now()}`,
+        terms_accepted: true,
+        privacy_accepted: true,
       });
 
       const user = res.data?.user;
@@ -373,6 +507,11 @@ export default function Registration() {
       setStep(4);
       toast.success("Package activated successfully! Welcome aboard.");
     } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        toast.error(err.response?.data?.error || "You must agree to the Terms & Conditions and Privacy Policy before payment.");
+        setStep(1);
+        return;
+      }
       toast.error(err.response?.data?.message || "Failed to activate package.");
     } finally {
       setActivating(false);
@@ -490,9 +629,44 @@ export default function Registration() {
           {step === 1 && (
             <div className="onboarding-step-content">
               <div className="auth-page__card-head">
-                <h2>Create your merchant account</h2>
-                <p>Fill in your credentials and business details to get started.</p>
+                <h2>
+                  {isResumingSession
+                    ? "Confirm legal agreements to continue"
+                    : "Create your merchant account"}
+                </h2>
+                <p>
+                  {isResumingSession
+                    ? "Review and accept our Terms & Conditions and Privacy Policy before selecting a plan and completing payment."
+                    : "Fill in your credentials and business details to get started."}
+                </p>
               </div>
+
+              {isResumingSession ? (
+                <div
+                  className="onboarding-legal-verified"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    background: "#f5f3ff",
+                    borderColor: "#ddd6fe",
+                    color: "#4c1d95",
+                  }}
+                >
+                  <span>
+                    Signed in as <strong>{sessionUser?.email}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    className="auth-page__legal-link"
+                    onClick={handleSwitchSignupAccount}
+                  >
+                    Use a different email
+                  </button>
+                </div>
+              ) : null}
 
               {apiErrorMessage ? (
                 <div className="auth-page__alert auth-page__alert--error" role="alert">
@@ -517,6 +691,7 @@ export default function Registration() {
                         type="text"
                         name="name"
                         value={name}
+                        readOnly={isResumingSession}
                         onChange={(e) => {
                           setName(e.target.value);
                           if (clientErrors.name) setClientErrors((c) => ({ ...c, name: null }));
@@ -543,6 +718,7 @@ export default function Registration() {
                         type="email"
                         name="email"
                         value={email}
+                        readOnly={isResumingSession}
                         onChange={(e) => {
                           setEmail(e.target.value);
                           if (clientErrors.email) setClientErrors((c) => ({ ...c, email: null }));
@@ -558,207 +734,262 @@ export default function Registration() {
                   </label>
                 </div>
 
-                <div className="auth-page__form-row">
-                  <label
-                    className={`auth-page__field ${
-                      touched.password && clientErrors.password ? "auth-page__field--error" : ""
-                    }`}
-                  >
-                    <span>Password *</span>
-                    <div className="auth-page__input-wrap">
-                      <LuLock />
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        name="password"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (clientErrors.password) setClientErrors((c) => ({ ...c, password: null }));
-                        }}
-                        onBlur={() => handleBlur("password")}
-                        placeholder="At least 8 characters"
-                        autoComplete="new-password"
-                      />
-                      <button
-                        type="button"
-                        className="auth-page__toggle-password"
-                        onClick={() => setShowPassword((v) => !v)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
+                {!isResumingSession && (
+                  <>
+                    <div className="auth-page__form-row">
+                      <label
+                        className={`auth-page__field ${
+                          touched.password && clientErrors.password ? "auth-page__field--error" : ""
+                        }`}
                       >
-                        {showPassword ? <LuEyeOff /> : <LuEye />}
-                      </button>
-                    </div>
-                    {touched.password && clientErrors.password ? (
-                      <span className="auth-page__field-error">{clientErrors.password}</span>
-                    ) : null}
-                  </label>
+                        <span>Password *</span>
+                        <div className="auth-page__input-wrap">
+                          <LuLock />
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            name="password"
+                            value={password}
+                            onChange={(e) => {
+                              setPassword(e.target.value);
+                              if (clientErrors.password) setClientErrors((c) => ({ ...c, password: null }));
+                            }}
+                            onBlur={() => handleBlur("password")}
+                            placeholder="At least 8 characters"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            className="auth-page__toggle-password"
+                            onClick={() => setShowPassword((v) => !v)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <LuEyeOff /> : <LuEye />}
+                          </button>
+                        </div>
+                        {touched.password && clientErrors.password ? (
+                          <span className="auth-page__field-error">{clientErrors.password}</span>
+                        ) : null}
+                      </label>
 
-                  <label
-                    className={`auth-page__field ${
-                      touched.passwordConfirmation && clientErrors.passwordConfirmation
-                        ? "auth-page__field--error"
-                        : ""
-                    }`}
-                  >
-                    <span>Confirm Password *</span>
-                    <div className="auth-page__input-wrap">
-                      <LuLock />
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        name="passwordConfirmation"
-                        value={passwordConfirmation}
-                        onChange={(e) => {
-                          setPasswordConfirmation(e.target.value);
-                          if (clientErrors.passwordConfirmation)
-                            setClientErrors((c) => ({ ...c, passwordConfirmation: null }));
-                        }}
-                        onBlur={() => handleBlur("passwordConfirmation")}
-                        placeholder="Re-enter password"
-                        autoComplete="new-password"
-                      />
-                      <button
-                        type="button"
-                        className="auth-page__toggle-password"
-                        onClick={() => setShowConfirmPassword((v) => !v)}
-                        aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                      <label
+                        className={`auth-page__field ${
+                          touched.passwordConfirmation && clientErrors.passwordConfirmation
+                            ? "auth-page__field--error"
+                            : ""
+                        }`}
                       >
-                        {showConfirmPassword ? <LuEyeOff /> : <LuEye />}
-                      </button>
-                    </div>
-                    {touched.passwordConfirmation && clientErrors.passwordConfirmation ? (
-                      <span className="auth-page__field-error">
-                        {clientErrors.passwordConfirmation}
-                      </span>
-                    ) : null}
-                  </label>
-                </div>
-
-                {/* Password strength & restriction checks */}
-                {password.length > 0 && (
-                  <div className="password-strength">
-                    <div className="password-strength__bar-wrapper">
-                      <div
-                        className={`password-strength__bar password-strength__bar--${passwordStrengthScore}`}
-                      />
-                    </div>
-                    <div className="password-strength__meta">
-                      <span>Password Strength</span>
-                      <span>{passwordStrengthLabel}</span>
+                        <span>Confirm Password *</span>
+                        <div className="auth-page__input-wrap">
+                          <LuLock />
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="passwordConfirmation"
+                            value={passwordConfirmation}
+                            onChange={(e) => {
+                              setPasswordConfirmation(e.target.value);
+                              if (clientErrors.passwordConfirmation)
+                                setClientErrors((c) => ({ ...c, passwordConfirmation: null }));
+                            }}
+                            onBlur={() => handleBlur("passwordConfirmation")}
+                            placeholder="Re-enter password"
+                            autoComplete="new-password"
+                          />
+                          <button
+                            type="button"
+                            className="auth-page__toggle-password"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          >
+                            {showConfirmPassword ? <LuEyeOff /> : <LuEye />}
+                          </button>
+                        </div>
+                        {touched.passwordConfirmation && clientErrors.passwordConfirmation ? (
+                          <span className="auth-page__field-error">
+                            {clientErrors.passwordConfirmation}
+                          </span>
+                        ) : null}
+                      </label>
                     </div>
 
-                    <div className="restrictions-checklist">
-                      <div
-                        className={`restriction-item ${
-                          passwordCriteria.length ? "restriction-item--valid" : ""
-                        }`}
-                      >
-                        {passwordCriteria.length ? <LuCircleCheck /> : <LuCircle />}
-                        <span>At least 8 characters</span>
+                    {/* Password strength & restriction checks */}
+                    {password.length > 0 && (
+                      <div className="password-strength">
+                        <div className="password-strength__bar-wrapper">
+                          <div
+                            className={`password-strength__bar password-strength__bar--${passwordStrengthScore}`}
+                          />
+                        </div>
+                        <div className="password-strength__meta">
+                          <span>Password Strength</span>
+                          <span>{passwordStrengthLabel}</span>
+                        </div>
+
+                        <div className="restrictions-checklist">
+                          <div
+                            className={`restriction-item ${
+                              passwordCriteria.length ? "restriction-item--valid" : ""
+                            }`}
+                          >
+                            {passwordCriteria.length ? <LuCircleCheck /> : <LuCircle />}
+                            <span>At least 8 characters</span>
+                          </div>
+                          <div
+                            className={`restriction-item ${
+                              passwordCriteria.uppercase ? "restriction-item--valid" : ""
+                            }`}
+                          >
+                            {passwordCriteria.uppercase ? <LuCircleCheck /> : <LuCircle />}
+                            <span>Uppercase & lowercase</span>
+                          </div>
+                          <div
+                            className={`restriction-item ${
+                              passwordCriteria.numberOrSpecial ? "restriction-item--valid" : ""
+                            }`}
+                          >
+                            {passwordCriteria.numberOrSpecial ? <LuCircleCheck /> : <LuCircle />}
+                            <span>Number or symbol</span>
+                          </div>
+                          <div
+                            className={`restriction-item ${
+                              passwordCriteria.match ? "restriction-item--valid" : ""
+                            }`}
+                          >
+                            {passwordCriteria.match ? <LuCircleCheck /> : <LuCircle />}
+                            <span>Passwords match</span>
+                          </div>
+                        </div>
                       </div>
-                      <div
-                        className={`restriction-item ${
-                          passwordCriteria.uppercase ? "restriction-item--valid" : ""
-                        }`}
-                      >
-                        {passwordCriteria.uppercase ? <LuCircleCheck /> : <LuCircle />}
-                        <span>Uppercase & lowercase</span>
-                      </div>
-                      <div
-                        className={`restriction-item ${
-                          passwordCriteria.numberOrSpecial ? "restriction-item--valid" : ""
-                        }`}
-                      >
-                        {passwordCriteria.numberOrSpecial ? <LuCircleCheck /> : <LuCircle />}
-                        <span>Number or symbol</span>
-                      </div>
-                      <div
-                        className={`restriction-item ${
-                          passwordCriteria.match ? "restriction-item--valid" : ""
-                        }`}
-                      >
-                        {passwordCriteria.match ? <LuCircleCheck /> : <LuCircle />}
-                        <span>Passwords match</span>
-                      </div>
+                    )}
+
+                    {/* Store Profile Meta */}
+                    <div className="auth-page__form-row">
+                      <label className="auth-page__field">
+                        <span>Store / Brand Name (Optional)</span>
+                        <div className="auth-page__input-wrap">
+                          <LuStore />
+                          <input
+                            type="text"
+                            name="storeName"
+                            value={storeName}
+                            onChange={(e) => setStoreName(e.target.value)}
+                            placeholder="My Auto Store"
+                          />
+                        </div>
+                      </label>
+
+                      <label className="auth-page__field">
+                        <span>Primary Marketplace</span>
+                        <div className="auth-page__input-wrap">
+                          <LuGlobe />
+                          <select
+                            className="auth-page__select"
+                            value={primaryMarketplace}
+                            onChange={(e) => setPrimaryMarketplace(e.target.value)}
+                          >
+                            {MARKETPLACES.map((m) => (
+                              <option key={m} value={m}>
+                                {m}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </label>
                     </div>
-                  </div>
+
+                    <div className="auth-page__form-row">
+                      <label className="auth-page__field">
+                        <span>Country</span>
+                        <div className="auth-page__input-wrap">
+                          <LuGlobe />
+                          <select
+                            className="auth-page__select"
+                            value={country}
+                            onChange={(e) => setCountry(e.target.value)}
+                          >
+                            {COUNTRIES.map((c) => (
+                              <option key={c.code} value={c.code}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </label>
+                    </div>
+                  </>
                 )}
 
-                {/* Store Profile Meta */}
-                <div className="auth-page__form-row">
-                  <label className="auth-page__field">
-                    <span>Store / Brand Name (Optional)</span>
-                    <div className="auth-page__input-wrap">
-                      <LuStore />
+                {/* Legal Agreement Checkboxes (Required before Signup & Payment) */}
+                <div
+                  className={`auth-page__legal-box ${
+                    (touched.terms && clientErrors.terms) || (touched.privacy && clientErrors.privacy)
+                      ? "auth-page__legal-box--error"
+                      : ""
+                  }`}
+                >
+                  <div className="auth-page__legal-header">
+                    <LuFileText />
+                    <span>Legal Agreements (Required Before Signup &amp; Payment)</span>
+                  </div>
+
+                  <div className="auth-page__legal-item">
+                    <label className="auth-page__checkbox">
                       <input
-                        type="text"
-                        name="storeName"
-                        value={storeName}
-                        onChange={(e) => setStoreName(e.target.value)}
-                        placeholder="My Auto Store"
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => {
+                          setTermsAccepted(e.target.checked);
+                          if (clientErrors.terms) setClientErrors((c) => ({ ...c, terms: null }));
+                        }}
                       />
-                    </div>
-                  </label>
+                      <span>
+                        I have read and agree to the{" "}
+                        <button
+                          type="button"
+                          className="auth-page__legal-link"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setLegalModalType("terms");
+                          }}
+                        >
+                          Terms &amp; Conditions
+                        </button>{" "}
+                        *
+                      </span>
+                    </label>
+                    {touched.terms && clientErrors.terms ? (
+                      <span className="auth-page__field-error">{clientErrors.terms}</span>
+                    ) : null}
+                  </div>
 
-                  <label className="auth-page__field">
-                    <span>Primary Marketplace</span>
-                    <div className="auth-page__input-wrap">
-                      <LuGlobe />
-                      <select
-                        className="auth-page__select"
-                        value={primaryMarketplace}
-                        onChange={(e) => setPrimaryMarketplace(e.target.value)}
-                      >
-                        {MARKETPLACES.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="auth-page__form-row">
-                  <label className="auth-page__field">
-                    <span>Country</span>
-                    <div className="auth-page__input-wrap">
-                      <LuGlobe />
-                      <select
-                        className="auth-page__select"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                      >
-                        {COUNTRIES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Terms checkbox */}
-                <div>
-                  <label className="auth-page__checkbox">
-                    <input
-                      type="checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => {
-                        setTermsAccepted(e.target.checked);
-                        if (clientErrors.terms) setClientErrors((c) => ({ ...c, terms: null }));
-                      }}
-                    />
-                    <span>
-                      I agree to the <a href="#terms" onClick={(e) => e.preventDefault()}>Terms of Service</a> and{" "}
-                      <a href="#privacy" onClick={(e) => e.preventDefault()}>Privacy Policy</a>.
-                    </span>
-                  </label>
-                  {touched.terms && clientErrors.terms ? (
-                    <span className="auth-page__field-error d-block mt-1">
-                      {clientErrors.terms}
-                    </span>
-                  ) : null}
+                  <div className="auth-page__legal-item">
+                    <label className="auth-page__checkbox">
+                      <input
+                        type="checkbox"
+                        checked={privacyAccepted}
+                        onChange={(e) => {
+                          setPrivacyAccepted(e.target.checked);
+                          if (clientErrors.privacy) setClientErrors((c) => ({ ...c, privacy: null }));
+                        }}
+                      />
+                      <span>
+                        I have read and agree to the{" "}
+                        <button
+                          type="button"
+                          className="auth-page__legal-link"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setLegalModalType("privacy");
+                          }}
+                        >
+                          Privacy Policy
+                        </button>{" "}
+                        *
+                      </span>
+                    </label>
+                    {touched.privacy && clientErrors.privacy ? (
+                      <span className="auth-page__field-error">{clientErrors.privacy}</span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <button
@@ -948,6 +1179,29 @@ export default function Registration() {
                 <span><LuCheck /> Cancel Anytime</span>
               </div>
 
+              <div className="onboarding-legal-verified" style={{ width: "100%", flexWrap: "wrap" }}>
+                <LuCircleCheck />
+                <span>
+                  Verified agreement to our{" "}
+                  <button
+                    type="button"
+                    className="auth-page__legal-link"
+                    onClick={() => setLegalModalType("terms")}
+                  >
+                    Terms &amp; Conditions
+                  </button>{" "}
+                  and{" "}
+                  <button
+                    type="button"
+                    className="auth-page__legal-link"
+                    onClick={() => setLegalModalType("privacy")}
+                  >
+                    Privacy Policy
+                  </button>
+                  .
+                </span>
+              </div>
+
               {/* Action Buttons */}
               <div className="onboarding-action-buttons">
                 <button
@@ -1029,6 +1283,31 @@ export default function Registration() {
           )}
         </div>
       </main>
+
+      <LegalDocumentModal
+        open={Boolean(legalModalType)}
+        type={legalModalType || "terms"}
+        documentData={
+          legalModalType === "privacy"
+            ? legalDocs.privacy_policy
+            : legalDocs.terms_and_conditions
+        }
+        loading={legalLoading}
+        onAgree={
+          step === 1
+            ? () => {
+                if (legalModalType === "privacy") {
+                  setPrivacyAccepted(true);
+                  setClientErrors((c) => ({ ...c, privacy: null }));
+                } else {
+                  setTermsAccepted(true);
+                  setClientErrors((c) => ({ ...c, terms: null }));
+                }
+              }
+            : undefined
+        }
+        onClose={() => setLegalModalType(null)}
+      />
     </div>
   );
 }

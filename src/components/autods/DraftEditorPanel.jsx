@@ -1,18 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   LuCheck,
   LuImage,
+  LuLoader,
   LuMapPin,
   LuPencil,
   LuPlus,
+  LuSparkles,
   LuTrash2,
   LuX,
 } from "react-icons/lu";
 import { buildSourceProductUrl, getListingImageUrl, normalizeListingSourceInput } from "./helpers";
 import { uid, normalizeVariantPricing } from "../../utils/draftEditorState";
+import { optimizeProductTitle, getAiConfig } from "../../services/AiGenerationService";
+import { selectUser } from "../../store/selectors/AuthSelectors";
+import { updateUserStateAction } from "../../store/actions/AuthActions";
+import { formatAiUsd, normalizeAiConfig } from "../../utils/aiPricing";
+import { toast } from "../../utils/toast";
 import DraftDescriptionEditor from "./DraftDescriptionEditor";
 import DraftCategorySelect from "./DraftCategorySelect";
 import BulkEditVariantsModal, { applyBulkEditToVariant } from "./BulkEditVariantsModal";
+import BuyAiCreditsModal from "./pages/BuyAiCreditsModal";
 
 const EDITOR_TABS = [
   { id: "general", label: "General" },
@@ -47,9 +56,90 @@ function DraftEditorPanel({
   onChange,
   onSave,
 }) {
+  const dispatch = useDispatch();
+  const authUser = useSelector(selectUser);
   const [editingVariantId, setEditingVariantId] = useState(null);
   const [editingSpecificId, setEditingSpecificId] = useState(null);
   const [bulkEditingVariants, setBulkEditingVariants] = useState(false);
+  const [aiConfig, setAiConfig] = useState(() => normalizeAiConfig());
+  const [optimizingTitle, setOptimizingTitle] = useState(false);
+  const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
+
+  useEffect(() => {
+    const loadAiConfig = () => {
+      getAiConfig()
+        .then((res) => {
+          if (res.data) {
+            setAiConfig(normalizeAiConfig(res.data));
+          }
+        })
+        .catch(() => {});
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === "autods_ai_config_updated_at") {
+        loadAiConfig();
+      }
+    };
+
+    loadAiConfig();
+    window.addEventListener("autods_refresh_ai_config", loadAiConfig);
+    window.addEventListener("ai_credits_updated", loadAiConfig);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("autods_refresh_ai_config", loadAiConfig);
+      window.removeEventListener("ai_credits_updated", loadAiConfig);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const handleAiOptimizeTitle = async () => {
+    const currentTitle = String(form.title ?? "").trim();
+    if (!currentTitle) {
+      toast.warn("Enter a product title first before optimizing.");
+      return;
+    }
+
+    setOptimizingTitle(true);
+    try {
+      const res = await optimizeProductTitle({
+        title: currentTitle,
+        listing_id: item?.id,
+        category_name: form.categoryName || item?.category_name || undefined,
+        supplier: resolvedSource.source_platform || undefined,
+      });
+
+      const data = res.data || {};
+      if (data.optimized_title) {
+        patch({ title: data.optimized_title });
+      }
+      if (data.ai_credits !== undefined) {
+        dispatch(updateUserStateAction({ ai_credits: data.ai_credits }));
+        window.dispatchEvent(
+          new CustomEvent("ai_credits_updated", {
+            detail: { ai_credits: data.ai_credits },
+          }),
+        );
+      }
+
+      const used = Number(data.credits_used ?? 0);
+      const costStr = formatAiUsd(data.cost_usd ?? used * aiConfig.price_per_credit);
+      toast.success(
+        used > 0
+          ? `Title optimized (${used} credit${used === 1 ? "" : "s"} / ${costStr}). Click Save to apply changes.`
+          : "Title optimized with AI. Click Save to apply changes.",
+      );
+    } catch (err) {
+      const status = err.response?.status;
+      const errData = err.response?.data || {};
+      toast.error(errData.message || "Failed to optimize product title.");
+      if (status === 402 || errData.error_code === "insufficient_credits") {
+        setBuyCreditsOpen(true);
+      }
+    } finally {
+      setOptimizingTitle(false);
+    }
+  };
 
   const imageUrl = getListingImageUrl(item);
   const selectedImageCount = form.images.filter((image) => image.selected).length;
@@ -62,11 +152,24 @@ function DraftEditorPanel({
 
   const patch = (partial) => onChange({ ...form, ...partial });
 
+  const recalcTotalQuantity = (variants) => {
+    const active = variants.filter((v) => v.selected !== false);
+    if (!active.length) {
+      return 0;
+    }
+    return active.reduce((sum, v) => {
+      const q = Number(v.quantity);
+      return sum + (Number.isFinite(q) ? Math.max(0, Math.floor(q)) : 0);
+    }, 0);
+  };
+
   const updateVariant = (variantId, partial) => {
+    const nextVariants = form.variants.map((variant) =>
+      variant.id === variantId ? normalizeVariantPricing({ ...variant, ...partial }) : variant,
+    );
     patch({
-      variants: form.variants.map((variant) =>
-        variant.id === variantId ? normalizeVariantPricing({ ...variant, ...partial }) : variant,
-      ),
+      variants: nextVariants,
+      quantity: recalcTotalQuantity(nextVariants),
     });
   };
 
@@ -100,7 +203,11 @@ function DraftEditorPanel({
     if (form.variants.length <= 1) {
       return;
     }
-    patch({ variants: form.variants.filter((variant) => variant.id !== variantId) });
+    const nextVariants = form.variants.filter((variant) => variant.id !== variantId);
+    patch({
+      variants: nextVariants,
+      quantity: recalcTotalQuantity(nextVariants),
+    });
     if (editingVariantId === variantId) {
       setEditingVariantId(null);
     }
@@ -121,37 +228,47 @@ function DraftEditorPanel({
       },
       form.monitoring,
     );
-    patch({ variants: [...form.variants, next] });
+    const nextVariants = [...form.variants, next];
+    patch({
+      variants: nextVariants,
+      quantity: recalcTotalQuantity(nextVariants),
+    });
     setEditingVariantId(next.id);
   };
 
   const selectedVariants = form.variants.filter((v) => v.selected !== false);
   const selectedVariantCount = selectedVariants.length;
+  const isMultiVariant = selectedVariantCount > 1;
+  const computedTotalStock = recalcTotalQuantity(form.variants);
   const isSelectionFiltered = selectedVariantCount > 0 && selectedVariantCount < form.variants.length;
   const bulkEditTargetCount = isSelectionFiltered ? selectedVariantCount : form.variants.length;
 
   const toggleSelectAllVariants = (checked) => {
+    const nextVariants = form.variants.map((variant) => ({
+      ...variant,
+      selected: checked,
+    }));
     patch({
-      variants: form.variants.map((variant) => ({
-        ...variant,
-        selected: checked,
-      })),
+      variants: nextVariants,
+      quantity: recalcTotalQuantity(nextVariants),
     });
   };
 
   const applyBulkVariantEdit = (changes) => {
     const applyToSelectedOnly = selectedVariantCount > 0 && selectedVariantCount < form.variants.length;
+    const nextVariants = form.variants.map((variant) => {
+      if (applyToSelectedOnly && variant.selected === false) {
+        return variant;
+      }
+      return normalizeVariantPricing(
+        applyBulkEditToVariant(normalizeVariantPricing(variant, form.monitoring), changes),
+        form.monitoring,
+      );
+    });
 
     patch({
-      variants: form.variants.map((variant) => {
-        if (applyToSelectedOnly && variant.selected === false) {
-          return variant;
-        }
-        return normalizeVariantPricing(
-          applyBulkEditToVariant(normalizeVariantPricing(variant, form.monitoring), changes),
-          form.monitoring,
-        );
-      }),
+      variants: nextVariants,
+      quantity: recalcTotalQuantity(nextVariants),
     });
     setBulkEditingVariants(false);
   };
@@ -280,6 +397,31 @@ function DraftEditorPanel({
                       onChange={(event) => patch({ title: event.target.value })}
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={handleAiOptimizeTitle}
+                    disabled={optimizingTitle}
+                    title={`Optimize title with AI (Costs ${aiConfig.credits_per_title} credit(s) / ${formatAiUsd(aiConfig.title_cost_usd)} at ${formatAiUsd(aiConfig.price_per_credit)}/credit)`}
+                    style={{
+                      borderColor: "#c7d2fe",
+                      backgroundColor: "#eef2ff",
+                      color: "#4338ca",
+                    }}
+                  >
+                    {optimizingTitle ? <LuLoader className="spin-icon" /> : <LuSparkles />}
+                    <span>
+                      {optimizingTitle
+                        ? "Optimizing…"
+                        : `AI Optimize (${aiConfig.credits_per_title}⚡ · ${formatAiUsd(aiConfig.title_cost_usd)})`}
+                    </span>
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: -8 }}>
+                  AI Title Optimization costs{" "}
+                  <strong style={{ color: "#4338ca" }}>
+                    {aiConfig.credits_per_title} credit{aiConfig.credits_per_title === 1 ? "" : "s"} ({formatAiUsd(aiConfig.title_cost_usd)})
+                  </strong>{" "}
+                  ({formatAiUsd(aiConfig.price_per_credit)} / credit) and enforces eBay&apos;s 80-character limit.
                 </div>
 
                 <div className="draft-editor__grid">
@@ -323,13 +465,55 @@ function DraftEditorPanel({
                     />
                   </label>
                   <label>
-                    <span>Quantity</span>
+                    <span>
+                      {isMultiVariant ? `Total Stock (${selectedVariantCount} active variants)` : "Quantity"}
+                    </span>
                     <input
                       type="number"
-                      min="1"
-                      value={form.quantity ?? ""}
-                      onChange={(event) => patch({ quantity: event.target.value })}
+                      min="0"
+                      step="1"
+                      readOnly={isMultiVariant}
+                      value={isMultiVariant ? computedTotalStock : (form.quantity ?? "")}
+                      style={isMultiVariant ? { background: "#f8fafc", color: "#475569", cursor: "default" } : undefined}
+                      onChange={(event) => {
+                        if (isMultiVariant) {
+                          return;
+                        }
+                        const rawVal = event.target.value;
+                        if (rawVal === "") {
+                          patch({ quantity: "" });
+                          return;
+                        }
+                        const parsed = Math.max(0, Math.floor(Number(rawVal) || 0));
+                        const nextVariants =
+                          selectedVariantCount === 1
+                            ? form.variants.map((v) =>
+                                v.selected !== false ? { ...v, quantity: parsed } : v,
+                              )
+                            : form.variants;
+                        patch({ quantity: parsed, variants: nextVariants });
+                      }}
                     />
+                    {isMultiVariant ? (
+                      <small style={{ color: "#64748b", fontSize: 11, marginTop: 4, display: "block" }}>
+                        Per-variation quantities are synced individually to eBay.{" "}
+                        <button
+                          type="button"
+                          onClick={() => onTabChange("variants")}
+                          style={{
+                            border: 0,
+                            background: "transparent",
+                            color: "#eda343",
+                            fontWeight: 700,
+                            padding: 0,
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          Edit in Variants tab
+                        </button>
+                      </small>
+                    ) : null}
                   </label>
                 </div>
 
@@ -566,11 +750,15 @@ function DraftEditorPanel({
                                 <span>Qty</span>
                                 <input
                                   type="number"
-                                  min="1"
-                                  value={pricing.quantity}
-                                  onChange={(event) =>
-                                    updateVariant(variant.id, { quantity: event.target.value })
-                                  }
+                                  min="0"
+                                  step="1"
+                                  value={pricing.quantity ?? 0}
+                                  onChange={(event) => {
+                                    const rawVal = event.target.value;
+                                    updateVariant(variant.id, {
+                                      quantity: rawVal === "" ? "" : Math.max(0, Math.floor(Number(rawVal) || 0)),
+                                    });
+                                  }}
                                 />
                               </label>
                             </div>
@@ -592,7 +780,15 @@ function DraftEditorPanel({
                                 </div>
                                 <div>
                                   <span>Qty</span>
-                                  <span>{pricing.quantity ?? 1}</span>
+                                  <span
+                                    style={
+                                      Number(pricing.quantity ?? 0) === 0
+                                        ? { color: "#dc2626", fontWeight: 700 }
+                                        : undefined
+                                    }
+                                  >
+                                    {Number(pricing.quantity ?? 0) === 0 ? "0 (OOS)" : (pricing.quantity ?? 0)}
+                                  </span>
                                 </div>
                               </div>
                             </>
@@ -821,6 +1017,13 @@ function DraftEditorPanel({
         defaultFeesPercent={item.raw_source_data?.pricing?.fees_percent ?? form.monitoring?.feesPercent ?? 0}
         onClose={() => setBulkEditingVariants(false)}
         onApply={applyBulkVariantEdit}
+      />
+
+      <BuyAiCreditsModal
+        open={buyCreditsOpen}
+        onClose={() => setBuyCreditsOpen(false)}
+        currentCredits={authUser?.ai_credits ?? 0}
+        requiredCredits={aiConfig.credits_per_title}
       />
     </div>
   );

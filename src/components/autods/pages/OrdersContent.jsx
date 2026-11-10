@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "../../../utils/toast";
 import {
+  dispatchNewOrdersCount,
   getOrders,
+  markOrdersSeen,
   pushOrderTracking,
   syncAliExpressOrders,
   syncOrders,
@@ -15,6 +17,7 @@ import {
   cancelOrder,
   archiveOrder,
 } from "../../../services/OrderService";
+import { triggerNotificationsRefresh } from "../../../services/NotificationService";
 import {
   LuArchive,
   LuArchiveRestore,
@@ -504,6 +507,21 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
   };
 
   useEffect(() => {
+    let active = true;
+    dispatchNewOrdersCount(0);
+    markOrdersSeen()
+      .then((res) => {
+        if (!active) return;
+        dispatchNewOrdersCount(res.data?.new_orders_count ?? 0);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     loadOrders();
   }, [
     debouncedSearch,
@@ -525,7 +543,10 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
     try {
       const res = await syncOrders();
       toast.success(res.data?.message ?? "Orders synced.");
+      triggerNotificationsRefresh();
       await loadOrders();
+      dispatchNewOrdersCount(0);
+      markOrdersSeen().catch(() => {});
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Order sync failed."));
     } finally {

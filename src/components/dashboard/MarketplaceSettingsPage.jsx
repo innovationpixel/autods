@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   LuBadgeCheck,
+  LuChartLine,
   LuChevronDown,
   LuCopy,
   LuLink,
@@ -63,6 +64,11 @@ import { toast } from "../../utils/toast";
 import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
 import { getAccountSettings, updateAccountSettings, getAddonPricing } from "../../services/SettingsService";
 import {
+  cancelAddonSubscription,
+  confirmAddonPayPal,
+  confirmAddonStripe,
+} from "../../services/AddonService";
+import {
   getVirtualAssistants,
   createVirtualAssistant,
   updateVirtualAssistant,
@@ -79,6 +85,8 @@ import {
   saveStripePaymentMethod,
 } from "../../services/BillingService";
 import { getCurrentPlan } from "../../services/PlanService";
+import { getAiConfig } from "../../services/AiGenerationService";
+import { formatAiUsd, normalizeAiConfig } from "../../utils/aiPricing";
 import {
   getBuyerAccounts,
   getBuyerAccountAuthUrl,
@@ -88,6 +96,7 @@ import {
 import SettingsTemplatesPanel from "../autods/settings/SettingsTemplatesPanel";
 import { allTemplates } from "../autods/settings/settingsTemplates";
 import BuyAiCreditsModal from "../autods/pages/BuyAiCreditsModal";
+import AddonPurchaseModal from "../autods/pages/AddonPurchaseModal";
 
 const settingsPrimaryTabs = [
   "Store Settings",
@@ -770,6 +779,12 @@ export default function MarketplaceSettingsPage() {
   const [addOns, setAddOns] = useState(settingsAddOns);
   const [addOnTermsTarget, setAddOnTermsTarget] = useState(null);
   const [aiCreditsModalOpen, setAiCreditsModalOpen] = useState(false);
+  const [aiConfig, setAiConfig] = useState(() => normalizeAiConfig());
+  const [purchaseAddonTarget, setPurchaseAddonTarget] = useState(null);
+  const [cancelAddonTarget, setCancelAddonTarget] = useState(null);
+  const [cancelingAddon, setCancelingAddon] = useState(false);
+  const [confirmingAddonReturn, setConfirmingAddonReturn] = useState(false);
+  const addonConfirmHandledRef = useRef("");
 
   // Platform Add-ons Pricing from Super Admin Settings
   const [addonPricing, setAddonPricing] = useState({
@@ -793,6 +808,30 @@ export default function MarketplaceSettingsPage() {
       enabled: true,
       price_per_order: 0.05,
       description: "Automated tracking number retrieval and instant update to eBay buyers.",
+    },
+    trending_products: {
+      key: "trending_products",
+      title: "Trending Products",
+      curated_type: "trending",
+      enabled: true,
+      price: 14.99,
+      billing_mode: "monthly",
+      description: "Unlock daily winning & trending product feeds curated by AutoDS market research analysts.",
+      entitled: false,
+      is_free: false,
+      subscription: null,
+    },
+    hand_picked_products: {
+      key: "hand_picked_products",
+      title: "Hand-Picked Products",
+      curated_type: "hand_picked",
+      enabled: true,
+      price: 19.99,
+      billing_mode: "monthly",
+      description: "Access hand-picked high-margin winning products with verified supplier links and profit potential.",
+      entitled: false,
+      is_free: false,
+      subscription: null,
     },
   });
   const [addonPricingLoading, setAddonPricingLoading] = useState(false);
@@ -968,24 +1007,148 @@ export default function MarketplaceSettingsPage() {
         }
       })
       .catch(() => {});
+    getAiConfig()
+      .then((res) => {
+        if (res.data) {
+          setAiConfig(normalizeAiConfig(res.data));
+        }
+      })
+      .catch(() => {});
   }, [dispatch]);
+
+  const refreshAddonPricing = async (silent = false) => {
+    if (!silent) setAddonPricingLoading(true);
+    try {
+      const res = await getAddonPricing();
+      if (res.data?.addons) {
+        setAddonPricing(res.data.addons);
+      }
+    } catch {
+      // keep existing fallback catalog
+    } finally {
+      if (!silent) setAddonPricingLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (activePrimaryTab === "Plans & Add-ons") {
-      setAddonPricingLoading(true);
-      getAddonPricing()
-        .then((res) => {
-          if (res.data?.addons) {
-            setAddonPricing(res.data.addons);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setAddonPricingLoading(false));
+      refreshAddonPricing(false);
+      getPaymentHistory().then((res) => setPaymentHistory(res.data?.data ?? [])).catch(() => {});
+      getAiConfig().then((res) => { if (res.data) setAiConfig(normalizeAiConfig(res.data)); }).catch(() => {});
     }
     if (activePrimaryTab === "VAs") {
       loadVAs();
     }
   }, [activePrimaryTab]);
+
+  useEffect(() => {
+    const refreshAiConfig = () => {
+      getAiConfig()
+        .then((res) => {
+          if (res.data) {
+            setAiConfig(normalizeAiConfig(res.data));
+          }
+        })
+        .catch(() => {});
+    };
+    const handleStorageAi = (event) => {
+      if (event.key === "autods_ai_config_updated_at") {
+        refreshAiConfig();
+      }
+    };
+    window.addEventListener("autods_refresh_ai_config", refreshAiConfig);
+    window.addEventListener("ai_credits_updated", refreshAiConfig);
+    window.addEventListener("focus", refreshAiConfig);
+    window.addEventListener("storage", handleStorageAi);
+    return () => {
+      window.removeEventListener("autods_refresh_ai_config", refreshAiConfig);
+      window.removeEventListener("ai_credits_updated", refreshAiConfig);
+      window.removeEventListener("focus", refreshAiConfig);
+      window.removeEventListener("storage", handleStorageAi);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleAddonRefresh = () => {
+      refreshAddonPricing(true);
+      getPaymentHistory().then((res) => setPaymentHistory(res.data?.data ?? [])).catch(() => {});
+    };
+    const handleStorage = (event) => {
+      if (event.key === "autods_addon_updated_at") {
+        handleAddonRefresh();
+      }
+    };
+    window.addEventListener("autods_refresh_addons", handleAddonRefresh);
+    window.addEventListener("focus", handleAddonRefresh);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("autods_refresh_addons", handleAddonRefresh);
+      window.removeEventListener("focus", handleAddonRefresh);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const addonKey = params.get("addon_key");
+    const success = params.get("success");
+    const canceled = params.get("canceled");
+    const provider = params.get("provider");
+    const sessionId = params.get("session_id");
+    const paypalToken = params.get("token") || params.get("order_id");
+
+    if (!addonKey || (!success && !canceled)) {
+      return;
+    }
+
+    const handledSignature = `${addonKey}:${success || ""}:${canceled || ""}:${provider || ""}:${sessionId || paypalToken || ""}`;
+    if (addonConfirmHandledRef.current === handledSignature) {
+      return;
+    }
+    addonConfirmHandledRef.current = handledSignature;
+
+    setActivePrimaryTab("Plans & Add-ons");
+
+    if (canceled) {
+      toast.info("Add-on checkout was canceled.");
+      navigate("/settings?tab=plans", { replace: true });
+      return;
+    }
+
+    if (success) {
+      setConfirmingAddonReturn(true);
+
+      const confirmCall =
+        provider === "paypal" && paypalToken
+          ? confirmAddonPayPal({ order_id: paypalToken })
+          : sessionId
+            ? confirmAddonStripe({ session_id: sessionId })
+            : Promise.reject(new Error("Missing payment session reference."));
+
+      confirmCall
+        .then(async (res) => {
+          toast.success(res.data?.message || "Add-on activated successfully!");
+          await refreshAddonPricing(true);
+          getPaymentHistory().then((h) => setPaymentHistory(h.data?.data ?? [])).catch(() => {});
+          window.dispatchEvent(new CustomEvent("autods_refresh_addons"));
+          try {
+            localStorage.setItem("autods_addon_updated_at", String(Date.now()));
+          } catch { /* ignore storage errors */ }
+        })
+        .catch((err) => {
+          toast.error(
+            err.response?.data?.error ||
+              err.response?.data?.message ||
+              err.message ||
+              "Could not verify add-on payment."
+          );
+        })
+        .finally(() => {
+          setConfirmingAddonReturn(false);
+          navigate("/settings?tab=plans", { replace: true });
+        });
+    }
+  }, [search, navigate]);
 
   const loadVAs = () => {
     setVasLoading(true);
@@ -2184,8 +2347,8 @@ export default function MarketplaceSettingsPage() {
         <div className="marketplace-settings__section-head">
           <h3 className="marketplace-settings__section-title">Ai Optimization Settings</h3>
           <div className="marketplace-settings__balance-pill">
-            <span>AI Balance: 30 credits.</span>
-            <button type="button">Buy More</button>
+            <span>AI Balance: {Number(user?.ai_credits ?? 0).toLocaleString()} credits · {formatAiUsd(aiConfig.price_per_credit)}/credit · {aiConfig.credits_per_title}⚡ ({formatAiUsd(aiConfig.title_cost_usd)}) / title.</span>
+            <button type="button" onClick={() => setAiCreditsModalOpen(true)}>Buy More</button>
           </div>
         </div>
 
@@ -2195,7 +2358,7 @@ export default function MarketplaceSettingsPage() {
             onChange={(value) => patchNestedSection("lister", "aiOptimization", "aiTitle", value)}
           >
             <span>
-              Ai Title <SettingsHelpBadge />
+              Ai Title ({aiConfig.credits_per_title} credit{aiConfig.credits_per_title === 1 ? "" : "s"} · {formatAiUsd(aiConfig.title_cost_usd)} / title) <SettingsHelpBadge />
             </span>
           </SettingsSwitch>
 
@@ -2961,7 +3124,7 @@ export default function MarketplaceSettingsPage() {
                   {aiCredits.toLocaleString()} <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b" }}>Credits</span>
                 </div>
                 <span style={{ fontSize: "11px", color: "#64748b" }}>
-                  Ready for AI photo &amp; vision generation
+                  {formatAiUsd(aiConfig.price_per_credit)}/credit · Img: {aiConfig.credits_per_image}⚡ ({formatAiUsd(aiConfig.image_cost_usd)}) · Title: {aiConfig.credits_per_title}⚡ ({formatAiUsd(aiConfig.title_cost_usd)})
                 </span>
               </div>
             </div>
@@ -2993,6 +3156,11 @@ export default function MarketplaceSettingsPage() {
                     <LuLoader className="spin-icon" /> Syncing prices…
                   </span>
                 )}
+                {confirmingAddonReturn && (
+                  <span style={{ fontSize: "11px", color: "#2563eb", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <LuLoader className="spin-icon" /> Confirming add-on payment…
+                  </span>
+                )}
               </div>
               <h3 style={{ fontSize: "18px", fontWeight: 800, margin: "6px 0 2px 0", color: "#0f172a" }}>
                 Automation Add-ons &amp; Power-ups
@@ -3004,6 +3172,279 @@ export default function MarketplaceSettingsPage() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+            {/* Featured Research Add-ons: Trending Products & Hand-Picked Products */}
+            {[
+              {
+                key: "trending_products",
+                title: "Trending Products",
+                subtitle: "Curated Viral & Trending Feed",
+                icon: <LuChartLine />,
+                gradient: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
+                shadow: "0 4px 10px rgba(234, 88, 12, 0.25)",
+                accent: "#ea580c",
+                pillBg: "#ffedd5",
+                bullets: [
+                  "Daily viral & trending AliExpress winners updated by analysts",
+                  "Market-filtered by your connected eBay marketplace region",
+                  "Category & sub-niche filtering with 1-click Draft import",
+                  "Includes supplier links and suggested pricing signals",
+                ],
+                curatedType: "trending",
+              },
+              {
+                key: "hand_picked_products",
+                title: "Hand-Picked Products",
+                subtitle: "Vetted High-Margin Winners Vault",
+                icon: <LuBadgeCheck />,
+                gradient: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                shadow: "0 4px 10px rgba(79, 70, 229, 0.25)",
+                accent: "#4f46e5",
+                pillBg: "#e0e7ff",
+                bullets: [
+                  "Hand-selected products vetted for profitability & demand",
+                  "Pre-verified AliExpress sellers & international shipping options",
+                  "Localized product catalog matched to your eBay store country",
+                  "1-click product import directly into your Drafts queue",
+                ],
+                curatedType: "hand_picked",
+              },
+            ].map((meta) => {
+              const cfg = addonPricing?.[meta.key] ?? {};
+              const enabled = cfg.enabled !== false;
+              const price = Math.max(0, Number(cfg.price ?? 0));
+              const billingMode = cfg.billing_mode === "one_time" ? "one_time" : "monthly";
+              const isFree = enabled && price <= 0;
+              const entitled = Boolean(cfg.entitled) || isFree || user?.role === "super_admin";
+              const sub = cfg.subscription;
+              const cancelPending = Boolean(sub?.cancel_at_period_end);
+              const periodEnd = sub?.current_period_end;
+              const isVaUser = user?.role === "va" || Boolean(user?.parent_id);
+
+              let statusText = "Add-on";
+              let statusStyle = {
+                background: meta.pillBg,
+                color: meta.accent,
+                border: `1px solid ${meta.accent}33`,
+              };
+
+              if (!enabled && !entitled) {
+                statusText = "Disabled";
+                statusStyle = { background: "#f1f5f9", color: "#64748b", border: "1px solid #e2e8f0" };
+              } else if (cfg.access_source === "super_admin") {
+                statusText = "Admin Access";
+                statusStyle = { background: "#ede9fe", color: "#5b21b6", border: "1px solid #ddd6fe" };
+              } else if (isFree) {
+                statusText = "Included Free";
+                statusStyle = { background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" };
+              } else if (entitled && cancelPending) {
+                statusText = `Cancels ${formatBillingDate(periodEnd)}`;
+                statusStyle = { background: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" };
+              } else if (entitled) {
+                statusText = "Active";
+                statusStyle = { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" };
+              }
+
+              return (
+                <article
+                  key={meta.key}
+                  style={{
+                    padding: "20px",
+                    borderRadius: "14px",
+                    border: entitled ? `1px solid ${meta.accent}44` : "1px solid #e2e8f0",
+                    background: "#ffffff",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    boxShadow: "0 2px 6px rgba(0,0,0,0.03)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", gap: "8px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                        <div
+                          style={{
+                            width: "42px",
+                            height: "42px",
+                            borderRadius: "10px",
+                            background: meta.gradient,
+                            color: "#ffffff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "20px",
+                            boxShadow: meta.shadow,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {meta.icon}
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#0f172a" }}>
+                            {meta.title}
+                          </h4>
+                          <span style={{ fontSize: "12px", color: "#64748b" }}>
+                            {meta.subtitle}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          ...statusStyle,
+                          padding: "3px 10px",
+                          borderRadius: "999px",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {statusText}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "10px 12px",
+                        marginBottom: "14px",
+                        display: "flex",
+                        alignItems: "baseline",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: "6px",
+                      }}
+                    >
+                      <div>
+                        <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                          {isFree ? "Free" : `$${price.toFixed(2)}`}
+                        </span>
+                        <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>
+                          {isFree
+                            ? " included with plan"
+                            : billingMode === "monthly"
+                            ? " / month"
+                            : " one-time unlock"}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: meta.accent,
+                          fontWeight: 700,
+                          background: meta.pillBg,
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        {entitled && sub?.billing_type === "monthly" && periodEnd
+                          ? cancelPending
+                            ? `Ends ${formatBillingDate(periodEnd)}`
+                            : `Renews ${formatBillingDate(periodEnd)}`
+                          : billingMode === "monthly"
+                          ? "Monthly Plan"
+                          : "One-Time Unlock"}
+                      </span>
+                    </div>
+
+                    <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
+                      {cfg.description || meta.description}
+                    </p>
+
+                    <ul style={{ margin: "0 0 16px 0", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {meta.bullets.map((feat, idx) => (
+                        <li key={idx} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "12px", color: "#334155" }}>
+                          <span style={{ color: meta.accent, fontSize: "14px", lineHeight: "16px", flexShrink: 0 }}>✓</span>
+                          <span>{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f1f5f9", paddingTop: "14px", gap: "10px", flexWrap: "wrap" }}>
+                    {isVaUser ? (
+                      entitled ? (
+                        <button
+                          type="button"
+                          className="plans-settings__btn plans-settings__btn--primary"
+                          onClick={() => navigate(`/marketplace?curated=${meta.curatedType}`)}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px", marginLeft: "auto" }}
+                        >
+                          <span>Open Feed</span>
+                          <LuArrowUpRight />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>
+                          Managed by Store Owner
+                        </span>
+                      )
+                    ) : !enabled && !entitled ? (
+                      <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}>
+                        Currently unavailable
+                      </span>
+                    ) : entitled ? (
+                      <>
+                        {sub?.status === "active" && sub?.billing_type === "monthly" && !cancelPending ? (
+                          <button
+                            type="button"
+                            className="plans-settings__ghost-btn"
+                            onClick={() => setCancelAddonTarget({ ...cfg, key: meta.key, title: meta.title })}
+                            style={{ fontSize: "12px", padding: "8px 12px" }}
+                          >
+                            Cancel Renewal
+                          </button>
+                        ) : sub?.cancel_at_period_end && enabled && price > 0 ? (
+                          <button
+                            type="button"
+                            className="plans-settings__ghost-btn"
+                            onClick={() => setPurchaseAddonTarget({ ...cfg, key: meta.key, title: meta.title })}
+                            style={{ fontSize: "12px", padding: "8px 12px" }}
+                          >
+                            Renew Add-on
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: "12px", color: "#059669", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            <LuCheck /> Unlocked
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="plans-settings__btn plans-settings__btn--primary"
+                          onClick={() => navigate(`/marketplace?curated=${meta.curatedType}`)}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                        >
+                          <span>Open Feed</span>
+                          <LuArrowUpRight />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="plans-settings__ghost-btn"
+                          onClick={() => navigate(`/marketplace?curated=${meta.curatedType}`)}
+                          style={{ fontSize: "12px", padding: "8px 12px" }}
+                        >
+                          View Feed
+                        </button>
+                        <button
+                          type="button"
+                          className="plans-settings__btn plans-settings__btn--primary"
+                          disabled={confirmingAddonReturn}
+                          onClick={() => setPurchaseAddonTarget({ ...cfg, key: meta.key, title: meta.title })}
+                          style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "8px 14px" }}
+                        >
+                          <LuLock />
+                          <span>Unlock (${price.toFixed(2)})</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+
             {/* 1. Order Processing Automation Card */}
             <article
               style={{
@@ -3451,34 +3892,62 @@ export default function MarketplaceSettingsPage() {
                     padding: "10px 12px",
                     marginBottom: "14px",
                     display: "flex",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    gap: "6px",
+                    flexDirection: "column",
+                    gap: "8px",
                   }}
                 >
-                  <div>
-                    <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
-                      {aiCredits.toLocaleString()}
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}> Available Credits</span>
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: "6px" }}>
+                    <div>
+                      <span style={{ fontSize: "20px", fontWeight: 800, color: "#0f172a" }}>
+                        {aiCredits.toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: "12px", color: "#64748b", fontWeight: 600 }}> Available Credits</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAiCreditsModalOpen(true)}
+                      style={{
+                        background: "#fdf2f8",
+                        color: "#db2777",
+                        border: "1px solid #fbcfe8",
+                        borderRadius: "4px",
+                        padding: "2px 8px",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      + Top Up
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setAiCreditsModalOpen(true)}
+
+                  <div
                     style={{
-                      background: "#fdf2f8",
-                      color: "#db2777",
-                      border: "1px solid #fbcfe8",
-                      borderRadius: "4px",
-                      padding: "2px 8px",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: "6px",
+                      paddingTop: "8px",
+                      borderTop: "1px solid #e2e8f0",
                       fontSize: "11px",
-                      fontWeight: 700,
-                      cursor: "pointer",
                     }}
                   >
-                    + Top Up
-                  </button>
+                    <div>
+                      <span style={{ color: "#64748b", display: "block" }}>Per Credit</span>
+                      <strong style={{ color: "#059669" }}>{formatAiUsd(aiConfig.price_per_credit)}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: "#64748b", display: "block" }}>Per Image</span>
+                      <strong style={{ color: "#0f172a" }}>
+                        {aiConfig.credits_per_image}⚡ ({formatAiUsd(aiConfig.image_cost_usd)})
+                      </strong>
+                    </div>
+                    <div>
+                      <span style={{ color: "#64748b", display: "block" }}>Per Title</span>
+                      <strong style={{ color: "#0f172a" }}>
+                        {aiConfig.credits_per_title}⚡ ({formatAiUsd(aiConfig.title_cost_usd)})
+                      </strong>
+                    </div>
+                  </div>
                 </div>
 
                 <p style={{ fontSize: "12px", color: "#475569", margin: "0 0 14px 0", lineHeight: "1.5" }}>
@@ -3706,6 +4175,50 @@ export default function MarketplaceSettingsPage() {
         <BuyAiCreditsModal
           open={aiCreditsModalOpen}
           onClose={() => setAiCreditsModalOpen(false)}
+        />
+
+        <AddonPurchaseModal
+          open={Boolean(purchaseAddonTarget)}
+          addon={purchaseAddonTarget}
+          onClose={() => setPurchaseAddonTarget(null)}
+          onSuccess={() => {
+            refreshAddonPricing();
+            getPaymentHistory().then((h) => setPaymentHistory(h.data?.data ?? [])).catch(() => {});
+            try { localStorage.setItem("autods_addon_updated_at", String(Date.now())); } catch { /* ignore storage errors */ }
+          }}
+        />
+
+        <ConfirmModal
+          open={Boolean(cancelAddonTarget)}
+          title={`Cancel ${cancelAddonTarget?.title ?? "Add-on"} auto-renewal?`}
+          description={`You will retain full access until the end of your current billing period${
+            cancelAddonTarget?.subscription?.current_period_end
+              ? ` (${formatBillingDate(cancelAddonTarget.subscription.current_period_end)})`
+              : ""
+          }, and you will not be billed again.`}
+          confirmLabel="Cancel Auto-Renewal"
+          cancelLabel="Keep Subscription"
+          danger={true}
+          saving={cancelingAddon}
+          onConfirm={async () => {
+            if (!cancelAddonTarget) return;
+            setCancelingAddon(true);
+            try {
+              const res = await cancelAddonSubscription(cancelAddonTarget.key);
+              toast.success(res.data?.message || `${cancelAddonTarget.title} renewal canceled.`);
+              window.dispatchEvent(new CustomEvent("autods_refresh_addons"));
+              try { localStorage.setItem("autods_addon_updated_at", String(Date.now())); } catch { /* ignore storage errors */ }
+              await refreshAddonPricing();
+              setCancelAddonTarget(null);
+            } catch (err) {
+              toast.error(err.response?.data?.error || err.response?.data?.message || "Failed to cancel subscription.");
+            } finally {
+              setCancelingAddon(false);
+            }
+          }}
+          onClose={() => {
+            if (!cancelingAddon) setCancelAddonTarget(null);
+          }}
         />
       </section>
     );
@@ -4105,7 +4618,7 @@ export default function MarketplaceSettingsPage() {
                 <div className="billing-settings__history-row" key={tx.id}>
                   <span data-label="Date">{formatBillingDateTime(tx.created_at)}</span>
                   <span data-label="Description">
-                    <strong>{tx.plan?.title ?? "Plan purchase"}</strong>
+                    <strong>{tx.plan?.title ?? (tx.metadata?.addon_title ? `${tx.metadata.addon_title} Add-on` : "Plan purchase")}</strong>
                     <small>{tx.provider_payment_id ?? `#${tx.id}`}</small>
                   </span>
                   <span data-label="Provider" className="billing-settings__provider">{tx.provider ?? "—"}</span>

@@ -3,8 +3,16 @@ import axiosInstance from './AxiosInstance';
 export const getAiConfig = () =>
     axiosInstance.get('/ai/config');
 
-export const buyAiCredits = (packageId) =>
-    axiosInstance.post('/ai/credits/buy', { package_id: String(packageId) });
+export const buyAiCredits = (packageIdOrPayload) => {
+    const payload =
+        packageIdOrPayload && typeof packageIdOrPayload === 'object'
+            ? packageIdOrPayload
+            : { package_id: String(packageIdOrPayload) };
+    return axiosInstance.post('/ai/credits/buy', payload);
+};
+
+export const optimizeProductTitle = (payload) =>
+    axiosInstance.post('/ai/optimize-title', payload);
 
 export const generateAiImage = (formData) =>
     axiosInstance.post('/ai?image', formData, {

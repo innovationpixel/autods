@@ -27,6 +27,7 @@ import {
   respondReturnDispute,
   syncReturnsDisputes,
 } from "../../../services/ReturnDisputeService";
+import { triggerNotificationsRefresh } from "../../../services/NotificationService";
 import { toast } from "../../../utils/toast";
 import { getApiErrorMessage } from "../../../utils/apiErrors";
 import "../../../assets/css/returns-disputes.css";
@@ -212,6 +213,7 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
       }
 
       toast.success(res.data?.message ?? "Resolution submitted successfully.");
+      triggerNotificationsRefresh();
       setActiveResolveItem(null);
       loadData();
     } catch (err) {
@@ -264,6 +266,7 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
     try {
       const res = await syncReturnsDisputes();
       toast.success(res.data?.message || "Returns and disputes synced from eBay successfully.");
+      triggerNotificationsRefresh();
       await loadData();
     } catch (err) {
       toast.error(getApiErrorMessage(err, "Failed to sync returns and disputes from eBay."));

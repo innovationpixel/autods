@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { LuLoader, LuTriangleAlert, LuX } from "react-icons/lu";
+import "../../assets/css/legal-documents.css";
 
 function ConfirmModal({
   open,
@@ -9,9 +10,19 @@ function ConfirmModal({
   cancelLabel = "Cancel",
   danger = true,
   saving = false,
+  requireAgreement = false,
+  agreementLabel = null,
   onConfirm,
   onClose,
 }) {
+  const [agreed, setAgreed] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setAgreed(false);
+    }
+  }, [open, title]);
+
   useEffect(() => {
     if (!open) {
       return undefined;
@@ -28,6 +39,8 @@ function ConfirmModal({
   if (!open) {
     return null;
   }
+
+  const confirmDisabled = saving || (requireAgreement && !agreed);
 
   return (
     <div
@@ -58,6 +71,21 @@ function ConfirmModal({
           </div>
         </div>
 
+        {requireAgreement ? (
+          <div className="confirm-modal__agreement">
+            <label>
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+              />
+              <span>
+                {agreementLabel || "I agree to the Terms & Conditions and Privacy Policy."}
+              </span>
+            </label>
+          </div>
+        ) : null}
+
         <div className="quick-edit-modal__actions">
           <button
             type="button"
@@ -70,8 +98,12 @@ function ConfirmModal({
           <button
             type="button"
             className={`quick-edit-modal__btn ${danger ? "confirm-modal__btn--danger" : "quick-edit-modal__btn--primary"}`}
-            onClick={onConfirm}
-            disabled={saving}
+            onClick={() => {
+              if (requireAgreement && !agreed) return;
+              onConfirm?.();
+            }}
+            disabled={confirmDisabled}
+            style={confirmDisabled && !saving ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
           >
             {saving ? (
               <>

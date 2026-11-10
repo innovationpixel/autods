@@ -1,7 +1,10 @@
 import axiosInstance from './AxiosInstance';
 
-export const getPlans = () =>
-    axiosInstance.get('/plans');
+export const getPlans = (params = {}) =>
+    axiosInstance.get('/plans', { params });
+
+export const getPlanById = (planId) =>
+    axiosInstance.get(`/plans/${planId}`);
 
 export const getCurrentPlan = () =>
     axiosInstance.get('/plans/current');
@@ -11,6 +14,8 @@ export const checkoutStripe = (planId, options = {}) =>
         return_origin: options.return_origin || window.location.origin,
         return_path: options.return_path || '/plans',
         cancel_path: options.cancel_path,
+        ...(options.terms_accepted !== undefined ? { terms_accepted: options.terms_accepted } : {}),
+        ...(options.privacy_accepted !== undefined ? { privacy_accepted: options.privacy_accepted } : {}),
     });
 
 export const checkoutPayPal = (planId, options = {}) =>
@@ -18,6 +23,8 @@ export const checkoutPayPal = (planId, options = {}) =>
         return_origin: options.return_origin || window.location.origin,
         return_path: options.return_path || '/plans',
         cancel_path: options.cancel_path,
+        ...(options.terms_accepted !== undefined ? { terms_accepted: options.terms_accepted } : {}),
+        ...(options.privacy_accepted !== undefined ? { privacy_accepted: options.privacy_accepted } : {}),
     });
 
 export const activatePlan = (planId, payload = {}) =>

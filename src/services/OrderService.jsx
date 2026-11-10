@@ -1,7 +1,31 @@
 import axiosInstance from './AxiosInstance';
 
+export const ORDERS_NEW_COUNT_EVENT = 'autods_orders_new_count_updated';
+export const ORDERS_NEW_COUNT_STORAGE_KEY = 'autods_orders_new_count';
+
+export function dispatchNewOrdersCount(count) {
+    const safeCount = Math.max(0, Number.isFinite(Number(count)) ? Math.floor(Number(count)) : 0);
+    try {
+        window.dispatchEvent(
+            new CustomEvent(ORDERS_NEW_COUNT_EVENT, {
+                detail: { new_orders_count: safeCount },
+            }),
+        );
+        localStorage.setItem(ORDERS_NEW_COUNT_STORAGE_KEY, String(safeCount));
+    } catch {
+        // Ignore storage restrictions in private browsing
+    }
+    return safeCount;
+}
+
 export const getOrders = (params = {}) =>
     axiosInstance.get('/orders', { params });
+
+export const getNewOrdersCount = () =>
+    axiosInstance.get('/orders/new-count');
+
+export const markOrdersSeen = () =>
+    axiosInstance.post('/orders/mark-seen');
 
 export const syncOrders = () =>
     axiosInstance.post('/orders/sync');

@@ -8,6 +8,7 @@ import aiBackgroundQueue from "../../../services/AiBackgroundQueue";
 import AiTemplatePreviewModal from "./AiTemplatePreviewModal";
 import BuyAiCreditsModal from "./BuyAiCreditsModal";
 import { SAMPLE_TEMPLATE } from "./aiTemplateSample";
+import { formatAiUsd, normalizeAiConfig } from "../../../utils/aiPricing";
 
 const SORT_OPTIONS = [
   { value: "popular", label: "Most Popular" },
@@ -15,10 +16,11 @@ const SORT_OPTIONS = [
   { value: "name", label: "Name (A-Z)" },
 ];
 
-function TemplateCover({ template, creditsPerImage }) {
+function TemplateCover({ template, creditsPerImage, pricePerCredit = 0.02 }) {
   const [cover, ...rest] = template.example_images ?? [];
   const thumbs = rest.slice(0, 3);
   const cost = (template.prompts?.length || 1) * (creditsPerImage || 1);
+  const costUsd = cost * (pricePerCredit || 0.02);
 
   return (
     <div className="ai-gen-hub__tpl-cover">
@@ -54,7 +56,7 @@ function TemplateCover({ template, creditsPerImage }) {
         }}
       >
         <LuZap style={{ color: "#fbbf24", fontSize: 12 }} />
-        {cost} {cost === 1 ? "Credit" : "Credits"}
+        {cost} {cost === 1 ? "Credit" : "Credits"} · {formatAiUsd(costUsd)}
       </span>
     </div>
   );
@@ -69,6 +71,7 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
   const [category, setCategory] = useState("all");
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [creditsPerImage, setCreditsPerImage] = useState(1);
+  const [pricePerCredit, setPricePerCredit] = useState(0.02);
   const [userCredits, setUserCredits] = useState(authUser?.ai_credits ?? 0);
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [queueState, setQueueState] = useState(aiBackgroundQueue.getState());
@@ -78,12 +81,42 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
   }, []);
 
   useEffect(() => {
-    getAiConfig()
-      .then((res) => {
-        if (res.data?.credits_per_image) setCreditsPerImage(res.data.credits_per_image);
-        if (res.data?.ai_credits !== undefined) setUserCredits(res.data.ai_credits);
-      })
-      .catch(() => {});
+    if (authUser?.ai_credits !== undefined) {
+      setUserCredits(authUser.ai_credits);
+    }
+  }, [authUser?.ai_credits]);
+
+  useEffect(() => {
+    const loadAiConfig = () => {
+      getAiConfig()
+        .then((res) => {
+          const cfg = normalizeAiConfig(res.data || {});
+          setCreditsPerImage(cfg.credits_per_image);
+          setPricePerCredit(cfg.price_per_credit);
+          if (res.data?.ai_credits !== undefined) setUserCredits(res.data.ai_credits);
+        })
+        .catch(() => {});
+    };
+
+    const handleCreditsUpdated = (event) => {
+      if (event?.detail?.ai_credits !== undefined) {
+        setUserCredits(event.detail.ai_credits);
+      } else {
+        loadAiConfig();
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === "autods_ai_config_updated_at") {
+        loadAiConfig();
+      }
+    };
+
+    loadAiConfig();
+    window.addEventListener("autods_refresh_ai_config", loadAiConfig);
+    window.addEventListener("ai_credits_updated", handleCreditsUpdated);
+    window.addEventListener("focus", loadAiConfig);
+    window.addEventListener("storage", handleStorage);
 
     getAiTemplates()
       .then((res) => {
@@ -95,6 +128,13 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
         toast.error("Failed to load templates.");
       })
       .finally(() => setLoading(false));
+
+    return () => {
+      window.removeEventListener("autods_refresh_ai_config", loadAiConfig);
+      window.removeEventListener("ai_credits_updated", handleCreditsUpdated);
+      window.removeEventListener("focus", loadAiConfig);
+      window.removeEventListener("storage", handleStorage);
+    };
   }, []);
 
   const categories = useMemo(() => {
@@ -142,6 +182,9 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
             <span style={{ fontSize: 13, color: "#475569", display: "inline-flex", alignItems: "center", gap: 5 }}>
               <LuZap style={{ color: "#f59e0b" }} />
               <strong>{userCredits.toLocaleString()}</strong> AI Credits
+              <small style={{ color: "#64748b", fontWeight: 500 }}>
+                ({formatAiUsd(pricePerCredit)}/credit)
+              </small>
             </span>
             <button
               type="button"
@@ -261,14 +304,14 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
             const templateCost = (template.prompts?.length || 1) * creditsPerImage;
             return (
               <article className="ai-gen-hub__tpl-card" key={template.id}>
-                <TemplateCover template={template} creditsPerImage={creditsPerImage} />
+                <TemplateCover template={template} creditsPerImage={creditsPerImage} pricePerCredit={pricePerCredit} />
                 <div className="ai-gen-hub__tpl-meta">
                   <strong>{template.name}</strong>
                   <div className="ai-gen-hub__tpl-meta-row">
                     <span><LuImage /> {template.prompts?.length ?? 0} Images</span>
                     <span style={{ color: "#4f46e5", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <LuZap style={{ fontSize: 13 }} />
-                      {templateCost} {templateCost === 1 ? "Credit" : "Credits"}
+                      {templateCost} {templateCost === 1 ? "Credit" : "Credits"} ({formatAiUsd(templateCost * pricePerCredit)})
                     </span>
                     {template.category && <em>{template.category}</em>}
                   </div>
@@ -279,7 +322,7 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
                     className="ai-gen-hub__btn ai-gen-hub__btn--primary"
                     onClick={() => onUseTemplate(template)}
                   >
-                    Use Template ({templateCost}⚡)
+                    Use Template ({templateCost}⚡ · {formatAiUsd(templateCost * pricePerCredit)})
                   </button>
                   <button
                     type="button"
@@ -298,6 +341,7 @@ function AiTemplateGallery({ onUseTemplate, onViewMyImages }) {
       <AiTemplatePreviewModal
         template={previewTemplate}
         creditsPerImage={creditsPerImage}
+        pricePerCredit={pricePerCredit}
         userCredits={userCredits}
         onBuyCredits={() => setBuyModalOpen(true)}
         onClose={() => setPreviewTemplate(null)}

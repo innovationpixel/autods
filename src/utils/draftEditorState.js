@@ -8,6 +8,14 @@ function roundMoney(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function parseNonNegativeQuantity(value, fallback = 1) {
+  if (value === "" || value === null || value === undefined) {
+    return fallback;
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? Math.max(0, Math.floor(num)) : fallback;
+}
+
 export function normalizeVariantPricing(variant, fallback = {}) {
   const buyPrice = roundMoney(
     variant.buyPrice ?? variant.price ?? fallback.buyPrice ?? 0,
@@ -44,14 +52,14 @@ function buildVariantsFromItem(item) {
       {
         id: variant.id ?? uid(`variant-${index}`),
         label: variant.label ?? `Variant ${index + 1}`,
-        quantity: Number(variant.quantity ?? item.quantity ?? 1),
+        quantity: parseNonNegativeQuantity(variant.quantity ?? variant.stock, parseNonNegativeQuantity(item.quantity, 1)),
         image: normalizeImageUrl(variant.image) ?? null,
         selected: variant.selected !== false,
         buyPrice: variant.buyPrice,
         listingPrice: variant.listingPrice ?? variant.listPrice,
         profit: variant.profit,
         price: variant.price,
-        ebaySku: variant.ebaySku ?? null,
+        ebaySku: variant.ebaySku ?? variant.ebay_sku ?? variant.sku ?? null,
         properties: Array.isArray(variant.properties) ? variant.properties : (variant.properties ?? null),
       },
       fallback,
@@ -65,7 +73,7 @@ function buildVariantsFromItem(item) {
             id: "default",
             label: "Default",
             buyPrice: Number(item.buy_price ?? item.price ?? 0),
-            quantity: Number(item.quantity ?? 1),
+            quantity: parseNonNegativeQuantity(item.quantity, 1),
             image: getListingImageUrl(item),
             selected: true,
             profit: Number(item.profit ?? 0),
@@ -96,9 +104,10 @@ function buildVariantsFromItem(item) {
           ),
           listingPrice: Number(sku.listing_price ?? sku.listingPrice ?? sku.listPrice ?? 0),
           profit: Number(sku.profit ?? 0),
-          quantity: Number(sku.stock ?? sku.quantity ?? item.quantity ?? 1),
+          quantity: parseNonNegativeQuantity(sku.quantity ?? sku.stock, parseNonNegativeQuantity(item.quantity, 1)),
           image: normalizeImageUrl(sku.properties?.find((p) => p.image)?.image ?? sku.image) ?? null,
           selected: sku.selected !== false,
+          ebaySku: sku.ebaySku ?? sku.ebay_sku ?? sku.sku ?? null,
           properties: Array.isArray(sku.properties) ? sku.properties : null,
         },
         fallback,
@@ -112,7 +121,7 @@ function buildVariantsFromItem(item) {
         id: "default",
         label: "Default",
         buyPrice: Number(item.buy_price ?? item.price ?? 0),
-        quantity: Number(item.quantity ?? 1),
+        quantity: parseNonNegativeQuantity(item.quantity, 1),
         image: getListingImageUrl(item),
         selected: true,
         profit: Number(item.profit ?? 0),
@@ -239,12 +248,18 @@ function resolveImportedDescription(item) {
 export function buildDraftFormState(item) {
   const saved = item.raw_source_data?.draft_editor ?? {};
   const monitoring = saved.monitoring ?? {};
+  const variants = buildVariantsFromItem(item);
+  const activeVariants = variants.filter((v) => v.selected !== false);
+  const initialQuantity =
+    activeVariants.length > 1
+      ? activeVariants.reduce((sum, v) => sum + parseNonNegativeQuantity(v.quantity, 0), 0)
+      : parseNonNegativeQuantity(item.quantity, parseNonNegativeQuantity(activeVariants[0]?.quantity, 1));
 
   return {
     title: item.title ?? "",
     description: saved.description ?? resolveImportedDescription(item),
     price: Number(item.price ?? 0),
-    quantity: Number(item.quantity ?? 1),
+    quantity: initialQuantity,
     condition: saved.condition ?? item.condition ?? "NEW",
     brand: saved.brand ?? item.raw_source_data?.brand ?? "Unbranded",
     mpn: saved.mpn ?? item.raw_source_data?.mpn ?? "Does Not Apply",
@@ -256,7 +271,7 @@ export function buildDraftFormState(item) {
     allowBestOffer: saved.allowBestOffer ?? false,
     categoryId: saved.categoryId ?? item.category_id ?? "",
     categoryName: saved.categoryName ?? item.category_name ?? "",
-    variants: buildVariantsFromItem(item),
+    variants,
     images: buildImagesFromItem(item),
     specifics: buildSpecificsFromItem(item),
     monitoring: {
@@ -286,11 +301,20 @@ export function serializeDraftFormForApi(form) {
     buyPrice: form.monitoring.buyPrice,
     profit: form.monitoring.profit,
   };
-  const normalizedVariants = (form.variants ?? []).map((variant) =>
-    normalizeVariantPricing(variant, monitoringFallback),
-  );
-  const primaryVariant =
-    normalizedVariants.find((variant) => variant.selected !== false) ?? normalizedVariants[0];
+  const normalizedVariants = (form.variants ?? []).map((variant) => ({
+    ...normalizeVariantPricing(variant, monitoringFallback),
+    quantity: parseNonNegativeQuantity(variant.quantity, 0),
+  }));
+  const activeVariants = normalizedVariants.filter((variant) => variant.selected !== false);
+  const resolvedQuantity =
+    normalizedVariants.length === 0
+      ? parseNonNegativeQuantity(form.quantity, 0)
+      : activeVariants.length > 1
+        ? activeVariants.reduce((sum, variant) => sum + parseNonNegativeQuantity(variant.quantity, 0), 0)
+        : activeVariants.length === 1
+          ? parseNonNegativeQuantity(form.quantity, parseNonNegativeQuantity(activeVariants[0].quantity, 0))
+          : 0;
+  const primaryVariant = activeVariants[0] ?? normalizedVariants[0];
   const buyPrice = roundMoney(primaryVariant?.buyPrice ?? form.monitoring.buyPrice);
   const profit = roundMoney(primaryVariant?.profit ?? form.monitoring.profit);
   const listPrice = roundMoney(primaryVariant?.listingPrice ?? buyPrice + profit);
@@ -300,7 +324,7 @@ export function serializeDraftFormForApi(form) {
     title: form.title,
     description: form.description,
     price: listPrice,
-    quantity: Math.max(1, Number(form.quantity) || 1),
+    quantity: resolvedQuantity,
     condition: form.condition,
     category_id: form.categoryId || null,
     category_name: form.categoryName || null,

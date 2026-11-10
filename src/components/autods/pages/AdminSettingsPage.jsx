@@ -1,23 +1,28 @@
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   LuBadgeCheck,
   LuBoxes,
+  LuChartLine,
   LuChevronDown,
   LuDollarSign,
+  LuExternalLink,
   LuEye,
   LuEyeOff,
+  LuFileText,
   LuKey,
   LuLayers,
   LuLink,
   LuLoader,
   LuPackageCheck,
   LuPlug,
+  LuRotateCcw,
   LuSave,
   LuSearch,
   LuSettings2,
   LuSheet,
+  LuShieldCheck,
   LuShoppingCart,
   LuSparkles,
   LuTruck,
@@ -38,8 +43,15 @@ import {
   testAdminOpenAiConnection,
   getAdminAddonSettings,
   updateAdminAddonSettings,
+  getAdminLegalDocuments,
+  updateAdminLegalDocuments,
+  resetAdminLegalDocuments,
 } from "../../../services/AdminService";
 import { ALIEXPRESS_OAUTH_HINT, markOAuthReturnOrigin, openOAuthTab, OAUTH_TAB_HINT, watchOAuthTab } from "../../../utils/oauthBridge";
+import ConfirmModal from "../ConfirmModal";
+import { formatLegalDate, renderLegalContent } from "../../../utils/legalFormat";
+import { formatAiInputUsd, formatAiUsd, formatCreditConversionLabel } from "../../../utils/aiPricing";
+import "../../../assets/css/legal-documents.css";
 
 function AdminSettingsPage() {
   const role = useSelector(selectUserRole);
@@ -53,7 +65,11 @@ function AdminSettingsPage() {
   const [openAiKey, setOpenAiKey] = useState("");
   const [openAiImageModel, setOpenAiImageModel] = useState("dall-e-2");
   const [openAiVisionModel, setOpenAiVisionModel] = useState("gpt-4o");
-  const [openAiCreditsPerImage, setOpenAiCreditsPerImage] = useState(1);
+  const [openAiPricePerCredit, setOpenAiPricePerCredit] = useState("0.02");
+  const [openAiCreditsPerImage, setOpenAiCreditsPerImage] = useState("1");
+  const [openAiImageUsd, setOpenAiImageUsd] = useState("0.02");
+  const [openAiCreditsPerTitle, setOpenAiCreditsPerTitle] = useState("1");
+  const [openAiTitleUsd, setOpenAiTitleUsd] = useState("0.02");
   const [showKey, setShowKey] = useState(false);
   const [openAiSaving, setOpenAiSaving] = useState(false);
   const [openAiTesting, setOpenAiTesting] = useState(false);
@@ -82,9 +98,41 @@ function AdminSettingsPage() {
       price_per_order: 0.05,
       description: "Automated tracking number retrieval and instant update to eBay buyers.",
     },
+    trending_products: {
+      enabled: true,
+      price: 14.99,
+      billing_mode: "monthly",
+      description: "Unlock daily winning & trending product feeds curated by AutoDS market research analysts.",
+    },
+    hand_picked_products: {
+      enabled: true,
+      price: 19.99,
+      billing_mode: "monthly",
+      description: "Access hand-picked high-margin winning products with verified supplier links and profit potential.",
+    },
     updated_at: null,
   });
   const [addonSaving, setAddonSaving] = useState(false);
+
+  // Legal Agreements (Terms & Conditions & Privacy Policy) State
+  const [legalState, setLegalState] = useState({
+    loading: true,
+    terms_and_conditions: {
+      title: "Terms & Conditions",
+      content: "",
+      updated_at: null,
+    },
+    privacy_policy: {
+      title: "Privacy Policy",
+      content: "",
+      updated_at: null,
+    },
+  });
+  const [legalActiveTab, setLegalActiveTab] = useState("terms_and_conditions");
+  const [legalPreviewMode, setLegalPreviewMode] = useState(false);
+  const [legalSaving, setLegalSaving] = useState(false);
+  const [legalResetting, setLegalResetting] = useState(false);
+  const [legalResetModalOpen, setLegalResetModalOpen] = useState(false);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -145,9 +193,27 @@ function AdminSettingsPage() {
           price_per_order: Math.max(0, parseFloat(addonStatus.auto_tracking?.price_per_order) || 0),
           description: addonStatus.auto_tracking?.description || "",
         },
+        trending_products: {
+          enabled: Boolean(addonStatus.trending_products?.enabled),
+          price: Math.max(0, parseFloat(addonStatus.trending_products?.price) || 0),
+          billing_mode: addonStatus.trending_products?.billing_mode === "one_time" ? "one_time" : "monthly",
+          description: addonStatus.trending_products?.description || "",
+        },
+        hand_picked_products: {
+          enabled: Boolean(addonStatus.hand_picked_products?.enabled),
+          price: Math.max(0, parseFloat(addonStatus.hand_picked_products?.price) || 0),
+          billing_mode: addonStatus.hand_picked_products?.billing_mode === "one_time" ? "one_time" : "monthly",
+          description: addonStatus.hand_picked_products?.description || "",
+        },
       };
       await updateAdminAddonSettings(payload);
       toast.success("Add-on pricing & configurations saved successfully.");
+      window.dispatchEvent(new CustomEvent("autods_refresh_addons"));
+      try {
+        localStorage.setItem("autods_addon_updated_at", String(Date.now()));
+      } catch {
+        // Ignore cross-tab storage errors
+      }
       loadAddonSettings();
     } catch (err) {
       toast.error(err.response?.data?.message ?? "Failed to save add-on settings.");
@@ -160,28 +226,112 @@ function AdminSettingsPage() {
     setOpenAiStatus((prev) => ({ ...prev, loading: true }));
     getAdminOpenAiStatus()
       .then((res) => {
-        setOpenAiStatus({ ...res.data, loading: false });
-        if (res.data?.image_model) setOpenAiImageModel(res.data.image_model);
-        if (res.data?.vision_model) setOpenAiVisionModel(res.data.vision_model);
-        if (res.data?.credits_per_image !== undefined) setOpenAiCreditsPerImage(res.data.credits_per_image);
+        const d = res.data ?? {};
+        setOpenAiStatus({ ...d, loading: false });
+        if (d.image_model) setOpenAiImageModel(d.image_model);
+        if (d.vision_model) setOpenAiVisionModel(d.vision_model);
+
+        const ppc = Math.max(0.0001, Number(d.price_per_credit ?? 0.02) || 0.02);
+        const imgCredits = Math.max(1, parseInt(d.credits_per_image ?? 1, 10) || 1);
+        const titleCredits = Math.max(1, parseInt(d.credits_per_title ?? 1, 10) || 1);
+
+        setOpenAiPricePerCredit(formatAiInputUsd(ppc));
+        setOpenAiCreditsPerImage(String(imgCredits));
+        setOpenAiImageUsd(formatAiInputUsd(d.image_cost_usd ?? imgCredits * ppc));
+        setOpenAiCreditsPerTitle(String(titleCredits));
+        setOpenAiTitleUsd(formatAiInputUsd(d.title_cost_usd ?? titleCredits * ppc));
       })
       .catch(() => setOpenAiStatus({ loading: false, configured: false }));
   };
 
+  const getEffectivePricePerCredit = () => {
+    const parsed = parseFloat(openAiPricePerCredit);
+    return Number.isFinite(parsed) && parsed >= 0.0001 ? Math.min(100, parsed) : 0.02;
+  };
+
+  const handlePricePerCreditChange = (val) => {
+    setOpenAiPricePerCredit(val);
+    const parsed = parseFloat(val);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const imgCredits = Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1);
+      const titleCredits = Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1);
+      setOpenAiImageUsd(formatAiInputUsd(imgCredits * parsed));
+      setOpenAiTitleUsd(formatAiInputUsd(titleCredits * parsed));
+    }
+  };
+
+  const handleImageCreditsChange = (val) => {
+    setOpenAiCreditsPerImage(val);
+    const credits = parseInt(val, 10);
+    if (Number.isFinite(credits) && credits >= 1) {
+      setOpenAiImageUsd(formatAiInputUsd(credits * getEffectivePricePerCredit()));
+    }
+  };
+
+  const handleImageUsdChange = (val) => {
+    setOpenAiImageUsd(val);
+    const usd = parseFloat(val);
+    if (Number.isFinite(usd) && usd > 0) {
+      const computedCredits = Math.max(1, Math.min(1000, Math.round(usd / getEffectivePricePerCredit())));
+      setOpenAiCreditsPerImage(String(computedCredits));
+    }
+  };
+
+  const handleImageUsdBlur = () => {
+    const credits = Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1);
+    setOpenAiCreditsPerImage(String(credits));
+    setOpenAiImageUsd(formatAiInputUsd(credits * getEffectivePricePerCredit()));
+  };
+
+  const handleTitleCreditsChange = (val) => {
+    setOpenAiCreditsPerTitle(val);
+    const credits = parseInt(val, 10);
+    if (Number.isFinite(credits) && credits >= 1) {
+      setOpenAiTitleUsd(formatAiInputUsd(credits * getEffectivePricePerCredit()));
+    }
+  };
+
+  const handleTitleUsdChange = (val) => {
+    setOpenAiTitleUsd(val);
+    const usd = parseFloat(val);
+    if (Number.isFinite(usd) && usd > 0) {
+      const computedCredits = Math.max(1, Math.min(1000, Math.round(usd / getEffectivePricePerCredit())));
+      setOpenAiCreditsPerTitle(String(computedCredits));
+    }
+  };
+
+  const handleTitleUsdBlur = () => {
+    const credits = Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1);
+    setOpenAiCreditsPerTitle(String(credits));
+    setOpenAiTitleUsd(formatAiInputUsd(credits * getEffectivePricePerCredit()));
+  };
+
   const handleSaveOpenAi = async () => {
+    const pricePerCredit = Math.round(getEffectivePricePerCredit() * 10000) / 10000;
+    const creditsPerImage = Math.max(1, Math.min(1000, parseInt(openAiCreditsPerImage, 10) || 1));
+    const creditsPerTitle = Math.max(1, Math.min(1000, parseInt(openAiCreditsPerTitle, 10) || 1));
+
     setOpenAiSaving(true);
     try {
       const payload = {
         image_model: openAiImageModel,
         vision_model: openAiVisionModel,
-        credits_per_image: Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1),
+        price_per_credit: pricePerCredit,
+        credits_per_image: creditsPerImage,
+        credits_per_title: creditsPerTitle,
       };
       if (openAiKey.trim()) {
         payload.api_key = openAiKey.trim();
       }
       await updateAdminOpenAiSettings(payload);
-      toast.success("OpenAI settings updated successfully.");
+      toast.success("OpenAI & AI credit pricing settings updated successfully.");
       setOpenAiKey("");
+      window.dispatchEvent(new CustomEvent("autods_refresh_ai_config"));
+      try {
+        localStorage.setItem("autods_ai_config_updated_at", String(Date.now()));
+      } catch {
+        // Ignore storage errors
+      }
       loadOpenAiStatus();
     } catch (err) {
       toast.error(err.response?.data?.message ?? "Failed to save OpenAI settings.");
@@ -204,12 +354,98 @@ function AdminSettingsPage() {
     }
   };
 
+  const loadLegalDocuments = () => {
+    setLegalState((prev) => ({ ...prev, loading: true }));
+    getAdminLegalDocuments()
+      .then((res) => {
+        setLegalState({
+          loading: false,
+          terms_and_conditions: res.data?.terms_and_conditions ?? {
+            title: "Terms & Conditions",
+            content: "",
+            updated_at: null,
+          },
+          privacy_policy: res.data?.privacy_policy ?? {
+            title: "Privacy Policy",
+            content: "",
+            updated_at: null,
+          },
+        });
+      })
+      .catch(() => {
+        setLegalState((prev) => ({ ...prev, loading: false }));
+        toast.error("Failed to load legal agreement templates.");
+      });
+  };
+
+  const handleSaveLegalDocuments = async () => {
+    const termsContent = (legalState.terms_and_conditions?.content || "").trim();
+    const privacyContent = (legalState.privacy_policy?.content || "").trim();
+
+    if (termsContent.length < 10) {
+      setLegalActiveTab("terms_and_conditions");
+      setLegalPreviewMode(false);
+      toast.error("Terms & Conditions text must be at least 10 characters.");
+      return;
+    }
+
+    if (privacyContent.length < 10) {
+      setLegalActiveTab("privacy_policy");
+      setLegalPreviewMode(false);
+      toast.error("Privacy Policy text must be at least 10 characters.");
+      return;
+    }
+
+    setLegalSaving(true);
+    try {
+      const res = await updateAdminLegalDocuments({
+        terms_and_conditions: {
+          title: (legalState.terms_and_conditions?.title || "Terms & Conditions").trim() || "Terms & Conditions",
+          content: termsContent,
+        },
+        privacy_policy: {
+          title: (legalState.privacy_policy?.title || "Privacy Policy").trim() || "Privacy Policy",
+          content: privacyContent,
+        },
+      });
+      setLegalState({
+        loading: false,
+        terms_and_conditions: res.data?.terms_and_conditions ?? legalState.terms_and_conditions,
+        privacy_policy: res.data?.privacy_policy ?? legalState.privacy_policy,
+      });
+      toast.success(res.data?.message || "Legal agreements updated successfully.");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save legal agreements.");
+    } finally {
+      setLegalSaving(false);
+    }
+  };
+
+  const handleResetLegalDocument = async () => {
+    setLegalResetting(true);
+    try {
+      const res = await resetAdminLegalDocuments(legalActiveTab);
+      setLegalState({
+        loading: false,
+        terms_and_conditions: res.data?.terms_and_conditions ?? legalState.terms_and_conditions,
+        privacy_policy: res.data?.privacy_policy ?? legalState.privacy_policy,
+      });
+      setLegalResetModalOpen(false);
+      toast.success(res.data?.message || "Default legal template restored.");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to restore default template.");
+    } finally {
+      setLegalResetting(false);
+    }
+  };
+
   useEffect(() => {
     if (role === "super_admin") {
       loadAliExpressStatus();
       loadGoogleStatus();
       loadOpenAiStatus();
       loadAddonSettings();
+      loadLegalDocuments();
     }
   }, [role]);
 
@@ -461,10 +697,10 @@ function AdminSettingsPage() {
             <LuSparkles />
           </div>
           <div>
-            <h2>OpenAI / ChatGPT Image Generation</h2>
+            <h2>OpenAI Studio &amp; AI Credits Pricing</h2>
             <p>
-              Configure the OpenAI API key used for generating high-resolution product photography
-              and e-commerce template images with DALL-E 3 &amp; GPT-4o Vision.
+              Configure the OpenAI API key, base USD price per AI credit, and per-operation Credit &amp; USD rates
+              for AI product photography and eBay SEO product title optimization.
             </p>
           </div>
         </div>
@@ -562,7 +798,7 @@ function AdminSettingsPage() {
 
                 <div className="admin-settings-ai-field">
                   <label htmlFor="openai-vision-model" className="admin-settings-ai-label">
-                    Vision Enhancement Model
+                    Text &amp; Vision Model (Titles / Vision)
                   </label>
                   <div className="admin-settings-ai-select-wrap">
                     <select
@@ -579,30 +815,31 @@ function AdminSettingsPage() {
                     </span>
                   </div>
                   <p className="admin-settings-ai-help">
-                    Analyzes input photos to optimize prompt details.
+                    Analyzes input photos and powers AI product title optimization.
                   </p>
                 </div>
               </div>
 
-              {/* Field 4: Credits Cost Per Image */}
+              {/* Field 4: Price Per AI Credit ($ USD) */}
               <div className="admin-settings-ai-field">
-                <label htmlFor="openai-credits-input" className="admin-settings-ai-label">
-                  AI Credits Cost Per Image
+                <label htmlFor="openai-price-per-credit" className="admin-settings-ai-label">
+                  Price Per AI Credit ($ USD)
                 </label>
                 <div className="admin-settings-ai-input-wrap">
                   <span className="admin-settings-ai-input-icon">
-                    <LuZap style={{ color: "#f59e0b" }} />
+                    <LuDollarSign style={{ color: "#10b981" }} />
                   </span>
                   <input
-                    id="openai-credits-input"
+                    id="openai-price-per-credit"
                     className="admin-settings-ai-input"
                     type="number"
-                    min="1"
-                    max="1000"
-                    value={openAiCreditsPerImage}
-                    onChange={(e) => setOpenAiCreditsPerImage(e.target.value)}
-                    placeholder="1"
-                    style={{ paddingRight: 96 }}
+                    min="0.0001"
+                    max="100"
+                    step="0.0001"
+                    value={openAiPricePerCredit}
+                    onChange={(e) => handlePricePerCreditChange(e.target.value)}
+                    placeholder="0.02"
+                    style={{ paddingRight: 112 }}
                   />
                   <span
                     style={{
@@ -610,18 +847,242 @@ function AdminSettingsPage() {
                       right: 12,
                       fontSize: 12,
                       fontWeight: 650,
-                      color: "#64748b",
-                      backgroundColor: "#f1f5f9",
+                      color: "#065f46",
+                      backgroundColor: "#ecfdf5",
+                      border: "1px solid #a7f3d0",
                       padding: "4px 8px",
                       borderRadius: 6,
                     }}
                   >
-                    Credits / img
+                    USD / credit
                   </span>
                 </div>
                 <p className="admin-settings-ai-help">
-                  Number of AI credits deducted from a user&apos;s balance for each generated output image (default: 1).
+                  Base USD rate charged per 1 AI credit when users purchase credits (
+                  <strong>1 Credit = {formatAiUsd(getEffectivePricePerCredit())}</strong> ·{" "}
+                  <strong>{formatCreditConversionLabel(getEffectivePricePerCredit())}</strong>).
                 </p>
+              </div>
+
+              {/* Field 5: Per AI Image Cost (Credits & $) */}
+              <div className="admin-settings-ai-grid">
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-credits-input" className="admin-settings-ai-label">
+                    AI Image Cost (Credits)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuZap style={{ color: "#f59e0b" }} />
+                    </span>
+                    <input
+                      id="openai-credits-input"
+                      className="admin-settings-ai-input"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={openAiCreditsPerImage}
+                      onChange={(e) => handleImageCreditsChange(e.target.value)}
+                      placeholder="1"
+                      style={{ paddingRight: 102 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#64748b",
+                        backgroundColor: "#f1f5f9",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      Credits / img
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Credits deducted per generated image.
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-image-usd-input" className="admin-settings-ai-label">
+                    AI Image Cost ($ USD)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuDollarSign style={{ color: "#4f46e5" }} />
+                    </span>
+                    <input
+                      id="openai-image-usd-input"
+                      className="admin-settings-ai-input"
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      value={openAiImageUsd}
+                      onChange={(e) => handleImageUsdChange(e.target.value)}
+                      onBlur={handleImageUsdBlur}
+                      placeholder="0.02"
+                      style={{ paddingRight: 88 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#4338ca",
+                        backgroundColor: "#eef2ff",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      USD / img
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Synced with credits × $/credit ({Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1)} ×{" "}
+                    {formatAiUsd(getEffectivePricePerCredit())} ={" "}
+                    <strong>
+                      {formatAiUsd((Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1)) * getEffectivePricePerCredit())}
+                    </strong>
+                    ).
+                  </p>
+                </div>
+              </div>
+
+              {/* Field 6: Per Product Title Cost (Credits & $) */}
+              <div className="admin-settings-ai-grid">
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-title-credits-input" className="admin-settings-ai-label">
+                    Product Title Cost (Credits)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuZap style={{ color: "#f59e0b" }} />
+                    </span>
+                    <input
+                      id="openai-title-credits-input"
+                      className="admin-settings-ai-input"
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={openAiCreditsPerTitle}
+                      onChange={(e) => handleTitleCreditsChange(e.target.value)}
+                      placeholder="1"
+                      style={{ paddingRight: 108 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#64748b",
+                        backgroundColor: "#f1f5f9",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      Credits / title
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Credits deducted per AI product title optimization.
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="openai-title-usd-input" className="admin-settings-ai-label">
+                    Product Title Cost ($ USD)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuDollarSign style={{ color: "#4f46e5" }} />
+                    </span>
+                    <input
+                      id="openai-title-usd-input"
+                      className="admin-settings-ai-input"
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      value={openAiTitleUsd}
+                      onChange={(e) => handleTitleUsdChange(e.target.value)}
+                      onBlur={handleTitleUsdBlur}
+                      placeholder="0.02"
+                      style={{ paddingRight: 94 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#4338ca",
+                        backgroundColor: "#eef2ff",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      USD / title
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Synced with credits × $/credit ({Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1)} ×{" "}
+                    {formatAiUsd(getEffectivePricePerCredit())} ={" "}
+                    <strong>
+                      {formatAiUsd((Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1)) * getEffectivePricePerCredit())}
+                    </strong>
+                    ).
+                  </p>
+                </div>
+              </div>
+
+              {/* User Pricing Preview Banner */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                  gap: 12,
+                  padding: "14px 16px",
+                  borderRadius: 10,
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "block" }}>
+                    Rate Per AI Credit
+                  </span>
+                  <strong style={{ fontSize: 15, color: "#059669" }}>
+                    {formatAiUsd(getEffectivePricePerCredit())} / credit
+                  </strong>
+                  <span style={{ fontSize: 11, color: "#64748b", display: "block" }}>
+                    {formatCreditConversionLabel(getEffectivePricePerCredit())}
+                  </span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "block" }}>
+                    Cost Per AI Image
+                  </span>
+                  <strong style={{ fontSize: 15, color: "#0f172a" }}>
+                    {Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1)} credit(s)
+                  </strong>
+                  <span style={{ fontSize: 11, color: "#4f46e5", fontWeight: 600, display: "block" }}>
+                    {formatAiUsd((Math.max(1, parseInt(openAiCreditsPerImage, 10) || 1)) * getEffectivePricePerCredit())} USD / image
+                  </span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "block" }}>
+                    Cost Per Product Title
+                  </span>
+                  <strong style={{ fontSize: 15, color: "#0f172a" }}>
+                    {Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1)} credit(s)
+                  </strong>
+                  <span style={{ fontSize: 11, color: "#4f46e5", fontWeight: 600, display: "block" }}>
+                    {formatAiUsd((Math.max(1, parseInt(openAiCreditsPerTitle, 10) || 1)) * getEffectivePricePerCredit())} USD / title
+                  </span>
+                </div>
               </div>
 
               {/* Action Buttons */}
@@ -669,8 +1130,8 @@ function AdminSettingsPage() {
               )}
             </div>
             <p>
-              Configure client pricing and rules for Order Processing, Sourcing Requests, and Auto-Tracking.
-              These rates automatically apply to client balances and display live on their <strong>Plans &amp; Add-ons</strong> page.
+              Configure client pricing and rules for Order Processing, Sourcing Requests, Auto-Tracking, Trending Products, and Hand-Picked Products.
+              These rates apply immediately and display live on the client&apos;s <strong>Plans &amp; Add-ons</strong> and <strong>Usage &amp; Upgrade</strong> views.
             </p>
           </div>
         </div>
@@ -1234,6 +1695,328 @@ function AdminSettingsPage() {
               </div>
             </div>
 
+            {/* 4. Trending Products Add-on */}
+            <div
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "20px",
+                marginBottom: "20px",
+                background: "#f8fafc",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "#fff7ed",
+                      color: "#ea580c",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "20px",
+                    }}
+                  >
+                    <LuChartLine />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1e293b" }}>
+                      Trending Products Add-on
+                    </h3>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      Paid add-on gating client access to the curated Trending Products feed.
+                    </span>
+                  </div>
+                </div>
+
+                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                  <input
+                    type="checkbox"
+                    checked={addonStatus.trending_products?.enabled ?? true}
+                    onChange={(e) =>
+                      setAddonStatus((prev) => ({
+                        ...prev,
+                        trending_products: {
+                          ...prev.trending_products,
+                          enabled: e.target.checked,
+                        },
+                      }))
+                    }
+                    style={{ width: "16px", height: "16px", accentColor: "#ea580c", cursor: "pointer" }}
+                  />
+                  <span>Feature Enabled for Clients</span>
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Add-on Price ($)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuDollarSign style={{ color: "#ea580c" }} />
+                    </span>
+                    <input
+                      className="admin-settings-ai-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={addonStatus.trending_products?.price ?? 14.99}
+                      onChange={(e) =>
+                        setAddonStatus((prev) => ({
+                          ...prev,
+                          trending_products: {
+                            ...prev.trending_products,
+                            price: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="14.99"
+                      style={{ paddingRight: 88 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#ea580c",
+                        backgroundColor: "#ffedd5",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      {addonStatus.trending_products?.billing_mode === "one_time" ? "one-time" : "/ month"}
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Client unlock price (set $0.00 to include free for all merchants).
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Billing Frequency
+                  </label>
+                  <div className="admin-settings-ai-select-wrap">
+                    <select
+                      className="admin-settings-ai-select"
+                      value={addonStatus.trending_products?.billing_mode || "monthly"}
+                      onChange={(e) =>
+                        setAddonStatus((prev) => ({
+                          ...prev,
+                          trending_products: {
+                            ...prev.trending_products,
+                            billing_mode: e.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="monthly">Monthly Recurring</option>
+                      <option value="one_time">One-Time Unlock</option>
+                    </select>
+                    <span className="admin-settings-ai-select-arrow">
+                      <LuChevronDown />
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Monthly renews every 30 days; One-Time unlocks permanently.
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Client Card Description
+                  </label>
+                  <input
+                    className="admin-settings-ai-input"
+                    type="text"
+                    maxLength={500}
+                    style={{ paddingLeft: 14 }}
+                    value={addonStatus.trending_products?.description ?? ""}
+                    onChange={(e) =>
+                      setAddonStatus((prev) => ({
+                        ...prev,
+                        trending_products: {
+                          ...prev.trending_products,
+                          description: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Unlock daily winning & trending product feeds..."
+                  />
+                  <p className="admin-settings-ai-help">
+                    Shown on the Plans &amp; Add-ons card and lock prompt.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Hand-Picked Products Add-on */}
+            <div
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+                padding: "20px",
+                marginBottom: "24px",
+                background: "#f8fafc",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div
+                    style={{
+                      width: "38px",
+                      height: "38px",
+                      borderRadius: "8px",
+                      background: "#eef2ff",
+                      color: "#4f46e5",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "20px",
+                    }}
+                  >
+                    <LuBadgeCheck />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1e293b" }}>
+                      Hand-Picked Products Add-on
+                    </h3>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      Paid add-on gating client access to the curated Hand-Picked Products vault.
+                    </span>
+                  </div>
+                </div>
+
+                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                  <input
+                    type="checkbox"
+                    checked={addonStatus.hand_picked_products?.enabled ?? true}
+                    onChange={(e) =>
+                      setAddonStatus((prev) => ({
+                        ...prev,
+                        hand_picked_products: {
+                          ...prev.hand_picked_products,
+                          enabled: e.target.checked,
+                        },
+                      }))
+                    }
+                    style={{ width: "16px", height: "16px", accentColor: "#4f46e5", cursor: "pointer" }}
+                  />
+                  <span>Feature Enabled for Clients</span>
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Add-on Price ($)
+                  </label>
+                  <div className="admin-settings-ai-input-wrap">
+                    <span className="admin-settings-ai-input-icon">
+                      <LuDollarSign style={{ color: "#4f46e5" }} />
+                    </span>
+                    <input
+                      className="admin-settings-ai-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={addonStatus.hand_picked_products?.price ?? 19.99}
+                      onChange={(e) =>
+                        setAddonStatus((prev) => ({
+                          ...prev,
+                          hand_picked_products: {
+                            ...prev.hand_picked_products,
+                            price: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="19.99"
+                      style={{ paddingRight: 88 }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: 12,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        color: "#4f46e5",
+                        backgroundColor: "#e0e7ff",
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                      }}
+                    >
+                      {addonStatus.hand_picked_products?.billing_mode === "one_time" ? "one-time" : "/ month"}
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Client unlock price (set $0.00 to include free for all merchants).
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Billing Frequency
+                  </label>
+                  <div className="admin-settings-ai-select-wrap">
+                    <select
+                      className="admin-settings-ai-select"
+                      value={addonStatus.hand_picked_products?.billing_mode || "monthly"}
+                      onChange={(e) =>
+                        setAddonStatus((prev) => ({
+                          ...prev,
+                          hand_picked_products: {
+                            ...prev.hand_picked_products,
+                            billing_mode: e.target.value,
+                          },
+                        }))
+                      }
+                    >
+                      <option value="monthly">Monthly Recurring</option>
+                      <option value="one_time">One-Time Unlock</option>
+                    </select>
+                    <span className="admin-settings-ai-select-arrow">
+                      <LuChevronDown />
+                    </span>
+                  </div>
+                  <p className="admin-settings-ai-help">
+                    Monthly renews every 30 days; One-Time unlocks permanently.
+                  </p>
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Client Card Description
+                  </label>
+                  <input
+                    className="admin-settings-ai-input"
+                    type="text"
+                    maxLength={500}
+                    style={{ paddingLeft: 14 }}
+                    value={addonStatus.hand_picked_products?.description ?? ""}
+                    onChange={(e) =>
+                      setAddonStatus((prev) => ({
+                        ...prev,
+                        hand_picked_products: {
+                          ...prev.hand_picked_products,
+                          description: e.target.value,
+                        },
+                      }))
+                    }
+                    placeholder="Access hand-picked high-margin winning products..."
+                  />
+                  <p className="admin-settings-ai-help">
+                    Shown on the Plans &amp; Add-ons card and lock prompt.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Action Buttons */}
             <div className="admin-settings-ai-actions">
               <button
@@ -1260,6 +2043,247 @@ function AdminSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Legal Agreements (Terms & Conditions & Privacy Policy) Card */}
+      <div className="admin-settings-page__card card-wrapper" style={{ marginTop: "24px" }}>
+        <div className="admin-settings-page__card-head">
+          <div className="admin-settings-page__icon-wrap" style={{ background: "#ede9fe", color: "#5b21b6" }}>
+            <LuFileText />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+              <h2>Terms &amp; Conditions and Privacy Policy</h2>
+              {legalState[legalActiveTab]?.updated_at ? (
+                <span style={{ fontSize: "12px", color: "#64748b" }}>
+                  Last updated: {formatLegalDate(legalState[legalActiveTab].updated_at)}
+                </span>
+              ) : null}
+            </div>
+            <p>
+              Manage the platform&apos;s Terms &amp; Conditions and Privacy Policy templates. Both documents are seeded with
+              a general template and must be agreed to by new merchants during signup before payment.
+            </p>
+          </div>
+        </div>
+
+        {legalState.loading ? (
+          <div className="admin-settings-page__loading">
+            <LuLoader className="spin-icon" />
+            <span>Loading legal templates…</span>
+          </div>
+        ) : (
+          <div style={{ padding: "0 24px 24px 24px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: "12px",
+                marginBottom: "18px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className={`admin-page__btn ${
+                    legalActiveTab === "terms_and_conditions"
+                      ? "admin-page__btn--primary"
+                      : "admin-page__btn--ghost"
+                  }`}
+                  onClick={() => setLegalActiveTab("terms_and_conditions")}
+                  style={{ minHeight: 38, padding: "0 16px" }}
+                >
+                  <LuFileText />
+                  <span>Terms &amp; Conditions</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`admin-page__btn ${
+                    legalActiveTab === "privacy_policy"
+                      ? "admin-page__btn--primary"
+                      : "admin-page__btn--ghost"
+                  }`}
+                  onClick={() => setLegalActiveTab("privacy_policy")}
+                  style={{ minHeight: 38, padding: "0 16px" }}
+                >
+                  <LuShieldCheck />
+                  <span>Privacy Policy</span>
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="admin-page__btn admin-page__btn--ghost"
+                  onClick={() => setLegalPreviewMode((v) => !v)}
+                  style={{ minHeight: 38, padding: "0 14px" }}
+                >
+                  {legalPreviewMode ? <LuFileText /> : <LuEye />}
+                  <span>{legalPreviewMode ? "Back to Editor" : "Preview Formatting"}</span>
+                </button>
+
+                <Link
+                  to={
+                    legalActiveTab === "privacy_policy"
+                      ? "/privacy-policy"
+                      : "/terms-and-conditions"
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-page__btn admin-page__btn--ghost"
+                  style={{ minHeight: 38, padding: "0 14px", textDecoration: "none" }}
+                >
+                  <span>View Live Page</span>
+                  <LuExternalLink />
+                </Link>
+              </div>
+            </div>
+
+            {legalPreviewMode ? (
+              <div
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "12px",
+                  padding: "24px",
+                  background: "#ffffff",
+                  maxHeight: "480px",
+                  overflowY: "auto",
+                  marginBottom: "20px",
+                }}
+              >
+                <h3 style={{ margin: "0 0 14px", fontSize: "20px", fontWeight: 750, color: "#171426" }}>
+                  {legalState[legalActiveTab]?.title ||
+                    (legalActiveTab === "privacy_policy" ? "Privacy Policy" : "Terms & Conditions")}
+                </h3>
+                {renderLegalContent(legalState[legalActiveTab]?.content)}
+              </div>
+            ) : (
+              <div className="admin-settings-ai-form" style={{ marginBottom: "20px" }}>
+                <div className="admin-settings-ai-field">
+                  <label htmlFor="legal-doc-title" className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                    Document Heading
+                  </label>
+                  <input
+                    id="legal-doc-title"
+                    type="text"
+                    className="admin-settings-ai-input"
+                    style={{ paddingLeft: "14px" }}
+                    value={legalState[legalActiveTab]?.title || ""}
+                    onChange={(e) => {
+                      const nextTitle = e.target.value;
+                      setLegalState((prev) => ({
+                        ...prev,
+                        [legalActiveTab]: {
+                          ...prev[legalActiveTab],
+                          title: nextTitle,
+                        },
+                      }));
+                    }}
+                    placeholder={
+                      legalActiveTab === "privacy_policy" ? "Privacy Policy" : "Terms & Conditions"
+                    }
+                  />
+                </div>
+
+                <div className="admin-settings-ai-field">
+                  <div className="admin-settings-ai-label-row">
+                    <label htmlFor="legal-doc-content" className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
+                      {legalActiveTab === "privacy_policy"
+                        ? "Privacy Policy Content"
+                        : "Terms & Conditions Content"}
+                    </label>
+                    <span style={{ fontSize: "12px", color: "#64748b" }}>
+                      {(legalState[legalActiveTab]?.content || "").length} characters
+                    </span>
+                  </div>
+                  <textarea
+                    id="legal-doc-content"
+                    value={legalState[legalActiveTab]?.content || ""}
+                    onChange={(e) => {
+                      const nextContent = e.target.value;
+                      setLegalState((prev) => ({
+                        ...prev,
+                        [legalActiveTab]: {
+                          ...prev[legalActiveTab],
+                          content: nextContent,
+                        },
+                      }));
+                    }}
+                    placeholder="Enter document text. Numbered section titles (e.g. '1. Acceptance of Terms') and '- ' bullet lines format automatically."
+                    style={{
+                      width: "100%",
+                      minHeight: "360px",
+                      resize: "vertical",
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid #d8d6e2",
+                      fontSize: "13.5px",
+                      lineHeight: 1.65,
+                    }}
+                  />
+                  <p className="admin-settings-ai-help">
+                    Supports blank-line paragraphs, numbered section headings (e.g. <code>1. Acceptance of Terms</code>), and bullet points starting with <code>- </code>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="admin-settings-ai-actions" style={{ flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="admin-page__btn admin-page__btn--primary"
+                onClick={handleSaveLegalDocuments}
+                disabled={legalSaving || legalResetting}
+                style={{ minHeight: 42, padding: "0 22px" }}
+              >
+                {legalSaving ? <LuLoader className="spin-icon" /> : <LuSave />}
+                <span>{legalSaving ? "Saving Agreements…" : "Save Legal Agreements"}</span>
+              </button>
+
+              <button
+                type="button"
+                className="admin-page__btn admin-page__btn--ghost"
+                onClick={() => setLegalResetModalOpen(true)}
+                disabled={legalSaving || legalResetting}
+                style={{ minHeight: 42, padding: "0 18px" }}
+              >
+                <LuRotateCcw />
+                <span>
+                  Restore Default{" "}
+                  {legalActiveTab === "privacy_policy" ? "Privacy Policy" : "Terms"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="admin-page__btn admin-page__btn--ghost"
+                onClick={loadLegalDocuments}
+                disabled={legalSaving || legalResetting}
+                style={{ minHeight: 42, padding: "0 18px" }}
+              >
+                <span>Reload from Server</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={legalResetModalOpen}
+        title={`Restore Default ${
+          legalActiveTab === "privacy_policy" ? "Privacy Policy" : "Terms & Conditions"
+        }?`}
+        description="This will replace the current text of this agreement with the initial default template. You can edit it again afterwards."
+        confirmLabel="Restore Default Template"
+        danger={true}
+        saving={legalResetting}
+        onConfirm={handleResetLegalDocument}
+        onClose={() => {
+          if (!legalResetting) setLegalResetModalOpen(false);
+        }}
+      />
     </section>
 
   );
