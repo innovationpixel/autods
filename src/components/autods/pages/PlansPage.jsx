@@ -1,37 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   LuArrowUpRight,
-  LuBanknote,
-  LuCalendar,
   LuCheck,
+  LuClock,
   LuCreditCard,
   LuCrown,
   LuFileText,
   LuLoader,
-  LuLock,
   LuSettings,
   LuShield,
   LuSparkles,
-  LuZap,
 } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
 import { openPaymentCheckout } from "../../../utils/paymentCheckout";
-import { checkoutPayPal, checkoutStripe, getCurrentPlan, getPlans } from "../../../services/PlanService";
+import {
+  activatePlan,
+  checkoutPayPal,
+  checkoutStripe,
+  getCurrentPlan,
+  getPlans,
+  startPlanFreeTrial,
+} from "../../../services/PlanService";
 import { acceptLegalConsent } from "../../../services/AuthService";
 import { getLegalDocuments } from "../../../services/LegalService";
 import { selectUser } from "../../../store/selectors/AuthSelectors";
-import { updateUserStateAction } from "../../../store/actions/AuthActions";
+import {
+  fetchFreshUserAction,
+  updateUserStateAction,
+} from "../../../store/actions/AuthActions";
 import LegalDocumentModal from "../../legal/LegalDocumentModal";
+import PlanReferenceCard from "./PlanReferenceCard";
 import "../../../assets/css/legal-documents.css";
-
-function formatPlanInterval(plan) {
-  if (plan.billing_type === "monthly") {
-    return "month";
-  }
-  return `${plan.duration_days ?? 30} days`;
-}
 
 function formatExpiryDate(value) {
   if (!value) return null;
@@ -51,6 +52,18 @@ function PlansPage() {
   const [current, setCurrent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checkoutId, setCheckoutId] = useState(null);
+  const [trialStartingId, setTrialStartingId] = useState(null);
+  const [activatingId, setActivatingId] = useState(null);
+  const initialCycleParam = (
+    searchParams.get("billing_cycle") ||
+    searchParams.get("billing_type") ||
+    ""
+  ).toLowerCase();
+  const [billingCycle, setBillingCycle] = useState(
+    initialCycleParam === "yearly" || initialCycleParam === "annual"
+      ? "annual"
+      : "monthly"
+  );
 
   const hasStoredLegalConsent = Boolean(
     user?.legal_accepted || (user?.terms_accepted_at && user?.privacy_accepted_at)
@@ -100,23 +113,102 @@ function PlansPage() {
     }
   }, [checkoutSuccess, checkoutCanceled, setSearchParams]);
 
+  const reloadPlansAndStatus = useCallback(async () => {
+    try {
+      const [plansRes, currentRes] = await Promise.all([getPlans(), getCurrentPlan()]);
+      const list = plansRes.data?.plans ?? [];
+      const currentData = currentRes.data;
+      setPlans(list);
+      setCurrent(currentData);
+      if (currentData?.subscription?.billing_type === "yearly" && !initialCycleParam) {
+        setBillingCycle("annual");
+      }
+      dispatch(fetchFreshUserAction());
+      window.dispatchEvent(new CustomEvent("autods_refresh_quota"));
+      window.dispatchEvent(new CustomEvent("autods_refresh_addons"));
+    } catch {
+      toast.error("Failed to load plans.");
+    }
+  }, [dispatch, initialCycleParam]);
+
   useEffect(() => {
     Promise.all([getPlans(), getCurrentPlan()])
       .then(([plansRes, currentRes]) => {
-        setPlans(plansRes.data?.plans ?? []);
-        setCurrent(currentRes.data);
+        const list = plansRes.data?.plans ?? [];
+        const currentData = currentRes.data;
+        setPlans(list);
+        setCurrent(currentData);
+        if (currentData?.subscription?.billing_type === "yearly" && !initialCycleParam) {
+          setBillingCycle("annual");
+        }
       })
       .catch(() => toast.error("Failed to load plans."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [initialCycleParam]);
 
   const activePlanId = current?.current_plan?.id ?? current?.subscription?.plan_id;
+  const activeBillingCycle = current?.subscription?.billing_type ?? current?.current_plan?.billing_type ?? null;
+  const isOnFreeTrial = Boolean(current?.is_on_free_trial);
+  const hasUsedFreeTrial = Boolean(current?.has_used_free_trial);
+  const hasActivePaidPlan = Boolean(
+    current?.is_plan_paid &&
+      current?.plan_expires_at &&
+      new Date(current.plan_expires_at).getTime() > Date.now()
+  );
+  const signFreeAvailable = Boolean(current?.sign_free_available);
+  const isSignFreeCurrent = Boolean(current?.current_plan?.is_sign_free && !current?.is_plan_paid);
+  const hasAnyAnnualOption = useMemo(
+    () =>
+      plans.some(
+        (p) =>
+          Boolean(p.has_annual_plan) ||
+          p.billing_type === "yearly" ||
+          (p.billing_type === "monthly" &&
+            p.annual_price !== null &&
+            p.annual_price !== undefined &&
+            p.annual_price !== "")
+      ),
+    [plans]
+  );
+
+  const maxAnnualDiscount = useMemo(() => {
+    let best = 0;
+    plans.forEach((p) => {
+      let pct = Number(p.annual_discount_percent ?? 0);
+      if (!pct && p.billing_type === "monthly" && p.annual_price !== null && p.annual_price !== undefined) {
+        const m12 = Number(p.price ?? 0) * 12;
+        const a = Number(p.annual_price);
+        if (m12 > 0 && a < m12) {
+          pct = Math.round(((m12 - a) / m12) * 1000) / 10;
+        }
+      }
+      if (pct > best) {
+        best = pct;
+      }
+    });
+    return best;
+  }, [plans]);
+
   const featuredPlanId = useMemo(() => {
-    const pro = plans.find((p) => /pro/i.test(p.title) && p.billing_type === "monthly");
+    const publicPlans = plans.filter((p) => !p.is_custom);
+    if (!publicPlans.length) return null;
+    const pro =
+      publicPlans.find(
+        (p) =>
+          /\bpro\b|professional/i.test(p.title || "") &&
+          (p.base_billing_type || p.billing_type) === "monthly"
+      ) ??
+      publicPlans.find(
+        (p) =>
+          /pro/i.test(p.title || "") &&
+          (p.base_billing_type || p.billing_type) === "monthly"
+      );
     if (pro) return pro.id;
-    const monthly = plans.filter((p) => p.billing_type === "monthly");
+    const monthly = publicPlans.filter(
+      (p) => (p.base_billing_type || p.billing_type) === "monthly"
+    );
     if (monthly.length >= 2) return monthly[1]?.id;
-    return plans[1]?.id ?? plans[0]?.id;
+    return publicPlans[1]?.id ?? publicPlans[0]?.id;
   }, [plans]);
 
   const validateLegalAgreementBeforePayment = () => {
@@ -129,14 +221,26 @@ function PlansPage() {
     return false;
   };
 
-  const handleCheckout = async (planId, provider) => {
+  const handleCheckout = async (planId, provider, requestedCycle = null) => {
     if (!validateLegalAgreementBeforePayment()) {
       return;
     }
 
+    const plan = plans.find((p) => p.id === planId);
+    const resolvedCycle =
+      requestedCycle ||
+      (plan?.billing_type === "one_time"
+        ? "one_time"
+        : billingCycle === "annual" && plan?.has_annual_plan
+        ? "yearly"
+        : plan?.billing_type === "yearly"
+        ? "yearly"
+        : "monthly");
+
     setCheckoutId(`${planId}-${provider}`);
     try {
       const options = {
+        billing_cycle: resolvedCycle,
         terms_accepted: true,
         privacy_accepted: true,
       };
@@ -184,11 +288,99 @@ function PlansPage() {
       }
     }
 
+    const checkoutPrice =
+      plan.effective_checkout_price !== undefined && plan.effective_checkout_price !== null
+        ? plan.effective_checkout_price
+        : plan.price;
+    const cycleNote =
+      plan.effective_checkout_cycle === "yearly"
+        ? "Annual"
+        : plan.effective_checkout_cycle === "one_time"
+        ? `${plan.duration_days ?? 30}-Day`
+        : "Monthly";
+
     navigate(
       `/wallet?method=wire&amount=${encodeURIComponent(
-        plan.price
-      )}&note=${encodeURIComponent(`Subscription Plan: ${plan.title}`)}`
+        checkoutPrice
+      )}&note=${encodeURIComponent(`Subscription Plan: ${plan.title} (${cycleNote})`)}`
     );
+  };
+
+  const handleStartFreeTrial = async (planId) => {
+    if (!validateLegalAgreementBeforePayment()) {
+      return;
+    }
+
+    setTrialStartingId(planId);
+    try {
+      const res = await startPlanFreeTrial(planId, {
+        terms_accepted: true,
+        privacy_accepted: true,
+      });
+
+      const nextUser = res.data?.user;
+      if (nextUser) {
+        dispatch(updateUserStateAction({ ...nextUser, legal_accepted: true }));
+      } else if (!hasStoredLegalConsent) {
+        const nowIso = new Date().toISOString();
+        dispatch(
+          updateUserStateAction({
+            terms_accepted_at: user?.terms_accepted_at || nowIso,
+            privacy_accepted_at: user?.privacy_accepted_at || nowIso,
+            legal_accepted: true,
+          })
+        );
+      }
+
+      toast.success(res.data?.message || "Free trial started!");
+      await reloadPlansAndStatus();
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        setLegalError(true);
+      }
+      toast.error(err.response?.data?.error ?? err.response?.data?.message ?? "Failed to start free trial.");
+    } finally {
+      setTrialStartingId(null);
+    }
+  };
+
+  const handleActivateFreePlan = async (planId) => {
+    if (!validateLegalAgreementBeforePayment()) {
+      return;
+    }
+
+    const plan = plans.find((p) => p.id === planId);
+    const resolvedCycle =
+      plan?.base_billing_type === "one_time" || plan?.billing_type === "one_time"
+        ? "one_time"
+        : plan?.base_billing_type === "yearly" || plan?.billing_type === "yearly"
+        ? "yearly"
+        : "monthly";
+
+    setActivatingId(planId);
+    try {
+      const res = await activatePlan(planId, {
+        provider: "system",
+        billing_cycle: resolvedCycle,
+        terms_accepted: true,
+        privacy_accepted: true,
+      });
+
+      const nextUser = res.data?.user;
+      if (nextUser) {
+        dispatch(updateUserStateAction({ ...nextUser, legal_accepted: true }));
+      }
+
+      toast.success(res.data?.message || "Free plan activated!");
+      await reloadPlansAndStatus();
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        setLegalError(true);
+      }
+      toast.error(err.response?.data?.error ?? err.response?.data?.message ?? "Failed to activate free plan.");
+    } finally {
+      setActivatingId(null);
+    }
   };
 
   if (loading) {
@@ -209,29 +401,43 @@ function PlansPage() {
 
   return (
     <section className="plans-hub card-wrapper">
-      <header className="plans-hub__hero">
+      <header className="plans-hub__hero plans-hub__hero--ref">
         <div className="plans-hub__hero-copy">
-          <span className="plans-hub__eyebrow"><LuSparkles /> Subscription Plans</span>
+          <span className="plans-hub__eyebrow"><LuSparkles /> Pricing &amp; Plans</span>
           <h1>Choose the plan that fits your store</h1>
           <p>
-            Scale your dropshipping business with flexible plans. Import products, sync orders,
-            and automate listings — all from one dashboard.
+            Powerful automation tools to help you import, list, manage and grow your dropshipping business.
           </p>
         </div>
         {current?.current_plan ? (
           <div className="plans-hub__active-chip">
-            <span className="plans-hub__active-chip-icon"><LuCrown /></span>
+            <span className="plans-hub__active-chip-icon">
+              {isOnFreeTrial ? <LuClock /> : <LuCrown />}
+            </span>
             <div>
               <span className="plans-hub__active-chip-label">
-                {current.current_plan.is_custom
+                {isOnFreeTrial
+                  ? "Free trial active"
+                  : isSignFreeCurrent
+                  ? "Sign Free Plan"
+                  : current.current_plan.is_custom
                   ? "Your custom package"
                   : current?.custom_overrides?.has_overrides
                   ? "Your plan · Custom quotas"
                   : "Your plan"}
               </span>
               <strong>{current.current_plan.title}</strong>
-              {current.plan_expires_at ? (
+              {isOnFreeTrial ? (
+                <span>
+                  Ends {formatExpiryDate(current.trial_ends_at || current.plan_expires_at)} ·{" "}
+                  {signFreeAvailable
+                    ? "Auto-switches to Free plan unless upgraded"
+                    : "Upgrade before end to stay active"}
+                </span>
+              ) : current.plan_expires_at ? (
                 <span>Renews {formatExpiryDate(current.plan_expires_at)}</span>
+              ) : isSignFreeCurrent ? (
+                <span>No expiry · Upgrade anytime</span>
               ) : (
                 <span>Active subscription</span>
               )}
@@ -317,120 +523,70 @@ function PlansPage() {
         </div>
       ) : null}
 
+      {plans.length && hasAnyAnnualOption ? (
+        <div className="plans-billing-bar">
+          <div className="plans-billing-toggle" role="group" aria-label="Billing Cycle">
+            <button
+              type="button"
+              className={`plans-billing-toggle__btn ${billingCycle === "monthly" ? "is-active" : ""}`}
+              onClick={() => setBillingCycle("monthly")}
+            >
+              <span>Monthly</span>
+            </button>
+            <button
+              type="button"
+              className={`plans-billing-toggle__btn ${billingCycle === "annual" ? "is-active" : ""}`}
+              onClick={() => setBillingCycle("annual")}
+            >
+              <span>Annual</span>
+              {maxAnnualDiscount > 0 ? (
+                <span className="plans-billing-toggle__save-badge">
+                  Save up to {maxAnnualDiscount}%
+                </span>
+              ) : null}
+            </button>
+          </div>
+          {billingCycle === "annual" && maxAnnualDiscount > 0 ? (
+            <span className="plans-billing-bar__hint">
+              Discount calculated against 12 months of monthly billing.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {plans.length ? (
-        <div className="plans-hub__grid">
-          {plans.map((plan) => {
+        <div
+          className={`pricing-grid ${
+            plans.length >= 5 ? "pricing-grid--dense" : ""
+          }`}
+        >
+          {plans.map((plan, index) => {
             const isCurrent = activePlanId === plan.id;
             const isCustom = Boolean(plan.is_custom);
-            const isFeatured = !isCustom && plan.id === featuredPlanId && !isCurrent;
-            const interval = formatPlanInterval(plan);
-            const isOneTime = plan.billing_type !== "monthly";
+            const isFeatured = !isCustom && plan.id === featuredPlanId;
 
             return (
-              <article
-                className={`plans-hub__card ${isCurrent ? "plans-hub__card--current" : ""} ${isFeatured ? "plans-hub__card--featured" : ""} ${isCustom ? "plans-hub__card--custom" : ""}`}
+              <PlanReferenceCard
                 key={plan.id}
-              >
-                {isCurrent ? (
-                  <span className="plans-hub__ribbon plans-hub__ribbon--current">Current Plan</span>
-                ) : isCustom ? (
-                  <span className="plans-hub__ribbon plans-hub__ribbon--custom">
-                    <LuLock /> Custom Package
-                  </span>
-                ) : isFeatured ? (
-                  <span className="plans-hub__ribbon">Most Popular</span>
-                ) : null}
-
-                <div className="plans-hub__card-head">
-                  <div className="plans-hub__card-icon">
-                    {isCustom ? <LuLock /> : isOneTime ? <LuCalendar /> : isFeatured ? <LuCrown /> : <LuZap />}
-                  </div>
-                  <div>
-                    <h2>{plan.title}</h2>
-                    {isCustom && isCurrent ? (
-                      <span className="plans-hub__custom-badge">
-                        <LuLock /> Private Custom Package
-                      </span>
-                    ) : null}
-                    <p>{plan.description}</p>
-                  </div>
-                </div>
-
-                <div className="plans-hub__price">
-                  <strong>${Number(plan.price).toFixed(2)}</strong>
-                  <span>{plan.currency ?? "USD"} / {interval}</span>
-                </div>
-
-                {(plan.orders_limit !== null && plan.orders_limit !== undefined) ||
-                (plan.stores_limit !== null && plan.stores_limit !== undefined) ? (
-                  <div className="plans-hub__quota-chips">
-                    <span>{Number(plan.products_limit ?? 200).toLocaleString()} Products</span>
-                    {plan.orders_limit !== null && plan.orders_limit !== undefined ? (
-                      <span>{Number(plan.orders_limit).toLocaleString()} Orders</span>
-                    ) : null}
-                    {plan.stores_limit !== null && plan.stores_limit !== undefined ? (
-                      <span>
-                        {Number(plan.stores_limit).toLocaleString()}{" "}
-                        {Number(plan.stores_limit) === 1 ? "Store" : "Stores"}
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <ul className="plans-hub__features">
-                  {(plan.inclusions ?? []).map((item) => (
-                    <li key={item}>
-                      <LuCheck />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="plans-hub__card-foot">
-                  {isCurrent ? (
-                    <button type="button" className="plans-hub__btn plans-hub__btn--current" disabled>
-                      <LuCheck />
-                      <span>Current Plan</span>
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className={`plans-hub__btn ${isFeatured ? "plans-hub__btn--primary" : "plans-hub__btn--secondary"}`}
-                        disabled={checkoutId === `${plan.id}-stripe`}
-                        onClick={() => handleCheckout(plan.id, "stripe")}
-                      >
-                        {checkoutId === `${plan.id}-stripe` ? (
-                          <LuLoader className="spin-icon" />
-                        ) : (
-                          <LuCreditCard />
-                        )}
-                        <span>{checkoutId === `${plan.id}-stripe` ? "Redirecting…" : "Pay with Credit Card/Debit Cards"}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="plans-hub__btn plans-hub__btn--ghost"
-                        disabled={checkoutId === `${plan.id}-paypal`}
-                        onClick={() => handleCheckout(plan.id, "paypal")}
-                      >
-                        {checkoutId === `${plan.id}-paypal` ? (
-                          <LuLoader className="spin-icon" />
-                        ) : null}
-                        <span>{checkoutId === `${plan.id}-paypal` ? "Redirecting…" : "Pay with PayPal"}</span>
-                        {!checkoutId || checkoutId !== `${plan.id}-paypal` ? <LuArrowUpRight /> : null}
-                      </button>
-                      <button
-                        type="button"
-                        className="plans-hub__btn plans-hub__btn--ghost"
-                        onClick={() => handleWireCheckout(plan)}
-                      >
-                        <LuBanknote />
-                        <span>Pay with Wire Transfer/ACH</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </article>
+                plan={plan}
+                index={index}
+                isCurrent={isCurrent}
+                isOnFreeTrial={isOnFreeTrial}
+                hasUsedFreeTrial={hasUsedFreeTrial}
+                hasActivePaidPlan={hasActivePaidPlan}
+                activeBillingCycle={activeBillingCycle}
+                isFeatured={isFeatured}
+                mode="user"
+                billingCycle={billingCycle}
+                checkoutId={checkoutId}
+                trialStartingId={trialStartingId}
+                activatingId={activatingId}
+                onCheckoutStripe={(id, cycle) => handleCheckout(id, "stripe", cycle)}
+                onCheckoutPayPal={(id, cycle) => handleCheckout(id, "paypal", cycle)}
+                onWireCheckout={handleWireCheckout}
+                onStartFreeTrial={handleStartFreeTrial}
+                onActivateFreePlan={handleActivateFreePlan}
+              />
             );
           })}
         </div>

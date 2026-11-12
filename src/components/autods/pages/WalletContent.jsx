@@ -9,6 +9,7 @@ import {
   LuCreditCard,
   LuHistory,
   LuLoader,
+  LuMail,
   LuPlus,
   LuSettings,
   LuShield,
@@ -26,6 +27,7 @@ import {
   depositWalletPayPal,
   depositWalletStripe,
   depositWalletWireTransfer,
+  emailWalletInvoice,
   getWalletSummary,
   getWalletTransactions,
 } from "../../../services/WalletService";
@@ -66,6 +68,33 @@ function WalletContent() {
   const [wireScreenshot, setWireScreenshot] = useState(null);
   const [wireNote, setWireNote] = useState("");
   const [wireSubmitting, setWireSubmitting] = useState(false);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState(null);
+
+  const isTxInvoiceable = (tx) => {
+    if (!tx || (tx.status ?? "").toLowerCase() !== "completed") return false;
+    if (tx.type === "deposit") return true;
+    if (tx.type !== "payment") return false;
+    const meta = tx.metadata || {};
+    return meta.type === "addon_purchase" || Boolean(meta.addon_key) || Boolean(meta.credits);
+  };
+
+  const handleSendWalletInvoice = async (tx) => {
+    if (!tx?.id || sendingInvoiceId) return;
+    setSendingInvoiceId(tx.id);
+    try {
+      const res = await emailWalletInvoice(tx.id);
+      toast.success(res.data?.message || "Invoice email sent.");
+      if (res.data?.transaction) {
+        setTransactions((prev) =>
+          prev.map((item) => (item.id === tx.id ? { ...item, ...res.data.transaction } : item)),
+        );
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to send invoice email.");
+    } finally {
+      setSendingInvoiceId(null);
+    }
+  };
 
   const currency = summary?.currency ?? "USD";
   const depositAmount = useMemo(() => {
@@ -472,6 +501,7 @@ function WalletContent() {
               <span>Status</span>
               <span>Amount</span>
               <span>Balance</span>
+              <span>Invoice</span>
             </div>
             {transactions.map((tx) => (
               <div className="wallet-hub__history-row" key={tx.id}>
@@ -490,6 +520,21 @@ function WalletContent() {
                   {tx.type === "deposit" ? "+" : "−"}{formatMoney(tx.amount, tx.currency ?? currency)}
                 </span>
                 <span data-label="Balance">{formatMoney(tx.balance_after, tx.currency ?? currency)}</span>
+                <span data-label="Invoice">
+                  {isTxInvoiceable(tx) ? (
+                    <button
+                      type="button"
+                      className="wallet-hub__invoice-btn"
+                      disabled={sendingInvoiceId === tx.id}
+                      onClick={() => handleSendWalletInvoice(tx)}
+                    >
+                      {sendingInvoiceId === tx.id ? <LuLoader className="spin-icon" /> : <LuMail />}
+                      <span>{sendingInvoiceId === tx.id ? "Sending…" : "Email Invoice"}</span>
+                    </button>
+                  ) : (
+                    <span style={{ color: "#9ca3af", fontSize: "11px" }}>—</span>
+                  )}
+                </span>
               </div>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { LuLoader, LuPencil, LuPlus, LuSearch, LuShieldCheck, LuTrash2 } from "react-icons/lu";
 import { selectUser, selectUserRole } from "../../../store/selectors/AuthSelectors";
+import { getStoredUser } from "../../../services/AuthService";
 import { toast } from "../../../utils/toast";
 import { ADMIN_MODULES } from "../constants";
 import ConfirmModal from "../ConfirmModal";
@@ -35,13 +36,14 @@ function formatDate(value) {
 }
 
 function AdminUsersPage() {
-  const role = useSelector(selectUserRole);
-  const currentUser = useSelector(selectUser);
+  const role = useSelector(selectUserRole) ?? getStoredUser()?.role;
+  const currentUser = useSelector(selectUser) ?? getStoredUser();
   const navigate = useNavigate();
 
   const [admins, setAdmins] = useState([]);
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 });
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ function AdminUsersPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [togglingId, setTogglingId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [sortBy, setSortBy] = useState("name");
@@ -101,6 +104,7 @@ function AdminUsersPage() {
       per_page: perPage,
       search: search.trim() || undefined,
       role: "super_admin",
+      is_active: statusFilter || undefined,
     })
       .then((res) => {
         setAdmins(res.data?.data ?? []);
@@ -112,7 +116,32 @@ function AdminUsersPage() {
       })
       .catch(() => toast.error("Failed to load admin users."))
       .finally(() => setLoading(false));
-  }, [page, perPage, search]);
+  }, [page, perPage, search, statusFilter]);
+
+  const handleToggleAdminStatus = async (admin) => {
+    if (admin.id === currentUser?.id) return;
+    setTogglingId(admin.id);
+    const nextActive = !admin.is_active;
+    try {
+      const res = await updateAdminUser(admin.id, { is_active: nextActive });
+      const updated = res.data?.user;
+      if (updated) {
+        setAdmins((prev) => prev.map((a) => (a.id === admin.id ? updated : a)));
+      } else {
+        loadAdmins();
+      }
+      toast.success(nextActive ? `${admin.name} marked Active.` : `${admin.name} marked Inactive.`);
+    } catch (err) {
+      toast.error(
+        err.response?.data?.errors?.is_active?.[0] ??
+          err.response?.data?.message ??
+          err.response?.data?.error ??
+          "Failed to update status."
+      );
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   useEffect(() => {
     if (role === "super_admin") {
@@ -230,7 +259,7 @@ function AdminUsersPage() {
         </button>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
         <label className="admin-clients-page__search">
           <LuSearch />
           <input
@@ -241,7 +270,17 @@ function AdminUsersPage() {
             onChange={(event) => { setSearch(event.target.value); setPage(1); }}
           />
         </label>
-        <span className="admin-clients-page__count">{meta.total} admin users</span>
+
+        <label className="admin-filters-bar__field">
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
+            <option value="">All statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+        </label>
+
+        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} admin users</span>
       </div>
 
       {loading ? (
@@ -286,9 +325,30 @@ function AdminUsersPage() {
                     )}
                   </td>
                   <td>
-                    <span className={admin.is_active ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
-                      {admin.is_active ? "Active" : "Disabled"}
-                    </span>
+                    <button
+                      type="button"
+                      className={`admin-toggle-pill ${
+                        admin.is_active ? "admin-toggle-pill--active" : "admin-toggle-pill--inactive"
+                      }`}
+                      disabled={togglingId === admin.id || admin.id === currentUser?.id}
+                      onClick={() => handleToggleAdminStatus(admin)}
+                      title={
+                        admin.id === currentUser?.id
+                          ? "You cannot deactivate your own account"
+                          : admin.is_active
+                          ? "Click to mark Inactive"
+                          : "Click to mark Active"
+                      }
+                    >
+                      <span className="admin-toggle-pill__dot" />
+                      <span>
+                        {togglingId === admin.id
+                          ? "Updating…"
+                          : admin.is_active
+                          ? "Active"
+                          : "Inactive"}
+                      </span>
+                    </button>
                   </td>
                   <td>{formatDate(admin.created_at)}</td>
                   <td>
@@ -349,12 +409,27 @@ function AdminUsersPage() {
                 <span>{editingId ? "New Password (optional)" : "Password"}</span>
                 <input type="password" className="marketplace-settings__control" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
               </label>
-            </div>
 
-            <label className="marketplace-settings__field admin-modal__checkbox">
-              <input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
-              <span>Active account</span>
-            </label>
+              <div className="marketplace-settings__field admin-modal__full">
+                <span>Account Status</span>
+                <div className="admin-segmented-toggle" role="group" aria-label="Admin Account Status">
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${form.is_active ? "is-selected is-active" : ""}`}
+                    onClick={() => setForm({ ...form, is_active: true })}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${!form.is_active ? "is-selected is-inactive" : ""}`}
+                    onClick={() => setForm({ ...form, is_active: false })}
+                  >
+                    Inactive
+                  </button>
+                </div>
+              </div>
+            </div>
 
             <label className="marketplace-settings__field admin-modal__checkbox">
               <input

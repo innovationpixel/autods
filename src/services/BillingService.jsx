@@ -20,3 +20,6 @@ export const deletePaymentMethod = (id) =>
 
 export const getPaymentHistory = (params = {}) =>
     axiosInstance.get('/billing/history', { params });
+
+export const emailBillingInvoice = (id) =>
+    axiosInstance.post(`/billing/history/${id}/email-invoice`);

@@ -18,6 +18,9 @@ export const updateAdminUser = (id, data) =>
 export const updateAdminUserPlanDetails = (id, data) =>
     axiosInstance.put(`/admin/users/${id}/plan-details`, data);
 
+export const sendAdminUserExpiredInvoice = (id, data = {}) =>
+    axiosInstance.post(`/admin/users/${id}/send-invoice`, data);
+
 export const deleteAdminUser = (id) =>
     axiosInstance.delete(`/admin/users/${id}`);
 

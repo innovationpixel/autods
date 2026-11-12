@@ -85,6 +85,13 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         if (mounted) setLoading(false);
       });
 
+    const refreshQuota = () => {
+      getCurrentPlan()
+        .then((planRes) => {
+          if (mounted) setData(planRes.data);
+        })
+        .catch(() => {});
+    };
     const refreshAddons = () => {
       getAddonPricing()
         .then((res) => {
@@ -111,6 +118,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         refreshAiConfig();
       }
     };
+    window.addEventListener("autods_refresh_quota", refreshQuota);
     window.addEventListener("autods_refresh_addons", refreshAddons);
     window.addEventListener("autods_refresh_ai_config", refreshAiConfig);
     window.addEventListener("ai_credits_updated", refreshAiConfig);
@@ -120,6 +128,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
 
     return () => {
       mounted = false;
+      window.removeEventListener("autods_refresh_quota", refreshQuota);
       window.removeEventListener("autods_refresh_addons", refreshAddons);
       window.removeEventListener("autods_refresh_ai_config", refreshAiConfig);
       window.removeEventListener("ai_credits_updated", refreshAiConfig);
@@ -141,7 +150,11 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
   const plan = data?.current_plan;
   const subscription = data?.subscription;
   const usage = data?.usage ?? {};
+  const isOnFreeTrial = Boolean(data?.is_on_free_trial);
   const expiresAt = data?.plan_expires_at || subscription?.current_period_end;
+  const trialEndsAt = data?.trial_ends_at || expiresAt;
+  const signFreeAvailable = Boolean(data?.sign_free_available);
+  const isSignFreePlan = Boolean(plan?.is_sign_free && !data?.is_plan_paid);
   const isCustomPlan = Boolean(plan?.is_custom);
   const hasCustomOverrides = Boolean(data?.custom_overrides?.has_overrides || plan?.has_custom_overrides);
 
@@ -221,16 +234,25 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                background: "rgba(59, 130, 246, 0.2)",
-                color: "#60a5fa",
+                background: isOnFreeTrial
+                  ? "rgba(16, 185, 129, 0.2)"
+                  : isSignFreePlan
+                  ? "rgba(148, 163, 184, 0.2)"
+                  : "rgba(59, 130, 246, 0.2)",
+                color: isOnFreeTrial ? "#6ee7b7" : isSignFreePlan ? "#e2e8f0" : "#60a5fa",
                 padding: "4px 10px",
                 borderRadius: 999,
                 fontSize: 12,
                 fontWeight: 600,
-                border: "1px solid rgba(96, 165, 250, 0.3)",
+                border: isOnFreeTrial
+                  ? "1px solid rgba(52, 211, 153, 0.38)"
+                  : isSignFreePlan
+                  ? "1px solid rgba(148, 163, 184, 0.35)"
+                  : "1px solid rgba(96, 165, 250, 0.3)",
               }}
             >
-              <LuCrown /> ACTIVE PLAN
+              {isOnFreeTrial ? <LuClock /> : <LuCrown />}{" "}
+              {isOnFreeTrial ? "FREE TRIAL" : isSignFreePlan ? "FREE PLAN" : "ACTIVE PLAN"}
             </span>
             {isCustomPlan && (
               <span
@@ -268,18 +290,30 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
                 <LuSparkles /> CUSTOM QUOTAS / FEATURES
               </span>
             )}
-            {expiresAt && (
+            {isOnFreeTrial && trialEndsAt ? (
+              <span style={{ fontSize: 13, color: "#fde68a", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <LuClock /> Trial ends {new Date(trialEndsAt).toLocaleDateString()}
+              </span>
+            ) : expiresAt ? (
               <span style={{ fontSize: 13, color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <LuClock /> Renews on {new Date(expiresAt).toLocaleDateString()}
               </span>
-            )}
+            ) : isSignFreePlan ? (
+              <span style={{ fontSize: 13, color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <LuCheck /> No expiry · Upgrade anytime
+              </span>
+            ) : null}
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px 0", color: "#f8fafc" }}>
             {plan?.title ?? plan?.name ?? "Starter Plan"}
           </h1>
           <p style={{ margin: 0, color: "#cbd5e1", fontSize: 14, maxWidth: 540 }}>
-            {plan?.description ??
-              "You are currently subscribed to the standard dropshipping plan. Track your monthly quotas below and upgrade anytime to scale."}
+            {isOnFreeTrial
+              ? signFreeAvailable
+                ? "You are currently on a free trial with full plan access. After your trial ends, your account switches automatically to our Free plan unless you upgrade."
+                : "You are currently on a free trial with full plan access. Upgrade before your trial ends to prevent automatic account deactivation."
+              : plan?.description ??
+                "You are currently subscribed to the standard dropshipping plan. Track your monthly quotas below and upgrade anytime to scale."}
           </p>
         </div>
 

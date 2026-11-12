@@ -254,3 +254,179 @@ export function parseFeaturesAndExtras(plan) {
   };
 }
 
+export function resolvePlanThemeVariant(plan, index = 0, isFeatured = false) {
+  const title = (plan?.title || "").toLowerCase();
+
+  if (plan?.is_custom) {
+    return { key: "rose", tierLabel: "CUSTOM" };
+  }
+  if (/trial/.test(title)) {
+    return { key: "emerald", tierLabel: "TRIAL" };
+  }
+  if (/starter|basic/.test(title)) {
+    return { key: "blue", tierLabel: "STARTER" };
+  }
+  if (isFeatured || /\bpro\b|professional|growth/.test(title)) {
+    return { key: "purple", tierLabel: "PROFESSIONAL" };
+  }
+  if (/enterprise|scale|unlimited|agency|business|vip/.test(title)) {
+    return { key: "orange", tierLabel: "ENTERPRISE" };
+  }
+
+  const palette = [
+    { key: "emerald", tierLabel: "PLAN" },
+    { key: "blue", tierLabel: "STARTER" },
+    { key: "purple", tierLabel: "PRO" },
+    { key: "orange", tierLabel: "SCALE" },
+    { key: "rose", tierLabel: "CUSTOM" },
+  ];
+  return palette[index % palette.length];
+}
+
+export function resolveFeatureRowVisual(keyOrText = "") {
+  const value = String(keyOrText).toLowerCase();
+
+  if (value.includes("trending")) return "trending";
+  if (value.includes("hand_picked") || value.includes("hand-picked")) return "hand_picked";
+  if (value.includes("research") || value.includes("finder")) return "research";
+  if (value.includes("ai_") || value.includes("smartedit") || value.includes("ai ") || value.includes("content")) return "ai";
+  if (value.includes("schedule") || value.includes("recurring")) return "schedule";
+  if (value.includes("price") || value.includes("stock") || value.includes("monitor")) return "monitor";
+  if (value.includes("order") || value.includes("tracking") || value.includes("fulfilled")) return "orders";
+  if (value.includes("bulk") || value.includes("extension") || value.includes("sheet") || value.includes("draft")) return "sheets";
+  if (value.includes("return") || value.includes("case") || value.includes("refund")) return "returns";
+  if (value.includes("store")) return "stores";
+  if (value.includes("team") || value.includes("customer_support") || value.includes("buyer") || value.includes("branding")) return "team";
+  if (value.includes("vip") || value.includes("support") || value.includes("chat") || value.includes("ticket")) return "support";
+  if (value.includes("import") || value.includes("supplier") || value.includes("product")) return "import";
+
+  return "default";
+}
+
+export function buildPlanCardRows(plan) {
+  const parsed = parseFeaturesAndExtras(plan);
+  const featuresMap = parsed.features || {};
+  const productsLimit =
+    plan?.products_limit !== null && plan?.products_limit !== undefined
+      ? Number(plan.products_limit)
+      : parsed.products_limit ?? 200;
+
+  const rows = [
+    {
+      id: "quota-products",
+      visualType: "import",
+      label: "Import Products (All Platforms)",
+      valueText: `${Number(productsLimit || 0).toLocaleString()} Listings`,
+      isChecked: false,
+    },
+  ];
+
+  if (plan?.orders_limit !== null && plan?.orders_limit !== undefined) {
+    rows.push({
+      id: "quota-orders",
+      visualType: "orders",
+      label: "Auto-Orders Capacity",
+      valueText: `${Number(plan.orders_limit).toLocaleString()} Orders`,
+      isChecked: false,
+    });
+  }
+
+  const skippedFeatureKeys = new Set([
+    "store_integration_1",
+    "unlimited_stores_integration",
+    "support_24_7",
+    "vip_live_chat_support",
+    "vip_tickets_support",
+  ]);
+
+  ALL_FEATURE_DEFINITIONS.forEach((def) => {
+    if (skippedFeatureKeys.has(def.key)) return;
+    if (featuresMap[def.key]) {
+      rows.push({
+        id: `feat-${def.key}`,
+        visualType: resolveFeatureRowVisual(def.key),
+        label: def.title,
+        isChecked: true,
+        isAddon: Boolean(def.isAddon),
+      });
+    }
+  });
+
+  // Extract explicit stores count from custom inclusion if stores_limit isn't set
+  let extractedStoresLabel = null;
+  if (plan?.stores_limit !== null && plan?.stores_limit !== undefined) {
+    const num = Number(plan.stores_limit);
+    extractedStoresLabel = num >= 999 ? "Unlimited" : `${num} ${num === 1 ? "store" : "stores"}`;
+  } else if (featuresMap.unlimited_stores_integration) {
+    extractedStoresLabel = "Unlimited";
+  } else if (featuresMap.store_integration_1) {
+    extractedStoresLabel = "1 store";
+  }
+
+  const remainingCustom = [];
+  (parsed.customInclusions || []).forEach((raw) => {
+    const line = String(raw || "").trim();
+    if (!line) return;
+
+    const storeMatch = line.match(/^(\d+|unlimited)\s+(?:ebay\s+)?stores?$/i);
+    if (storeMatch) {
+      if (!extractedStoresLabel) {
+        extractedStoresLabel = line;
+      }
+      return;
+    }
+
+    if (/^(basic|priority|vip|live chat)\s+support$/i.test(line)) {
+      return;
+    }
+
+    remainingCustom.push(line);
+  });
+
+  remainingCustom.forEach((line, idx) => {
+    rows.push({
+      id: `custom-${idx}`,
+      visualType: resolveFeatureRowVisual(line),
+      label: line,
+      isChecked: true,
+    });
+  });
+
+  if (extractedStoresLabel) {
+    rows.push({
+      id: "quota-stores",
+      visualType: "stores",
+      label: "eBay Stores",
+      valueText: extractedStoresLabel,
+      isChecked: false,
+    });
+  }
+
+  let supportLabel = null;
+  if (featuresMap.vip_live_chat_support || featuresMap.vip_tickets_support) {
+    supportLabel = "VIP Support";
+  } else if (featuresMap.support_24_7) {
+    supportLabel = "Live Chat";
+  } else {
+    const matchedSupport = (parsed.customInclusions || []).find((line) =>
+      /support/i.test(String(line || ""))
+    );
+    if (matchedSupport) {
+      supportLabel = matchedSupport;
+    }
+  }
+
+  if (supportLabel) {
+    rows.push({
+      id: "meta-support",
+      visualType: "support",
+      label: "24/7 Customer Support",
+      valueText: supportLabel,
+      isChecked: false,
+    });
+  }
+
+  return rows;
+}
+
+

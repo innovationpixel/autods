@@ -8,6 +8,8 @@ import {
   LuLayers,
   LuLoader,
   LuLock,
+  LuMail,
+  LuMailCheck,
   LuPackagePlus,
   LuPencil,
   LuPlus,
@@ -22,13 +24,15 @@ import {
   LuX,
 } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
+import { getStoredUser } from "../../../services/AuthService";
 import { toast } from "../../../utils/toast";
-import { getAdminPlans } from "../../../services/PlanService";
+import { getAdminPlans, getPlans } from "../../../services/PlanService";
 import ConfirmModal from "../ConfirmModal";
 import {
   createAdminUser,
   deleteAdminUser,
   getAdminUsers,
+  sendAdminUserExpiredInvoice,
   updateAdminUser,
   updateAdminUserPlanDetails,
 } from "../../../services/AdminService";
@@ -45,11 +49,48 @@ const emptyClientForm = {
   password: "",
   role: "client",
   is_active: true,
+  is_plan_paid: false,
   current_plan_id: "",
   plan_expires_at: "",
   wallet_balance: 0,
   wallet_currency: "USD",
 };
+
+function toLocalDateInput(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getTomorrowDateInput() {
+  const next = new Date();
+  next.setDate(next.getDate() + 1);
+  return toLocalDateInput(next);
+}
+
+function isStrictFutureDateInput(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return value > toLocalDateInput(new Date());
+}
+
+function computeFutureExpiryInput(planObj) {
+  const next = new Date();
+  if (planObj?.billing_type === "yearly") {
+    next.setFullYear(next.getFullYear() + 1);
+  } else if (planObj?.billing_type === "one_time" && Number(planObj?.duration_days) > 0) {
+    next.setDate(next.getDate() + Number(planObj.duration_days));
+  } else {
+    next.setMonth(next.getMonth() + 1);
+  }
+  return toLocalDateInput(next);
+}
+
+function isExpiredIsoDate(value) {
+  if (!value) return false;
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() < Date.now();
+}
 
 function formatMoney(value, currency = "USD") {
   const amount = Number(value ?? 0);
@@ -105,7 +146,7 @@ function resolveBaseLimits(planObj) {
 }
 
 function AdminClientsPage() {
-  const role = useSelector(selectUserRole);
+  const role = useSelector(selectUserRole) ?? getStoredUser()?.role;
   const navigate = useNavigate();
 
   const [clients, setClients] = useState([]);
@@ -113,6 +154,7 @@ function AdminClientsPage() {
   const [plans, setPlans] = useState([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
   const [planFilter, setPlanFilter] = useState("");
   const [sort, setSort] = useState("created_at");
   const [sortDir, setSortDir] = useState("desc");
@@ -121,8 +163,11 @@ function AdminClientsPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyClientForm);
+  const [expiryTouched, setExpiryTouched] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [togglingRowKey, setTogglingRowKey] = useState(null);
+  const [sendingInvoiceUserId, setSendingInvoiceUserId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -131,6 +176,8 @@ function AdminClientsPage() {
   const [planForm, setPlanForm] = useState(null);
   const [planFeatureSearch, setPlanFeatureSearch] = useState("");
   const [savingPlanDetails, setSavingPlanDetails] = useState(false);
+
+  const tomorrowDateInput = useMemo(() => getTomorrowDateInput(), []);
 
   useEffect(() => {
     if (role !== "super_admin") {
@@ -141,7 +188,11 @@ function AdminClientsPage() {
   const loadPlans = useCallback(() => {
     getAdminPlans()
       .then((res) => setPlans(res.data?.plans ?? []))
-      .catch(() => {});
+      .catch(() =>
+        getPlans({ scope: "public" })
+          .then((res) => setPlans(res.data?.plans ?? []))
+          .catch(() => {})
+      );
   }, []);
 
   const loadClients = useCallback(() => {
@@ -152,6 +203,7 @@ function AdminClientsPage() {
       search: search.trim() || undefined,
       role: "client",
       is_active: statusFilter || undefined,
+      payment_status: paymentFilter || undefined,
       plan_id: planFilter || undefined,
       sort,
       sort_dir: sortDir,
@@ -166,7 +218,7 @@ function AdminClientsPage() {
       })
       .catch(() => toast.error("Failed to load clients."))
       .finally(() => setLoading(false));
-  }, [page, perPage, search, statusFilter, planFilter, sort, sortDir]);
+  }, [page, perPage, search, statusFilter, paymentFilter, planFilter, sort, sortDir]);
 
   const handleSort = (key, dir) => {
     setSort(key);
@@ -183,24 +235,128 @@ function AdminClientsPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setExpiryTouched(false);
     setForm(emptyClientForm);
     setModalOpen(true);
   };
 
   const openEdit = (client) => {
     setEditingId(client.id);
+    setExpiryTouched(Boolean(client.plan_expires_at));
     setForm({
       name: client.name ?? "",
       email: client.email ?? "",
       password: "",
       role: "client",
       is_active: client.is_active ?? true,
+      is_plan_paid: Boolean(client.is_plan_paid),
       current_plan_id: client.current_plan_id ? String(client.current_plan_id) : "",
       plan_expires_at: client.plan_expires_at ? client.plan_expires_at.slice(0, 10) : "",
       wallet_balance: client.wallet_balance ?? 0,
       wallet_currency: client.wallet_currency ?? "USD",
     });
     setModalOpen(true);
+  };
+
+  const handleClientFormPaidToggle = (nextPaid) => {
+    setForm((prev) => {
+      const selectedPlan = plans.find((p) => Number(p.id) === Number(prev.current_plan_id)) || null;
+      let nextExpiry = prev.plan_expires_at;
+      if (nextPaid && !isStrictFutureDateInput(nextExpiry)) {
+        nextExpiry = computeFutureExpiryInput(selectedPlan);
+        setExpiryTouched(false);
+      }
+      return {
+        ...prev,
+        is_plan_paid: nextPaid,
+        plan_expires_at: nextExpiry,
+      };
+    });
+  };
+
+  const handleClientFormPlanChange = (nextPlanId) => {
+    setForm((prev) => {
+      const selectedPlan = plans.find((p) => Number(p.id) === Number(nextPlanId)) || null;
+      let nextExpiry = prev.plan_expires_at;
+      if (prev.is_plan_paid && (!expiryTouched || !isStrictFutureDateInput(nextExpiry))) {
+        nextExpiry = computeFutureExpiryInput(selectedPlan);
+      }
+      return {
+        ...prev,
+        current_plan_id: nextPlanId,
+        plan_expires_at: nextExpiry,
+      };
+    });
+  };
+
+  const handleQuickToggleStatus = async (client) => {
+    const key = `active-${client.id}`;
+    setTogglingRowKey(key);
+    const nextActive = !client.is_active;
+    try {
+      const res = await updateAdminUser(client.id, { is_active: nextActive });
+      const updatedUser = res.data?.user;
+      if (updatedUser) {
+        setClients((prev) => prev.map((c) => (c.id === client.id ? updatedUser : c)));
+      } else {
+        loadClients();
+      }
+      toast.success(nextActive ? `${client.name} marked Active.` : `${client.name} marked Inactive.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? err.response?.data?.error ?? "Status update failed.");
+    } finally {
+      setTogglingRowKey(null);
+    }
+  };
+
+  const handleQuickTogglePaid = async (client) => {
+    const key = `paid-${client.id}`;
+    setTogglingRowKey(key);
+    const nextPaid = !client.is_plan_paid;
+    try {
+      const res = await updateAdminUser(client.id, { is_plan_paid: nextPaid });
+      const updatedUser = res.data?.user;
+      if (updatedUser) {
+        setClients((prev) => prev.map((c) => (c.id === client.id ? updatedUser : c)));
+      } else {
+        loadClients();
+      }
+      toast.success(
+        nextPaid
+          ? `${client.name} marked Paid with future expiry.`
+          : `${client.name} marked Unpaid.`
+      );
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? err.response?.data?.error ?? "Payment status update failed.");
+    } finally {
+      setTogglingRowKey(null);
+    }
+  };
+
+  const handleSendExpiredInvoice = async (client) => {
+    if (!client?.id || sendingInvoiceUserId) return;
+    setSendingInvoiceUserId(client.id);
+    try {
+      const res = await sendAdminUserExpiredInvoice(client.id);
+      const updatedUser = res.data?.user;
+      if (updatedUser) {
+        setClients((prev) => prev.map((c) => (c.id === client.id ? updatedUser : c)));
+      } else {
+        loadClients();
+      }
+      toast.success(res.data?.message ?? `Invoice sent to ${client.email}.`);
+    } catch (err) {
+      const message =
+        err.response?.data?.error ??
+        err.response?.data?.message ??
+        "Failed to send invoice.";
+      toast.error(message);
+      if (err.response?.status === 422) {
+        loadClients();
+      }
+    } finally {
+      setSendingInvoiceUserId(null);
+    }
   };
 
   const openPlanDetailsModal = (client) => {
@@ -219,6 +375,7 @@ function AdminClientsPage() {
     setPlanFeatureSearch("");
     setPlanForm({
       current_plan_id: client.current_plan_id ? String(client.current_plan_id) : "",
+      is_plan_paid: Boolean(client.is_plan_paid),
       plan_expires_at: client.plan_expires_at ? client.plan_expires_at.slice(0, 10) : "",
       products_limit:
         client.effective_products_limit !== null && client.effective_products_limit !== undefined
@@ -245,6 +402,12 @@ function AdminClientsPage() {
       custom_plan_title: `${client.name || "Customer"} Custom Package`,
       custom_plan_description: "",
       custom_plan_price: matchedPlan?.price ?? 0,
+      custom_plan_annual_price:
+        matchedPlan?.billing_type === "monthly" &&
+        matchedPlan?.annual_price !== null &&
+        matchedPlan?.annual_price !== undefined
+          ? String(matchedPlan.annual_price)
+          : "",
       custom_plan_currency: matchedPlan?.currency ?? client.wallet_currency ?? "USD",
       custom_plan_billing_type: matchedPlan?.billing_type ?? "monthly",
       custom_plan_duration_days: matchedPlan?.duration_days ?? 30,
@@ -266,14 +429,36 @@ function AdminClientsPage() {
   const handleModalBasePlanChange = (newPlanId) => {
     const newPlan = plans.find((p) => Number(p.id) === Number(newPlanId)) || null;
     const defaults = resolveBaseLimits(newPlan);
-    setPlanForm((prev) => ({
-      ...prev,
-      current_plan_id: newPlanId,
-      products_limit: defaults.products_limit,
-      orders_limit: defaults.orders_limit,
-      stores_limit: defaults.stores_limit,
-      features: { ...defaults.features },
-    }));
+    setPlanForm((prev) => {
+      let nextExpiry = prev.plan_expires_at;
+      if (prev.is_plan_paid && !isStrictFutureDateInput(nextExpiry)) {
+        nextExpiry = computeFutureExpiryInput(newPlan);
+      }
+      return {
+        ...prev,
+        current_plan_id: newPlanId,
+        plan_expires_at: nextExpiry,
+        products_limit: defaults.products_limit,
+        orders_limit: defaults.orders_limit,
+        stores_limit: defaults.stores_limit,
+        features: { ...defaults.features },
+      };
+    });
+  };
+
+  const handlePlanModalPaidToggle = (nextPaid) => {
+    setPlanForm((prev) => {
+      const matched = plans.find((p) => Number(p.id) === Number(prev.current_plan_id)) || null;
+      let nextExpiry = prev.plan_expires_at;
+      if (nextPaid && !isStrictFutureDateInput(nextExpiry)) {
+        nextExpiry = computeFutureExpiryInput(matched);
+      }
+      return {
+        ...prev,
+        is_plan_paid: nextPaid,
+        plan_expires_at: nextExpiry,
+      };
+    });
   };
 
   const resetAllOverridesToBase = () => {
@@ -351,9 +536,25 @@ function AdminClientsPage() {
       .map((line) => (line || "").trim())
       .filter(Boolean);
 
+    const selectedPlanObj = plans.find((p) => Number(p.id) === Number(planForm.current_plan_id)) || null;
+    const effectivePaid = Boolean(planForm.is_plan_paid);
+
+    let resolvedExpiry = planForm.plan_expires_at || null;
+    if (effectivePaid && !isStrictFutureDateInput(resolvedExpiry)) {
+      resolvedExpiry = computeFutureExpiryInput(
+        planForm.save_as_custom_plan
+          ? {
+              billing_type: planForm.custom_plan_billing_type || "monthly",
+              duration_days: Number(planForm.custom_plan_duration_days) || 30,
+            }
+          : selectedPlanObj
+      );
+    }
+
     const payload = {
       current_plan_id: planForm.current_plan_id ? Number(planForm.current_plan_id) : null,
-      plan_expires_at: planForm.plan_expires_at || null,
+      is_plan_paid: effectivePaid,
+      plan_expires_at: resolvedExpiry,
       bonus_ai_credits: Math.max(0, parseInt(planForm.bonus_ai_credits, 10) || 0),
       custom_inclusions: cleanedInclusions,
     };
@@ -370,11 +571,25 @@ function AdminClientsPage() {
       payload.activate_custom_plan = Boolean(planForm.activate_custom_plan);
       payload.custom_plan_title = planForm.custom_plan_title.trim();
       payload.custom_plan_description = planForm.custom_plan_description?.trim() || null;
-      payload.custom_plan_price = Math.max(0, Number(planForm.custom_plan_price) || 0);
+      const customBillingType = planForm.custom_plan_billing_type || "monthly";
+      const customPrice = Math.max(0, Number(planForm.custom_plan_price) || 0);
+      payload.custom_plan_price = customPrice;
+      payload.custom_plan_annual_price =
+        customBillingType === "monthly"
+          ? planForm.custom_plan_annual_price !== "" &&
+            planForm.custom_plan_annual_price !== null &&
+            planForm.custom_plan_annual_price !== undefined &&
+            !isNaN(Number(planForm.custom_plan_annual_price)) &&
+            Number(planForm.custom_plan_annual_price) >= 0
+            ? Number(planForm.custom_plan_annual_price)
+            : null
+          : customBillingType === "yearly"
+          ? customPrice
+          : null;
       payload.custom_plan_currency = (planForm.custom_plan_currency || "USD").toUpperCase().slice(0, 3);
-      payload.custom_plan_billing_type = planForm.custom_plan_billing_type || "monthly";
+      payload.custom_plan_billing_type = customBillingType;
       payload.custom_plan_duration_days =
-        planForm.custom_plan_billing_type === "one_time"
+        customBillingType === "one_time"
           ? Math.max(1, parseInt(planForm.custom_plan_duration_days, 10) || 30)
           : null;
       payload.custom_products_limit = targetProducts;
@@ -428,16 +643,28 @@ function AdminClientsPage() {
   };
 
   const saveClient = async () => {
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Name and email are required.");
+      return;
+    }
+
+    const selectedPlan = plans.find((p) => Number(p.id) === Number(form.current_plan_id)) || null;
+    let resolvedExpiry = form.plan_expires_at || null;
+    if (form.is_plan_paid && !isStrictFutureDateInput(resolvedExpiry)) {
+      resolvedExpiry = computeFutureExpiryInput(selectedPlan);
+    }
+
     setSaving(true);
     const payload = {
       name: form.name.trim(),
       email: form.email.trim(),
       role: "client",
-      is_active: form.is_active,
+      is_active: Boolean(form.is_active),
+      is_plan_paid: Boolean(form.is_plan_paid),
       wallet_balance: Number(form.wallet_balance) || 0,
       wallet_currency: form.wallet_currency || "USD",
       current_plan_id: form.current_plan_id ? Number(form.current_plan_id) : null,
-      plan_expires_at: form.plan_expires_at || null,
+      plan_expires_at: resolvedExpiry,
     };
 
     if (form.password.trim()) {
@@ -501,13 +728,13 @@ function AdminClientsPage() {
     <section className="admin-page admin-clients-page">
       <header className="admin-page__hero admin-page__hero--split">
         <div>
-          <span className="admin-page__eyebrow"><LuUsers /> Clients</span>
-          <h1>Manage Clients</h1>
-          <p>Create, edit, update plan quotas &amp; features, or assign custom packages for clients.</p>
+          <span className="admin-page__eyebrow"><LuUsers /> Users &amp; Clients</span>
+          <h1>Manage Users &amp; Clients</h1>
+          <p>Add users, toggle Active / Inactive and Paid / Unpaid flags, manage expiry dates, or assign custom packages.</p>
         </div>
         <button type="button" className="admin-page__btn admin-page__btn--primary" onClick={openCreate}>
           <LuPlus />
-          <span>Add Client</span>
+          <span>Add User / Client</span>
         </button>
       </header>
 
@@ -528,7 +755,16 @@ function AdminClientsPage() {
           <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
             <option value="">All statuses</option>
             <option value="1">Active</option>
-            <option value="0">Disabled</option>
+            <option value="0">Inactive</option>
+          </select>
+        </label>
+
+        <label className="admin-filters-bar__field">
+          <span>Payment</span>
+          <select value={paymentFilter} onChange={(event) => { setPaymentFilter(event.target.value); setPage(1); }}>
+            <option value="">All payments</option>
+            <option value="paid">Paid</option>
+            <option value="unpaid">Unpaid</option>
           </select>
         </label>
 
@@ -544,7 +780,7 @@ function AdminClientsPage() {
           </select>
         </label>
 
-        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} clients</span>
+        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} users</span>
       </div>
 
       {loading ? (
@@ -562,6 +798,7 @@ function AdminClientsPage() {
                 <AdminSortableHeader label="Wallet" sortKey="wallet_balance" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Total Revenue" sortKey="total_paid" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Activity" sortKey="orders_count" sort={sort} sortDir={sortDir} onSort={handleSort} />
+                <AdminSortableHeader label="Payment" sortKey="is_plan_paid" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Status" sortKey="status" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <AdminSortableHeader label="Joined" sortKey="created_at" sort={sort} sortDir={sortDir} onSort={handleSort} />
                 <th aria-label="Actions" />
@@ -573,6 +810,16 @@ function AdminClientsPage() {
                 const effOrders = client.effective_orders_limit ?? client.current_plan?.orders_limit ?? 100;
                 const effStores = client.effective_stores_limit ?? client.current_plan?.stores_limit ?? 1;
                 const usedProducts = client.products_quota_used ?? 0;
+                const isPaid = Boolean(client.is_plan_paid);
+                const isExpired = Boolean(client.is_plan_expired ?? isExpiredIsoDate(client.plan_expires_at));
+                const invoiceAutoSent = Boolean(client.invoice_auto_sent);
+                const canSendExpiredInvoice =
+                  typeof client.can_send_expired_invoice === "boolean"
+                    ? client.can_send_expired_invoice
+                    : Boolean(isExpired && !invoiceAutoSent && (client.has_invoiceable_plan ?? client.current_plan));
+                const isSendingInvoice = sendingInvoiceUserId === client.id;
+                const isTogglingPaid = togglingRowKey === `paid-${client.id}`;
+                const isTogglingActive = togglingRowKey === `active-${client.id}`;
 
                 return (
                   <tr key={client.id}>
@@ -586,6 +833,16 @@ function AdminClientsPage() {
                       <div className="admin-clients-page__plan">
                         <div className="admin-clients-page__plan-title-row">
                           <strong>{client.current_plan?.title ?? "No plan"}</strong>
+                          {client.is_on_free_trial ? (
+                            <span className="admin-clients-page__pill admin-clients-page__pill--trial">
+                              Free Trail{client.trial_ends_at ? ` · Ends ${formatDate(client.trial_ends_at)}` : ""}
+                            </span>
+                          ) : null}
+                          {client.current_plan?.is_sign_free ? (
+                            <span className="admin-clients-page__pill admin-clients-page__pill--free">
+                              Sign Free
+                            </span>
+                          ) : null}
                           {client.current_plan?.is_custom ? (
                             <span className="admin-clients-page__pill admin-clients-page__pill--custom">
                               Custom Pkg
@@ -601,8 +858,33 @@ function AdminClientsPage() {
                           {Number(usedProducts).toLocaleString()} / {Number(effProducts).toLocaleString()} products ·{" "}
                           {Number(effOrders).toLocaleString()} orders · {Number(effStores).toLocaleString()} stores
                         </span>
-                        {client.plan_expires_at ? (
-                          <span>Expires {formatDate(client.plan_expires_at)}</span>
+                        {client.is_on_free_trial && (client.trial_ends_at || client.plan_expires_at) ? (
+                          <span className="admin-clients-page__expiry-note">
+                            Trial ends {formatDate(client.trial_ends_at || client.plan_expires_at)}
+                          </span>
+                        ) : client.plan_expires_at ? (
+                          <span
+                            className={`admin-clients-page__expiry-note ${
+                              isExpired ? "admin-clients-page__expiry-note--expired" : ""
+                            }`}
+                          >
+                            {isExpired ? "Expired" : "Expires"} {formatDate(client.plan_expires_at)}
+                          </span>
+                        ) : null}
+                        {isExpired && invoiceAutoSent ? (
+                          <span
+                            className="admin-clients-page__invoice-sent"
+                            title={
+                              client.invoice_sent_at
+                                ? `Invoice sent on ${formatDate(client.invoice_sent_at)}`
+                                : "Invoice already sent automatically"
+                            }
+                          >
+                            <LuMailCheck />
+                            <span>
+                              Invoice sent{client.invoice_sent_at ? ` ${formatDate(client.invoice_sent_at)}` : ""}
+                            </span>
+                          </span>
                         ) : null}
                       </div>
                     </td>
@@ -626,13 +908,52 @@ function AdminClientsPage() {
                       </span>
                     </td>
                     <td>
-                      <span className={client.is_active ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
-                        {client.is_active ? "Active" : "Disabled"}
-                      </span>
+                      <button
+                        type="button"
+                        className={`admin-toggle-pill ${
+                          isPaid ? "admin-toggle-pill--paid" : "admin-toggle-pill--unpaid"
+                        }`}
+                        disabled={isTogglingPaid}
+                        onClick={() => handleQuickTogglePaid(client)}
+                        title={
+                          isPaid
+                            ? "Click to mark Unpaid"
+                            : "Click to mark Paid and set a future plan expiry date"
+                        }
+                      >
+                        <span className="admin-toggle-pill__dot" />
+                        <span>{isTogglingPaid ? "Updating…" : isPaid ? "Paid" : "Unpaid"}</span>
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={`admin-toggle-pill ${
+                          client.is_active ? "admin-toggle-pill--active" : "admin-toggle-pill--inactive"
+                        }`}
+                        disabled={isTogglingActive}
+                        onClick={() => handleQuickToggleStatus(client)}
+                        title={client.is_active ? "Click to mark Inactive" : "Click to mark Active"}
+                      >
+                        <span className="admin-toggle-pill__dot" />
+                        <span>{isTogglingActive ? "Updating…" : client.is_active ? "Active" : "Inactive"}</span>
+                      </button>
                     </td>
                     <td>{formatDate(client.created_at)}</td>
                     <td>
                       <div className="admin-clients-page__actions">
+                        {canSendExpiredInvoice ? (
+                          <button
+                            type="button"
+                            className="admin-clients-page__invoice-btn"
+                            disabled={isSendingInvoice}
+                            onClick={() => handleSendExpiredInvoice(client)}
+                            title="Send billing invoice email for this expired plan"
+                          >
+                            {isSendingInvoice ? <LuLoader className="spin-icon" /> : <LuMail />}
+                            <span>{isSendingInvoice ? "Sending…" : "Send Invoice"}</span>
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="admin-page__btn admin-page__btn--ghost admin-clients-page__plan-btn"
@@ -654,7 +975,7 @@ function AdminClientsPage() {
                 );
               }) : (
                 <tr>
-                  <td colSpan={8} className="admin-table__empty">No clients found.</td>
+                  <td colSpan={9} className="admin-table__empty">No users found.</td>
                 </tr>
               )}
             </tbody>
@@ -672,12 +993,12 @@ function AdminClientsPage() {
         entityName="clients"
       />
 
-      {/* Edit / Create Client Modal */}
+      {/* Edit / Add User (Client) Modal */}
       {modalOpen ? (
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
           <div className="orders-modal__card admin-modal">
-            <h3>{editingId ? "Edit Client" : "Create Client"}</h3>
+            <h3>{editingId ? "Edit User / Client" : "Add User / Client"}</h3>
 
             <div className="admin-modal__grid">
               <label className="marketplace-settings__field">
@@ -695,9 +1016,49 @@ function AdminClientsPage() {
                 <input type="password" className="marketplace-settings__control" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
               </label>
 
+              <div className="marketplace-settings__field">
+                <span>Account Status</span>
+                <div className="admin-segmented-toggle" role="group" aria-label="Account Status">
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${form.is_active ? "is-selected is-active" : ""}`}
+                    onClick={() => setForm({ ...form, is_active: true })}
+                  >
+                    Active
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${!form.is_active ? "is-selected is-inactive" : ""}`}
+                    onClick={() => setForm({ ...form, is_active: false })}
+                  >
+                    Inactive
+                  </button>
+                </div>
+              </div>
+
+              <div className="marketplace-settings__field">
+                <span>Plan Payment Status</span>
+                <div className="admin-segmented-toggle" role="group" aria-label="Plan Payment Status">
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${form.is_plan_paid ? "is-selected is-paid" : ""}`}
+                    onClick={() => handleClientFormPaidToggle(true)}
+                  >
+                    Paid
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${!form.is_plan_paid ? "is-selected is-unpaid" : ""}`}
+                    onClick={() => handleClientFormPaidToggle(false)}
+                  >
+                    Unpaid
+                  </button>
+                </div>
+              </div>
+
               <label className="marketplace-settings__field">
                 <span>Plan</span>
-                <select className="marketplace-settings__control" value={form.current_plan_id} onChange={(event) => setForm({ ...form, current_plan_id: event.target.value })}>
+                <select className="marketplace-settings__control" value={form.current_plan_id} onChange={(event) => handleClientFormPlanChange(event.target.value)}>
                   <option value="">No plan</option>
                   {plans.map((plan) => (
                     <option key={plan.id} value={plan.id}>
@@ -709,7 +1070,21 @@ function AdminClientsPage() {
 
               <label className="marketplace-settings__field">
                 <span>Plan Expires</span>
-                <input type="date" className="marketplace-settings__control" value={form.plan_expires_at} onChange={(event) => setForm({ ...form, plan_expires_at: event.target.value })} />
+                <input
+                  type="date"
+                  min={form.is_plan_paid ? tomorrowDateInput : undefined}
+                  className="marketplace-settings__control"
+                  value={form.plan_expires_at}
+                  onChange={(event) => {
+                    setExpiryTouched(true);
+                    setForm({ ...form, plan_expires_at: event.target.value });
+                  }}
+                />
+                {form.is_plan_paid ? (
+                  <small className="admin-modal__field-hint">
+                    Future expiry date auto-populated for Paid users.
+                  </small>
+                ) : null}
               </label>
 
               <label className="marketplace-settings__field">
@@ -742,15 +1117,10 @@ function AdminClientsPage() {
               </div>
             ) : null}
 
-            <label className="marketplace-settings__field admin-modal__checkbox">
-              <input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
-              <span>Active account</span>
-            </label>
-
             <div className="admin-modal__footer">
               <button type="button" className="admin-page__btn admin-page__btn--ghost" onClick={() => setModalOpen(false)}>Cancel</button>
               <button type="button" className="admin-page__btn admin-page__btn--primary" disabled={saving} onClick={saveClient}>
-                {saving ? "Saving…" : editingId ? "Update Client" : "Create Client"}
+                {saving ? "Saving…" : editingId ? "Update User" : "Create User"}
               </button>
             </div>
           </div>
@@ -810,11 +1180,37 @@ function AdminClientsPage() {
                 <span>Plan Expiry Date</span>
                 <input
                   type="date"
+                  min={planForm.is_plan_paid ? tomorrowDateInput : undefined}
                   className="marketplace-settings__control"
                   value={planForm.plan_expires_at}
                   onChange={(e) => setPlanForm({ ...planForm, plan_expires_at: e.target.value })}
                 />
+                {planForm.is_plan_paid ? (
+                  <small className="admin-modal__field-hint">
+                    Future date auto-applied while Paid is selected.
+                  </small>
+                ) : null}
               </label>
+
+              <div className="marketplace-settings__field admin-modal__full">
+                <span>Plan Payment Status</span>
+                <div className="admin-segmented-toggle" role="group" aria-label="Plan Details Payment Status">
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${planForm.is_plan_paid ? "is-selected is-paid" : ""}`}
+                    onClick={() => handlePlanModalPaidToggle(true)}
+                  >
+                    Paid (Active / Future Expiry)
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-segmented-toggle__btn ${!planForm.is_plan_paid ? "is-selected is-unpaid" : ""}`}
+                    onClick={() => handlePlanModalPaidToggle(false)}
+                  >
+                    Unpaid
+                  </button>
+                </div>
+              </div>
 
               {/* Quotas Management */}
               <div className="admin-plans-modal__section">
@@ -1107,9 +1503,25 @@ function AdminClientsPage() {
                   <input
                     type="checkbox"
                     checked={Boolean(planForm.save_as_custom_plan)}
-                    onChange={(e) =>
-                      setPlanForm({ ...planForm, save_as_custom_plan: e.target.checked })
-                    }
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setPlanForm((prev) => {
+                        const shouldAutoPaid = checked && prev.activate_custom_plan;
+                        let nextExpiry = prev.plan_expires_at;
+                        if (shouldAutoPaid && !isStrictFutureDateInput(nextExpiry)) {
+                          nextExpiry = computeFutureExpiryInput({
+                            billing_type: prev.custom_plan_billing_type || "monthly",
+                            duration_days: Number(prev.custom_plan_duration_days) || 30,
+                          });
+                        }
+                        return {
+                          ...prev,
+                          save_as_custom_plan: checked,
+                          is_plan_paid: shouldAutoPaid ? true : prev.is_plan_paid,
+                          plan_expires_at: nextExpiry,
+                        };
+                      });
+                    }}
                   />
                   <span>
                     <LuPackagePlus style={{ verticalAlign: "-2px", marginRight: 6 }} />
@@ -1141,7 +1553,13 @@ function AdminClientsPage() {
                       />
                     </label>
                     <label className="marketplace-settings__field">
-                      <span>Price</span>
+                      <span>
+                        {planForm.custom_plan_billing_type === "yearly"
+                          ? "Annual Price (12-Month Total)"
+                          : planForm.custom_plan_billing_type === "monthly"
+                          ? "Monthly Price"
+                          : "Price"}
+                      </span>
                       <input
                         type="number"
                         min="0"
@@ -1153,6 +1571,22 @@ function AdminClientsPage() {
                         }
                       />
                     </label>
+                    {planForm.custom_plan_billing_type === "monthly" ? (
+                      <label className="marketplace-settings__field">
+                        <span>Annual Price (Optional · 12-Month Total)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Leave blank for monthly-only"
+                          className="marketplace-settings__control"
+                          value={planForm.custom_plan_annual_price ?? ""}
+                          onChange={(e) =>
+                            setPlanForm({ ...planForm, custom_plan_annual_price: e.target.value })
+                          }
+                        />
+                      </label>
+                    ) : null}
                     <label className="marketplace-settings__field">
                       <span>Currency</span>
                       <input
@@ -1173,13 +1607,86 @@ function AdminClientsPage() {
                         className="marketplace-settings__control"
                         value={planForm.custom_plan_billing_type}
                         onChange={(e) =>
-                          setPlanForm({ ...planForm, custom_plan_billing_type: e.target.value })
+                          setPlanForm((prev) => {
+                            const nextType = e.target.value;
+                            let nextExpiry = prev.plan_expires_at;
+                            if (prev.activate_custom_plan && prev.is_plan_paid) {
+                              nextExpiry = computeFutureExpiryInput({
+                                billing_type: nextType,
+                                duration_days: Number(prev.custom_plan_duration_days) || 30,
+                              });
+                            }
+                            return {
+                              ...prev,
+                              custom_plan_billing_type: nextType,
+                              plan_expires_at: nextExpiry,
+                            };
+                          })
                         }
                       >
-                        <option value="monthly">Monthly</option>
+                        <option value="monthly">Monthly (+ Optional Annual)</option>
+                        <option value="yearly">Yearly (Annual Only)</option>
                         <option value="one_time">One Time</option>
                       </select>
                     </label>
+                    {planForm.custom_plan_billing_type === "monthly" ? (() => {
+                      const mPrice = Math.max(0, Number(planForm.custom_plan_price) || 0);
+                      const m12 = Math.round(mPrice * 12 * 100) / 100;
+                      const rawAnnual = planForm.custom_plan_annual_price;
+                      const hasAnnual =
+                        rawAnnual !== "" &&
+                        rawAnnual !== null &&
+                        rawAnnual !== undefined &&
+                        !isNaN(Number(rawAnnual)) &&
+                        Number(rawAnnual) >= 0;
+                      const aPrice = hasAnnual ? Math.round(Number(rawAnnual) * 100) / 100 : null;
+                      const pct =
+                        hasAnnual && m12 > 0 && aPrice < m12
+                          ? Math.round(((m12 - aPrice) / m12) * 1000) / 10
+                          : 0;
+                      const cur = planForm.custom_plan_currency || "USD";
+                      return (
+                        <div className="admin-plans-modal__discount-preview admin-modal__full">
+                          <div className="admin-plans-modal__discount-info">
+                            <span>
+                              12 months: <strong>{cur} {m12.toFixed(2)}</strong>
+                              {hasAnnual
+                                ? ` vs Annual ${cur} ${aPrice.toFixed(2)} (${(aPrice / 12).toFixed(2)}/mo)`
+                                : " · Optional annual price"}
+                            </span>
+                            {hasAnnual ? (
+                              <span className={`admin-plans-modal__discount-pill ${pct > 0 ? "is-saving" : ""}`}>
+                                {pct > 0 ? `Save ${pct}%` : "0% Discount"}
+                              </span>
+                            ) : null}
+                          </div>
+                          {mPrice > 0 ? (
+                            <div className="admin-plans-modal__discount-presets">
+                              <span>Presets:</span>
+                              {[15, 20, 25].map((p) => {
+                                const suggested = (mPrice * 12 * (1 - p / 100)).toFixed(2);
+                                return (
+                                  <button
+                                    key={p}
+                                    type="button"
+                                    className={`admin-plans-modal__chip ${
+                                      Number(planForm.custom_plan_annual_price) === Number(suggested)
+                                        ? "admin-plans-modal__chip--active"
+                                        : ""
+                                    }`}
+                                    onClick={() =>
+                                      setPlanForm({ ...planForm, custom_plan_annual_price: suggested })
+                                    }
+                                  >
+                                    -{p}% (${suggested}/yr)
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })() : null}
                     {planForm.custom_plan_billing_type === "one_time" ? (
                       <label className="marketplace-settings__field">
                         <span>Duration (days)</span>
@@ -1201,9 +1708,24 @@ function AdminClientsPage() {
                       <input
                         type="checkbox"
                         checked={Boolean(planForm.activate_custom_plan)}
-                        onChange={(e) =>
-                          setPlanForm({ ...planForm, activate_custom_plan: e.target.checked })
-                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setPlanForm((prev) => {
+                            let nextExpiry = prev.plan_expires_at;
+                            if (checked && !isStrictFutureDateInput(nextExpiry)) {
+                              nextExpiry = computeFutureExpiryInput({
+                                billing_type: prev.custom_plan_billing_type || "monthly",
+                                duration_days: Number(prev.custom_plan_duration_days) || 30,
+                              });
+                            }
+                            return {
+                              ...prev,
+                              activate_custom_plan: checked,
+                              is_plan_paid: checked ? true : prev.is_plan_paid,
+                              plan_expires_at: nextExpiry,
+                            };
+                          });
+                        }}
                       />
                       <span>
                         <LuLock style={{ verticalAlign: "-2px", marginRight: 5 }} />

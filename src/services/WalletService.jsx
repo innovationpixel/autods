@@ -39,3 +39,6 @@ export const getWalletDepositScreenshot = (id) =>
 
 export const transferToProcessingWallet = (amount) =>
     axiosInstance.post('/wallet/transfer-to-processing', { amount });
+
+export const emailWalletInvoice = (id) =>
+    axiosInstance.post(`/wallet/transactions/${id}/email-invoice`);

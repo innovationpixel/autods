@@ -1676,7 +1676,15 @@ const MarketplaceDashboard = () => {
 
       <section className="marketplace-main">
         {accountAlert?.show ? (
-          <div className={`topbar-alert topbar-alert--${accountAlert.severity === "critical" ? "critical" : "warning"}`}>
+          <div
+            className={`topbar-alert topbar-alert--${
+              accountAlert.severity === "critical"
+                ? "critical"
+                : accountAlert.severity === "info"
+                ? "info"
+                : "warning"
+            }`}
+          >
             <span className="topbar-alert__icon">!</span>
             <span>
               {accountAlert.message}{" "}

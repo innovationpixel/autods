@@ -19,6 +19,7 @@ import Error503 from '../pages/error/Error503';
 import EmptyPage from '../pages/error/emptypage';
 import Login from '../pages/authentication/Login';
 import Registration from '../pages/authentication/Registration';
+import ForgotPassword from '../pages/authentication/ForgotPassword';
 import OAuthCallback from '../pages/OAuthCallback';
 import LegalDocumentPage from '../pages/legal/LegalDocumentPage';
 
@@ -50,6 +51,7 @@ const Markup = () => {
                 {/* Public auth & legal routes — no layout */}
                 <Route path="/user/login" element={<Login />} />
                 <Route path="/user/register" element={<Registration />} />
+                <Route path="/user/forgot-password" element={<ForgotPassword />} />
                 <Route path="/onboarding" element={<Registration />} />
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/terms-and-conditions" element={<LegalDocumentPage type="terms" />} />

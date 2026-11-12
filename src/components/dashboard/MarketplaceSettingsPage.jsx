@@ -79,6 +79,7 @@ import { getEbayPolicies } from "../../services/ProductService";
 import {
   createStripeSetupIntent,
   deletePaymentMethod,
+  emailBillingInvoice,
   getPaymentHistory,
   getPaymentMethods,
   savePayPalPaymentMethod,
@@ -775,6 +776,7 @@ export default function MarketplaceSettingsPage() {
   const [savingBuyerAccountId, setSavingBuyerAccountId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [sendingInvoiceId, setSendingInvoiceId] = useState(null);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [addOns, setAddOns] = useState(settingsAddOns);
   const [addOnTermsTarget, setAddOnTermsTarget] = useState(null);
@@ -1035,6 +1037,10 @@ export default function MarketplaceSettingsPage() {
       refreshAddonPricing(false);
       getPaymentHistory().then((res) => setPaymentHistory(res.data?.data ?? [])).catch(() => {});
       getAiConfig().then((res) => { if (res.data) setAiConfig(normalizeAiConfig(res.data)); }).catch(() => {});
+      getCurrentPlan().then((res) => setCurrentSubscription(res.data)).catch(() => {});
+    }
+    if (activePrimaryTab === "Account & Billing") {
+      getCurrentPlan().then((res) => setCurrentSubscription(res.data)).catch(() => {});
     }
     if (activePrimaryTab === "VAs") {
       loadVAs();
@@ -1085,6 +1091,22 @@ export default function MarketplaceSettingsPage() {
       window.removeEventListener("autods_refresh_addons", handleAddonRefresh);
       window.removeEventListener("focus", handleAddonRefresh);
       window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const refreshCurrentPlan = () => {
+      getCurrentPlan()
+        .then((res) => {
+          if (res.data) setCurrentSubscription(res.data);
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("autods_refresh_quota", refreshCurrentPlan);
+    window.addEventListener("autods_refresh_addons", refreshCurrentPlan);
+    return () => {
+      window.removeEventListener("autods_refresh_quota", refreshCurrentPlan);
+      window.removeEventListener("autods_refresh_addons", refreshCurrentPlan);
     };
   }, []);
 
@@ -1250,11 +1272,11 @@ export default function MarketplaceSettingsPage() {
       }
 
       if (editingVa) {
-        await updateVirtualAssistant(editingVa.id, payload);
-        toast.success("Virtual Assistant updated successfully.");
+        const res = await updateVirtualAssistant(editingVa.id, payload);
+        toast.success(res.data?.message || "Virtual Assistant updated successfully.");
       } else {
-        await createVirtualAssistant(payload);
-        toast.success("Virtual Assistant created successfully.");
+        const res = await createVirtualAssistant(payload);
+        toast.success(res.data?.message || "Virtual Assistant created successfully.");
       }
       setVaModalOpen(false);
       loadVAs();
@@ -2908,7 +2930,11 @@ export default function MarketplaceSettingsPage() {
     const ebayConnected = ebayConnections.length > 0;
     const plan = currentSubscription?.current_plan;
     const usage = currentSubscription?.usage ?? {};
+    const isOnFreeTrial = Boolean(currentSubscription?.is_on_free_trial);
     const planExpires = currentSubscription?.plan_expires_at || currentSubscription?.subscription?.current_period_end;
+    const trialEndsAt = currentSubscription?.trial_ends_at || planExpires;
+    const signFreeAvailable = Boolean(currentSubscription?.sign_free_available);
+    const isSignFreePlan = Boolean(plan?.is_sign_free && !currentSubscription?.is_plan_paid);
     const isCustomPlan = Boolean(plan?.is_custom);
     const hasCustomOverrides = Boolean(
       currentSubscription?.custom_overrides?.has_overrides || plan?.has_custom_overrides
@@ -2958,16 +2984,25 @@ export default function MarketplaceSettingsPage() {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: "4px",
-                  background: "rgba(59, 130, 246, 0.2)",
-                  color: "#60a5fa",
+                  background: isOnFreeTrial
+                    ? "rgba(16, 185, 129, 0.2)"
+                    : isSignFreePlan
+                    ? "rgba(148, 163, 184, 0.2)"
+                    : "rgba(59, 130, 246, 0.2)",
+                  color: isOnFreeTrial ? "#6ee7b7" : isSignFreePlan ? "#e2e8f0" : "#60a5fa",
                   padding: "3px 10px",
                   borderRadius: "999px",
                   fontSize: "11px",
                   fontWeight: 700,
-                  border: "1px solid rgba(96, 165, 250, 0.3)",
+                  border: isOnFreeTrial
+                    ? "1px solid rgba(52, 211, 153, 0.38)"
+                    : isSignFreePlan
+                    ? "1px solid rgba(148, 163, 184, 0.35)"
+                    : "1px solid rgba(96, 165, 250, 0.3)",
                 }}
               >
-                <LuCrown /> ACTIVE PLAN
+                {isOnFreeTrial ? <LuClock /> : <LuCrown />}{" "}
+                {isOnFreeTrial ? "FREE TRIAL" : isSignFreePlan ? "FREE PLAN" : "ACTIVE PLAN"}
               </span>
               {isCustomPlan && (
                 <span
@@ -3005,17 +3040,29 @@ export default function MarketplaceSettingsPage() {
                   <LuSparkles /> CUSTOM QUOTAS / FEATURES
                 </span>
               )}
-              {planExpires && (
+              {isOnFreeTrial && trialEndsAt ? (
+                <span style={{ fontSize: "12px", color: "#fde68a", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <LuClock /> Trial ends {formatBillingDate(trialEndsAt)}
+                </span>
+              ) : planExpires ? (
                 <span style={{ fontSize: "12px", color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                   <LuClock /> Renews {formatBillingDate(planExpires)}
                 </span>
-              )}
+              ) : isSignFreePlan ? (
+                <span style={{ fontSize: "12px", color: "#94a3b8", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  <LuCheck /> No expiry · Upgrade anytime
+                </span>
+              ) : null}
             </div>
             <h2 style={{ fontSize: "24px", fontWeight: 800, margin: "0 0 4px 0", color: "#f8fafc" }}>
               {plan?.title ?? plan?.name ?? "Starter Plan"}
             </h2>
             <p style={{ margin: 0, color: "#94a3b8", fontSize: "13px", maxWidth: "560px" }}>
-              Manage your plan limits, connected marketplace channels, AI generation credits, and automation power-ups.
+              {isOnFreeTrial
+                ? signFreeAvailable
+                  ? "You have full plan access during your free trial. After it ends, your account switches automatically to our Free plan unless you upgrade."
+                  : "You have full plan access during your free trial. Upgrade before it ends to prevent automatic account deactivation."
+                : "Manage your plan limits, connected marketplace channels, AI generation credits, and automation power-ups."}
             </p>
           </div>
 
@@ -4319,7 +4366,10 @@ export default function MarketplaceSettingsPage() {
 
   const renderAccountBillingTab = () => {
     const activePlan = currentSubscription?.current_plan;
+    const isOnFreeTrial = Boolean(currentSubscription?.is_on_free_trial);
+    const isSignFreePlan = Boolean(activePlan?.is_sign_free && !currentSubscription?.is_plan_paid);
     const planExpires = currentSubscription?.plan_expires_at;
+    const trialEndsAt = currentSubscription?.trial_ends_at || planExpires;
     const defaultMethod = paymentMethods.find((m) => m.is_default) ?? paymentMethods[0];
     const totalSpent = paymentHistory.reduce(
       (sum, tx) => sum + (tx.status === "completed" || !tx.status ? Number(tx.amount) : 0),
@@ -4327,6 +4377,24 @@ export default function MarketplaceSettingsPage() {
     );
     const userInitials = getUserInitials(profileName || user?.name, profileEmail || user?.email);
     const hasPasswordChange = Boolean(newPassword || confirmPassword || currentPassword);
+
+    const handleSendInvoiceEmail = async (tx) => {
+      if (!tx?.id || sendingInvoiceId) return;
+      setSendingInvoiceId(tx.id);
+      try {
+        const res = await emailBillingInvoice(tx.id);
+        toast.success(res.data?.message || "Invoice email sent.");
+        if (res.data?.transaction) {
+          setPaymentHistory((prev) =>
+            prev.map((item) => (item.id === tx.id ? { ...item, ...res.data.transaction } : item)),
+          );
+        }
+      } catch (err) {
+        toast.error(err?.response?.data?.error || err?.message || "Failed to send invoice email.");
+      } finally {
+        setSendingInvoiceId(null);
+      }
+    };
 
     return (
       <section className="billing-settings card-wrapper">
@@ -4349,14 +4417,24 @@ export default function MarketplaceSettingsPage() {
             <span className="billing-settings__stat-icon billing-settings__stat-icon--plan"><LuCrown /></span>
             <div>
               <span className="billing-settings__stat-label">Current Plan</span>
-              <strong>{activePlan?.title ?? "Free"}</strong>
+              <strong>{activePlan?.title ?? "Free"}{isOnFreeTrial ? " (Trial)" : ""}</strong>
             </div>
           </article>
           <article className="billing-settings__stat">
             <span className="billing-settings__stat-icon billing-settings__stat-icon--renewal"><LuCalendar /></span>
             <div>
-              <span className="billing-settings__stat-label">Renewal</span>
-              <strong>{planExpires ? formatBillingDate(planExpires) : activePlan ? "Active" : "—"}</strong>
+              <span className="billing-settings__stat-label">{isOnFreeTrial ? "Trial Ends" : "Renewal"}</span>
+              <strong>
+                {isOnFreeTrial && trialEndsAt
+                  ? formatBillingDate(trialEndsAt)
+                  : planExpires
+                  ? formatBillingDate(planExpires)
+                  : isSignFreePlan
+                  ? "No expiry"
+                  : activePlan
+                  ? "Active"
+                  : "—"}
+              </strong>
             </div>
           </article>
           <article className="billing-settings__stat">
@@ -4662,6 +4740,7 @@ export default function MarketplaceSettingsPage() {
                 <span>Provider</span>
                 <span>Status</span>
                 <span>Amount</span>
+                <span>Invoice</span>
               </div>
               {paymentHistory.map((tx) => (
                 <div className="billing-settings__history-row" key={tx.id}>
@@ -4678,6 +4757,21 @@ export default function MarketplaceSettingsPage() {
                   </span>
                   <span data-label="Amount" className="billing-settings__amount">
                     ${Number(tx.amount).toFixed(2)} {tx.currency ?? "USD"}
+                  </span>
+                  <span data-label="Invoice">
+                    {(tx.status ?? "completed").toLowerCase() === "completed" ? (
+                      <button
+                        type="button"
+                        className="billing-settings__invoice-btn"
+                        disabled={sendingInvoiceId === tx.id}
+                        onClick={() => handleSendInvoiceEmail(tx)}
+                      >
+                        {sendingInvoiceId === tx.id ? <LuLoader className="spin-icon" /> : <LuMail />}
+                        <span>{sendingInvoiceId === tx.id ? "Sending…" : "Email Invoice"}</span>
+                      </button>
+                    ) : (
+                      <span style={{ color: "#9ca3af", fontSize: "11px" }}>—</span>
+                    )}
                   </span>
                 </div>
               ))}
@@ -5195,6 +5289,28 @@ export default function MarketplaceSettingsPage() {
                 <label htmlFor="va-active-checkbox" style={{ fontSize: "13px", fontWeight: 600, color: "#334155", cursor: "pointer" }}>
                   Account Active (allows VA to sign in)
                 </label>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  background: "#f5f3ff",
+                  border: "1px solid #ddd6fe",
+                  color: "#4c1d95",
+                  fontSize: "12px",
+                  lineHeight: 1.45,
+                }}
+              >
+                <LuMail style={{ fontSize: "15px", flexShrink: 0, marginTop: "2px", color: "#6d28d9" }} />
+                <span>
+                  {editingVa
+                    ? "If you set a new password above, updated login credentials and module permissions will be emailed automatically to this Virtual Assistant."
+                    : "Login credentials, portal URL, and assigned module permissions are automatically sent to this Virtual Assistant's email when created."}
+                </span>
               </div>
 
               {/* Module Permissions Granular Selection */}

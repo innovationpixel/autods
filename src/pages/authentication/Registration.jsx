@@ -8,6 +8,7 @@ import {
   LuCircle,
   LuCircleAlert,
   LuCircleCheck,
+  LuClock,
   LuCreditCard,
   LuCrown,
   LuEye,
@@ -38,6 +39,7 @@ import {
   confirmPayPalPlan,
   confirmStripePlan,
   getPlans,
+  startPlanFreeTrial,
 } from "../../services/PlanService";
 import {
   acceptLegalConsent,
@@ -75,6 +77,126 @@ const MARKETPLACES = [
   "Shopify",
   "WooCommerce",
 ];
+
+function resolveOnboardingPricing(plan, billingCycle = "monthly") {
+  if (!plan) {
+    return {
+      baseType: "monthly",
+      isAnnualView: false,
+      hasAnnual: false,
+      displayPrice: 0,
+      periodLabel: "/ month",
+      checkoutCycle: "monthly",
+      monthlyPrice: 0,
+      annualPrice: null,
+      monthly12Months: 0,
+      savingsAmount: 0,
+      discountPercent: 0,
+      monthlyEquivalent: null,
+    };
+  }
+
+  const baseType = plan.base_billing_type ?? plan.billing_type ?? "monthly";
+  const rawMonthly = Number(plan.monthly_price ?? plan.price ?? 0);
+  const rawAnnual =
+    plan.annual_price !== null &&
+    plan.annual_price !== undefined &&
+    plan.annual_price !== ""
+      ? Number(plan.annual_price)
+      : null;
+
+  if (baseType === "one_time") {
+    const oneTimePrice = Number(plan.price ?? 0);
+    return {
+      baseType,
+      isAnnualView: false,
+      hasAnnual: false,
+      displayPrice: oneTimePrice,
+      periodLabel: `/${plan.duration_days ?? 30} days`,
+      checkoutCycle: "one_time",
+      monthlyPrice: null,
+      annualPrice: null,
+      monthly12Months: 0,
+      savingsAmount: 0,
+      discountPercent: 0,
+      monthlyEquivalent: null,
+    };
+  }
+
+  if (baseType === "yearly") {
+    const annualVal =
+      rawAnnual !== null && Number.isFinite(rawAnnual)
+        ? rawAnnual
+        : Number(plan.price ?? 0);
+    const monthlyEq =
+      plan.annual_monthly_equivalent !== null &&
+      plan.annual_monthly_equivalent !== undefined
+        ? Number(plan.annual_monthly_equivalent)
+        : Math.round((annualVal / 12) * 100) / 100;
+
+    return {
+      baseType,
+      isAnnualView: true,
+      hasAnnual: true,
+      displayPrice: annualVal,
+      periodLabel: "/ year",
+      checkoutCycle: "yearly",
+      monthlyPrice: null,
+      annualPrice: annualVal,
+      monthly12Months: 0,
+      savingsAmount: 0,
+      discountPercent: 0,
+      monthlyEquivalent: monthlyEq,
+    };
+  }
+
+  const monthlyPrice = Number.isFinite(rawMonthly) ? rawMonthly : 0;
+  const hasAnnual = rawAnnual !== null && Number.isFinite(rawAnnual);
+  const monthly12Months =
+    plan.monthly_12_months_price !== null &&
+    plan.monthly_12_months_price !== undefined
+      ? Number(plan.monthly_12_months_price)
+      : Math.round(monthlyPrice * 12 * 100) / 100;
+
+  let savingsAmount = 0;
+  let discountPercent = 0;
+  if (hasAnnual && monthly12Months > 0 && rawAnnual < monthly12Months) {
+    savingsAmount =
+      plan.annual_savings_amount !== null &&
+      plan.annual_savings_amount !== undefined
+        ? Number(plan.annual_savings_amount)
+        : Math.round((monthly12Months - rawAnnual) * 100) / 100;
+    discountPercent =
+      plan.annual_discount_percent !== null &&
+      plan.annual_discount_percent !== undefined
+        ? Number(plan.annual_discount_percent)
+        : Math.round(((monthly12Months - rawAnnual) / monthly12Months) * 1000) / 10;
+  }
+
+  const monthlyEquivalent = hasAnnual
+    ? plan.annual_monthly_equivalent !== null &&
+      plan.annual_monthly_equivalent !== undefined
+      ? Number(plan.annual_monthly_equivalent)
+      : Math.round((rawAnnual / 12) * 100) / 100
+    : null;
+
+  const isAnnualView = billingCycle === "annual" && hasAnnual;
+
+  return {
+    baseType,
+    isAnnualView,
+    hasAnnual,
+    displayPrice: isAnnualView ? rawAnnual : monthlyPrice,
+    periodLabel: isAnnualView ? "/ year" : "/ month",
+    checkoutCycle: isAnnualView ? "yearly" : "monthly",
+    monthlyPrice,
+    annualPrice: hasAnnual ? rawAnnual : null,
+    monthly12Months,
+    savingsAmount,
+    discountPercent,
+    monthlyEquivalent,
+  };
+}
 
 export default function Registration() {
   const navigate = useNavigate();
@@ -115,13 +237,27 @@ export default function Registration() {
   const [touched, setTouched] = useState({});
 
   // Plans & Payment
+  const initialCycleParam = (
+    searchParams.get("billing_cycle") ||
+    searchParams.get("billing_type") ||
+    ""
+  ).toLowerCase();
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
+  const [signFreeAvailable, setSignFreeAvailable] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const [billingCycle, setBillingCycle] = useState(
+    initialCycleParam === "yearly" || initialCycleParam === "annual"
+      ? "annual"
+      : "monthly"
+  );
   const [paymentMethod, setPaymentMethod] = useState("stripe"); // 'stripe' | 'paypal'
   const [activating, setActivating] = useState(false);
+  const [trialStarting, setTrialStarting] = useState(false);
   const [countdown, setCountdown] = useState(4);
   const [activatedPlan, setActivatedPlan] = useState(null);
+  const [activatedMode, setActivatedMode] = useState("paid"); // 'paid' | 'trial' | 'free'
+  const [activatedTrialEndsAt, setActivatedTrialEndsAt] = useState(null);
 
   const hasUserLegalConsent = (user) =>
     Boolean(user?.legal_accepted || (user?.terms_accepted_at && user?.privacy_accepted_at));
@@ -193,10 +329,11 @@ export default function Registration() {
       .then((res) => {
         const list = res.data?.plans ?? [];
         setPlans(list);
-        if (list.length > 0 && !selectedPlanId) {
+        setSignFreeAvailable(Boolean(res.data?.sign_free_available));
+        if (list.length > 0) {
           // Select Pro by default if available, else first plan
           const pro = list.find((p) => /pro/i.test(p.title) && p.billing_type === "monthly");
-          setSelectedPlanId(pro ? pro.id : list[0].id);
+          setSelectedPlanId((prev) => prev || (pro ? pro.id : list[0].id));
         }
       })
       .catch((err) => {
@@ -211,16 +348,34 @@ export default function Registration() {
     const sessionId = searchParams.get("session_id");
     const providerParam = searchParams.get("provider");
     const tokenParam = searchParams.get("token");
+    const planIdParam = searchParams.get("plan_id");
+    const subscriptionIdParam = searchParams.get("subscription_id");
+    const billingCycleParam =
+      searchParams.get("billing_cycle") || searchParams.get("billing_type");
 
     if (isSuccess && (sessionId || providerParam || tokenParam)) {
       setActivating(true);
       setStep(3);
+      if (planIdParam && !Number.isNaN(Number(planIdParam))) {
+        setSelectedPlanId(Number(planIdParam));
+      }
+      if (
+        billingCycleParam &&
+        ["yearly", "annual"].includes(billingCycleParam.toLowerCase())
+      ) {
+        setBillingCycle("annual");
+      }
 
       const confirmPromise = sessionId
-        ? confirmStripePlan({ session_id: sessionId })
+        ? confirmStripePlan({
+            session_id: sessionId,
+            billing_cycle: billingCycleParam || undefined,
+          })
         : confirmPayPalPlan({
-            plan_id: selectedPlanId || (plans[0]?.id ?? 1),
+            plan_id: Number(planIdParam) || selectedPlanId || (plans[0]?.id ?? 1),
             order_id: tokenParam,
+            subscription_id: subscriptionIdParam,
+            billing_cycle: billingCycleParam || undefined,
           });
 
       confirmPromise
@@ -232,6 +387,8 @@ export default function Registration() {
             dispatch(loginConfirmedAction({ access_token: getStoredToken(), user }));
           }
           setActivatedPlan(plan);
+          setActivatedMode("paid");
+          setActivatedTrialEndsAt(null);
           setStep(4);
           toast.success("Payment confirmed! Package activated successfully.");
           setSearchParams({}, { replace: true });
@@ -247,6 +404,45 @@ export default function Registration() {
   const selectedPlan = useMemo(() => {
     return plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
   }, [plans, selectedPlanId]);
+
+  const hasAnyAnnualOption = useMemo(
+    () =>
+      plans.some(
+        (p) =>
+          Boolean(p.has_annual_plan) ||
+          p.billing_type === "yearly" ||
+          (p.billing_type === "monthly" &&
+            p.annual_price !== null &&
+            p.annual_price !== undefined &&
+            p.annual_price !== "")
+      ),
+    [plans]
+  );
+
+  const maxAnnualDiscount = useMemo(() => {
+    let best = 0;
+    plans.forEach((p) => {
+      const stats = resolveOnboardingPricing(p, "annual");
+      if (stats.discountPercent > best) {
+        best = stats.discountPercent;
+      }
+    });
+    return best;
+  }, [plans]);
+
+  const selectedPricing = useMemo(
+    () => resolveOnboardingPricing(selectedPlan, billingCycle),
+    [selectedPlan, billingCycle]
+  );
+
+  const isSignFreeFreePlan = (planObj) =>
+    Boolean(planObj?.is_sign_free) && Number(planObj?.price ?? 0) <= 0;
+
+  const hasPlanFreeTrial = (planObj) =>
+    Boolean(planObj?.has_free_trial) &&
+    Number(planObj?.free_trial_days) > 0 &&
+    !sessionUser?.has_used_free_trial &&
+    !isSignFreeFreePlan(planObj);
 
   // Password strength calculation
   const passwordCriteria = useMemo(() => {
@@ -439,11 +635,13 @@ export default function Registration() {
 
     setActivating(true);
     const origin = window.location.origin;
-    const returnPath = `/onboarding?step=3&plan_id=${selectedPlan.id}`;
+    const checkoutCycle = selectedPricing.checkoutCycle;
+    const returnPath = `/onboarding?step=3&plan_id=${selectedPlan.id}&billing_cycle=${encodeURIComponent(checkoutCycle)}`;
 
     try {
       if (provider === "stripe") {
         const res = await checkoutStripe(selectedPlan.id, {
+          billing_cycle: checkoutCycle,
           return_origin: origin,
           return_path: `${returnPath}&provider=stripe`,
           terms_accepted: true,
@@ -455,6 +653,7 @@ export default function Registration() {
         }
       } else if (provider === "paypal") {
         const res = await checkoutPayPal(selectedPlan.id, {
+          billing_cycle: checkoutCycle,
           return_origin: origin,
           return_path: `${returnPath}&provider=paypal`,
           terms_accepted: true,
@@ -493,6 +692,7 @@ export default function Registration() {
       setActivating(true);
       const res = await activatePlan(selectedPlan.id, {
         provider: paymentMethod,
+        billing_cycle: selectedPricing.checkoutCycle,
         reference_id: `onboarding_${Date.now()}`,
         terms_accepted: true,
         privacy_accepted: true,
@@ -504,6 +704,8 @@ export default function Registration() {
         dispatch(loginConfirmedAction({ access_token: getStoredToken(), user }));
       }
       setActivatedPlan(res.data?.plan || selectedPlan);
+      setActivatedMode("paid");
+      setActivatedTrialEndsAt(null);
       setStep(4);
       toast.success("Package activated successfully! Welcome aboard.");
     } catch (err) {
@@ -513,6 +715,93 @@ export default function Registration() {
         return;
       }
       toast.error(err.response?.data?.message || "Failed to activate package.");
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  // Start free trial directly during onboarding
+  const handleStartTrialOnboarding = async () => {
+    if (!ensureLegalAgreementsBeforePayment()) {
+      return;
+    }
+    if (!selectedPlan) {
+      toast.error("Please select a plan first.");
+      return;
+    }
+
+    setTrialStarting(true);
+    try {
+      const res = await startPlanFreeTrial(selectedPlan.id, {
+        terms_accepted: true,
+        privacy_accepted: true,
+      });
+
+      const user = res.data?.user;
+      if (user) {
+        saveSession({ access_token: getStoredToken(), user });
+        dispatch(loginConfirmedAction({ access_token: getStoredToken(), user }));
+      }
+      setActivatedPlan(res.data?.plan || selectedPlan);
+      setActivatedMode("trial");
+      setActivatedTrialEndsAt(res.data?.trial_ends_at || res.data?.user?.trial_ends_at || null);
+      setStep(4);
+      toast.success(res.data?.message || "Free trial started! Welcome aboard.");
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        toast.error(err.response?.data?.error || "You must agree to the Terms & Conditions and Privacy Policy first.");
+        setStep(1);
+        return;
+      }
+      toast.error(err.response?.data?.error ?? err.response?.data?.message ?? "Failed to start free trial.");
+    } finally {
+      setTrialStarting(false);
+    }
+  };
+
+  // Activate $0 Sign Free plan directly during onboarding
+  const handleActivateFreeOnboarding = async () => {
+    if (!ensureLegalAgreementsBeforePayment()) {
+      return;
+    }
+    if (!selectedPlan) {
+      toast.error("Please select a plan first.");
+      return;
+    }
+
+    const freeCycle =
+      selectedPlan.base_billing_type === "one_time" || selectedPlan.billing_type === "one_time"
+        ? "one_time"
+        : selectedPlan.base_billing_type === "yearly" || selectedPlan.billing_type === "yearly"
+        ? "yearly"
+        : "monthly";
+
+    setActivating(true);
+    try {
+      const res = await activatePlan(selectedPlan.id, {
+        provider: "system",
+        billing_cycle: freeCycle,
+        terms_accepted: true,
+        privacy_accepted: true,
+      });
+
+      const user = res.data?.user;
+      if (user) {
+        saveSession({ access_token: getStoredToken(), user });
+        dispatch(loginConfirmedAction({ access_token: getStoredToken(), user }));
+      }
+      setActivatedPlan(res.data?.plan || selectedPlan);
+      setActivatedMode("free");
+      setActivatedTrialEndsAt(null);
+      setStep(4);
+      toast.success(res.data?.message || "Free plan activated! Welcome aboard.");
+    } catch (err) {
+      if (err.response?.status === 422 && err.response?.data?.requires_legal_consent) {
+        toast.error(err.response?.data?.error || "You must agree to the Terms & Conditions and Privacy Policy first.");
+        setStep(1);
+        return;
+      }
+      toast.error(err.response?.data?.error ?? err.response?.data?.message ?? "Failed to activate free plan.");
     } finally {
       setActivating(false);
     }
@@ -1035,10 +1324,47 @@ export default function Registration() {
                 </div>
               ) : (
                 <form onSubmit={handleStep2Submit}>
+                  {hasAnyAnnualOption ? (
+                    <div className="onboarding-billing-switch-wrap">
+                      <div
+                        className="onboarding-billing-switch"
+                        role="group"
+                        aria-label="Choose Billing Cycle"
+                      >
+                        <button
+                          type="button"
+                          className={`onboarding-billing-switch__btn ${
+                            billingCycle === "monthly" ? "is-active" : ""
+                          }`}
+                          onClick={() => setBillingCycle("monthly")}
+                        >
+                          <span>Monthly</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`onboarding-billing-switch__btn ${
+                            billingCycle === "annual" ? "is-active" : ""
+                          }`}
+                          onClick={() => setBillingCycle("annual")}
+                        >
+                          <span>Annual</span>
+                          {maxAnnualDiscount > 0 ? (
+                            <span className="onboarding-billing-switch__badge">
+                              Save up to {maxAnnualDiscount}%
+                            </span>
+                          ) : null}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="onboarding-plans">
                     {plans.map((plan) => {
                       const isSelected = selectedPlanId === plan.id;
                       const isPro = /pro/i.test(plan.title);
+                      const planPricing = resolveOnboardingPricing(plan, billingCycle);
+                      const showTrialTag = hasPlanFreeTrial(plan);
+                      const showFreeTag = isSignFreeFreePlan(plan);
                       return (
                         <div
                           key={plan.id}
@@ -1060,18 +1386,80 @@ export default function Registration() {
                             </div>
                           </div>
 
-                          <div className="onboarding-plan-card__price">
-                            <span className="onboarding-plan-card__amount">
-                              ${parseFloat(plan.price).toFixed(2)}
-                            </span>
-                            <span className="onboarding-plan-card__period">
-                              {plan.billing_type === "monthly"
-                                ? "/ month"
-                                : `/${plan.duration_days ?? 30} days`}
-                            </span>
+                          {(showTrialTag || showFreeTag) ? (
+                            <div className="onboarding-plan-tag-row">
+                              {showTrialTag ? (
+                                <span className="onboarding-plan-trial-tag">
+                                  <LuClock />
+                                  <span>{plan.free_trial_days}-Day Free Trial</span>
+                                </span>
+                              ) : null}
+                              {showFreeTag ? (
+                                <span className="onboarding-plan-free-tag">
+                                  Free Plan
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          <div className="onboarding-plan-price-row">
+                            <div className="onboarding-plan-card__price">
+                              <span className="onboarding-plan-card__amount">
+                                ${Number(planPricing.displayPrice).toFixed(2)}
+                              </span>
+                              <span className="onboarding-plan-card__period">
+                                {planPricing.periodLabel}
+                              </span>
+                            </div>
+                            {planPricing.isAnnualView && planPricing.discountPercent > 0 ? (
+                              <span className="onboarding-plan-save-badge">
+                                Save {planPricing.discountPercent}%
+                              </span>
+                            ) : null}
                           </div>
 
+                          {planPricing.isAnnualView ? (
+                            <div className="onboarding-plan-subnote">
+                              {planPricing.discountPercent > 0 && planPricing.monthly12Months > 0 ? (
+                                <>
+                                  <s className="onboarding-plan-compare">
+                                    ${planPricing.monthly12Months.toFixed(2)}/yr
+                                  </s>
+                                  <span>·</span>
+                                </>
+                              ) : null}
+                              <span>
+                                <strong>${Number(planPricing.monthlyEquivalent).toFixed(2)}/mo</strong>{" "}
+                                billed annually
+                              </span>
+                            </div>
+                          ) : planPricing.baseType === "monthly" &&
+                            billingCycle === "monthly" &&
+                            planPricing.hasAnnual ? (
+                            <div className="onboarding-plan-subnote">
+                              Or <strong>${Number(planPricing.annualPrice).toFixed(2)}/yr</strong>
+                              {planPricing.discountPercent > 0
+                                ? ` (Save ${planPricing.discountPercent}%)`
+                                : ""}
+                            </div>
+                          ) : planPricing.baseType === "monthly" &&
+                            billingCycle === "annual" &&
+                            !planPricing.hasAnnual ? (
+                            <div className="onboarding-plan-subnote onboarding-plan-subnote--muted">
+                              Billed monthly (${planPricing.monthly12Months.toFixed(2)}/yr)
+                            </div>
+                          ) : null}
+
                           <p className="onboarding-plan-card__desc">{plan.description}</p>
+
+                          {showTrialTag ? (
+                            <div className="onboarding-plan-subnote">
+                              <strong>Free for {plan.free_trial_days} days</strong> ·{" "}
+                              {signFreeAvailable
+                                ? "Auto-switches to Free plan unless upgraded"
+                                : "Upgrade before trial ends"}
+                            </div>
+                          ) : null}
 
                           {Array.isArray(plan.inclusions) && plan.inclusions.length > 0 && (
                             <ul className="onboarding-plan-card__features">
@@ -1092,20 +1480,74 @@ export default function Registration() {
                     <button
                       type="button"
                       className="onboarding-btn-back"
+                      disabled={trialStarting || activating}
                       onClick={() => setStep(1)}
                     >
                       <LuArrowLeft />
                       <span>Back</span>
                     </button>
 
-                    <button
-                      type="submit"
-                      className="auth-page__submit flex-grow-1"
-                      disabled={!selectedPlanId}
-                    >
-                      <span>Continue to Payment & Activation</span>
-                      <LuArrowRight />
-                    </button>
+                    {isSignFreeFreePlan(selectedPlan) ? (
+                      <button
+                        type="button"
+                        className="auth-page__submit flex-grow-1"
+                        disabled={!selectedPlanId || activating}
+                        onClick={handleActivateFreeOnboarding}
+                      >
+                        {activating ? (
+                          <>
+                            <LuLoader className="spin-icon" />
+                            <span>Activating Free Plan…</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Activate Free Plan &amp; Go to Dashboard</span>
+                            <LuArrowRight />
+                          </>
+                        )}
+                      </button>
+                    ) : hasPlanFreeTrial(selectedPlan) ? (
+                      <>
+                        <button
+                          type="button"
+                          className="onboarding-btn-trial flex-grow-1"
+                          disabled={!selectedPlanId || trialStarting || activating}
+                          onClick={handleStartTrialOnboarding}
+                        >
+                          {trialStarting ? (
+                            <>
+                              <LuLoader className="spin-icon" />
+                              <span>Starting Free Trial…</span>
+                            </>
+                          ) : (
+                            <>
+                              <LuClock />
+                              <span>
+                                Start {selectedPlan.free_trial_days}-Day Free Trial ($0 Today)
+                              </span>
+                              <LuArrowRight />
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="submit"
+                          className="auth-page__submit"
+                          disabled={!selectedPlanId || trialStarting}
+                        >
+                          <span>Continue to Payment</span>
+                          <LuArrowRight />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="submit"
+                        className="auth-page__submit flex-grow-1"
+                        disabled={!selectedPlanId}
+                      >
+                        <span>Continue to Payment &amp; Activation</span>
+                        <LuArrowRight />
+                      </button>
+                    )}
                   </div>
                 </form>
               )}
@@ -1116,8 +1558,16 @@ export default function Registration() {
           {step === 3 && selectedPlan && (
             <div className="onboarding-step-content">
               <div className="auth-page__card-head">
-                <h2>Complete payment & activate package</h2>
-                <p>Choose your preferred payment gateway to activate your subscription.</p>
+                <h2>
+                  {isSignFreeFreePlan(selectedPlan)
+                    ? "Activate your free plan"
+                    : "Complete payment & activate package"}
+                </h2>
+                <p>
+                  {isSignFreeFreePlan(selectedPlan)
+                    ? "No credit card required. Activate your free fallback package now."
+                    : "Choose your preferred payment gateway to activate your subscription."}
+                </p>
               </div>
 
               {/* Selected Plan Summary Box */}
@@ -1127,125 +1577,213 @@ export default function Registration() {
                     <LuSparkles className="me-1" /> {selectedPlan.title} Plan
                   </h4>
                   <div className="onboarding-checkout-summary__meta">
-                    {selectedPlan.billing_type === "monthly" ? "Billed Monthly" : "One-Time Access"} • Automatic Renewal & Instant Activation
+                    {selectedPricing.checkoutCycle === "yearly" ? (
+                      <>
+                        Billed Annually
+                        {selectedPricing.monthlyEquivalent !== null
+                          ? ` ($${Number(selectedPricing.monthlyEquivalent).toFixed(2)}/mo)`
+                          : ""}
+                        {selectedPricing.discountPercent > 0
+                          ? ` • Save ${selectedPricing.discountPercent}% vs monthly`
+                          : ""}
+                      </>
+                    ) : selectedPricing.checkoutCycle === "monthly" ? (
+                      "Billed Monthly • Automatic Renewal & Instant Activation"
+                    ) : (
+                      `One-Time Access (${selectedPlan.duration_days ?? 30} days) • Instant Activation`
+                    )}
                   </div>
                 </div>
                 <div className="onboarding-checkout-summary__price">
-                  ${parseFloat(selectedPlan.price).toFixed(2)}
+                  ${Number(selectedPricing.displayPrice).toFixed(2)}
+                  <small className="onboarding-checkout-summary__unit">
+                    {selectedPricing.checkoutCycle === "yearly"
+                      ? "/yr"
+                      : selectedPricing.checkoutCycle === "monthly"
+                      ? "/mo"
+                      : ""}
+                  </small>
                 </div>
               </div>
 
-              {/* Payment Method Cards */}
-              <div className="onboarding-payment-cards">
-                <div
-                  className={`onboarding-payment-card onboarding-payment-card--stripe ${
-                    paymentMethod === "stripe" ? "onboarding-payment-card--active" : ""
-                  }`}
-                  onClick={() => setPaymentMethod("stripe")}
-                >
-                  <div className="onboarding-payment-card__icon">
-                    <LuCreditCard />
+              {hasPlanFreeTrial(selectedPlan) ? (
+                <div className="onboarding-trial-notice-box">
+                  <div className="onboarding-trial-notice-box__copy">
+                    <strong>
+                      <LuClock /> {selectedPlan.free_trial_days}-Day Free Trial Available ($0 Today)
+                    </strong>
+                    <span>
+                      {signFreeAvailable
+                        ? "Start using all plan features free. If you do not upgrade before your trial ends, your account switches automatically to our Free plan."
+                        : "Start using all plan features free. Upgrade before your trial ends to keep your account active."}
+                    </span>
                   </div>
-                  <div className="onboarding-payment-card__info">
-                    <h5 className="onboarding-payment-card__name">Credit / Debit Card</h5>
-                    <p className="onboarding-payment-card__desc">Secure checkout via Stripe</p>
-                  </div>
-                  <div className="onboarding-plan-card__check">
-                    {paymentMethod === "stripe" ? <LuCheck /> : null}
-                  </div>
-                </div>
-
-                <div
-                  className={`onboarding-payment-card onboarding-payment-card--paypal ${
-                    paymentMethod === "paypal" ? "onboarding-payment-card--active" : ""
-                  }`}
-                  onClick={() => setPaymentMethod("paypal")}
-                >
-                  <div className="onboarding-payment-card__icon">
-                    <LuShieldCheck />
-                  </div>
-                  <div className="onboarding-payment-card__info">
-                    <h5 className="onboarding-payment-card__name">PayPal</h5>
-                    <p className="onboarding-payment-card__desc">PayPal balance or linked cards</p>
-                  </div>
-                  <div className="onboarding-plan-card__check">
-                    {paymentMethod === "paypal" ? <LuCheck /> : null}
-                  </div>
-                </div>
-              </div>
-
-              <div className="auth-page__trust mt-0 mb-3 pt-0 border-top-0">
-                <span><LuShieldCheck /> 256-bit SSL Encryption</span>
-                <span><LuCheck /> Cancel Anytime</span>
-              </div>
-
-              <div className="onboarding-legal-verified" style={{ width: "100%", flexWrap: "wrap" }}>
-                <LuCircleCheck />
-                <span>
-                  Verified agreement to our{" "}
                   <button
                     type="button"
-                    className="auth-page__legal-link"
-                    onClick={() => setLegalModalType("terms")}
+                    className="onboarding-btn-trial"
+                    disabled={trialStarting || activating}
+                    onClick={handleStartTrialOnboarding}
                   >
-                    Terms &amp; Conditions
-                  </button>{" "}
-                  and{" "}
-                  <button
-                    type="button"
-                    className="auth-page__legal-link"
-                    onClick={() => setLegalModalType("privacy")}
-                  >
-                    Privacy Policy
+                    {trialStarting ? (
+                      <>
+                        <LuLoader className="spin-icon" />
+                        <span>Starting…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Start Free Trial</span>
+                        <LuArrowRight />
+                      </>
+                    )}
                   </button>
-                  .
-                </span>
-              </div>
+                </div>
+              ) : null}
 
-              {/* Action Buttons */}
-              <div className="onboarding-action-buttons">
-                <button
-                  type="button"
-                  className="onboarding-btn-back"
-                  onClick={() => setStep(2)}
-                  disabled={activating}
-                >
-                  <LuArrowLeft />
-                  <span>Back</span>
-                </button>
+              {isSignFreeFreePlan(selectedPlan) ? (
+                <div className="onboarding-action-buttons">
+                  <button
+                    type="button"
+                    className="onboarding-btn-back"
+                    onClick={() => setStep(2)}
+                    disabled={activating}
+                  >
+                    <LuArrowLeft />
+                    <span>Back</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-page__submit flex-grow-1"
+                    disabled={activating}
+                    onClick={handleActivateFreeOnboarding}
+                  >
+                    {activating ? (
+                      <>
+                        <LuLoader className="spin-icon" />
+                        <span>Activating Free Plan…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Activate Free Plan ($0.00)</span>
+                        <LuArrowRight />
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Payment Method Cards */}
+                  <div className="onboarding-payment-cards">
+                    <div
+                      className={`onboarding-payment-card onboarding-payment-card--stripe ${
+                        paymentMethod === "stripe" ? "onboarding-payment-card--active" : ""
+                      }`}
+                      onClick={() => setPaymentMethod("stripe")}
+                    >
+                      <div className="onboarding-payment-card__icon">
+                        <LuCreditCard />
+                      </div>
+                      <div className="onboarding-payment-card__info">
+                        <h5 className="onboarding-payment-card__name">Credit / Debit Card</h5>
+                        <p className="onboarding-payment-card__desc">Secure checkout via Stripe</p>
+                      </div>
+                      <div className="onboarding-plan-card__check">
+                        {paymentMethod === "stripe" ? <LuCheck /> : null}
+                      </div>
+                    </div>
 
-                <button
-                  type="button"
-                  className="auth-page__submit flex-grow-1"
-                  disabled={activating}
-                  onClick={() => handlePaymentAndActivation(paymentMethod)}
-                >
-                  {activating ? (
-                    <>
-                      <LuLoader className="spin-icon" />
-                      <span>Processing Activation…</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Pay with {paymentMethod === "stripe" ? "Credit Card/Debit Cards" : "PayPal"} & Activate</span>
-                      <LuArrowRight />
-                    </>
-                  )}
-                </button>
-              </div>
+                    <div
+                      className={`onboarding-payment-card onboarding-payment-card--paypal ${
+                        paymentMethod === "paypal" ? "onboarding-payment-card--active" : ""
+                      }`}
+                      onClick={() => setPaymentMethod("paypal")}
+                    >
+                      <div className="onboarding-payment-card__icon">
+                        <LuShieldCheck />
+                      </div>
+                      <div className="onboarding-payment-card__info">
+                        <h5 className="onboarding-payment-card__name">PayPal</h5>
+                        <p className="onboarding-payment-card__desc">PayPal balance or linked cards</p>
+                      </div>
+                      <div className="onboarding-plan-card__check">
+                        {paymentMethod === "paypal" ? <LuCheck /> : null}
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Quick direct activation link for instant verification */}
-              <div className="text-center mt-3">
-                <button
-                  type="button"
-                  className="btn btn-link btn-sm text-muted p-0"
-                  onClick={handleDirectActivation}
-                  disabled={activating}
-                  style={{ fontSize: 12, textDecoration: "underline" }}
-                >
-                  Instant sandbox activation (Test mode)
-                </button>
-              </div>
+                  <div className="auth-page__trust mt-0 mb-3 pt-0 border-top-0">
+                    <span><LuShieldCheck /> 256-bit SSL Encryption</span>
+                    <span><LuCheck /> Cancel Anytime</span>
+                  </div>
+
+                  <div className="onboarding-legal-verified" style={{ width: "100%", flexWrap: "wrap" }}>
+                    <LuCircleCheck />
+                    <span>
+                      Verified agreement to our{" "}
+                      <button
+                        type="button"
+                        className="auth-page__legal-link"
+                        onClick={() => setLegalModalType("terms")}
+                      >
+                        Terms &amp; Conditions
+                      </button>{" "}
+                      and{" "}
+                      <button
+                        type="button"
+                        className="auth-page__legal-link"
+                        onClick={() => setLegalModalType("privacy")}
+                      >
+                        Privacy Policy
+                      </button>
+                      .
+                    </span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="onboarding-action-buttons">
+                    <button
+                      type="button"
+                      className="onboarding-btn-back"
+                      onClick={() => setStep(2)}
+                      disabled={activating || trialStarting}
+                    >
+                      <LuArrowLeft />
+                      <span>Back</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="auth-page__submit flex-grow-1"
+                      disabled={activating || trialStarting}
+                      onClick={() => handlePaymentAndActivation(paymentMethod)}
+                    >
+                      {activating ? (
+                        <>
+                          <LuLoader className="spin-icon" />
+                          <span>Processing Activation…</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Pay with {paymentMethod === "stripe" ? "Credit Card/Debit Cards" : "PayPal"} & Activate</span>
+                          <LuArrowRight />
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Quick direct activation link for instant verification */}
+                  <div className="text-center mt-3">
+                    <button
+                      type="button"
+                      className="btn btn-link btn-sm text-muted p-0"
+                      onClick={handleDirectActivation}
+                      disabled={activating || trialStarting}
+                      style={{ fontSize: 12, textDecoration: "underline" }}
+                    >
+                      Instant sandbox activation (Test mode)
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1256,15 +1794,45 @@ export default function Registration() {
                 <LuCheck />
               </div>
 
-              <h2>Welcome to AutoDropshipPrime!</h2>
+              <h2>
+                {activatedMode === "trial"
+                  ? "Your Free Trial Is Active!"
+                  : activatedMode === "free"
+                  ? "Your Free Plan Is Active!"
+                  : "Welcome to AutoDropshipPrime!"}
+              </h2>
               <p>
-                Your <strong>{activatedPlan?.title || "Subscription"}</strong> package is now active.
-                Your dropshipping dashboard is ready for product imports and order automation.
+                {activatedMode === "trial" ? (
+                  <>
+                    You now have full free trial access to <strong>{activatedPlan?.title || "your selected plan"}</strong>
+                    {activatedTrialEndsAt
+                      ? ` until ${new Date(activatedTrialEndsAt).toLocaleDateString()}.`
+                      : "."}{" "}
+                    {signFreeAvailable
+                      ? "After your trial ends, your account will automatically switch to the Free plan unless you upgrade."
+                      : "Please upgrade before your trial ends to keep your account active."}
+                  </>
+                ) : activatedMode === "free" ? (
+                  <>
+                    Your <strong>{activatedPlan?.title || "Free"}</strong> plan is now active. You can upgrade anytime to unlock higher quotas and features.
+                  </>
+                ) : (
+                  <>
+                    Your <strong>{activatedPlan?.title || "Subscription"}</strong> package is now active.
+                    Your dropshipping dashboard is ready for product imports and order automation.
+                  </>
+                )}
               </p>
 
               <div className="onboarding-success__badge">
-                <LuCrown />
-                <span>Subscription Active: {activatedPlan?.title || "Plan"}</span>
+                {activatedMode === "trial" ? <LuClock /> : <LuCrown />}
+                <span>
+                  {activatedMode === "trial"
+                    ? `Free Trial Active: ${activatedPlan?.title || "Plan"}`
+                    : activatedMode === "free"
+                    ? `Free Plan Active: ${activatedPlan?.title || "Plan"}`
+                    : `Subscription Active: ${activatedPlan?.title || "Plan"}`}
+                </span>
               </div>
 
               <div className="onboarding-success__countdown-bar">

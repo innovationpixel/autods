@@ -522,6 +522,7 @@ a.text-primary,
 }
 .topbar-alert--warning{background:#fff8ed!important;color:#7f4d10!important;}
 .topbar-alert--critical{background:#fff1f4!important;color:#94314d!important;}
+.topbar-alert--info{background:#eff6ff!important;color:#1e40af!important;border-bottom-color:#bfdbfe!important;}
 .super-admin-shell .marketplace-header{background:rgba(255,255,255,.98)!important;}
 .super-admin-shell .marketplace-content-wrapper{max-width:none!important;}
 .super-admin-shell .section-title{color:var(--ap-text)!important;}
@@ -548,6 +549,12 @@ a.text-primary,
   background:#1d172b!important;
   border-color:#342a48!important;
   color:#f7f4ff!important;
+}
+.marketplace-dashboard-page--dark .topbar-alert--info,
+[data-theme-version="dark"] .topbar-alert--info{
+  background:rgba(37,99,235,.16)!important;
+  color:#bfdbfe!important;
+  border-bottom-color:rgba(96,165,250,.32)!important;
 }
 .marketplace-dashboard-page--dark .marketplace-main,
 .marketplace-dashboard-page--dark .marketplace-main__scroll{background:#151121!important;}

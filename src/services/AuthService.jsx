@@ -39,6 +39,18 @@ export function acceptLegalConsent(payload) {
     return axiosInstance.post('/auth/legal-consent', payload);
 }
 
+export function sendPasswordResetCode(email) {
+    return axiosInstance.post('/auth/forgot-password/send-code', { email });
+}
+
+export function verifyPasswordResetCode(email, code) {
+    return axiosInstance.post('/auth/forgot-password/verify-code', { email, code });
+}
+
+export function resetPasswordWithCode(payload) {
+    return axiosInstance.post('/auth/forgot-password/reset', payload);
+}
+
 export function saveSession(data) {
     const expiresIn = data.expires_in ?? null;
     const session = {

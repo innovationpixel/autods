@@ -2,27 +2,26 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
-  LuCalendar,
   LuCheck,
   LuCheckCheck,
-  LuCrown,
+  LuCircleAlert,
+  LuClock,
   LuLayers,
   LuLoader,
   LuLock,
-  LuPencil,
   LuPlus,
   LuSearch,
   LuShoppingCart,
   LuSparkles,
   LuStore,
-  LuTrash2,
   LuUsers,
   LuX,
-  LuZap,
 } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
+import { getStoredUser } from "../../../services/AuthService";
 import { toast } from "../../../utils/toast";
 import ConfirmModal from "../ConfirmModal";
+import PlanReferenceCard from "./PlanReferenceCard";
 import {
   createAdminPlan,
   deleteAdminPlan,
@@ -46,9 +45,13 @@ const createEmptyPlan = (isCustom = false) => ({
   features: {},
   customInclusions: [],
   price: 0,
+  annual_price: "",
   currency: "USD",
   billing_type: "monthly",
   duration_days: 30,
+  has_free_trial: false,
+  free_trial_days: "3",
+  is_sign_free: false,
   is_active: true,
   is_custom: Boolean(isCustom),
   assigned_user_ids: [],
@@ -57,26 +60,94 @@ const createEmptyPlan = (isCustom = false) => ({
   sort_order: 0,
 });
 
-function formatPlanInterval(plan) {
-  if (plan.billing_type === "monthly") {
-    return "month";
+function formatCurrencyCompact(value) {
+  const num = Number(value ?? 0);
+  if (!Number.isFinite(num)) return "0.00";
+  const rounded = Math.round(num * 100) / 100;
+  return Number.isInteger(rounded) ? rounded.toLocaleString() : rounded.toFixed(2);
+}
+
+function computePlanDiscountStats(priceValue, annualValue, billingType) {
+  const numericPrice = Number(priceValue);
+  const validPrice = Number.isFinite(numericPrice) && numericPrice >= 0 ? numericPrice : 0;
+
+  if (billingType === "yearly") {
+    return {
+      monthly12: 0,
+      hasAnnual: true,
+      annualPrice: validPrice,
+      savings: 0,
+      discountPercent: 0,
+      monthlyEquivalent: Math.round((validPrice / 12) * 100) / 100,
+    };
   }
-  return `${plan.duration_days ?? 30} days`;
+
+  if (billingType !== "monthly") {
+    return {
+      monthly12: 0,
+      hasAnnual: false,
+      annualPrice: null,
+      savings: 0,
+      discountPercent: 0,
+      monthlyEquivalent: null,
+    };
+  }
+
+  const monthly12 = Math.round(validPrice * 12 * 100) / 100;
+  const hasAnnualInput =
+    annualValue !== "" &&
+    annualValue !== null &&
+    annualValue !== undefined &&
+    !Number.isNaN(Number(annualValue)) &&
+    Number(annualValue) >= 0;
+
+  if (!hasAnnualInput) {
+    return {
+      monthly12,
+      hasAnnual: false,
+      annualPrice: null,
+      savings: 0,
+      discountPercent: 0,
+      monthlyEquivalent: null,
+    };
+  }
+
+  const annualPrice = Math.round(Number(annualValue) * 100) / 100;
+  const savings =
+    monthly12 > 0 && annualPrice < monthly12
+      ? Math.round((monthly12 - annualPrice) * 100) / 100
+      : 0;
+  const discountPercent =
+    monthly12 > 0 && annualPrice < monthly12
+      ? Math.round(((monthly12 - annualPrice) / monthly12) * 1000) / 10
+      : 0;
+  const monthlyEquivalent = Math.round((annualPrice / 12) * 100) / 100;
+
+  return {
+    monthly12,
+    hasAnnual: true,
+    annualPrice,
+    savings,
+    discountPercent,
+    monthlyEquivalent,
+  };
 }
 
 function AdminPlansPage() {
-  const role = useSelector(selectUserRole);
+  const role = useSelector(selectUserRole) ?? getStoredUser()?.role;
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [billingCyclePreview, setBillingCyclePreview] = useState("monthly");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(() => createEmptyPlan(false));
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [activatingId, setActivatingId] = useState(null);
   const [featureSearch, setFeatureSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
 
@@ -142,9 +213,23 @@ function AdminPlansPage() {
           : parsed.features,
       customInclusions: parsed.customInclusions,
       price: plan.price ?? 0,
+      annual_price:
+        plan.billing_type === "monthly" &&
+        plan.annual_price !== null &&
+        plan.annual_price !== undefined
+          ? String(plan.annual_price)
+          : "",
       currency: plan.currency ?? "USD",
       billing_type: plan.billing_type ?? "monthly",
       duration_days: plan.duration_days ?? 30,
+      has_free_trial: Boolean(plan.has_free_trial),
+      free_trial_days:
+        plan.free_trial_days !== null && plan.free_trial_days !== undefined
+          ? String(plan.free_trial_days)
+          : plan.has_free_trial
+          ? "3"
+          : "",
+      is_sign_free: !plan.is_custom && Boolean(plan.is_sign_free),
       is_active: Boolean(plan.is_active),
       is_custom: Boolean(plan.is_custom),
       assigned_user_ids: assignedIds,
@@ -228,6 +313,11 @@ function AdminPlansPage() {
     return Object.values(form.features).filter(Boolean).length;
   }, [form.features]);
 
+  const formDiscountStats = useMemo(
+    () => computePlanDiscountStats(form.price, form.annual_price, form.billing_type),
+    [form.price, form.annual_price, form.billing_type]
+  );
+
   const displayedPlans = useMemo(() => {
     if (typeFilter === "custom") {
       return plans.filter((p) => Boolean(p.is_custom));
@@ -238,6 +328,58 @@ function AdminPlansPage() {
     return plans;
   }, [plans, typeFilter]);
 
+  const hasAnyAnnualOption = useMemo(
+    () =>
+      displayedPlans.some(
+        (p) =>
+          Boolean(p.has_annual_plan) ||
+          p.billing_type === "yearly" ||
+          (p.billing_type === "monthly" &&
+            p.annual_price !== null &&
+            p.annual_price !== undefined &&
+            p.annual_price !== "")
+      ),
+    [displayedPlans]
+  );
+
+  const displayedMaxDiscount = useMemo(() => {
+    let best = 0;
+    displayedPlans.forEach((p) => {
+      let pct = Number(p.annual_discount_percent ?? 0);
+      if (!pct && p.billing_type === "monthly" && p.annual_price !== null && p.annual_price !== undefined) {
+        const m12 = Number(p.price ?? 0) * 12;
+        const a = Number(p.annual_price);
+        if (m12 > 0 && a < m12) {
+          pct = Math.round(((m12 - a) / m12) * 1000) / 10;
+        }
+      }
+      if (pct > best) best = pct;
+    });
+    return best;
+  }, [displayedPlans]);
+
+  const featuredPlanId = useMemo(() => {
+    const publicPlans = displayedPlans.filter((p) => !p.is_custom);
+    if (!publicPlans.length) return null;
+    const pro =
+      publicPlans.find(
+        (p) =>
+          /\bpro\b|professional/i.test(p.title || "") &&
+          (p.base_billing_type || p.billing_type) === "monthly"
+      ) ??
+      publicPlans.find(
+        (p) =>
+          /pro/i.test(p.title || "") &&
+          (p.base_billing_type || p.billing_type) === "monthly"
+      );
+    if (pro) return pro.id;
+    const monthly = publicPlans.filter(
+      (p) => (p.base_billing_type || p.billing_type) === "monthly"
+    );
+    if (monthly.length >= 2) return monthly[1]?.id;
+    return publicPlans[1]?.id ?? publicPlans[0]?.id;
+  }, [displayedPlans]);
+
   const savePlan = async () => {
     if (!form.title.trim()) {
       toast.error("Plan title is required.");
@@ -246,6 +388,15 @@ function AdminPlansPage() {
 
     if (form.is_custom && (!form.assigned_user_ids || form.assigned_user_ids.length === 0)) {
       toast.error("Please select at least one customer for a Custom Package.");
+      return;
+    }
+
+    const parsedTrialDays = Number(form.free_trial_days);
+    if (
+      form.has_free_trial &&
+      (!Number.isInteger(parsedTrialDays) || parsedTrialDays < 1 || parsedTrialDays > 365)
+    ) {
+      toast.error("Free Trail days must be a whole number between 1 and 365.");
       return;
     }
 
@@ -274,10 +425,27 @@ function AdminPlansPage() {
       features: form.features || {},
       inclusions: finalInclusions,
       price: Number(form.price) >= 0 ? Number(form.price) : 0,
+      annual_price:
+        form.billing_type === "monthly"
+          ? form.annual_price !== "" &&
+            form.annual_price !== null &&
+            form.annual_price !== undefined &&
+            !isNaN(Number(form.annual_price)) &&
+            Number(form.annual_price) >= 0
+            ? Number(form.annual_price)
+            : null
+          : form.billing_type === "yearly"
+          ? Number(form.price) >= 0
+            ? Number(form.price)
+            : 0
+          : null,
       currency: (form.currency || "USD").toUpperCase().slice(0, 3),
       billing_type: form.billing_type || "monthly",
       duration_days:
         form.billing_type === "one_time" ? Number(form.duration_days) || 30 : null,
+      has_free_trial: Boolean(form.has_free_trial),
+      free_trial_days: form.has_free_trial ? parseInt(form.free_trial_days, 10) : null,
+      is_sign_free: !form.is_custom && Boolean(form.is_sign_free),
       is_active: Boolean(form.is_active),
       is_custom: Boolean(form.is_custom),
       assigned_user_ids: form.is_custom ? (form.assigned_user_ids ?? []) : [],
@@ -330,6 +498,65 @@ function AdminPlansPage() {
     }
   };
 
+  const reactivatePlan = async (plan) => {
+    if (!plan?.id) {
+      return;
+    }
+
+    setActivatingId(plan.id);
+    const billingType = plan.billing_type || "monthly";
+    const parsed = parseFeaturesAndExtras(plan);
+    const payload = {
+      title: plan.title,
+      description: plan.description ?? null,
+      products_limit:
+        plan.products_limit !== null && plan.products_limit !== undefined
+          ? Number(plan.products_limit)
+          : parsed.products_limit,
+      orders_limit:
+        plan.orders_limit !== null && plan.orders_limit !== undefined
+          ? Number(plan.orders_limit)
+          : null,
+      stores_limit:
+        plan.stores_limit !== null && plan.stores_limit !== undefined
+          ? Number(plan.stores_limit)
+          : null,
+      features: plan.features && Object.keys(plan.features).length > 0 ? plan.features : parsed.features,
+      inclusions: Array.isArray(plan.inclusions) ? plan.inclusions : [],
+      price: Number(plan.price ?? 0),
+      annual_price:
+        billingType === "monthly"
+          ? plan.annual_price !== null && plan.annual_price !== undefined && plan.annual_price !== ""
+            ? Number(plan.annual_price)
+            : null
+          : billingType === "yearly"
+          ? Number(plan.price ?? 0)
+          : null,
+      currency: (plan.currency || "USD").toUpperCase().slice(0, 3),
+      billing_type: billingType,
+      duration_days: billingType === "one_time" ? Number(plan.duration_days) || 30 : null,
+      has_free_trial: Boolean(plan.has_free_trial),
+      free_trial_days:
+        plan.has_free_trial && plan.free_trial_days ? Number(plan.free_trial_days) : null,
+      is_sign_free: !plan.is_custom && Boolean(plan.is_sign_free),
+      is_active: true,
+      is_custom: Boolean(plan.is_custom),
+      sort_order: Number(plan.sort_order ?? 0),
+    };
+
+    try {
+      await updateAdminPlan(plan.id, payload);
+      toast.success("Plan activated.");
+      loadPlans();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.error ?? err.response?.data?.message ?? "Failed to activate plan."
+      );
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   if (role !== "super_admin") {
     return null;
   }
@@ -348,254 +575,174 @@ function AdminPlansPage() {
   const activeCount = plans.filter((plan) => plan.is_active).length;
   const customPlansCount = plans.filter((plan) => Boolean(plan.is_custom)).length;
   const standardPlansCount = plans.length - customPlansCount;
+  const activeSignFreePlan = plans.find(
+    (plan) => !plan.is_custom && Boolean(plan.is_sign_free) && plan.is_active !== false
+  );
+  const otherSignFreePlan = plans.find(
+    (plan) => !plan.is_custom && Boolean(plan.is_sign_free) && Number(plan.id) !== Number(editingId)
+  );
+  const otherActiveSignFreePlan = plans.find(
+    (plan) =>
+      !plan.is_custom &&
+      Boolean(plan.is_sign_free) &&
+      plan.is_active !== false &&
+      Number(plan.id) !== Number(editingId)
+  );
 
   return (
-    <section className="admin-page admin-plans-page">
-      <header className="admin-page__hero admin-page__hero--split">
-        <div>
-          <span className="admin-page__eyebrow">
-            <LuSparkles /> Subscription Plans
-          </span>
-          <h1>Manage Plans &amp; Custom Packages</h1>
-          <p>
-            Create public pricing tiers or private custom packages tailored for specific customers.
-          </p>
-        </div>
-        <div className="admin-plans-page__header-actions">
-          <button
-            type="button"
-            className="admin-page__btn admin-page__btn--ghost"
-            onClick={() => openCreate(true)}
-          >
-            <LuUsers />
-            <span>Create Custom Package</span>
-          </button>
-          <button
-            type="button"
-            className="admin-page__btn admin-page__btn--primary"
-            onClick={() => openCreate(false)}
-          >
-            <LuPlus />
-            <span>Add Plan</span>
-          </button>
-        </div>
-      </header>
-
-      <div className="admin-plans-page__summary admin-plans-page__summary--4 card-wrapper">
-        <div>
-          <strong>{plans.length}</strong>
-          <span>Total plans</span>
-        </div>
-        <div>
-          <strong>{activeCount}</strong>
-          <span>Active plans</span>
-        </div>
-        <div>
-          <strong>{standardPlansCount}</strong>
-          <span>Standard public plans</span>
-        </div>
-        <div>
-          <strong>{customPlansCount}</strong>
-          <span>Custom customer packages</span>
-        </div>
-      </div>
-
-      <div className="admin-plans-page__tabs">
-        <button
-          type="button"
-          className={`admin-plans-page__tab ${typeFilter === "all" ? "is-active" : ""}`}
-          onClick={() => setTypeFilter("all")}
-        >
-          All ({plans.length})
-        </button>
-        <button
-          type="button"
-          className={`admin-plans-page__tab ${typeFilter === "standard" ? "is-active" : ""}`}
-          onClick={() => setTypeFilter("standard")}
-        >
-          Standard Public Plans ({standardPlansCount})
-        </button>
-        <button
-          type="button"
-          className={`admin-plans-page__tab ${typeFilter === "custom" ? "is-active" : ""}`}
-          onClick={() => setTypeFilter("custom")}
-        >
-          <LuLock />
-          <span>Custom Packages ({customPlansCount})</span>
-        </button>
-      </div>
-
-      <div className="admin-plans-page__grid">
-        {displayedPlans.map((plan, index) => {
-          const isCustom = Boolean(plan.is_custom);
-          const isFeatured =
-            !isCustom &&
-            (index === 1 || (/pro/i.test(plan.title) && plan.billing_type === "monthly"));
-          const Icon = isCustom ? LuLock : plan.billing_type === "monthly" ? LuZap : LuCrown;
-          const featCount =
-            plan.features && Object.keys(plan.features).length > 0
-              ? Object.values(plan.features).filter(Boolean).length
-              : (plan.inclusions ?? []).filter(Boolean).length;
-          const assignedUsers = Array.isArray(plan.assigned_users) ? plan.assigned_users : [];
-
-          return (
-            <article
-              key={plan.id}
-              className={`admin-plans-page__card card-wrapper ${
-                isFeatured ? "admin-plans-page__card--featured" : ""
-              } ${isCustom ? "admin-plans-page__card--custom" : ""} ${
-                plan.is_active ? "" : "admin-plans-page__card--inactive"
-              }`}
+    <section className="admin-page admin-plans-page admin-plans-page--ref">
+      <div className="admin-plans-page__ref-shell card-wrapper">
+        <header className="admin-plans-page__ref-head">
+          <div>
+            <span className="admin-page__eyebrow">
+              <LuSparkles /> Subscription Plans
+            </span>
+            <h1>Manage Plans &amp; Custom Packages</h1>
+            <p>
+              Powerful automation tools to help you import, list, manage and grow your dropshipping business.
+            </p>
+          </div>
+          <div className="admin-plans-page__header-actions">
+            <button
+              type="button"
+              className="admin-page__btn admin-page__btn--ghost"
+              onClick={() => openCreate(true)}
             >
-              {!plan.is_active ? (
-                <span className="admin-plans-page__ribbon admin-plans-page__ribbon--inactive">
-                  Inactive
-                </span>
-              ) : isCustom ? (
-                <span className="admin-plans-page__ribbon admin-plans-page__ribbon--custom">
-                  Custom
-                </span>
-              ) : isFeatured ? (
-                <span className="admin-plans-page__ribbon">Popular</span>
-              ) : null}
+              <LuUsers />
+              <span>Create Custom Package</span>
+            </button>
+            <button
+              type="button"
+              className="admin-page__btn admin-page__btn--primary"
+              onClick={() => openCreate(false)}
+            >
+              <LuPlus />
+              <span>Add Plan</span>
+            </button>
+          </div>
+        </header>
 
-              <div className="admin-plans-page__card-head">
-                <span className="admin-plans-page__card-icon">
-                  <Icon />
-                </span>
-                <div>
-                  <h2>{plan.title}</h2>
-                  <p>{plan.description || (isCustom ? "Private customer package." : "No description provided.")}</p>
-                </div>
-              </div>
+        <div className="admin-plans-page__ref-toolbar">
+          <div className="admin-plans-page__tabs">
+            <button
+              type="button"
+              className={`admin-plans-page__tab ${typeFilter === "all" ? "is-active" : ""}`}
+              onClick={() => setTypeFilter("all")}
+            >
+              All ({plans.length})
+            </button>
+            <button
+              type="button"
+              className={`admin-plans-page__tab ${typeFilter === "standard" ? "is-active" : ""}`}
+              onClick={() => setTypeFilter("standard")}
+            >
+              Standard Public Plans ({standardPlansCount})
+            </button>
+            <button
+              type="button"
+              className={`admin-plans-page__tab ${typeFilter === "custom" ? "is-active" : ""}`}
+              onClick={() => setTypeFilter("custom")}
+            >
+              <LuLock />
+              <span>Custom Packages ({customPlansCount})</span>
+            </button>
+          </div>
 
-              <div className="admin-plans-page__quota-badges">
-                <div className="admin-plans-page__products-badge">
-                  <LuLayers />
-                  <span>{(plan.products_limit ?? 200).toLocaleString()} Products</span>
-                </div>
-                {plan.orders_limit !== null && plan.orders_limit !== undefined ? (
-                  <div className="admin-plans-page__mini-badge">
-                    <LuShoppingCart />
-                    <span>{Number(plan.orders_limit).toLocaleString()} Orders</span>
-                  </div>
-                ) : null}
-                {plan.stores_limit !== null && plan.stores_limit !== undefined ? (
-                  <div className="admin-plans-page__mini-badge">
-                    <LuStore />
-                    <span>{Number(plan.stores_limit).toLocaleString()} Stores</span>
-                  </div>
-                ) : null}
-              </div>
-
-              {isCustom ? (
-                <div className="admin-plans-page__assigned-box">
-                  <div className="admin-plans-page__assigned-head">
-                    <LuUsers />
-                    <span>
-                      Assigned Customers ({assignedUsers.length})
-                    </span>
-                  </div>
-                  {assignedUsers.length ? (
-                    <div className="admin-plans-page__assigned-chips">
-                      {assignedUsers.slice(0, 3).map((u) => (
-                        <span key={u.id} className="admin-plans-page__assigned-chip" title={u.email}>
-                          {u.name}
-                        </span>
-                      ))}
-                      {assignedUsers.length > 3 ? (
-                        <span className="admin-plans-page__assigned-chip admin-plans-page__assigned-chip--more">
-                          +{assignedUsers.length - 3} more
-                        </span>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <span className="admin-plans-page__assigned-empty">
-                      No customers assigned yet
-                    </span>
-                  )}
-                </div>
-              ) : null}
-
-              <div className="admin-plans-page__price">
-                <strong>${Number(plan.price).toFixed(2)}</strong>
-                <span>
-                  {plan.currency} / {formatPlanInterval(plan)}
-                </span>
-              </div>
-
-              <span className="admin-plans-page__features-count">
-                {featCount} {featCount === 1 ? "feature" : "features"} included
+          <div className="admin-plans-page__toolbar-right">
+            <div className="admin-plans-page__ref-stats">
+              <span><strong>{activeCount}</strong> Active</span>
+              <span><strong>{standardPlansCount}</strong> Public</span>
+              <span><strong>{customPlansCount}</strong> Custom</span>
+              <span
+                className={`admin-plans-page__signfree-note ${
+                  activeSignFreePlan ? "is-configured" : "is-missing"
+                }`}
+              >
+                {activeSignFreePlan
+                  ? `Sign Free: ${activeSignFreePlan.title}`
+                  : "No Sign Free (Auto-Deactivate)"}
               </span>
-
-              <ul className="admin-plans-page__features">
-                {(plan.inclusions ?? []).filter(Boolean).slice(0, 5).map((item) => (
-                  <li key={item}>
-                    <LuCheck /> {item}
-                  </li>
-                ))}
-                {(plan.inclusions ?? []).filter(Boolean).length > 5 ? (
-                  <li className="admin-plans-page__features-empty">
-                    + {(plan.inclusions ?? []).filter(Boolean).length - 5} more features
-                  </li>
-                ) : null}
-                {!(plan.inclusions ?? []).filter(Boolean).length ? (
-                  <li className="admin-plans-page__features-empty">
-                    No inclusions listed
-                  </li>
-                ) : null}
-              </ul>
-
-              <div className="admin-plans-page__meta">
-                <span>
-                  <LuCalendar />{" "}
-                  {plan.billing_type === "monthly"
-                    ? "Monthly billing"
-                    : `One-time · ${plan.duration_days ?? 30} days`}
-                </span>
-                <span>Sort order: {plan.sort_order ?? 0}</span>
-              </div>
-
-              <div className="admin-plans-page__actions">
-                <button
-                  type="button"
-                  className="admin-page__btn admin-page__btn--ghost"
-                  onClick={() => openEdit(plan)}
-                >
-                  <LuPencil />
-                  <span>Edit</span>
-                </button>
-                <button
-                  type="button"
-                  className="admin-page__btn admin-page__btn--danger"
-                  onClick={() => removePlan(plan)}
-                >
-                  <LuTrash2 />
-                  <span>Deactivate</span>
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      {!displayedPlans.length ? (
-        <div className="admin-page__empty card-wrapper">
-          <p>
-            {typeFilter === "custom"
-              ? "No custom packages created yet. Create one specifically for select customers."
-              : "No plans match this filter."}
-          </p>
-          <button
-            type="button"
-            className="admin-page__btn admin-page__btn--primary"
-            onClick={() => openCreate(typeFilter === "custom")}
-          >
-            <LuPlus />
-            <span>{typeFilter === "custom" ? "Create Custom Package" : "Add Plan"}</span>
-          </button>
+            </div>
+          </div>
         </div>
-      ) : null}
+
+        {displayedPlans.length && hasAnyAnnualOption ? (
+          <div className="plans-billing-bar admin-plans-page__billing-bar">
+            <div className="plans-billing-toggle" role="group" aria-label="Preview Billing Cycle">
+              <button
+                type="button"
+                className={`plans-billing-toggle__btn ${billingCyclePreview === "monthly" ? "is-active" : ""}`}
+                onClick={() => setBillingCyclePreview("monthly")}
+              >
+                <span>Monthly</span>
+              </button>
+              <button
+                type="button"
+                className={`plans-billing-toggle__btn ${billingCyclePreview === "annual" ? "is-active" : ""}`}
+                onClick={() => setBillingCyclePreview("annual")}
+              >
+                <span>Annual</span>
+                {displayedMaxDiscount > 0 ? (
+                  <span className="plans-billing-toggle__save-badge">
+                    Save up to {displayedMaxDiscount}%
+                  </span>
+                ) : null}
+              </button>
+            </div>
+            {billingCyclePreview === "annual" && displayedMaxDiscount > 0 ? (
+              <span className="plans-billing-bar__hint">
+                Discount calculated against 12 months of monthly billing.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        {displayedPlans.length ? (
+          <div
+            className={`pricing-grid ${
+              displayedPlans.length >= 5 ? "pricing-grid--dense" : ""
+            }`}
+          >
+            {displayedPlans.map((plan, index) => {
+              const isCustom = Boolean(plan.is_custom);
+              const isFeatured = !isCustom && plan.id === featuredPlanId;
+
+              return (
+                <PlanReferenceCard
+                  key={plan.id}
+                  plan={plan}
+                  index={index}
+                  isFeatured={isFeatured}
+                  mode="admin"
+                  billingCycle={billingCyclePreview}
+                  activatingId={activatingId}
+                  onEdit={openEdit}
+                  onDeactivate={removePlan}
+                  onActivate={reactivatePlan}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+
+        {!displayedPlans.length ? (
+          <div className="admin-page__empty">
+            <p>
+              {typeFilter === "custom"
+                ? "No custom packages created yet. Create one specifically for select customers."
+                : "No plans match this filter."}
+            </p>
+            <button
+              type="button"
+              className="admin-page__btn admin-page__btn--primary"
+              onClick={() => openCreate(typeFilter === "custom")}
+            >
+              <LuPlus />
+              <span>{typeFilter === "custom" ? "Create Custom Package" : "Add Plan"}</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
 
       {modalOpen ? (
         <div className="orders-modal">
@@ -630,7 +777,7 @@ function AdminPlansPage() {
               <button
                 type="button"
                 className={`admin-plans-modal__mode-btn ${form.is_custom ? "is-active" : ""}`}
-                onClick={() => setForm({ ...form, is_custom: true })}
+                onClick={() => setForm({ ...form, is_custom: true, is_sign_free: false })}
               >
                 <LuLock />
                 <div>
@@ -665,7 +812,13 @@ function AdminPlansPage() {
               </label>
 
               <label className="marketplace-settings__field">
-                <span>Price</span>
+                <span>
+                  {form.billing_type === "yearly"
+                    ? "Annual Price (12-Month Total) *"
+                    : form.billing_type === "monthly"
+                    ? "Monthly Price *"
+                    : "Price *"}
+                </span>
                 <input
                   type="number"
                   min="0"
@@ -678,17 +831,34 @@ function AdminPlansPage() {
                 />
               </label>
 
-              <label className="marketplace-settings__field">
-                <span>Currency</span>
-                <input
-                  className="marketplace-settings__control"
-                  value={form.currency}
-                  maxLength={3}
-                  onChange={(e) =>
-                    setForm({ ...form, currency: e.target.value.toUpperCase() })
-                  }
-                />
-              </label>
+              {form.billing_type === "monthly" ? (
+                <label className="marketplace-settings__field">
+                  <span>Annual Price (Optional · 12-Month Total)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g. 190.00 (leave blank for monthly-only)"
+                    className="marketplace-settings__control"
+                    value={form.annual_price}
+                    onChange={(e) =>
+                      setForm({ ...form, annual_price: e.target.value })
+                    }
+                  />
+                </label>
+              ) : (
+                <label className="marketplace-settings__field">
+                  <span>Currency</span>
+                  <input
+                    className="marketplace-settings__control"
+                    value={form.currency}
+                    maxLength={3}
+                    onChange={(e) =>
+                      setForm({ ...form, currency: e.target.value.toUpperCase() })
+                    }
+                  />
+                </label>
+              )}
 
               <label className="marketplace-settings__field">
                 <span>Billing Type</span>
@@ -699,10 +869,25 @@ function AdminPlansPage() {
                     setForm({ ...form, billing_type: e.target.value })
                   }
                 >
-                  <option value="monthly">Monthly</option>
+                  <option value="monthly">Monthly (+ Optional Annual)</option>
+                  <option value="yearly">Yearly (Annual Only)</option>
                   <option value="one_time">One Time</option>
                 </select>
               </label>
+
+              {form.billing_type === "monthly" ? (
+                <label className="marketplace-settings__field">
+                  <span>Currency</span>
+                  <input
+                    className="marketplace-settings__control"
+                    value={form.currency}
+                    maxLength={3}
+                    onChange={(e) =>
+                      setForm({ ...form, currency: e.target.value.toUpperCase() })
+                    }
+                  />
+                </label>
+              ) : null}
 
               <label className="marketplace-settings__field">
                 <span>Sort Order</span>
@@ -716,6 +901,82 @@ function AdminPlansPage() {
                   }
                 />
               </label>
+
+              {form.billing_type === "monthly" ? (
+                <div className="admin-plans-modal__discount-preview admin-modal__full">
+                  <div className="admin-plans-modal__discount-info">
+                    <div>
+                      <strong>
+                        12-Month Rate: {form.currency || "USD"} {formatCurrencyCompact(formDiscountStats.monthly12)}
+                      </strong>
+                      {formDiscountStats.hasAnnual ? (
+                        <span className="admin-plans-modal__discount-summary">
+                          {" "}
+                          vs Annual Price <strong>{form.currency || "USD"} {formatCurrencyCompact(formDiscountStats.annualPrice)}</strong>{" "}
+                          ({formatCurrencyCompact(formDiscountStats.monthlyEquivalent)}/mo effective)
+                        </span>
+                      ) : (
+                        <span className="admin-plans-modal__discount-summary">
+                          {" "}
+                          · Enter an annual price or pick a preset to calculate the annual discount.
+                        </span>
+                      )}
+                    </div>
+                    {formDiscountStats.hasAnnual ? (
+                      <span
+                        className={`admin-plans-modal__discount-pill ${
+                          formDiscountStats.discountPercent > 0 ? "is-saving" : ""
+                        }`}
+                      >
+                        {formDiscountStats.discountPercent > 0
+                          ? `Save ${formDiscountStats.discountPercent}% (${form.currency || "USD"} ${formatCurrencyCompact(formDiscountStats.savings)}/yr)`
+                          : "0% Discount"}
+                      </span>
+                    ) : null}
+                  </div>
+                  {Number(form.price) > 0 ? (
+                    <div className="admin-plans-modal__discount-presets">
+                      <span>Quick annual discount:</span>
+                      {[15, 20, 25].map((pct) => {
+                        const suggested = (Number(form.price) * 12 * (1 - pct / 100)).toFixed(2);
+                        return (
+                          <button
+                            key={pct}
+                            type="button"
+                            className={`admin-plans-modal__chip ${
+                              Number(form.annual_price) === Number(suggested)
+                                ? "admin-plans-modal__chip--active"
+                                : ""
+                            }`}
+                            onClick={() => setForm({ ...form, annual_price: suggested })}
+                          >
+                            -{pct}% (${suggested}/yr)
+                          </button>
+                        );
+                      })}
+                      {form.annual_price !== "" ? (
+                        <button
+                          type="button"
+                          className="admin-plans-modal__chip"
+                          onClick={() => setForm({ ...form, annual_price: "" })}
+                        >
+                          Clear Annual
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : form.billing_type === "yearly" ? (
+                <div className="admin-plans-modal__discount-preview admin-modal__full">
+                  <div className="admin-plans-modal__discount-info">
+                    <span>
+                      Customers pay <strong>{form.currency || "USD"} {formatCurrencyCompact(formDiscountStats.annualPrice)}</strong> once per year ({" "}
+                      <strong>{form.currency || "USD"} {formatCurrencyCompact(formDiscountStats.monthlyEquivalent)}/mo</strong> effective).
+                    </span>
+                    <span className="admin-plans-modal__discount-pill">Annual Only</span>
+                  </div>
+                </div>
+              ) : null}
 
               {form.billing_type === "one_time" ? (
                 <label className="marketplace-settings__field admin-modal__full">
@@ -1067,6 +1328,131 @@ function AdminPlansPage() {
                   />
                 </label>
               </div>
+            </div>
+
+            <div className="admin-plans-modal__trial-box">
+              <div className="admin-plans-modal__section-header">
+                <div>
+                  <span className="admin-plans-modal__section-title">
+                    <LuClock /> Free Trail &amp; Sign Free Lifecycle
+                  </span>
+                  <p className="admin-plans-modal__section-subtitle">
+                    Configure free trial access days and the automatic fallback Free plan behavior when trials end.
+                  </p>
+                </div>
+              </div>
+
+              <label className="marketplace-settings__field admin-modal__checkbox">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.has_free_trial)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({
+                      ...form,
+                      has_free_trial: checked,
+                      free_trial_days:
+                        checked && (!form.free_trial_days || Number(form.free_trial_days) < 1)
+                          ? "3"
+                          : form.free_trial_days,
+                    });
+                  }}
+                />
+                <span>
+                  <strong>Free Trail</strong> — Give users free access to this plan&apos;s resources for N days before upgrading or switching
+                </span>
+              </label>
+
+              {form.has_free_trial ? (
+                <div className="admin-plans-modal__trial-days-row">
+                  <label className="marketplace-settings__field">
+                    <span>Trial Days *</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      step="1"
+                      placeholder="e.g. 2, 3"
+                      className="marketplace-settings__control"
+                      value={form.free_trial_days}
+                      onChange={(e) =>
+                        setForm({ ...form, free_trial_days: e.target.value })
+                      }
+                    />
+                  </label>
+                  <div className="admin-plans-modal__discount-presets">
+                    <span>Quick presets:</span>
+                    {[2, 3, 7, 14].map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        className={`admin-plans-modal__chip ${
+                          Number(form.free_trial_days) === days
+                            ? "admin-plans-modal__chip--active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setForm({ ...form, free_trial_days: String(days) })
+                        }
+                      >
+                        {days} Days
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {!form.is_custom ? (
+                <div className="admin-plans-modal__signfree-block">
+                  <label className="marketplace-settings__field admin-modal__checkbox">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.is_sign_free)}
+                      onChange={(e) =>
+                        setForm({ ...form, is_sign_free: e.target.checked })
+                      }
+                    />
+                    <span>
+                      <strong>Sign Free</strong> — Marks this plan as the automatic Free fallback when users&apos; Free Trail ends (only one plan can be Sign Free)
+                    </span>
+                  </label>
+
+                  {form.is_sign_free && otherSignFreePlan ? (
+                    <div className="admin-plans-modal__trial-warning is-info">
+                      <LuCircleAlert />
+                      <span>
+                        Enabling <strong>Sign Free</strong> here will automatically uncheck Sign Free on{" "}
+                        <strong>{otherSignFreePlan.title}</strong>.
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {!form.is_sign_free && !otherActiveSignFreePlan ? (
+                    <div className="admin-plans-modal__trial-warning">
+                      <LuCircleAlert />
+                      <span>
+                        No <strong>Sign Free</strong> plan is configured yet — users whose Free Trail expires will automatically be marked <strong>Inactive</strong> and cannot log in to the portal.
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {form.is_sign_free && Number(form.price) > 0 ? (
+                    <div className="admin-plans-modal__trial-warning">
+                      <LuCircleAlert />
+                      <span>
+                        Sign Free fallback plans are normally priced at <strong>$0</strong> so users can activate or switch cleanly without payment.
+                      </span>
+                      <button
+                        type="button"
+                        className="admin-plans-modal__chip"
+                        onClick={() => setForm({ ...form, price: 0, annual_price: "" })}
+                      >
+                        Set $0 Price
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <label className="marketplace-settings__field admin-modal__checkbox">

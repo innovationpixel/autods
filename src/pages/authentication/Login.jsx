@@ -35,6 +35,13 @@ function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [clientErrors, setClientErrors] = useState({});
   const [dismissedApiFields, setDismissedApiFields] = useState([]);
+  const [disabledNotice, setDisabledNotice] = useState(() => {
+    try {
+      return sessionStorage.getItem("autods_disabled_notice") || "";
+    } catch {
+      return "";
+    }
+  });
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -42,6 +49,14 @@ function Login() {
   const errorMessage = useSelector((state) => state.auth.errorMessage);
   const apiFieldErrors = useSelector((state) => state.auth.fieldErrors);
   const showLoading = useSelector((state) => state.auth.showLoading);
+
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("autods_disabled_notice");
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   useEffect(() => {
     if (getStoredToken()) {
@@ -99,6 +114,7 @@ function Login() {
   const onSubmit = (event) => {
     event.preventDefault();
     dispatch(clearAuthErrorsAction());
+    setDisabledNotice("");
     setClientErrors({});
     setDismissedApiFields([]);
 
@@ -132,10 +148,10 @@ function Login() {
           </div>
 
           <ul className="auth-page__features">
-            {featureItems.map(({ icon: Icon, text }) => (
-              <li key={text}>
-                <span className="auth-page__feature-icon"><Icon /></span>
-                <span>{text}</span>
+            {featureItems.map((item) => (
+              <li key={item.text}>
+                <span className="auth-page__feature-icon"><item.icon /></span>
+                <span>{item.text}</span>
               </li>
             ))}
           </ul>
@@ -151,11 +167,11 @@ function Login() {
             <p>Welcome back. Enter your credentials to continue.</p>
           </div>
 
-          {(errorMessage || apiErrorList.length > 0) ? (
+          {(errorMessage || apiErrorList.length > 0 || disabledNotice) ? (
             <div className="auth-page__alert auth-page__alert--error" role="alert">
               <LuCircleAlert />
               <div>
-                <strong>{errorMessage || "Please fix the following:"}</strong>
+                <strong>{errorMessage || (apiErrorList.length > 0 ? "Please fix the following:" : disabledNotice)}</strong>
                 {apiErrorList.length > 0 ? (
                   <ul className="auth-page__alert-list">
                     {apiErrorList.map(({ field, message }) => (
@@ -191,11 +207,20 @@ function Login() {
               ) : null}
             </label>
 
-            <label className={`auth-page__field ${getFieldError("password") ? "auth-page__field--error" : ""}`}>
-              <span>Password</span>
+            <div className={`auth-page__field ${getFieldError("password") ? "auth-page__field--error" : ""}`}>
+              <div className="auth-field-header">
+                <label htmlFor="login-password-input">Password</label>
+                <Link
+                  to={email.trim() ? `/user/forgot-password?email=${encodeURIComponent(email.trim())}` : "/user/forgot-password"}
+                  className="auth-forgot-link"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="auth-page__input-wrap">
                 <LuLock />
                 <input
+                  id="login-password-input"
                   type={showPassword ? "text" : "password"}
                   name="password"
                   autoComplete="current-password"
@@ -220,7 +245,7 @@ function Login() {
               {getFieldError("password") ? (
                 <span className="auth-page__field-error" id="login-password-error">{getFieldError("password")}</span>
               ) : null}
-            </label>
+            </div>
 
             <button
               type="submit"

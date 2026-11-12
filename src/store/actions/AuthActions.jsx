@@ -74,6 +74,13 @@ export function checkAutoLogin(dispatch, navigate) {
                 fresh.name  !== user.name  ||
                 fresh.email !== user.email ||
                 fresh.role  !== user.role  ||
+                fresh.is_active !== user.is_active ||
+                fresh.is_plan_paid !== user.is_plan_paid ||
+                fresh.current_plan_id !== user.current_plan_id ||
+                fresh.is_on_free_trial !== user.is_on_free_trial ||
+                fresh.has_used_free_trial !== user.has_used_free_trial ||
+                fresh.trial_ends_at !== user.trial_ends_at ||
+                fresh.plan_expires_at !== user.plan_expires_at ||
                 fresh.ai_credits !== user.ai_credits ||
                 fresh.wallet_balance !== user.wallet_balance ||
                 fresh.legal_accepted !== user.legal_accepted ||
