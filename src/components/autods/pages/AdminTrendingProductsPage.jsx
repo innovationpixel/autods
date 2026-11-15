@@ -367,60 +367,103 @@ function AdminTrendingProductsPage() {
         </div>
       ) : (
         <div className="admin-clients-page__table card-wrapper">
-          <table className="admin-table">
+          <table className="admin-table admin-curated-table">
             <thead>
               <tr>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("product")}>
+                <th className="admin-curated-table__col-product" style={{ cursor: "pointer" }} onClick={() => handleSort("product")}>
                   <GridSortHeader columnId="product" label="Product" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("category")}>
+                <th className="admin-curated-table__col-category" style={{ cursor: "pointer" }} onClick={() => handleSort("category")}>
                   <GridSortHeader columnId="category" label="Category" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("country")}>
+                <th className="admin-curated-table__col-country" style={{ cursor: "pointer" }} onClick={() => handleSort("country")}>
                   <GridSortHeader columnId="country" label="Country" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("price")}>
+                <th className="admin-curated-table__col-price" style={{ cursor: "pointer" }} onClick={() => handleSort("price")}>
                   <GridSortHeader columnId="price" label="Price" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("sort_order")}>
+                <th className="admin-curated-table__col-sort" style={{ cursor: "pointer" }} onClick={() => handleSort("sort_order")}>
                   <GridSortHeader columnId="sort_order" label="Sort" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
+                <th className="admin-curated-table__col-status" style={{ cursor: "pointer" }} onClick={() => handleSort("status")}>
                   <GridSortHeader columnId="status" label="Status" sortBy={sortBy} sortDirection={sortDirection} onSort={handleSort} />
                 </th>
-                <th aria-label="Actions" />
+                <th className="admin-curated-table__col-actions" aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
-              {paginatedProducts.length ? paginatedProducts.map((product) => (
-                <tr key={product.id}>
-                  <td>
-                    <div className="admin-curated-page__product">
-                      {product.image_url ? <img src={product.image_url} alt={product.title} referrerPolicy="no-referrer" /> : null}
-                      <span>{product.title}</span>
-                    </div>
-                  </td>
-                  <td>{product.category?.name ?? "—"}</td>
-                  <td>{product.country}</td>
-                  <td>{product.currency} {Number(product.price).toFixed(2)}</td>
-                  <td>{product.sort_order ?? 0}</td>
-                  <td>
-                    <span className={product.is_active ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
-                      {product.is_active ? "Active" : "Disabled"}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="admin-clients-page__actions">
-                      <button type="button" className="orders-icon-btn" onClick={() => openEdit(product)} aria-label="Edit product">
-                        <LuPencil />
-                      </button>
-                      <button type="button" className="orders-icon-btn" onClick={() => setDeleteConfirm(product)} aria-label="Delete product">
-                        <LuTrash2 />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )) : (
+              {paginatedProducts.length ? paginatedProducts.map((product) => {
+                const productUrl = product.aliexpress_url || product.listing_url;
+                return (
+                  <tr key={product.id}>
+                    <td className="admin-curated-table__cell-product">
+                      <div className="admin-curated-page__product">
+                        {product.image_url ? (
+                          productUrl ? (
+                            <a
+                              href={productUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="admin-curated-page__product-img-link"
+                              title="Open AliExpress product in new tab"
+                            >
+                              <img src={product.image_url} alt={product.title} referrerPolicy="no-referrer" />
+                            </a>
+                          ) : (
+                            <img src={product.image_url} alt={product.title} referrerPolicy="no-referrer" />
+                          )
+                        ) : null}
+                        {productUrl ? (
+                          <a
+                            href={productUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="admin-curated-page__product-link"
+                            title={product.title}
+                          >
+                            {product.title}
+                          </a>
+                        ) : (
+                          <span className="admin-curated-page__product-title" title={product.title}>
+                            {product.title}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="admin-curated-table__cell-category">
+                      <div className="admin-curated-table__text-wrap">
+                        {product.category?.name ?? "—"}
+                      </div>
+                    </td>
+                    <td className="admin-curated-table__cell-country">
+                      <div className="admin-curated-table__text-wrap">
+                        {product.country}
+                      </div>
+                    </td>
+                    <td className="admin-curated-table__cell-price">
+                      {product.currency} {Number(product.price).toFixed(2)}
+                    </td>
+                    <td className="admin-curated-table__cell-sort">
+                      {product.sort_order ?? 0}
+                    </td>
+                    <td className="admin-curated-table__cell-status">
+                      <span className={product.is_active ? "admin-badge admin-badge--success" : "admin-badge admin-badge--muted"}>
+                        {product.is_active ? "Active" : "Disabled"}
+                      </span>
+                    </td>
+                    <td className="admin-curated-table__cell-actions">
+                      <div className="admin-clients-page__actions">
+                        <button type="button" className="orders-icon-btn" onClick={() => openEdit(product)} aria-label="Edit product">
+                          <LuPencil />
+                        </button>
+                        <button type="button" className="orders-icon-btn" onClick={() => setDeleteConfirm(product)} aria-label="Delete product">
+                          <LuTrash2 />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }) : (
                 <tr>
                   <td colSpan={7} className="admin-table__empty">No trending products yet.</td>
                 </tr>

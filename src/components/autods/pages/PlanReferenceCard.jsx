@@ -334,13 +334,29 @@ function PlanReferenceCard({
       ) : null}
 
       <div className="pricing-tier__head">
-        <div className="pricing-tier__icon">
-          <HeaderIcon />
+        <div className="pricing-tier__head-main">
+          <div className="pricing-tier__icon">
+            <HeaderIcon />
+          </div>
+          <div className="pricing-tier__head-copy">
+            <h2>{plan?.title}</h2>
+            <span>{getPlanSubTagline(plan, isCustom, isFeatured, theme.key)}</span>
+          </div>
         </div>
-        <div className="pricing-tier__head-copy">
-          <h2>{plan?.title}</h2>
-          <span>{getPlanSubTagline(plan, isCustom, isFeatured, theme.key)}</span>
-        </div>
+        {headCornerTag ? (
+          <span
+            className={`pricing-tier__head-pill pricing-tier__head-pill--${headCornerTag.tone}`}
+          >
+            {headCornerTag.tone === "rose" ? (
+              <LuLock />
+            ) : headCornerTag.tone === "trial" ? (
+              <LuClock />
+            ) : (
+              <LuCheck />
+            )}
+            <span>{headCornerTag.label}</span>
+          </span>
+        ) : null}
       </div>
 
       <div className="pricing-tier__body">
@@ -370,41 +386,23 @@ function PlanReferenceCard({
           <div className="pricing-tier__price-row">
             <div className="pricing-tier__price">
               {showCustomPriceWord ? (
-                <strong>Custom</strong>
+                <strong className="pricing-tier__price-custom">Custom</strong>
               ) : (
                 <>
-                  <strong>${formatReferencePrice(priceNum)}</strong>
-                  <span>/ {interval}</span>
+                  <span className="pricing-tier__currency">$</span>
+                  <strong className="pricing-tier__amount">
+                    {formatReferencePrice(priceNum)}
+                  </strong>
+                  <span className="pricing-tier__interval">/ {interval}</span>
                 </>
               )}
             </div>
-            {(!showCustomPriceWord &&
-              pricing.isAnnualView &&
-              pricing.discountPercent > 0) ||
-            headCornerTag ? (
-              <div className="pricing-tier__price-badges">
-                {!showCustomPriceWord &&
-                pricing.isAnnualView &&
-                pricing.discountPercent > 0 ? (
-                  <span className="pricing-tier__save-pill">
-                    Save {pricing.discountPercent}%
-                  </span>
-                ) : null}
-                {headCornerTag ? (
-                  <span
-                    className={`pricing-tier__head-pill pricing-tier__head-pill--${headCornerTag.tone}`}
-                  >
-                    {headCornerTag.tone === "rose" ? (
-                      <LuLock />
-                    ) : headCornerTag.tone === "trial" ? (
-                      <LuClock />
-                    ) : (
-                      <LuCheck />
-                    )}
-                    <span>{headCornerTag.label}</span>
-                  </span>
-                ) : null}
-              </div>
+            {!showCustomPriceWord &&
+            pricing.isAnnualView &&
+            pricing.discountPercent > 0 ? (
+              <span className="pricing-tier__save-pill">
+                Save {pricing.discountPercent}%
+              </span>
             ) : null}
           </div>
 
@@ -423,7 +421,7 @@ function PlanReferenceCard({
                 billed annually
               </span>
               {pricing.savingsAmount > 0 ? (
-                <span>· Save ${formatReferencePrice(pricing.savingsAmount)}/yr</span>
+                <span className="pricing-tier__annual-savings">· Save ${formatReferencePrice(pricing.savingsAmount)}/yr</span>
               ) : null}
             </div>
           ) : !showCustomPriceWord &&
@@ -438,11 +436,13 @@ function PlanReferenceCard({
             billingCycle === "monthly" &&
             pricing.hasAnnual ? (
             <div className="pricing-tier__annual-sub">
-              Or{" "}
+              <span>Or</span>{" "}
               <strong>${formatReferencePrice(pricing.annualPrice)}/yr</strong>
-              {pricing.discountPercent > 0
-                ? ` (Save ${pricing.discountPercent}%)`
-                : " billed annually"}
+              <span className="pricing-tier__annual-badge">
+                {pricing.discountPercent > 0
+                  ? `Save ${pricing.discountPercent}%`
+                  : "Billed annually"}
+              </span>
             </div>
           ) : null}
         </div>

@@ -383,6 +383,7 @@ function OrderSourceModal({
   open,
   order = null,
   orders = null,
+  errorMessage = "",
   requireAliExpress = true,
   saving = false,
   onClose,
@@ -524,6 +525,32 @@ function OrderSourceModal({
           </div>
         </div>
 
+        {/* Error Alert if provided */}
+        {errorMessage && (
+          <div style={{ padding: "14px 24px 0" }}>
+            <div
+              style={{
+                padding: "12px 16px",
+                borderRadius: "8px",
+                backgroundColor: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#991b1b",
+                fontSize: "13px",
+                lineHeight: "1.45",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "10px",
+              }}
+            >
+              <LuTriangleAlert size={18} style={{ flexShrink: 0, marginTop: 1, color: "#dc2626" }} />
+              <div>
+                <strong style={{ display: "block", marginBottom: 2 }}>Variation Selection Required:</strong>
+                <span>{errorMessage}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Scrollable Order Items */}
         <div style={{ padding: "20px 24px", overflowY: "auto", flex: 1 }}>
           {ordersList.map((ord, idx) => {
@@ -532,7 +559,7 @@ function OrderSourceModal({
             return (
               <div key={ord.id} style={{ marginBottom: idx < ordersList.length - 1 ? 0 : 4 }}>
                 {/* Header for this Order */}
-                {isMultiple && (
+                {isMultiple ? (
                   <div
                     style={{
                       display: "flex",
@@ -547,7 +574,7 @@ function OrderSourceModal({
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <img
-                        src={ord.imageUrl || "/img/product-placeholder.png"}
+                        src={ord.imageUrl || ord.image || "/img/product-placeholder.png"}
                         alt=""
                         style={{
                           width: 38,
@@ -563,13 +590,57 @@ function OrderSourceModal({
                       />
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>
-                          Order #{ord.orderId || ord.id}
+                          Order #{ord.ebayOrderId || ord.orderId || ord.id}
                         </div>
                         <div style={{ fontSize: 12, color: "#64748b" }}>
                           Buyer: <strong>{ord.buyerName || "Customer"}</strong>
                           {purchasedVariant ? (
                             <span style={{ marginLeft: 8, color: "#2563eb", fontWeight: 600 }}>
                               · Purchased: {purchasedVariant}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      background: "#f8fafc",
+                      borderRadius: 8,
+                      border: "1px solid #e2e8f0",
+                      marginBottom: 14,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <img
+                        src={ord.imageUrl || ord.image || "/img/product-placeholder.png"}
+                        alt=""
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 6,
+                          objectFit: "cover",
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                        }}
+                        onError={(e) => {
+                          e.target.src = "https://placehold.co/40x40?text=Item";
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a" }}>
+                          Order #{ord.ebayOrderId || ord.orderId || ord.id}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          Buyer: <strong>{ord.buyerName || "Customer"}</strong>
+                          {purchasedVariant ? (
+                            <span style={{ marginLeft: 8, color: "#2563eb", fontWeight: 600 }}>
+                              · Buyer Ordered: {purchasedVariant}
                             </span>
                           ) : null}
                         </div>

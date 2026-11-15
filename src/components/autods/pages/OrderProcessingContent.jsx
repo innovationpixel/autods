@@ -321,7 +321,21 @@ function OrderProcessingContent() {
     }
     addressErrorTimerRef.current = setTimeout(() => {
       setAddressErrorNotice(null);
-    }, 8000);
+    }, 15000);
+  };
+
+  const [sourceModalError, setSourceModalError] = useState("");
+  const [sourceErrorNotice, setSourceErrorNotice] = useState(null);
+  const sourceErrorTimerRef = useRef(null);
+
+  const showVariationErrorNotice = (notice) => {
+    setSourceErrorNotice(notice);
+    if (sourceErrorTimerRef.current) {
+      clearTimeout(sourceErrorTimerRef.current);
+    }
+    sourceErrorTimerRef.current = setTimeout(() => {
+      setSourceErrorNotice(null);
+    }, 20000);
   };
   const [addressModalSaving, setAddressModalSaving] = useState(false);
   const [bulkAddressModalOpen, setBulkAddressModalOpen] = useState(false);
@@ -527,12 +541,16 @@ function OrderProcessingContent() {
     }
   };
 
-  const startEditSource = (order) => {
+  const startEditSource = (order, error = "") => {
     setEditingSourceOrder(order);
+    if (error) {
+      setSourceModalError(error);
+    }
   };
 
   const cancelEditSource = () => {
     setEditingSourceOrder(null);
+    setSourceModalError("");
   };
 
   const saveSource = async (payload) => {
@@ -545,6 +563,8 @@ function OrderProcessingContent() {
     try {
       const res = await updateOrderSource(order.id, payload);
       toast.success(res.data?.message ?? "Source link updated.");
+      setSourceModalError("");
+      setSourceErrorNotice(null);
       cancelEditSource();
       await loadOrders();
     } catch (err) {
@@ -767,10 +787,22 @@ function OrderProcessingContent() {
         lowerErr.includes("postal") ||
         lowerErr.includes("zip") ||
         lowerErr.includes("state");
-      toast.error(errMsg, { autoClose: 6000 });
+      const isVar =
+        lowerErr.includes("source") ||
+        lowerErr.includes("link") ||
+        lowerErr.includes("product") ||
+        lowerErr.includes("sku") ||
+        lowerErr.includes("variation");
+      toast.error(errMsg, { autoClose: 15000 });
       if (isAddr) {
         setAddressModalError(errMsg);
         showAddressErrorNotice({
+          order,
+          message: errMsg,
+        });
+      } else if (isVar) {
+        setSourceModalError(errMsg);
+        showVariationErrorNotice({
           order,
           message: errMsg,
         });
@@ -890,7 +922,7 @@ function OrderProcessingContent() {
           const detailedMsg = message.includes("AliExpress")
             ? message
             : (message || "The buyer's delivery address could not be validated by AliExpress. Please check or edit the shipping details.");
-          toast.error(detailedMsg, { autoClose: 6000 });
+          toast.error(detailedMsg, { autoClose: 15000 });
           setAddressModalError(detailedMsg);
           showAddressErrorNotice({
             order,
@@ -898,10 +930,18 @@ function OrderProcessingContent() {
           });
           setAddressModalOrder(order);
         } else if (isVariation) {
-          toast.error("1 have 0 source link or defined variant.", { autoClose: 6000 });
-          startEditSource(order);
+          const detailedMsg =
+            message ||
+            `Order #${order.ebayOrderId || order.id}: This AliExpress product has multiple variations. Please open the order source dialog and select the correct variation (SKU) before placing the order.`;
+          toast.error(detailedMsg, { autoClose: 15000 });
+          setSourceModalError(detailedMsg);
+          showVariationErrorNotice({
+            order,
+            message: detailedMsg,
+          });
+          startEditSource(order, detailedMsg);
         } else {
-          toast.error(message, { autoClose: 6000 });
+          toast.error(message, { autoClose: 15000 });
         }
       }
     } finally {
@@ -1216,7 +1256,7 @@ function OrderProcessingContent() {
       parts.push(`${failedAddress} Failed due to address`);
     }
     if (failedVariantOrSource > 0) {
-      parts.push(`${failedVariantOrSource} have 0 source link or defined variant`);
+      parts.push(`${failedVariantOrSource} require variation (SKU) selection or source link`);
     }
     if (failedOther > 0) {
       parts.push(`${failedOther} Failed`);
@@ -1232,9 +1272,9 @@ function OrderProcessingContent() {
 
     if (failedAddress > 0 || failedVariantOrSource > 0 || failedOther > 0) {
       if (succeeded > 0) {
-        toast.warn(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
+        toast.warn(summaryText, { autoClose: 12000, toastId: "bulk-process-summary" });
       } else {
-        toast.error(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
+        toast.error(summaryText, { autoClose: 15000, toastId: "bulk-process-summary" });
       }
       if (failedAddress > 0) {
         const addrNoticeMsg = `${failedAddress} order${failedAddress === 1 ? "" : "s"} failed due to AliExpress delivery address validation.`;
@@ -1244,11 +1284,19 @@ function OrderProcessingContent() {
           isBulk: true,
         });
       }
+      if (failedVariantOrSource > 0) {
+        const varNoticeMsg = `${failedVariantOrSource} order${failedVariantOrSource === 1 ? "" : "s"} require selecting a variation (SKU) or adding an AliExpress source link.`;
+        setSourceModalError(varNoticeMsg);
+        showVariationErrorNotice({
+          message: varNoticeMsg,
+          isBulk: true,
+        });
+      }
       if (walletInsufficient) {
         setTransferModalOpen(true);
       }
     } else {
-      toast.success(summaryText, { autoClose: 8000, toastId: "bulk-process-summary" });
+      toast.success(summaryText, { autoClose: 10000, toastId: "bulk-process-summary" });
     }
   };
 
@@ -1728,6 +1776,70 @@ function OrderProcessingContent() {
           </div>
         )}
 
+        {sourceErrorNotice && (
+          <div
+            style={{
+              margin: "12px 16px 0",
+              padding: "12px 16px",
+              borderRadius: "8px",
+              background: "#fef2f2",
+              border: "1px solid #fecaca",
+              color: "#991b1b",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13.5 }}>
+              <LuTriangleAlert size={20} style={{ color: "#dc2626", flexShrink: 0 }} />
+              <div>
+                <strong>Variation / Supplier Error:</strong> {sourceErrorNotice.message}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {sourceErrorNotice.order && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                  onClick={() => {
+                    startEditSource(sourceErrorNotice.order, sourceErrorNotice.message);
+                  }}
+                >
+                  Select Variation Now
+                </button>
+              )}
+              {sourceErrorNotice.isBulk && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6 }}
+                  onClick={() => setBulkSourceModalOpen(true)}
+                >
+                  Select Variations
+                </button>
+              )}
+              <button
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "#991b1b",
+                  padding: 4,
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                onClick={() => setSourceErrorNotice(null)}
+                aria-label="Dismiss error notification"
+              >
+                <LuX size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="calculations-table-toolbar">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <strong>{orders.length} orders</strong>
@@ -2027,6 +2139,32 @@ function OrderProcessingContent() {
                               <LuPencil />
                             </button>
                           </div>
+                          {sourceErrorNotice?.order?.id === order.id && (
+                            <button
+                              type="button"
+                              onClick={() => startEditSource(order, sourceErrorNotice.message)}
+                              title={sourceErrorNotice.message}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                background: "#fee2e2",
+                                color: "#b91c1c",
+                                border: "1px solid #fca5a5",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                width: "fit-content",
+                                cursor: "pointer",
+                                marginTop: "4px",
+                                textAlign: "left",
+                                lineHeight: "1.3",
+                              }}
+                            >
+                              <span>⚠️ Variation Selection Required</span>
+                            </button>
+                          )}
                           {order.sourceVariationText ? (
                             <span className="orders-source-cell__variation" title={order.sourceVariationText}>
                               {order.sourceVariationText}
@@ -2398,6 +2536,7 @@ function OrderProcessingContent() {
         <OrderSourceModal
           open={Boolean(editingSourceOrder)}
           order={editingSourceOrder}
+          errorMessage={sourceModalError}
           requireAliExpress={true}
           saving={Boolean(editingSourceOrder) && savingSourceId === editingSourceOrder.id}
           onClose={cancelEditSource}
@@ -2542,9 +2681,13 @@ function OrderProcessingContent() {
       <OrderSourceModal
         open={bulkSourceModalOpen}
         orders={selectedOrders}
+        errorMessage={sourceModalError}
         requireAliExpress={true}
         saving={savingSourceId === "bulk"}
-        onClose={() => setBulkSourceModalOpen(false)}
+        onClose={() => {
+          setBulkSourceModalOpen(false);
+          setSourceModalError("");
+        }}
         onSave={handleBulkSaveVariants}
       />
 
