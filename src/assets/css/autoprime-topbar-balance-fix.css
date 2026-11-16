@@ -277,3 +277,124 @@
     max-height: 34px !important;
   }
 }
+
+/* Client marketplace topbar: preserve wallet content and let search use spare space.
+   Scoped to exclude the simpler super-admin header. */
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+  grid-template-columns: minmax(112px, 1fr) minmax(155px, 400px) max-content !important;
+  gap: 14px !important;
+  padding-inline: clamp(14px, 1.4vw, 24px) !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__title-group,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__title {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__title {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__search {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+  width: max-content !important;
+  min-width: max-content !important;
+  flex-wrap: nowrap !important;
+  gap: 7px !important;
+}
+
+/* Neither the wallet container nor either amount may shrink into its sibling. */
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls > *,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-box,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-segment,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-copy,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-value {
+  flex-shrink: 0 !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-box {
+  width: max-content !important;
+  min-width: max-content !important;
+  max-width: none !important;
+}
+
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-segment,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-copy,
+.marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__wallet-value {
+  min-width: max-content !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 1500px) {
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(112px, 1fr) minmax(155px, 330px) max-content !important;
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(100px, 1fr) minmax(135px, 280px) max-content !important;
+    gap: 10px !important;
+    padding-inline: 14px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    gap: 10px !important;
+  }
+
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__search {
+    display: none !important;
+  }
+
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+    gap: 6px !important;
+  }
+}
+
+/* On phones, title and actions occupy separate rows so neither is clipped. */
+@media (max-width: 700px) {
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+    height: auto !important;
+    min-height: 96px !important;
+    padding: 10px 12px !important;
+    row-gap: 8px !important;
+  }
+
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-content: space-between !important;
+    gap: 5px !important;
+  }
+
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__profile-wrap .profile-dropdown {
+    left: auto !important;
+    right: 0 !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    padding-inline: 10px !important;
+  }
+
+  .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+    gap: 4px !important;
+  }
+}
