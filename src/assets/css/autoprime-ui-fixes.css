@@ -333,3 +333,67 @@
   font-weight: 500 !important;
   min-height: 52px !important;
 }
+
+/* --------------------------------------------------------------------------
+   Product Editor Modal (Edit Product popup on Products Page)
+   Gives clean spacing from the top navigation header and prevents it from
+   starting underneath or behind the header.
+   -------------------------------------------------------------------------- */
+.product-editor-modal-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10050 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 84px 16px 24px !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.product-editor-modal-layer__backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 10051 !important;
+  border: 0 !important;
+  background: rgba(15, 23, 42, 0.55) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.product-editor-modal {
+  position: relative !important;
+  z-index: 10052 !important;
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+  width: min(1120px, calc(100vw - 32px)) !important;
+  max-height: calc(100vh - 108px) !important;
+  margin: 0 auto !important;
+  border: 1px solid #e1e4ec !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 25px 60px -15px rgba(15, 22, 62, 0.35), 0 0 1px 1px rgba(15, 23, 42, 0.05) !important;
+  overflow: hidden !important;
+}
+
+@media (max-width: 768px) {
+  .product-editor-modal-layer {
+    padding: 72px 10px 16px !important;
+  }
+  .product-editor-modal {
+    width: calc(100vw - 20px) !important;
+    max-height: calc(100vh - 90px) !important;
+  }
+}
+
+.marketplace-dashboard-page .marketplace-content-wrapper:has(.product-editor-modal-layer) {
+  z-index: 10000 !important;
+}
+
+.product-editor-modal-layer .bulk-edit-modal-layer,
+.bulk-edit-modal-layer {
+  z-index: 10100 !important;
+}
+
+.bulk-edit-modal {
+  z-index: 10102 !important;
+}

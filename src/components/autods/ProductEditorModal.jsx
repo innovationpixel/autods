@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { LuLoader, LuPencil, LuX } from "react-icons/lu";
 import DraftEditorPanel from "./DraftEditorPanel";
 import { getListingImageUrl } from "./helpers";
@@ -40,17 +41,19 @@ function ProductEditorModal({
 
   const imageUrl = getListingImageUrl(product);
 
-  return (
+  const modalContent = (
     <div
-      className="product-editor-modal-layer"
+      className="product-editor-modal-layer autoprime-portal"
       role="presentation"
       style={{
         position: "fixed",
         inset: 0,
-        zIndex: 2050,
+        zIndex: 10050,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
+        padding: "84px 16px 24px",
+        overflowY: "auto",
       }}
     >
       <button
@@ -67,8 +70,9 @@ function ProductEditorModal({
         aria-label="Edit product"
         style={{
           position: "relative",
-          zIndex: 2051,
-          margin: "auto",
+          zIndex: 10051,
+          margin: "0 auto",
+          maxHeight: "calc(100vh - 108px)",
         }}
       >
         <header className="product-editor-modal__head">
@@ -128,6 +132,10 @@ function ProductEditorModal({
       </section>
     </div>
   );
+
+  return typeof document !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 }
 
 export default ProductEditorModal;
