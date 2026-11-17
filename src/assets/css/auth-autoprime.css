@@ -1041,3 +1041,61 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Onboarding add-on services picker */
+.onboarding-addons { margin-top: 22px; }
+.onboarding-addons__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; }
+.onboarding-addons__list { display: grid; gap: 8px; }
+.onboarding-addon {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px solid #e3deec; border-radius: 10px; cursor: pointer; background: #fff;
+}
+.onboarding-addon--selected { border-color: #6d28d9; background: #f5f0ff; }
+.onboarding-addon input { width: 16px; height: 16px; accent-color: #6d28d9; }
+.onboarding-addon__body { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 2px; }
+.onboarding-addon__body small { color: #817b8d; font-size: 12px; }
+.onboarding-addon__price { font-weight: 700; font-size: 13px; white-space: nowrap; }
+
+/* Plan cards: equal height, fixed feature count, "+ N more" pinned to the bottom */
+.onboarding-plans { align-items: stretch !important; }
+.onboarding-plan-card { height: 100%; min-width: 0; }
+.onboarding-plan-card__features { margin-bottom: 10px !important; }
+.onboarding-plan-card__more {
+  margin-top: auto;
+  padding-top: 10px;
+  color: var(--auth-ap-purple, #6d28d9);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Payment step polish */
+.onboarding-payment-cards { margin: 18px 0 !important; }
+.onboarding-payment-card { padding: 16px 18px !important; cursor: pointer; }
+.onboarding-payment-card__name { margin: 0 0 2px !important; font-size: 15px !important; font-weight: 700 !important; }
+.onboarding-payment-card__desc { margin: 0 !important; font-size: 12.5px !important; color: #817b8d !important; }
+.onboarding-checkout-summary { margin-bottom: 18px !important; }
+.auth-page__trust { justify-content: center !important; gap: 18px !important; margin: 4px 0 14px !important; }
+.onboarding-action-buttons { margin-top: 18px !important; }
+
+/* Stepper: three equal columns so every circle is centred on the connector line */
+.onboarding-stepper {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  align-items: start !important;
+  justify-content: stretch !important;
+}
+.onboarding-stepper::before {
+  top: 18px !important;
+  left: calc(100% / 6) !important;
+  right: calc(100% / 6) !important;
+}
+.onboarding-stepper__progress {
+  top: 18px !important;
+  left: calc(100% / 6) !important;
+  max-width: calc(100% * 2 / 3) !important;
+}
+.onboarding-step-item {
+  justify-self: center !important;
+  text-align: center !important;
+}
+.onboarding-step-label { white-space: normal !important; line-height: 1.25 !important; }

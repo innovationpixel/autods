@@ -51,6 +51,9 @@ const Markup = () => {
                 {/* Public auth & legal routes — no layout */}
                 <Route path="/user/login" element={<Login />} />
                 <Route path="/user/register" element={<Registration />} />
+                {/* Tolerate the doubled "/user/user/..." prefix, keeping the query string (plan_id, addons…) */}
+                <Route path="/user/user/register" element={<Registration />} />
+                <Route path="/user/user/login" element={<Login />} />
                 <Route path="/user/forgot-password" element={<ForgotPassword />} />
                 <Route path="/onboarding" element={<Registration />} />
                 <Route path="/oauth/callback" element={<OAuthCallback />} />

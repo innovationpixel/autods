@@ -41,9 +41,12 @@ function storeDisabledNotice(message) {
     }
 }
 
+const PUBLIC_AUTH_PATHS = ['/user/login', '/user/register', '/user/user/', '/onboarding', '/user/forgot-password'];
+
 function redirectToLogin() {
     clearSession();
-    if (!window.location.pathname.startsWith('/user/login')) {
+    const onPublicPage = PUBLIC_AUTH_PATHS.some((p) => window.location.pathname.startsWith(p));
+    if (!onPublicPage) {
         window.location.href = '/user/login';
     }
 }
@@ -77,7 +80,9 @@ axiosInstance.interceptors.response.use(
             error.response?.data?.platform_unavailable ||
             !originalRequest ||
             originalRequest._skipAuthRefresh ||
-            isAuthEndpoint(originalRequest.url)
+            isAuthEndpoint(originalRequest.url) ||
+            // A visitor with no session has nothing to refresh — never bounce them to login.
+            !getStoredToken()
         ) {
             return Promise.reject(error);
         }

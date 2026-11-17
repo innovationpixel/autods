@@ -99,7 +99,9 @@ export function checkAutoLogin(dispatch, navigate) {
         .catch(() => {
             clearSession();
             dispatch({ type: LOGOUT_ACTION });
-            if (!window.location.pathname.startsWith('/user/login')) {
+            // Stay put on public auth pages (e.g. a register link with a stale token).
+            const publicAuthPaths = ['/user/login', '/user/register', '/user/user/', '/onboarding', '/user/forgot-password'];
+            if (!publicAuthPaths.some((p) => window.location.pathname.startsWith(p))) {
                 navigate('/user/login');
             }
         });

@@ -49,6 +49,7 @@ import {
   saveSession,
 } from "../../services/AuthService";
 import { getLegalDocuments } from "../../services/LegalService";
+import { getAddonPricing } from "../../services/SettingsService";
 import LegalDocumentModal from "../../components/legal/LegalDocumentModal";
 import { openPaymentCheckout } from "../../utils/paymentCheckout";
 import { toast } from "../../utils/toast";
@@ -69,6 +70,40 @@ const COUNTRIES = [
   { code: "AE", name: "United Arab Emirates" },
   { code: "OTHER", name: "Other" },
 ];
+
+/** Max features listed per plan card; the rest collapse into "+ N more features". */
+const PLAN_FEATURES_VISIBLE = 6;
+
+/** Add-on keys that can be pre-selected via the `addons` URL param (comma separated). */
+const ADDON_CATALOG = [
+  { key: "trending", pricingKey: "trending_products", title: "Trending Products" },
+  { key: "hand_picked", pricingKey: "hand_picked_products", title: "Hand-Picked Products" },
+  { key: "order_processing", pricingKey: "order_processing", title: "Order Processing" },
+  { key: "sourcing_20", pricingKey: "sourcing_requests", title: "Sourcing Requests (20 pack)" },
+  { key: "auto_tracking", pricingKey: "auto_tracking", title: "Auto Tracking" },
+];
+
+function parseAddonsParam(value) {
+  if (!value) return [];
+  return [...new Set(value.split(",").map((v) => v.trim()).filter(Boolean))];
+}
+
+function describeAddonPrice(addon) {
+  if (!addon) return "";
+  if (addon.price !== undefined && addon.price !== null) {
+    return `$${Number(addon.price).toFixed(2)}/mo`;
+  }
+  if (addon.monthly_unlimited_price !== undefined && addon.monthly_unlimited_price !== null) {
+    return `$${Number(addon.monthly_unlimited_price).toFixed(2)}/mo`;
+  }
+  if (addon.price_per_order !== undefined && addon.price_per_order !== null) {
+    return `$${Number(addon.price_per_order).toFixed(2)}/order`;
+  }
+  if (addon.price_per_request !== undefined && addon.price_per_request !== null) {
+    return `$${Number(addon.price_per_request).toFixed(2)}/request`;
+  }
+  return "";
+}
 
 const MARKETPLACES = [
   "eBay",
@@ -251,6 +286,10 @@ export default function Registration() {
       ? "annual"
       : "monthly"
   );
+  const [selectedAddons, setSelectedAddons] = useState(() =>
+    parseAddonsParam(searchParams.get("addons"))
+  );
+  const [addonPricing, setAddonPricing] = useState({});
   const [paymentMethod, setPaymentMethod] = useState("stripe"); // 'stripe' | 'paypal'
   const [activating, setActivating] = useState(false);
   const [trialStarting, setTrialStarting] = useState(false);
@@ -331,9 +370,11 @@ export default function Registration() {
         setPlans(list);
         setSignFreeAvailable(Boolean(res.data?.sign_free_available));
         if (list.length > 0) {
-          // Select Pro by default if available, else first plan
+          // Pre-select the plan from the URL (?plan_id=), else Pro, else first plan
+          const urlPlanId = Number(new URLSearchParams(window.location.search).get("plan_id"));
+          const urlPlan = urlPlanId ? list.find((p) => p.id === urlPlanId) : null;
           const pro = list.find((p) => /pro/i.test(p.title) && p.billing_type === "monthly");
-          setSelectedPlanId((prev) => prev || (pro ? pro.id : list[0].id));
+          setSelectedPlanId((prev) => prev || (urlPlan ? urlPlan.id : pro ? pro.id : list[0].id));
         }
       })
       .catch((err) => {
@@ -341,6 +382,38 @@ export default function Registration() {
       })
       .finally(() => setPlansLoading(false));
   }, []);
+
+  // Fetch add-on pricing for the picker. The endpoint needs a login, so only call it
+  // once the user has a session — an unauthenticated 401 would redirect to /user/login.
+  useEffect(() => {
+    if (step < 2 || !getStoredToken()) return;
+    getAddonPricing({ _skipAuthRefresh: true })
+      .then((res) => setAddonPricing(res.data?.addons ?? {}))
+      .catch(() => {});
+  }, [step]);
+
+  // Keep the selected plan, billing cycle and add-ons in the URL so the whole
+  // selection can be shared / pre-selected at the portal.
+  useEffect(() => {
+    if (searchParams.get("success")) return;
+    if (!selectedPlanId) return;
+    const next = new URLSearchParams(searchParams);
+    next.set("plan_id", String(selectedPlanId));
+    next.set("billing_cycle", billingCycle === "annual" ? "yearly" : "monthly");
+    if (selectedAddons.length) {
+      next.set("addons", selectedAddons.join(","));
+    } else {
+      next.delete("addons");
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [selectedPlanId, billingCycle, selectedAddons, searchParams, setSearchParams]);
+
+  const toggleAddon = (key) =>
+    setSelectedAddons((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
 
   // Handle payment return callbacks (e.g., return from Stripe or PayPal)
   useEffect(() => {
@@ -520,7 +593,33 @@ export default function Registration() {
     }
 
     setClientErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
+  };
+
+  /** Builds a toast message that names exactly what is wrong. */
+  const describeStep1Errors = (errors) => {
+    const fieldLabels = {
+      name: "full name",
+      email: "email",
+      password: "password",
+      passwordConfirmation: "confirm password",
+    };
+    const fieldIssues = Object.keys(fieldLabels).filter((k) => errors[k]);
+    const missingLegal = [];
+    if (errors.terms) missingLegal.push("Terms & Conditions");
+    if (errors.privacy) missingLegal.push("Privacy Policy");
+
+    const parts = [];
+    if (fieldIssues.length === 1 && !missingLegal.length) {
+      return errors[fieldIssues[0]];
+    }
+    if (fieldIssues.length) {
+      parts.push(`Please fix: ${fieldIssues.map((k) => fieldLabels[k]).join(", ")}`);
+    }
+    if (missingLegal.length) {
+      parts.push(`Please agree to the ${missingLegal.join(" and ")}`);
+    }
+    return `${parts.join(". ")}.`;
   };
 
   const handleBlur = (field) => {
@@ -566,8 +665,9 @@ export default function Registration() {
       privacy: true,
     });
 
-    if (!validateStep1()) {
-      toast.error("Please agree to our Terms & Conditions and Privacy Policy and resolve any form errors.");
+    const step1Errors = validateStep1();
+    if (Object.keys(step1Errors).length > 0) {
+      toast.error(describeStep1Errors(step1Errors));
       return;
     }
 
@@ -636,7 +736,10 @@ export default function Registration() {
     setActivating(true);
     const origin = window.location.origin;
     const checkoutCycle = selectedPricing.checkoutCycle;
-    const returnPath = `/onboarding?step=3&plan_id=${selectedPlan.id}&billing_cycle=${encodeURIComponent(checkoutCycle)}`;
+    const addonsQuery = selectedAddons.length
+      ? `&addons=${encodeURIComponent(selectedAddons.join(","))}`
+      : "";
+    const returnPath = `/onboarding?step=3&plan_id=${selectedPlan.id}&billing_cycle=${encodeURIComponent(checkoutCycle)}${addonsQuery}`;
 
     try {
       if (provider === "stripe") {
@@ -875,8 +978,8 @@ export default function Registration() {
                   step === 1
                     ? "0%"
                     : step === 2
-                    ? "50%"
-                    : "100%",
+                    ? "calc(100% / 3)"
+                    : "calc(200% / 3)",
               }}
             />
 
@@ -1462,18 +1565,55 @@ export default function Registration() {
                           ) : null}
 
                           {Array.isArray(plan.inclusions) && plan.inclusions.length > 0 && (
-                            <ul className="onboarding-plan-card__features">
-                              {plan.inclusions.map((feature, idx) => (
-                                <li key={idx}>
-                                  <LuCheck />
-                                  <span>{feature}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            <>
+                              <ul className="onboarding-plan-card__features">
+                                {plan.inclusions.slice(0, PLAN_FEATURES_VISIBLE).map((feature, idx) => (
+                                  <li key={idx}>
+                                    <LuCheck />
+                                    <span>{feature}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              {plan.inclusions.length > PLAN_FEATURES_VISIBLE ? (
+                                <div className="onboarding-plan-card__more">
+                                  + {plan.inclusions.length - PLAN_FEATURES_VISIBLE} more features
+                                </div>
+                              ) : null}
+                            </>
                           )}
                         </div>
                       );
                     })}
+                  </div>
+
+                  <div className="onboarding-addons">
+                    <h3 className="onboarding-addons__title">Add-on services (optional)</h3>
+                    <div className="onboarding-addons__list">
+                      {ADDON_CATALOG.filter((a) => addonPricing[a.pricingKey]?.enabled !== false).map((addon) => {
+                        const info = addonPricing[addon.pricingKey];
+                        const checked = selectedAddons.includes(addon.key);
+                        const priceLabel = describeAddonPrice(info);
+                        return (
+                          <label
+                            key={addon.key}
+                            className={`onboarding-addon ${checked ? "onboarding-addon--selected" : ""}`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleAddon(addon.key)}
+                            />
+                            <span className="onboarding-addon__body">
+                              <strong>{info?.title || addon.title}</strong>
+                              {info?.description ? <small>{info.description}</small> : null}
+                            </span>
+                            {priceLabel ? (
+                              <span className="onboarding-addon__price">{priceLabel}</span>
+                            ) : null}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   <div className="onboarding-action-buttons">
@@ -1770,18 +1910,6 @@ export default function Registration() {
                     </button>
                   </div>
 
-                  {/* Quick direct activation link for instant verification */}
-                  <div className="text-center mt-3">
-                    <button
-                      type="button"
-                      className="btn btn-link btn-sm text-muted p-0"
-                      onClick={handleDirectActivation}
-                      disabled={activating || trialStarting}
-                      style={{ fontSize: 12, textDecoration: "underline" }}
-                    >
-                      Instant sandbox activation (Test mode)
-                    </button>
-                  </div>
                 </>
               )}
             </div>
