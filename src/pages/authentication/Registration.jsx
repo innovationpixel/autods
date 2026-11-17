@@ -1586,7 +1586,7 @@ export default function Registration() {
                     })}
                   </div>
 
-                  <div className="onboarding-addons">
+                  {/* <div className="onboarding-addons">
                     <h3 className="onboarding-addons__title">Add-on services (optional)</h3>
                     <div className="onboarding-addons__list">
                       {ADDON_CATALOG.filter((a) => addonPricing[a.pricingKey]?.enabled !== false).map((addon) => {
@@ -1614,7 +1614,7 @@ export default function Registration() {
                         );
                       })}
                     </div>
-                  </div>
+                  </div> */}
 
                   <div className="onboarding-action-buttons">
                     <button
