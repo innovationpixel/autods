@@ -41,9 +41,22 @@ function storeDisabledNotice(message) {
     }
 }
 
+const PUBLIC_ROUTES = [
+    '/user/login',
+    '/user/register',
+    '/user/forgot-password',
+    '/onboarding',
+    '/terms-and-conditions',
+    '/privacy-policy',
+];
+
+function isPublicRoute(pathname = window.location.pathname) {
+    return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+}
+
 function redirectToLogin() {
     clearSession();
-    if (!window.location.pathname.startsWith('/user/login')) {
+    if (!isPublicRoute(window.location.pathname)) {
         window.location.href = '/user/login';
     }
 }

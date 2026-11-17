@@ -414,11 +414,16 @@
 }
 
 .onboarding-plan-card {
+  justify-content: flex-start !important;
   border: 1px solid var(--auth-ap-border) !important;
   border-radius: 14px !important;
   background: #fff !important;
   box-shadow: none !important;
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease !important;
+}
+
+.onboarding-plan-card__desc {
+  flex-grow: 0 !important;
 }
 
 .onboarding-plan-card:hover {

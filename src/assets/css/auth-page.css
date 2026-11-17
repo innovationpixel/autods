@@ -615,6 +615,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   padding: 20px;
   border-radius: 14px;
   border: 2px solid #e5e7eb;
@@ -708,7 +709,7 @@
   color: #6b7280;
   line-height: 1.45;
   margin-bottom: 14px;
-  flex-grow: 1;
+  flex-grow: 0;
 }
 
 .onboarding-plan-card__features {

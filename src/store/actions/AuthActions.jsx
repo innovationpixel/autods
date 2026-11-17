@@ -53,6 +53,19 @@ export function logoutAction(navigate) {
     };
 }
 
+const PUBLIC_ROUTES = [
+    '/user/login',
+    '/user/register',
+    '/user/forgot-password',
+    '/onboarding',
+    '/terms-and-conditions',
+    '/privacy-policy',
+];
+
+function isPublicRoute(pathname = window.location.pathname) {
+    return PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+}
+
 export function checkAutoLogin(dispatch, navigate) {
     const token = getStoredToken();
     const user  = getStoredUser();
@@ -99,7 +112,7 @@ export function checkAutoLogin(dispatch, navigate) {
         .catch(() => {
             clearSession();
             dispatch({ type: LOGOUT_ACTION });
-            if (!window.location.pathname.startsWith('/user/login')) {
+            if (!isPublicRoute(window.location.pathname)) {
                 navigate('/user/login');
             }
         });

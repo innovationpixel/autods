@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -237,6 +237,13 @@ export default function Registration() {
   const [touched, setTouched] = useState({});
 
   // Plans & Payment
+  const initialPlanIdParam = searchParams.get("plan_id") || searchParams.get("plan");
+  const parsedInitialPlanId =
+    initialPlanIdParam &&
+    !Number.isNaN(Number(initialPlanIdParam)) &&
+    Number(initialPlanIdParam) > 0
+      ? Number(initialPlanIdParam)
+      : null;
   const initialCycleParam = (
     searchParams.get("billing_cycle") ||
     searchParams.get("billing_type") ||
@@ -245,12 +252,13 @@ export default function Registration() {
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(false);
   const [signFreeAvailable, setSignFreeAvailable] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const [selectedPlanId, setSelectedPlanId] = useState(parsedInitialPlanId);
   const [billingCycle, setBillingCycle] = useState(
     initialCycleParam === "yearly" || initialCycleParam === "annual"
       ? "annual"
       : "monthly"
   );
+  const appliedUrlSelectionRef = useRef("");
   const [paymentMethod, setPaymentMethod] = useState("stripe"); // 'stripe' | 'paypal'
   const [activating, setActivating] = useState(false);
   const [trialStarting, setTrialStarting] = useState(false);
@@ -331,9 +339,43 @@ export default function Registration() {
         setPlans(list);
         setSignFreeAvailable(Boolean(res.data?.sign_free_available));
         if (list.length > 0) {
-          // Select Pro by default if available, else first plan
-          const pro = list.find((p) => /pro/i.test(p.title) && p.billing_type === "monthly");
-          setSelectedPlanId((prev) => prev || (pro ? pro.id : list[0].id));
+          const params = new URLSearchParams(window.location.search);
+          const urlPlanRaw = params.get("plan_id") || params.get("plan");
+          const urlPlanNum =
+            urlPlanRaw && !Number.isNaN(Number(urlPlanRaw)) && Number(urlPlanRaw) > 0
+              ? Number(urlPlanRaw)
+              : null;
+          const matchedFromUrl =
+            urlPlanNum !== null
+              ? list.find((p) => Number(p.id) === urlPlanNum)
+              : null;
+
+          if (matchedFromUrl) {
+            setSelectedPlanId(matchedFromUrl.id);
+            const urlCycle = (
+              params.get("billing_cycle") ||
+              params.get("billing_type") ||
+              ""
+            ).toLowerCase();
+            if (urlCycle === "yearly" || urlCycle === "annual") {
+              setBillingCycle("annual");
+            } else if (urlCycle === "monthly") {
+              setBillingCycle("monthly");
+            } else if (
+              (matchedFromUrl.base_billing_type ?? matchedFromUrl.billing_type) === "yearly"
+            ) {
+              setBillingCycle("annual");
+            }
+            appliedUrlSelectionRef.current = `${urlPlanRaw || ""}|${urlCycle}`;
+          } else {
+            // Select Pro by default if available, else first plan
+            const pro = list.find((p) => /pro/i.test(p.title) && p.billing_type === "monthly");
+            setSelectedPlanId((prev) => {
+              const prevMatch =
+                prev !== null ? list.find((p) => Number(p.id) === Number(prev)) : null;
+              return prevMatch ? prevMatch.id : (pro ? pro.id : list[0].id);
+            });
+          }
         }
       })
       .catch((err) => {
@@ -341,6 +383,49 @@ export default function Registration() {
       })
       .finally(() => setPlansLoading(false));
   }, []);
+
+  // Sync plan_id & billing_cycle when URL query parameters change
+  useEffect(() => {
+    const urlPlanRaw = searchParams.get("plan_id") || searchParams.get("plan");
+    const urlCycle = (
+      searchParams.get("billing_cycle") ||
+      searchParams.get("billing_type") ||
+      ""
+    ).toLowerCase();
+
+    if (!urlPlanRaw && !urlCycle) {
+      return;
+    }
+
+    const selectionKey = `${urlPlanRaw || ""}|${urlCycle}`;
+    if (appliedUrlSelectionRef.current === selectionKey) {
+      return;
+    }
+
+    if (urlCycle === "yearly" || urlCycle === "annual") {
+      setBillingCycle("annual");
+    } else if (urlCycle === "monthly") {
+      setBillingCycle("monthly");
+    }
+
+    if (urlPlanRaw && !Number.isNaN(Number(urlPlanRaw)) && Number(urlPlanRaw) > 0) {
+      if (plans.length > 0) {
+        const matched = plans.find((p) => Number(p.id) === Number(urlPlanRaw));
+        if (matched) {
+          setSelectedPlanId(matched.id);
+          if (
+            !urlCycle &&
+            (matched.base_billing_type ?? matched.billing_type) === "yearly"
+          ) {
+            setBillingCycle("annual");
+          }
+        }
+        appliedUrlSelectionRef.current = selectionKey;
+      }
+    } else {
+      appliedUrlSelectionRef.current = selectionKey;
+    }
+  }, [searchParams, plans]);
 
   // Handle payment return callbacks (e.g., return from Stripe or PayPal)
   useEffect(() => {
@@ -402,8 +487,18 @@ export default function Registration() {
 
   // Selected plan object
   const selectedPlan = useMemo(() => {
-    return plans.find((p) => p.id === selectedPlanId) || plans[0] || null;
+    return (
+      plans.find((p) => Number(p.id) === Number(selectedPlanId)) ||
+      plans[0] ||
+      null
+    );
   }, [plans, selectedPlanId]);
+
+  const urlMatchedPlan = useMemo(() => {
+    const raw = searchParams.get("plan_id") || searchParams.get("plan");
+    if (!raw || Number.isNaN(Number(raw)) || Number(raw) <= 0) return null;
+    return plans.find((p) => Number(p.id) === Number(raw)) || null;
+  }, [plans, searchParams]);
 
   const hasAnyAnnualOption = useMemo(
     () =>
@@ -930,6 +1025,34 @@ export default function Registration() {
                 </p>
               </div>
 
+              {urlMatchedPlan ? (
+                <div
+                  className="onboarding-legal-verified"
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                    background: "#f5f3ff",
+                    borderColor: "#ddd6fe",
+                    color: "#4c1d95",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <LuSparkles />
+                    <span>
+                      Selected Plan: <strong>{urlMatchedPlan.title}</strong>
+                    </span>
+                  </span>
+                  <strong>
+                    ${Number(resolveOnboardingPricing(urlMatchedPlan, billingCycle).displayPrice).toFixed(2)}{" "}
+                    {resolveOnboardingPricing(urlMatchedPlan, billingCycle).periodLabel}
+                  </strong>
+                </div>
+              ) : null}
+
               {isResumingSession ? (
                 <div
                   className="onboarding-legal-verified"
@@ -1360,7 +1483,7 @@ export default function Registration() {
 
                   <div className="onboarding-plans">
                     {plans.map((plan) => {
-                      const isSelected = selectedPlanId === plan.id;
+                      const isSelected = Number(selectedPlanId) === Number(plan.id);
                       const isPro = /pro/i.test(plan.title);
                       const planPricing = resolveOnboardingPricing(plan, billingCycle);
                       const showTrialTag = hasPlanFreeTrial(plan);
