@@ -90,7 +90,9 @@ axiosInstance.interceptors.response.use(
             error.response?.data?.platform_unavailable ||
             !originalRequest ||
             originalRequest._skipAuthRefresh ||
-            isAuthEndpoint(originalRequest.url)
+            isAuthEndpoint(originalRequest.url) ||
+            // A visitor with no session has nothing to refresh — never bounce them to login.
+            !getStoredToken()
         ) {
             return Promise.reject(error);
         }
