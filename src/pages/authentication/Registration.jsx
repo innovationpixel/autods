@@ -294,6 +294,7 @@ export default function Registration() {
       : "monthly"
   );
   const appliedUrlSelectionRef = useRef("");
+  const [selectedAddons] = useState(() => parseAddonsParam(searchParams.get("addons")));
   const [paymentMethod, setPaymentMethod] = useState("stripe"); // 'stripe' | 'paypal'
   const [activating, setActivating] = useState(false);
   const [trialStarting, setTrialStarting] = useState(false);

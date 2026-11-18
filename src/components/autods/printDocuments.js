@@ -250,6 +250,7 @@ export function openPrintableDocument(docType, orders) {
   if (!win) {
     return false;
   }
+  win.opener = null;
 
   win.document.write(`<!DOCTYPE html>
 <html>

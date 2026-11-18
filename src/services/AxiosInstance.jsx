@@ -4,8 +4,37 @@ import { clearSession, getStoredToken, saveSession } from './AuthService';
 
 const axiosInstance = axios.create({
     baseURL: BASE_URL,
+    timeout: 30000,
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
 });
+
+const LONG_RUNNING_PATH_PATTERNS = [
+    '/ai',
+    '/products/import',
+    '/sync',
+    '/bundle/',
+    '/monitor',
+    '/place-aliexpress-order',
+    '/google-sheet',
+];
+
+const IDEMPOTENT_PATH_PATTERNS = [
+    '/wallet/deposit/',
+    '/wallet/transfer-to-processing',
+    '/place-aliexpress-order',
+    '/refund',
+    '/cancel',
+    '/plans/',
+    '/addons/',
+    '/ai/credits/buy',
+];
+
+function generateIdempotencyKey() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return `idem-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 let isRefreshing = false;
 let failedQueue = [];
@@ -44,6 +73,8 @@ function storeDisabledNotice(message) {
 const PUBLIC_ROUTES = [
     '/user/login',
     '/user/register',
+    '/user/user/login',
+    '/user/user/register',
     '/user/forgot-password',
     '/onboarding',
     '/terms-and-conditions',
@@ -66,6 +97,28 @@ axiosInstance.interceptors.request.use((config) => {
     if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
     }
+
+    const url = String(config.url || '');
+    const method = String(config.method || 'get').toUpperCase();
+
+    // Extend timeout for legitimately long-running AI, sync, and import endpoints
+    if (
+        (!config.timeout || config.timeout === 30000) &&
+        LONG_RUNNING_PATH_PATTERNS.some((pattern) => url.includes(pattern))
+    ) {
+        config.timeout = 120000;
+    }
+
+    // Automatically attach an Idempotency-Key on critical mutating financial/order calls
+    if (
+        method === 'POST' &&
+        !config.headers['Idempotency-Key'] &&
+        !config.headers['X-Idempotency-Key'] &&
+        IDEMPOTENT_PATH_PATTERNS.some((pattern) => url.includes(pattern))
+    ) {
+        config.headers['Idempotency-Key'] = generateIdempotencyKey();
+    }
+
     return config;
 });
 

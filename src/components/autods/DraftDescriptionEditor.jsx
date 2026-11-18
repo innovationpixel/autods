@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import {
@@ -544,7 +545,7 @@ function DraftDescriptionEditor({
           >
             <div
               style={{ margin: "0 auto", maxWidth: 940 }}
-              dangerouslySetInnerHTML={{ __html: value || "<p>No description content.</p>" }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(value || "<p>No description content.</p>") }}
             />
           </div>
         </div>
@@ -980,7 +981,7 @@ function DraftDescriptionEditor({
                         border: "1px solid #e2e8f0",
                         boxShadow: "0 4px 14px rgba(0,0,0,0.04)",
                       }}
-                      dangerouslySetInnerHTML={{ __html: modalPreviewHtml }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(modalPreviewHtml) }}
                     />
                   ) : (
                     <pre

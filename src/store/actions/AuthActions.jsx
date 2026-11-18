@@ -56,6 +56,8 @@ export function logoutAction(navigate) {
 const PUBLIC_ROUTES = [
     '/user/login',
     '/user/register',
+    '/user/user/login',
+    '/user/user/register',
     '/user/forgot-password',
     '/onboarding',
     '/terms-and-conditions',

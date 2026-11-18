@@ -2,6 +2,15 @@ node_modules/
 dist/
 build/
 .env
+.env.local
+.env.*.local
+*.sql
+*.bak
+*.tf
+*.tfstate
+*.tfstate.*
+*.pem
+*.key
 .DS_Store
 .vite-*.log
 .vite-*.err

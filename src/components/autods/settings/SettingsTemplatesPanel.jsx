@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LuCopy, LuEye, LuPencil, LuPlus, LuTrash2, LuX } from "react-icons/lu";
 import { toast } from "../../../utils/toast";
+import { sanitizeHtml } from "../../../utils/sanitizeHtml";
 import { updateAccountSettings } from "../../../services/SettingsService";
 import ConfirmModal from "../ConfirmModal";
 import {
@@ -287,7 +288,7 @@ function SettingsTemplatesPanel({ initialCustomTemplates = [], initialDefaultId 
             <div
               className="templates-settings__preview-frame"
               style={{ maxHeight: "68vh", background: "#ffffff", padding: 16 }}
-              dangerouslySetInnerHTML={{ __html: fillTemplatePreview(previewTemplate.html) }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(fillTemplatePreview(previewTemplate.html)) }}
             />
           </div>
         </div>
