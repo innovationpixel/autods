@@ -4,7 +4,7 @@ function resolveApiBaseUrl() {
         return String(fromEnv).replace(/\/$/, '');
     }
 
-    return 'https://app.autodropshipprime.com/api';
+    return 'https://panel.autodropshipprime.com/api';
 }
 
 export const BASE_URL = resolveApiBaseUrl();
