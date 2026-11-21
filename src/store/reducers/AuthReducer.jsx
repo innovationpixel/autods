@@ -22,7 +22,7 @@ export function AuthReducer(state = initialState, action) {
         return {
             ...state,
             auth: {
-                token: action.payload.access_token,
+                token: action.payload.access_token || action.payload.token,
                 user: action.payload.user,
             },
             errorMessage: '',

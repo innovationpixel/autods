@@ -64,14 +64,22 @@ function safeJsonParse(val, fallback = null) {
 
 export function saveSession(data) {
     if (!data || typeof data !== 'object') return;
-    const token = typeof data.access_token === 'string' && data.access_token !== 'undefined'
-        ? data.access_token
-        : '';
-    const user = data.user && typeof data.user === 'object' ? data.user : null;
-    const expiresIn = typeof data.expires_in === 'number' ? data.expires_in : null;
+    const token = (typeof data.access_token === 'string' && data.access_token !== 'undefined' ? data.access_token : '')
+        || (typeof data.token === 'string' && data.token !== 'undefined' ? data.token : '');
 
-    if (!token || !user) {
-        clearSession();
+    let user = data.user;
+    if (typeof user === 'string') {
+        user = safeJsonParse(user, null);
+    }
+    if (!user || typeof user !== 'object') {
+        user = getStoredUser() || null;
+    }
+
+    const expiresIn = typeof data.expires_in === 'number'
+        ? data.expires_in
+        : (Number(data.expires_in) || null);
+
+    if (!token) {
         return;
     }
 
@@ -86,7 +94,9 @@ export function saveSession(data) {
     try {
         localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
         localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        if (user) {
+            localStorage.setItem('user', JSON.stringify(user));
+        }
     } catch {
         // Storage full or quota exceeded
     }
@@ -111,13 +121,11 @@ export function getStoredUser() {
 
         const raw = localStorage.getItem('user');
         const user = safeJsonParse(raw, null);
-        if (!user || typeof user !== 'object') {
-            if (raw) {
-                localStorage.removeItem('user');
-            }
-            return null;
+        if (user && typeof user === 'object') {
+            return user;
         }
-        return user;
+
+        return null;
     } catch {
         return null;
     }
@@ -125,13 +133,17 @@ export function getStoredUser() {
 
 export function getStoredToken() {
     try {
-        const session = getStoredSession();
-        const token = session?.token || localStorage.getItem('token');
-        if (!token || token === 'undefined' || token === 'null' || typeof token !== 'string') {
-            localStorage.removeItem('token');
-            return null;
+        const rawToken = localStorage.getItem('token');
+        if (rawToken && rawToken !== 'undefined' && rawToken !== 'null' && typeof rawToken === 'string') {
+            return rawToken;
         }
-        return token;
+
+        const session = getStoredSession();
+        if (session?.token && session.token !== 'undefined' && session.token !== 'null') {
+            return session.token;
+        }
+
+        return null;
     } catch {
         return null;
     }
@@ -140,14 +152,8 @@ export function getStoredToken() {
 export function getStoredSession() {
     try {
         const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-        const session = safeJsonParse(raw, null);
-        if (!session || !session.token || session.token === 'undefined' || !session.user) {
-            if (raw) {
-                localStorage.removeItem(SESSION_STORAGE_KEY);
-            }
-            return null;
-        }
-        return session;
+        if (!raw) return null;
+        return safeJsonParse(raw, null);
     } catch {
         return null;
     }

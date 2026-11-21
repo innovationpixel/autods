@@ -49,6 +49,8 @@ function Login() {
   const errorMessage = useSelector((state) => state.auth.errorMessage);
   const apiFieldErrors = useSelector((state) => state.auth.fieldErrors);
   const showLoading = useSelector((state) => state.auth.showLoading);
+  const authToken = useSelector((state) => state.auth?.auth?.token);
+  const authUser = useSelector((state) => state.auth?.auth?.user);
 
   useEffect(() => {
     try {
@@ -59,10 +61,13 @@ function Login() {
   }, []);
 
   useEffect(() => {
-    if (getStoredToken()) {
-      navigate("/", { replace: true });
+    const token = authToken || getStoredToken();
+    if (token) {
+      const user = authUser || getStoredUser();
+      const target = user?.role === "super_admin" ? "/admin" : "/";
+      navigate(target, { replace: true });
     }
-  }, [navigate]);
+  }, [authToken, authUser, navigate]);
 
   const visibleApiFieldErrors = useMemo(() => {
     const next = { ...apiFieldErrors };

@@ -29,10 +29,22 @@ export function loginAction(email, password, navigate) {
 
         login(email, password)
             .then((response) => {
-                saveSession(response.data);
-                dispatch(loginConfirmedAction(response.data));
+                const data = response.data;
+                if (!data || typeof data !== 'object' || (!data.access_token && !data.token)) {
+                    throw new Error('Invalid response received from authentication endpoint. Please verify API configuration.');
+                }
+                saveSession(data);
+                dispatch(loginConfirmedAction(data));
                 toast.success('Logged in successfully.');
-                navigate(response.data?.user?.role === 'super_admin' ? '/admin' : '/');
+                const target = data?.user?.role === 'super_admin' ? '/admin' : '/';
+                if (typeof navigate === 'function') {
+                    navigate(target, { replace: true });
+                }
+                setTimeout(() => {
+                    if (window.location.pathname.includes('/login')) {
+                        window.location.href = target;
+                    }
+                }, 150);
             })
             .catch((error) => {
                 const { message, fieldErrors } = parseApiErrors(error);
