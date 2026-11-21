@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 const BRAND_PATTERN = /\bAuto\s*DS\b/gi;
-const BRAND_NAME = "AutoDrop Prime";
+const BRAND_NAME = "AutoDropshipPrime";
 const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "CODE", "PRE"]);
 
 function replaceBrandText(value) {
