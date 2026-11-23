@@ -209,6 +209,9 @@ function PlanReferenceCard({
   hasActivePaidPlan = false,
   activeBillingCycle = null,
   isFeatured = false,
+  hasUsedOneTimePlan = false,
+  hasExpiredOneTimePlan = false,
+  mustUpgradeRecurring = false,
   mode = "user",
   billingCycle = "monthly",
   checkoutId = null,
@@ -249,6 +252,7 @@ function PlanReferenceCard({
   const hasFreeTrial =
     !isCustom && Boolean(plan?.has_free_trial) && Number(plan?.free_trial_days) > 0;
   const freeTrialDays = hasFreeTrial ? Number(plan.free_trial_days) : null;
+  const isOneTime = Boolean(plan?.is_one_time || pricing?.baseType === "one_time");
   const isSignFree = !isCustom && Boolean(plan?.is_sign_free);
   const isFreeFallbackZeroPrice = isSignFree && effectiveCheckoutNum <= 0;
   const showCustomPriceWord =
@@ -266,6 +270,7 @@ function PlanReferenceCard({
     mode === "user" &&
     hasFreeTrial &&
     !hasUsedFreeTrial &&
+    !hasUsedOneTimePlan &&
     !isCurrent &&
     !isOnFreeTrial &&
     !hasActivePaidPlan &&
@@ -302,6 +307,11 @@ function PlanReferenceCard({
       headCornerTag = {
         tone: "free",
         label: mode === "admin" ? "Sign Free" : "Free Plan",
+      };
+    } else if (isOneTime) {
+      headCornerTag = {
+        tone: "purple",
+        label: "One-Time Plan",
       };
     } else if (isCustom) {
       headCornerTag = {
@@ -467,23 +477,43 @@ function PlanReferenceCard({
                 <span>Current Plan</span>
               </button>
             ) : isFreeFallbackZeroPrice ? (
+              hasUsedOneTimePlan ? (
+                <button
+                  type="button"
+                  className="pricing-tier__cta pricing-tier__cta--disabled"
+                  disabled
+                  title="Free signup plans are not available after using a one-time plan."
+                >
+                  <span>Unavailable (One-Time Plan Used)</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="pricing-tier__cta"
+                  disabled={activatingId === plan?.id || trialStartingId === plan?.id || Boolean(checkoutId)}
+                  onClick={() => onActivateFreePlan?.(plan.id)}
+                >
+                  {activatingId === plan?.id ? (
+                    <>
+                      <LuLoader className="spin-icon" />
+                      <span>Activating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Activate Free Plan</span>
+                      <LuArrowRight />
+                    </>
+                  )}
+                </button>
+              )
+            ) : isOneTime && hasUsedOneTimePlan && (!isCurrent || hasExpiredOneTimePlan || mustUpgradeRecurring) ? (
               <button
                 type="button"
-                className="pricing-tier__cta"
-                disabled={activatingId === plan?.id || trialStartingId === plan?.id || Boolean(checkoutId)}
-                onClick={() => onActivateFreePlan?.(plan.id)}
+                className="pricing-tier__cta pricing-tier__cta--disabled"
+                disabled
+                title="One-time plans can only be used once. Please select a monthly or annual subscription."
               >
-                {activatingId === plan?.id ? (
-                  <>
-                    <LuLoader className="spin-icon" />
-                    <span>Activating…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Activate Free Plan</span>
-                    <LuArrowRight />
-                  </>
-                )}
+                <span>One-Time Plan Used (Must Upgrade)</span>
               </button>
             ) : (
               <>

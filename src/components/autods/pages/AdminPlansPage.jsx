@@ -49,6 +49,7 @@ const createEmptyPlan = (isCustom = false) => ({
   currency: "USD",
   billing_type: "monthly",
   duration_days: 30,
+  is_one_time: false,
   has_free_trial: false,
   free_trial_days: "3",
   is_sign_free: false,
@@ -222,6 +223,7 @@ function AdminPlansPage() {
       currency: plan.currency ?? "USD",
       billing_type: plan.billing_type ?? "monthly",
       duration_days: plan.duration_days ?? 30,
+      is_one_time: Boolean(plan.is_one_time || plan.billing_type === "one_time"),
       has_free_trial: Boolean(plan.has_free_trial),
       free_trial_days:
         plan.free_trial_days !== null && plan.free_trial_days !== undefined
@@ -323,7 +325,10 @@ function AdminPlansPage() {
       return plans.filter((p) => Boolean(p.is_custom));
     }
     if (typeFilter === "standard") {
-      return plans.filter((p) => !p.is_custom);
+      return plans.filter((p) => !p.is_custom && !p.is_one_time && p.billing_type !== "one_time");
+    }
+    if (typeFilter === "one_time") {
+      return plans.filter((p) => Boolean(p.is_one_time || p.billing_type === "one_time"));
     }
     return plans;
   }, [plans, typeFilter]);
@@ -425,8 +430,11 @@ function AdminPlansPage() {
       features: form.features || {},
       inclusions: finalInclusions,
       price: Number(form.price) >= 0 ? Number(form.price) : 0,
+      is_one_time: Boolean(form.is_one_time || form.billing_type === "one_time"),
       annual_price:
-        form.billing_type === "monthly"
+        (form.is_one_time || form.billing_type === "one_time")
+          ? null
+          : form.billing_type === "monthly"
           ? form.annual_price !== "" &&
             form.annual_price !== null &&
             form.annual_price !== undefined &&
@@ -440,12 +448,28 @@ function AdminPlansPage() {
             : 0
           : null,
       currency: (form.currency || "USD").toUpperCase().slice(0, 3),
-      billing_type: form.billing_type || "monthly",
+      billing_type:
+        (form.is_one_time || form.billing_type === "one_time")
+          ? "one_time"
+          : (form.billing_type || "monthly"),
       duration_days:
-        form.billing_type === "one_time" ? Number(form.duration_days) || 30 : null,
-      has_free_trial: Boolean(form.has_free_trial),
-      free_trial_days: form.has_free_trial ? parseInt(form.free_trial_days, 10) : null,
-      is_sign_free: !form.is_custom && Boolean(form.is_sign_free),
+        (form.is_one_time || form.billing_type === "one_time")
+          ? Number(form.duration_days) || 30
+          : null,
+      has_free_trial:
+        (form.is_one_time || form.billing_type === "one_time")
+          ? false
+          : Boolean(form.has_free_trial),
+      free_trial_days:
+        (form.is_one_time || form.billing_type === "one_time")
+          ? null
+          : form.has_free_trial
+          ? parseInt(form.free_trial_days, 10)
+          : null,
+      is_sign_free:
+        (form.is_one_time || form.billing_type === "one_time")
+          ? false
+          : (!form.is_custom && Boolean(form.is_sign_free)),
       is_active: Boolean(form.is_active),
       is_custom: Boolean(form.is_custom),
       assigned_user_ids: form.is_custom ? (form.assigned_user_ids ?? []) : [],
@@ -533,6 +557,7 @@ function AdminPlansPage() {
           ? Number(plan.price ?? 0)
           : null,
       currency: (plan.currency || "USD").toUpperCase().slice(0, 3),
+      is_one_time: Boolean(plan.is_one_time || plan.billing_type === "one_time"),
       billing_type: billingType,
       duration_days: billingType === "one_time" ? Number(plan.duration_days) || 30 : null,
       has_free_trial: Boolean(plan.has_free_trial),
@@ -573,8 +598,9 @@ function AdminPlansPage() {
   }
 
   const activeCount = plans.filter((plan) => plan.is_active).length;
+  const oneTimePlansCount = plans.filter((plan) => Boolean(plan.is_one_time || plan.billing_type === "one_time")).length;
   const customPlansCount = plans.filter((plan) => Boolean(plan.is_custom)).length;
-  const standardPlansCount = plans.length - customPlansCount;
+  const standardPlansCount = plans.filter((plan) => !plan.is_custom && !plan.is_one_time && plan.billing_type !== "one_time").length;
   const activeSignFreePlan = plans.find(
     (plan) => !plan.is_custom && Boolean(plan.is_sign_free) && plan.is_active !== false
   );
@@ -646,6 +672,14 @@ function AdminPlansPage() {
               <LuLock />
               <span>Custom Packages ({customPlansCount})</span>
             </button>
+            <button
+              type="button"
+              className={`admin-plans-page__tab ${typeFilter === "one_time" ? "is-active" : ""}`}
+              onClick={() => setTypeFilter("one_time")}
+            >
+              <LuClock />
+              <span>One-Time Plans ({oneTimePlansCount})</span>
+            </button>
           </div>
 
           <div className="admin-plans-page__toolbar-right">
@@ -653,6 +687,7 @@ function AdminPlansPage() {
               <span><strong>{activeCount}</strong> Active</span>
               <span><strong>{standardPlansCount}</strong> Public</span>
               <span><strong>{customPlansCount}</strong> Custom</span>
+              <span><strong>{oneTimePlansCount}</strong> One-Time</span>
               <span
                 className={`admin-plans-page__signfree-note ${
                   activeSignFreePlan ? "is-configured" : "is-missing"
@@ -860,14 +895,46 @@ function AdminPlansPage() {
                 </label>
               )}
 
+              <label className="marketplace-settings__field admin-modal__checkbox admin-modal__full">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.is_one_time || form.billing_type === "one_time")}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm({
+                      ...form,
+                      is_one_time: checked,
+                      billing_type: checked ? "one_time" : "monthly",
+                      annual_price: checked ? "" : form.annual_price,
+                      has_free_trial: checked ? false : form.has_free_trial,
+                      is_sign_free: checked ? false : form.is_sign_free,
+                      duration_days: checked ? (Number(form.duration_days) || 30) : form.duration_days,
+                    });
+                  }}
+                />
+                <span>
+                  <strong>One-Time Plan</strong> — Single payment covering N days. When ended, users must upgrade to another recurring plan (cannot choose free signup, trial, or another one-time plan).
+                </span>
+              </label>
+
               <label className="marketplace-settings__field">
                 <span>Billing Type</span>
                 <select
                   className="marketplace-settings__control"
-                  value={form.billing_type}
-                  onChange={(e) =>
-                    setForm({ ...form, billing_type: e.target.value })
-                  }
+                  value={form.is_one_time ? "one_time" : form.billing_type}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const isOneTime = val === "one_time";
+                    setForm({
+                      ...form,
+                      billing_type: val,
+                      is_one_time: isOneTime,
+                      annual_price: isOneTime ? "" : form.annual_price,
+                      has_free_trial: isOneTime ? false : form.has_free_trial,
+                      is_sign_free: isOneTime ? false : form.is_sign_free,
+                      duration_days: isOneTime ? (Number(form.duration_days) || 30) : form.duration_days,
+                    });
+                  }}
                 >
                   <option value="monthly">Monthly (+ Optional Annual)</option>
                   <option value="yearly">Yearly (Annual Only)</option>
@@ -978,22 +1045,49 @@ function AdminPlansPage() {
                 </div>
               ) : null}
 
-              {form.billing_type === "one_time" ? (
-                <label className="marketplace-settings__field admin-modal__full">
-                  <span>Duration (days)</span>
-                  <input
-                    type="number"
-                    min="1"
-                    className="marketplace-settings__control"
-                    value={form.duration_days ?? 30}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        duration_days: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
+              {(form.is_one_time || form.billing_type === "one_time") ? (
+                <div className="admin-plans-modal__section admin-modal__full" style={{ marginTop: "10px" }}>
+                  <div className="admin-plans-modal__trial-warning is-info" style={{ marginBottom: "12px" }}>
+                    <LuCircleAlert />
+                    <span>
+                      <strong>One-Time Plan Policy:</strong> When this plan ends, the user will be required to update to another recurring plan (monthly or annual). They will be blocked from selecting Free Signup, starting Free Trials, or repurchasing any One-Time plan.
+                    </span>
+                  </div>
+                  <label className="marketplace-settings__field">
+                    <span>Duration (days) *</span>
+                    <input
+                      type="number"
+                      min="1"
+                      className="marketplace-settings__control"
+                      value={form.duration_days ?? 30}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          duration_days: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <div className="admin-plans-modal__discount-presets">
+                    <span>Quick presets:</span>
+                    {[15, 30, 60, 90, 365].map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        className={`admin-plans-modal__chip ${
+                          Number(form.duration_days) === days
+                            ? "admin-plans-modal__chip--active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setForm({ ...form, duration_days: days })
+                        }
+                      >
+                        {days} Days
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
 
               {/* Customer Multi-Select Assignment when Custom Package */}
@@ -1342,6 +1436,15 @@ function AdminPlansPage() {
                 </div>
               </div>
 
+              {form.is_one_time || form.billing_type === "one_time" ? (
+                <div className="admin-plans-modal__trial-warning is-info" style={{ marginTop: "12px" }}>
+                  <LuCircleAlert />
+                  <span>
+                    Free Trails and Sign Free options are disabled for <strong>One-Time Plans</strong>. Users purchasing this plan must update to a recurring subscription once this plan expires.
+                  </span>
+                </div>
+              ) : (
+                <>
               <label className="marketplace-settings__field admin-modal__checkbox">
                 <input
                   type="checkbox"
@@ -1453,6 +1556,8 @@ function AdminPlansPage() {
                   ) : null}
                 </div>
               ) : null}
+                </>
+              )}
             </div>
 
             <label className="marketplace-settings__field admin-modal__checkbox">

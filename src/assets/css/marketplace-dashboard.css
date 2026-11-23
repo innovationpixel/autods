@@ -18955,6 +18955,12 @@
   color: #5d5c65;
 }
 
+.plans-hub__banner--warning {
+  background: #fff8eb;
+  border: 1px solid #f9d8a7;
+  color: #b45309;
+}
+
 .plans-hub__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

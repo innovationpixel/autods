@@ -19,6 +19,10 @@ export function register(payloadOrName, email, password, passwordConfirmation) {
     return axiosInstance.post('/auth/register', payload);
 }
 
+export function checkEmailAvailability(email) {
+    return axiosInstance.post('/auth/check-email', { email });
+}
+
 export function logout() {
     return axiosInstance.post('/auth/logout');
 }

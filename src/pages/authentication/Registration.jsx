@@ -43,11 +43,13 @@ import {
 } from "../../services/PlanService";
 import {
   acceptLegalConsent,
+  checkEmailAvailability,
   clearSession,
   getStoredToken,
   getStoredUser,
   saveSession,
 } from "../../services/AuthService";
+import { parseApiErrors } from "../../utils/apiErrors";
 import { getLegalDocuments } from "../../services/LegalService";
 import { getAddonPricing } from "../../services/SettingsService";
 import LegalDocumentModal from "../../components/legal/LegalDocumentModal";
@@ -680,8 +682,32 @@ export default function Registration() {
     return `${parts.join(". ")}.`;
   };
 
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
   const handleBlur = (field) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleEmailBlur = async () => {
+    handleBlur("email");
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || isResumingSession) {
+      return;
+    }
+    try {
+      setCheckingEmail(true);
+      const res = await checkEmailAvailability(trimmed);
+      if (res.data?.exists) {
+        setClientErrors((prev) => ({
+          ...prev,
+          email: "An account with this email address already exists. Please sign in or use a different email.",
+        }));
+      }
+    } catch {
+      // Ignore background check failure
+    } finally {
+      setCheckingEmail(false);
+    }
   };
 
   const ensureLegalAgreementsBeforePayment = () => {
@@ -763,8 +789,12 @@ export default function Registration() {
       );
       toast.success("Account created! Now choose your subscription plan.");
       setStep(2);
-    } catch {
-      // API error handled in action and toast
+    } catch (err) {
+      const { fieldErrors } = parseApiErrors(err);
+      if (fieldErrors?.email) {
+        setClientErrors((prev) => ({ ...prev, email: fieldErrors.email }));
+        setTouched((prev) => ({ ...prev, email: true }));
+      }
     }
   };
 
@@ -1201,13 +1231,23 @@ export default function Registration() {
                           setEmail(e.target.value);
                           if (clientErrors.email) setClientErrors((c) => ({ ...c, email: null }));
                         }}
-                        onBlur={() => handleBlur("email")}
+                        onBlur={handleEmailBlur}
                         placeholder="john@example.com"
                         autoComplete="email"
                       />
+                      {checkingEmail ? (
+                        <LuLoader className="auth-page__spinner auth-page__spinner--inline" style={{ animation: "spin 1s linear infinite" }} />
+                      ) : null}
                     </div>
                     {touched.email && clientErrors.email ? (
-                      <span className="auth-page__field-error">{clientErrors.email}</span>
+                      <span className="auth-page__field-error">
+                        {clientErrors.email}{" "}
+                        {clientErrors.email.toLowerCase().includes("already") ? (
+                          <Link to="/user/login" style={{ textDecoration: "underline", fontWeight: 600, marginLeft: 4 }}>
+                            Sign in here
+                          </Link>
+                        ) : null}
+                      </span>
                     ) : null}
                   </label>
                 </div>

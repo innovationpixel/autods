@@ -150,6 +150,9 @@ function PlansPage() {
   const activeBillingCycle = current?.subscription?.billing_type ?? current?.current_plan?.billing_type ?? null;
   const isOnFreeTrial = Boolean(current?.is_on_free_trial);
   const hasUsedFreeTrial = Boolean(current?.has_used_free_trial);
+  const hasUsedOneTimePlan = Boolean(current?.has_used_one_time_plan);
+  const hasExpiredOneTimePlan = Boolean(current?.has_expired_one_time_plan);
+  const mustUpgradeRecurring = Boolean(current?.must_upgrade_recurring);
   const hasActivePaidPlan = Boolean(
     current?.is_plan_paid &&
       current?.plan_expires_at &&
@@ -459,6 +462,18 @@ function PlansPage() {
         </div>
       ) : null}
 
+      {mustUpgradeRecurring || hasExpiredOneTimePlan ? (
+        <div className="plans-hub__banner plans-hub__banner--warning">
+          <LuClock />
+          <div>
+            <strong>Your one-time plan has ended.</strong>
+            <span>
+              {" "}Please upgrade to a monthly or annual subscription to restore active access. Free trials, free signup plans, and one-time plans are no longer available for your account.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       {!hasStoredLegalConsent ? (
         <div
           className={`auth-page__legal-box ${legalError ? "auth-page__legal-box--error" : ""}`}
@@ -574,6 +589,9 @@ function PlansPage() {
                 isOnFreeTrial={isOnFreeTrial}
                 hasUsedFreeTrial={hasUsedFreeTrial}
                 hasActivePaidPlan={hasActivePaidPlan}
+                hasUsedOneTimePlan={hasUsedOneTimePlan}
+                hasExpiredOneTimePlan={hasExpiredOneTimePlan}
+                mustUpgradeRecurring={mustUpgradeRecurring}
                 activeBillingCycle={activeBillingCycle}
                 isFeatured={isFeatured}
                 mode="user"
