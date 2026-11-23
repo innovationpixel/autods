@@ -26,6 +26,9 @@ const initialState = {
     connections: [],
     connectionsLoading: false,
     connectionsError: null,
+    storesLimit: 1,
+    storesCount: 0,
+    quotaBreached: false,
 
     // Which connection IDs are currently syncing
     syncingIds: [],
@@ -62,6 +65,9 @@ export function EbayReducer(state = initialState, action) {
                 ...state,
                 connectionsLoading: false,
                 connections: action.payload.connections ?? [],
+                storesLimit: action.payload.stores_limit ?? 1,
+                storesCount: action.payload.stores_count ?? (action.payload.connections ?? []).length,
+                quotaBreached: Boolean(action.payload.quota_breached),
             };
 
         case EBAY_STATUS_FAILURE:

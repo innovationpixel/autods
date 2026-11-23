@@ -19,10 +19,16 @@ function ConnectEbayModal({
   connecting = false,
   siteId = "EBAY_US",
   onSiteChange,
+  storesLimit = 1,
+  storesCount = 0,
+  quotaBreached = false,
+  onUpgrade,
 }) {
   if (!open) {
     return null;
   }
+
+  const isLimitReached = Boolean(quotaBreached || (storesLimit > 0 && storesCount >= storesLimit));
 
   return (
     <div className="connect-ebay-modal-layer" role="presentation">
@@ -55,7 +61,27 @@ function ConnectEbayModal({
           Add your eBay seller account to import products, sync listings, and automate orders.
         </p>
 
-        <EbayOAuthSetupBanner onContinue={onConnect} />
+        {isLimitReached ? (
+          <div style={{
+            background: "#fff1f2",
+            border: "1px solid #fecdd3",
+            borderRadius: 8,
+            padding: "12px 14px",
+            marginBottom: 16,
+            color: "#9f1239",
+            fontSize: 13,
+            lineHeight: 1.4,
+          }}>
+            <strong style={{ display: "block", marginBottom: 4 }}>
+              Store Connection Limit Reached ({storesCount} / {storesLimit})
+            </strong>
+            <span>
+              Your current plan allows up to {storesLimit} connected store{storesLimit === 1 ? "" : "s"}. Upgrade your plan to connect additional stores.
+            </span>
+          </div>
+        ) : (
+          <EbayOAuthSetupBanner onContinue={onConnect} />
+        )}
 
         <label className="connect-ebay-modal__field">
           <span className="connect-ebay-modal__label">eBay marketplace (Country)</span>
@@ -63,7 +89,7 @@ function ConnectEbayModal({
             <select
               value={siteId}
               onChange={(event) => onSiteChange?.(event.target.value)}
-              disabled={connecting}
+              disabled={connecting || isLimitReached}
             >
               {EBAY_MARKETPLACES.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -78,21 +104,39 @@ function ConnectEbayModal({
           </span>
         </label>
 
-        <button
-          type="button"
-          className="connect-ebay-modal__submit"
-          onClick={onConnect}
-          disabled={connecting}
-        >
-          {connecting ? (
-            <>
-              <LuLoader className="spin-icon" />
-              <span>Opening eBay…</span>
-            </>
-          ) : (
-            <span>Authorize on eBay</span>
-          )}
-        </button>
+        {isLimitReached ? (
+          <button
+            type="button"
+            className="connect-ebay-modal__submit"
+            style={{ background: "#4f46e5", cursor: "pointer" }}
+            onClick={() => {
+              onClose?.();
+              if (onUpgrade) {
+                onUpgrade();
+              } else {
+                window.location.hash = "#plans";
+              }
+            }}
+          >
+            <span>Upgrade Plan to Connect More Stores</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="connect-ebay-modal__submit"
+            onClick={onConnect}
+            disabled={connecting}
+          >
+            {connecting ? (
+              <>
+                <LuLoader className="spin-icon" />
+                <span>Opening eBay…</span>
+              </>
+            ) : (
+              <span>Authorize on eBay</span>
+            )}
+          </button>
+        )}
 
         <p className="connect-ebay-modal__footnote">
           You&apos;ll be redirected to eBay to sign in and approve Auto DS access.

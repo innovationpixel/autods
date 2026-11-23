@@ -58,7 +58,14 @@ import {
   buildSupplierProfile,
   normalizeSuppliersFromApi,
 } from "../../utils/supplierProfiles";
-import { selectEbayConnections, selectEbayConnectionsLoading, selectEbaySyncingIds } from "../../store/selectors/EbaySelectors";
+import {
+  selectEbayConnections,
+  selectEbayConnectionsLoading,
+  selectEbaySyncingIds,
+  selectEbayStoresLimit,
+  selectEbayStoresCount,
+  selectEbayQuotaBreached,
+} from "../../store/selectors/EbaySelectors";
 import { selectUser } from "../../store/selectors/AuthSelectors";
 import { toast } from "../../utils/toast";
 import { openOAuthTab, watchOAuthTab, markOAuthReturnOrigin, OAUTH_TAB_HINT } from "../../utils/oauthBridge";
@@ -708,6 +715,9 @@ export default function MarketplaceSettingsPage() {
   const navigate = useNavigate();
   const { search } = useLocation();
   const ebayConnections        = useSelector(selectEbayConnections);
+  const ebayStoresLimit        = useSelector(selectEbayStoresLimit);
+  const ebayStoresCount        = useSelector(selectEbayStoresCount);
+  const ebayQuotaBreached      = useSelector(selectEbayQuotaBreached);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
   const ebaySyncingIds         = useSelector(selectEbaySyncingIds);
   const user                   = useSelector(selectUser);
@@ -5633,6 +5643,13 @@ export default function MarketplaceSettingsPage() {
         connecting={ebayConnecting}
         siteId={ebaySiteId}
         onSiteChange={setEbaySiteId}
+        storesLimit={ebayStoresLimit}
+        storesCount={ebayStoresCount}
+        quotaBreached={ebayQuotaBreached}
+        onUpgrade={() => {
+          setConnectEbayModalOpen(false);
+          setActivePrimaryTab("Plans & Add-ons");
+        }}
       />
     </section>
   );

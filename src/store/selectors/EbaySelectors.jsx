@@ -2,6 +2,9 @@
 export const selectEbayConnections       = (state) => state.ebay.connections;
 export const selectEbayConnectionsLoading = (state) => state.ebay.connectionsLoading;
 export const selectEbayConnected         = (state) => state.ebay.connections.length > 0;
+export const selectEbayStoresLimit       = (state) => state.ebay.storesLimit ?? 1;
+export const selectEbayStoresCount       = (state) => state.ebay.storesCount ?? (state.ebay.connections?.length || 0);
+export const selectEbayQuotaBreached     = (state) => Boolean(state.ebay.quotaBreached);
 export const selectEbayPrimaryConnection = (state) =>
     state.ebay.connections.find((c) => c.is_primary) ?? state.ebay.connections[0] ?? null;
 
