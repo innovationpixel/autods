@@ -233,7 +233,7 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   const [sortBy, setSortBy] = useState("uploaded");
   const [sortDirection, setSortDirection] = useState("desc");
   const [filterStatus, setFilterStatus] = useState("Active");
-  const [filterStore, setFilterStore] = useState("");
+  const [filterStore, setFilterStore] = useState(() => (selectedConnectionId ? String(selectedConnectionId) : ""));
   const [filterSupplier, setFilterSupplier] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
   const [editingStockId, setEditingStockId] = useState("");
@@ -386,17 +386,19 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   const hasProductFilters =
     filterStatus !== "Active" || filterStore || filterSupplier || tableView !== "compact";
 
-  const loadListings = () =>
-    dispatch(
+  const loadListings = () => {
+    const targetConnId = filterStore || (selectedConnectionId ? String(selectedConnectionId) : "");
+    return dispatch(
       fetchEbayListings({
         page: currentPage,
         limit: pageSize,
         status: filterStatus === "All" ? "" : filterStatus.toLowerCase(),
         supplier: filterSupplier,
-        connection_id: filterStore || undefined,
+        connection_id: targetConnId || undefined,
         q: searchQuery,
       }),
     );
+  };
 
   const startEditStock = (item) => {
     const formState = buildDraftFormState(item);

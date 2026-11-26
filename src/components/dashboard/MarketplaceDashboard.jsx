@@ -1192,8 +1192,9 @@ const MarketplaceDashboard = () => {
   };
 
   const refreshProductData = () => {
-    dispatch(fetchEbayDrafts());
-    dispatch(fetchEbayListings());
+    const connId = activeSidebarStore?.connectionId ?? undefined;
+    dispatch(fetchEbayDrafts(connId ? { connection_id: connId } : {}));
+    dispatch(fetchEbayListings(connId ? { connection_id: connId } : {}));
     fetchPlanQuota();
   };
 

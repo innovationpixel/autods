@@ -110,7 +110,7 @@ function DraftsContent({
   const [historyVisible, setHistoryVisible] = useState(false);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
-  const [filterStore, setFilterStore] = useState("");
+  const [filterStore, setFilterStore] = useState(() => (selectedConnectionId ? String(selectedConnectionId) : ""));
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const [scheduleTargets, setScheduleTargets] = useState([]);
@@ -339,6 +339,7 @@ function DraftsContent({
   };
 
   const loadDrafts = () => {
+    const connId = filterStore || (selectedConnectionId ? String(selectedConnectionId) : "");
     const params = {
       q: searchQuery,
       page: currentPage,
@@ -347,7 +348,7 @@ function DraftsContent({
     if (activeTab === "scheduled") params.tab = "scheduled";
     if (activeTab === "failed") params.tab = "failed";
     if (filterStatus) params.import_status = filterStatus;
-    if (filterStore) params.connection_id = filterStore;
+    if (connId) params.connection_id = connId;
     return dispatch(fetchEbayDrafts(params));
   };
 
@@ -427,11 +428,15 @@ function DraftsContent({
     if (filterSource && item.source_platform !== filterSource) {
       return false;
     }
+    const targetStoreId = filterStore || (selectedConnectionId ? String(selectedConnectionId) : "");
+    if (targetStoreId && item.ebay_connection_id && String(item.ebay_connection_id) !== String(targetStoreId)) {
+      return false;
+    }
     return true;
   });
-  const draftsCount = meta?.counts?.drafts ?? (activeTab === "drafts" ? (meta?.total ?? drafts.length) : 0);
-  const scheduledCount = meta?.counts?.scheduled ?? (activeTab === "scheduled" ? (meta?.total ?? drafts.length) : 0);
-  const failedCount = meta?.counts?.failed ?? (activeTab === "failed" ? (meta?.total ?? drafts.length) : 0);
+  const draftsCount = meta?.counts?.drafts ?? (activeTab === "drafts" ? (meta?.total ?? visibleDrafts.length) : 0);
+  const scheduledCount = meta?.counts?.scheduled ?? (activeTab === "scheduled" ? (meta?.total ?? visibleDrafts.length) : 0);
+  const failedCount = meta?.counts?.failed ?? (activeTab === "failed" ? (meta?.total ?? visibleDrafts.length) : 0);
 
   const allVisibleSelected =
     visibleDrafts.length > 0 && visibleDrafts.every((item) => selectedIds.includes(item.id));
