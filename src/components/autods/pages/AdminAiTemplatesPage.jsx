@@ -358,7 +358,7 @@ function AdminAiTemplatesPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (role !== "super_admin") navigate("/");
+    if (role && role !== "super_admin") navigate("/");
   }, [role, navigate]);
 
   const loadTemplates = () => {

@@ -5,11 +5,15 @@ import {
     CLEAR_AUTH_ERRORS_ACTION,
     LOGOUT_ACTION,
 } from '../actions/AuthActions';
+import { getStoredToken, getStoredUser } from '../../services/AuthService';
+
+const initialStoredUser = getStoredUser();
+const initialStoredToken = getStoredToken();
 
 const initialState = {
     auth: {
-        token: '',
-        user: null,
+        token: initialStoredToken || '',
+        user: initialStoredUser || null,
     },
     errorMessage: '',
     fieldErrors: {},

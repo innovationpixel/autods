@@ -67,6 +67,10 @@ function SuperAdminShell() {
   );
 
   useEffect(() => {
+    if (pathname === "/settings") {
+      navigate("/admin/settings", { replace: true });
+      return;
+    }
     if (pathname === "/" || !adminPages.includes(activePage)) {
       navigate("/admin", { replace: true });
       return;

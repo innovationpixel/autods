@@ -153,7 +153,7 @@ function AdminPlansPage() {
   const [customerSearch, setCustomerSearch] = useState("");
 
   useEffect(() => {
-    if (role !== "super_admin") {
+    if (role && role !== "super_admin") {
       navigate("/");
     }
   }, [role, navigate]);

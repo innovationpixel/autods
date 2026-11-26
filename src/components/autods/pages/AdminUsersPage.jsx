@@ -92,7 +92,7 @@ function AdminUsersPage() {
   }, [admins, sortBy, sortDirection]);
 
   useEffect(() => {
-    if (role !== "super_admin") {
+    if (role && role !== "super_admin") {
       navigate("/");
     }
   }, [role, navigate]);

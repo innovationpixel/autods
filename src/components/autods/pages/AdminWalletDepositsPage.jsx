@@ -53,7 +53,7 @@ function AdminWalletDepositsPage() {
   const [rejecting, setRejecting] = useState(false);
 
   useEffect(() => {
-    if (role !== "super_admin") {
+    if (role && role !== "super_admin") {
       navigate("/");
     }
   }, [role, navigate]);

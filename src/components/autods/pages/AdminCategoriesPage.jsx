@@ -37,7 +37,7 @@ function AdminCategoriesPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (role !== "super_admin") {
+    if (role && role !== "super_admin") {
       navigate("/");
     }
   }, [role, navigate]);
