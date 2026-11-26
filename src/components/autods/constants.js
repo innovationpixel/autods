@@ -205,8 +205,8 @@ export const subfilterOptions = {
 };
 
 export const filterOptions = {
-  shipsTo: ["United States", "Canada", "United Kingdom", "Australia"],
-  currency: ["USD", "EUR", "GBP"],
+  shipsTo: ["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Italy", "Spain"],
+  currency: ["USD", "GBP", "EUR", "AUD", "CAD"],
   shipsFrom: ["Select Ships From", "United States", "China", "Germany", "Spain"],
   priceRange: [
     "Select Price Range",

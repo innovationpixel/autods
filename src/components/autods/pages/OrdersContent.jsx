@@ -312,7 +312,7 @@ function mapApiOrder(order) {
   };
 }
 
-function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
+function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnectionId = undefined, selectedStoreName = undefined }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const focusedOrderParam = (searchParams.get("focus") ?? "").trim();
@@ -328,6 +328,16 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
   const [buyerFilter, setBuyerFilter] = useState(defaultFilters.buyerFilter);
   const [orderIdFilter, setOrderIdFilter] = useState(defaultFilters.orderIdFilter);
   const [storeFilter, setStoreFilter] = useState(defaultFilters.storeFilter);
+
+  useEffect(() => {
+    if (selectedStoreName) {
+      setStoreFilter(selectedStoreName);
+      setCurrentPage(1);
+    } else if (selectedConnectionId === null) {
+      setStoreFilter("All Stores");
+      setCurrentPage(1);
+    }
+  }, [selectedStoreName, selectedConnectionId]);
   const [carrierFilter, setCarrierFilter] = useState(defaultFilters.carrierFilter ?? "All Carriers");
   const [sourceFilter, setSourceFilter] = useState(defaultFilters.sourceFilter ?? "All Sources");
   const [dateRangePreset, setDateRangePreset] = useState(defaultFilters.dateRangePreset);
@@ -479,6 +489,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
         status: statusFilter !== "All Statuses" ? statusFilter : undefined,
         carrier: carrierFilter !== "All Carriers" ? carrierFilter : undefined,
         store: storeFilter !== "All Stores" ? storeFilter : undefined,
+        connection_id: selectedConnectionId || undefined,
         source: sourceFilter !== "All Sources" ? sourceFilter : undefined,
         buyer: buyerFilter.trim() || undefined,
         order_id: orderIdFilter.trim() || undefined,
@@ -531,6 +542,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "" }) {
     carrierFilter,
     storeFilter,
     sourceFilter,
+    selectedConnectionId,
     fromDate,
     toDate,
     showOnlyActive,

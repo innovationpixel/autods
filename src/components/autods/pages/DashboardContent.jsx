@@ -173,7 +173,7 @@ const EMPTY_KPIS = {
   views: { value: 0, growth: 0 },
 };
 
-function DashboardContent({ searchQuery }) {
+function DashboardContent({ searchQuery, selectedConnectionId = null }) {
   const navigate = useNavigate();
   const user = useSelector(selectUser);
   const [dateFilter, setDateFilter] = useState("30");
@@ -187,7 +187,7 @@ function DashboardContent({ searchQuery }) {
     let active = true;
     setSummaryLoading(true);
 
-    getDashboardSummary(dateFilter)
+    getDashboardSummary(dateFilter, selectedConnectionId)
       .then((res) => {
         if (active) setSummary(res.data);
       })
@@ -201,13 +201,13 @@ function DashboardContent({ searchQuery }) {
     return () => {
       active = false;
     };
-  }, [dateFilter]);
+  }, [dateFilter, selectedConnectionId]);
 
   useEffect(() => {
     let active = true;
     setSalesLoading(true);
 
-    getDashboardSummary(salesDateFilter)
+    getDashboardSummary(salesDateFilter, selectedConnectionId)
       .then((res) => {
         if (active) setSalesSummary(res.data);
       })
@@ -221,7 +221,7 @@ function DashboardContent({ searchQuery }) {
     return () => {
       active = false;
     };
-  }, [salesDateFilter]);
+  }, [salesDateFilter, selectedConnectionId]);
 
   const kpis = summary?.kpis ?? EMPTY_KPIS;
   const salesChart = salesSummary?.sales_chart ?? EMPTY_CHART;

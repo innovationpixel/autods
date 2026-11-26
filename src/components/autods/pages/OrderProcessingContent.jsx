@@ -252,7 +252,7 @@ function mapProcessingOrder(order) {
   };
 }
 
-function OrderProcessingContent() {
+function OrderProcessingContent({ selectedConnectionId = undefined }) {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -369,7 +369,11 @@ function OrderProcessingContent() {
   const loadOrders = async (preserveSelected = false) => {
     setLoading(true);
     try {
-      const res = await getOrders({ processing_status: activeTab, sort: "desc", limit: 200 });
+      const params = { processing_status: activeTab, sort: "desc", limit: 200 };
+      if (selectedConnectionId) {
+        params.connection_id = selectedConnectionId;
+      }
+      const res = await getOrders(params);
       const mapped = (res.data?.data ?? []).map(mapProcessingOrder);
       setOrders(mapped);
       if (!preserveSelected) {
@@ -433,7 +437,7 @@ function OrderProcessingContent() {
     setCurrentPage(1);
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, selectedConnectionId]);
 
   const totalValue = useMemo(
     () => orders.reduce((sum, order) => sum + (Number.isFinite(order.sellPrice) ? order.sellPrice : 0), 0),

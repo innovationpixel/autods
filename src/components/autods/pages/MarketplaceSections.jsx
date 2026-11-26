@@ -20,9 +20,11 @@ function MarketplaceSections({
   onResetView,
   onImport,
   importingId,
+  currency = "USD",
+  currencySymbol = "$",
 }) {
   const hasKeywordSearch = Boolean(keywordSearch.trim());
-  const aliCards = aliItems.map(mapAliItemToCard);
+  const aliCards = aliItems.map((item) => mapAliItemToCard(item, { currency, currencySymbol }));
 
   const renderPagination = () => {
     if (aliTotalPages <= 1) {

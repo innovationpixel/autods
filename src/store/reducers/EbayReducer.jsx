@@ -77,6 +77,16 @@ export function EbayReducer(state = initialState, action) {
             return {
                 ...state,
                 connections: state.connections.filter((c) => c.id !== action.payload),
+                listings: {
+                    ...state.listings,
+                    data: (state.listings?.data || []).filter((l) => l.ebay_connection_id !== action.payload),
+                    total: Math.max(0, (state.listings?.total || 0) - (state.listings?.data || []).filter((l) => l.ebay_connection_id === action.payload).length),
+                },
+                drafts: {
+                    ...state.drafts,
+                    data: (state.drafts?.data || []).filter((d) => d.ebay_connection_id !== action.payload),
+                    total: Math.max(0, (state.drafts?.total || 0) - (state.drafts?.data || []).filter((d) => d.ebay_connection_id === action.payload).length),
+                },
             };
 
         case EBAY_SET_PRIMARY:

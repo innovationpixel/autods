@@ -37,13 +37,37 @@ export function mapAliItemToCard(item, extra = {}) {
     ? Boolean(item.is_choice)
     : (item.isChoice !== undefined ? Boolean(item.isChoice) : (item.choice !== undefined ? Boolean(item.choice) : true));
 
+  const currency = extra.currency || item.currency || "USD";
+  const currencySymbol = extra.currencySymbol || getCurrencySymbol(currency);
+
+  const formatCardPrice = (val) => {
+    if (val === undefined || val === null || val === "") {
+      return null;
+    }
+    const str = String(val).trim();
+    if (
+      str.startsWith("$") ||
+      str.startsWith("£") ||
+      str.startsWith("€") ||
+      str.startsWith("AU$") ||
+      str.startsWith("CA$") ||
+      str.includes(" - ")
+    ) {
+      return str;
+    }
+    const num = parseFloat(str.replace(/[^0-9.-]/g, ""));
+    return Number.isNaN(num) ? str : `${currencySymbol}${num.toFixed(2)}`;
+  };
+
   return {
     id: item.id,
     vendor: item.seller || null,
     shopUrl: item.shop_url || null,
     title: item.title,
-    price: typeof item.price === "string" && (item.price.startsWith("$") || item.price.includes("-")) ? item.price : `$${Number(item.price ?? 0).toFixed(2)}`,
-    originalPrice: item.original_price ? `$${Number(item.original_price).toFixed(2)}` : null,
+    price: formatCardPrice(item.price ?? 0),
+    originalPrice: formatCardPrice(item.original_price),
+    currency,
+    currencySymbol,
     discount: item.discount || null,
     rating: item.rating ?? item.evaluate_rate ?? null,
     reviews: item.review_count ?? item.reviews ?? null,
@@ -219,8 +243,58 @@ export function getMarketplaceProductImages(item) {
   return urls;
 }
 
-export function formatCalculationAmount(value) {
-  return `$${Number(value).toFixed(2)}`;
+export function getCurrencySymbol(currencyOrSymbol = "$") {
+  if (!currencyOrSymbol) {
+    return "$";
+  }
+  const str = String(currencyOrSymbol).trim();
+  const upper = str.toUpperCase();
+  if (upper === "GBP" || upper === "EBAY_GB" || upper === "EBAY_UK" || str === "£") {
+    return "£";
+  }
+  if (
+    upper === "EUR" ||
+    str === "€" ||
+    ["EBAY_DE", "EBAY_FR", "EBAY_IT", "EBAY_ES", "EBAY_NL", "EBAY_IE", "EBAY_AT", "EBAY_BE", "EBAY_PL"].includes(upper)
+  ) {
+    return "€";
+  }
+  if (upper === "AUD" || upper === "EBAY_AU" || str === "AU$") {
+    return "AU$";
+  }
+  if (upper === "CAD" || upper === "EBAY_CA" || str === "CA$") {
+    return "CA$";
+  }
+  if (upper === "USD" || upper === "EBAY_US" || str === "$") {
+    return "$";
+  }
+  if (upper === "JPY" || str === "¥") {
+    return "¥";
+  }
+  if (str.length <= 3 && !/^[A-Z]{3}$/.test(str)) {
+    return str;
+  }
+  try {
+    const parts = new Intl.NumberFormat("en-US", { style: "currency", currency: upper }).formatToParts(0);
+    const sym = parts.find((p) => p.type === "currency")?.value;
+    if (sym) {
+      return sym;
+    }
+  } catch {}
+  return str;
+}
+
+export function formatCalculationAmount(value, currencyOrSymbol = "$") {
+  if (value === null || value === undefined || value === "") {
+    return "—";
+  }
+  const sym = getCurrencySymbol(currencyOrSymbol);
+  const num = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]/g, ""));
+  if (Number.isNaN(num)) {
+    return String(value);
+  }
+  const formatted = Math.abs(num).toFixed(2);
+  return num < 0 ? `-${sym}${formatted}` : `${sym}${formatted}`;
 }
 
 export function formatCalculationRoi(value) {
@@ -849,6 +923,7 @@ export function mapApiOrderToCalculationRow(order) {
     tax,
     afterTaxEbay,
     prep,
+    currency: order.currency ?? raw.pricingSummary?.total?.currency ?? "USD",
     aliexpressOrderId: order.aliexpress_order_id ?? "—",
     aliexpressStatus: order.aliexpress_order_status ?? "—",
   };

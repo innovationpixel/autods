@@ -210,7 +210,7 @@ function mapListingRow(item) {
   };
 }
 
-function ProductsContent({ searchQuery }) {
+function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -236,6 +236,13 @@ function ProductsContent({ searchQuery }) {
   const [filterStore, setFilterStore] = useState("");
   const [filterSupplier, setFilterSupplier] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
+
+  useEffect(() => {
+    if (selectedConnectionId !== undefined) {
+      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
+      setCurrentPage(1);
+    }
+  }, [selectedConnectionId]);
   const [editingStockId, setEditingStockId] = useState("");
   const [stockDraft, setStockDraft] = useState("");
   const [savingStockId, setSavingStockId] = useState("");

@@ -62,7 +62,7 @@ import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
 import HeaderNotifications from '../autods/HeaderNotifications';
 import { filterPills, addProductsMenuItems, storeSwitcherMenuItems, multipleProductsTabs, finderPlans, categoryFilters, subfilterOptions, filterOptions, podCategoryFilters, podProducts, profileMenuItems, whatsNewItems, importSuppliers } from '../autods/constants';
 import { sidebarGroups, marketplacePages } from '../autods/menu';
-import { mapAliItemToCard } from '../autods/helpers';
+import { getCurrencySymbol, mapAliItemToCard } from '../autods/helpers';
 import SidebarLink from '../autods/SidebarLink';
 import SelectField from '../autods/SelectField';
 import ConnectEbayModal from '../autods/ConnectEbayModal';
@@ -83,7 +83,15 @@ import CalculationsContent from '../autods/pages/CalculationsContent';
 import NotFoundContent from '../autods/pages/NotFoundContent';
 import AiVideoGenerationContent from '../autods/pages/AiVideoGenerationContent';
 import { fetchEbayStatus, disconnectEbayAction, fetchEbayDrafts, fetchEbayListings } from '../../store/actions/EbayActions';
-import { selectEbayConnections, selectEbayConnectionsLoading, selectEbayListingsMeta, selectEbayDraftsMeta } from '../../store/selectors/EbaySelectors';
+import {
+  selectEbayConnections,
+  selectEbayConnectionsLoading,
+  selectEbayListingsMeta,
+  selectEbayDraftsMeta,
+  selectEbayStoresLimit,
+  selectEbayStoresCount,
+  selectEbayQuotaBreached,
+} from '../../store/selectors/EbaySelectors';
 import { selectUser } from '../../store/selectors/AuthSelectors';
 import { getUserEmail, getUserFullName, getUserShortName } from '../../utils/userDisplay';
 import { getEbayAuthUrl, updateEbayStoreName } from '../../services/EbayService';
@@ -254,6 +262,9 @@ const MarketplaceDashboard = () => {
   const [importingCardId, setImportingCardId] = useState(null);
   const ebayConnections = useSelector(selectEbayConnections);
   const ebayConnectionsLoading = useSelector(selectEbayConnectionsLoading);
+  const reduxStoresLimit = useSelector(selectEbayStoresLimit);
+  const reduxStoresCount = useSelector(selectEbayStoresCount);
+  const reduxStoresQuotaBreached = useSelector(selectEbayQuotaBreached);
   const listingsMeta = useSelector(selectEbayListingsMeta);
   const draftsMeta = useSelector(selectEbayDraftsMeta);
   const authUser = useSelector(selectUser);
@@ -430,6 +441,10 @@ const MarketplaceDashboard = () => {
   const quotaLimit = Number(quotaUsage?.products_limit ?? currentPlan?.products_limit ?? 200);
   const quotaUsed = Number(quotaUsage?.products_quota_used ?? quotaUsage?.listings_count ?? 0);
   const isQuotaBreached = Boolean(quotaUsage?.products_quota_breached || (quotaLimit > 0 && quotaUsed >= quotaLimit));
+
+  const storesLimit = Number(quotaUsage?.stores_limit ?? currentPlan?.stores_limit ?? reduxStoresLimit ?? 1);
+  const storesCount = Number(quotaUsage?.stores_count ?? quotaUsage?.connections_count ?? reduxStoresCount ?? ebayConnections.length ?? 0);
+  const isStoresQuotaBreached = Boolean(quotaUsage?.stores_quota_breached || reduxStoresQuotaBreached || (storesLimit > 0 && storesCount >= storesLimit));
   const [addProductUrl, setAddProductUrl] = useState("");
   const [importSupplier, setImportSupplier] = useState("aliexpress");
   const [importWarehouse, setImportWarehouse] = useState("CN");
@@ -446,6 +461,19 @@ const MarketplaceDashboard = () => {
     "best-sellers": 0,
   });
   const [sidebarStoreId, setSidebarStoreId] = useState('');
+  const [sidebarStoreDropdownOpen, setSidebarStoreDropdownOpen] = useState(false);
+  const sidebarStoreDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!sidebarStoreDropdownOpen) return;
+    const handleClickOutside = (e) => {
+      if (sidebarStoreDropdownRef.current && !sidebarStoreDropdownRef.current.contains(e.target)) {
+        setSidebarStoreDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [sidebarStoreDropdownOpen]);
   const [selectedStoreIds, setSelectedStoreIds] = useState([]);
   const [pendingSelectedStoreIds, setPendingSelectedStoreIds] = useState([]);
   const [storeSwitcherSearch, setStoreSwitcherSearch] = useState("");
@@ -787,6 +815,10 @@ const MarketplaceDashboard = () => {
   useOAuthHandler(oauthHandlers);
 
   const startEbayOAuthFlow = async () => {
+    if (isStoresQuotaBreached) {
+      toast.error(`Store connection limit reached (${storesCount}/${storesLimit}). Please upgrade your plan to connect more stores.`);
+      return;
+    }
     try {
       setEbayConnecting(true);
       markOAuthReturnOrigin();
@@ -850,7 +882,7 @@ const MarketplaceDashboard = () => {
       if (categoryId) params.category_id = categoryId;
 
       if (priceRange !== "Select Price Range") {
-        const parts = priceRange.replace(/\$/g, "").split(" - ");
+        const parts = priceRange.replace(/[\$£€]/g, "").replace(/AU\$|CA\$/g, "").split(" - ");
         if (parts[0]) params.price_min = parseFloat(parts[0]);
         if (parts[1] && !parts[1].includes("+")) params.price_max = parseFloat(parts[1]);
       }
@@ -896,12 +928,57 @@ const MarketplaceDashboard = () => {
         siteDisplay: 'Connect Store',
         initials: 'EB',
         country: '—',
+        currency: 'USD',
+        currencySymbol: '$',
         marketplace: 'eBay',
+        connectionId: null,
+      };
+    }
+
+    if (sidebarStoreId === 'all') {
+      return {
+        id: 'all',
+        name: 'all-stores',
+        sidebarName: 'All Stores',
+        platformLabel: 'eBay Stores',
+        platformDisplay: 'EBAY',
+        siteDisplay: `All Stores (${stores.length})`,
+        initials: 'ALL',
+        country: 'All',
+        currency: 'USD',
+        currencySymbol: '$',
+        marketplace: 'eBay',
+        connectionId: null,
       };
     }
 
     return stores.find((store) => store.id === sidebarStoreId) ?? stores[0];
   }, [stores, sidebarStoreId]);
+
+  const activeCurrencySymbol = useMemo(() => {
+    return activeSidebarStore?.currencySymbol || getCurrencySymbol(currency);
+  }, [activeSidebarStore?.currencySymbol, currency]);
+
+  // Synchronize browse currency and shipsTo when switching eBay stores
+  useEffect(() => {
+    if (activeSidebarStore && activeSidebarStore.currency && sidebarStoreId !== 'all') {
+      setCurrency(activeSidebarStore.currency);
+      const countryMap = {
+        UK: 'United Kingdom',
+        GB: 'United Kingdom',
+        AU: 'Australia',
+        CA: 'Canada',
+        DE: 'Germany',
+        FR: 'France',
+        IT: 'Italy',
+        ES: 'Spain',
+        US: 'United States',
+      };
+      if (activeSidebarStore.country && countryMap[activeSidebarStore.country]) {
+        setShipsTo(countryMap[activeSidebarStore.country]);
+      }
+    }
+  }, [activeSidebarStore?.currency, activeSidebarStore?.country, sidebarStoreId]);
 
 
   const filteredStores = useMemo(() => {
@@ -1538,17 +1615,179 @@ const MarketplaceDashboard = () => {
           <img className="marketplace-sidebar__brand-logo" src="/autoprime-logo.png" alt="AutoDropshipPrime" />
         </div>
 
-        <div className="marketplace-sidebar__store-block">
-          <div className="marketplace-sidebar__store-avatar">{activeSidebarStore.initials}</div>
-          <div className="marketplace-sidebar__store-copy">
-            <button type="button" className="marketplace-sidebar__store-name" onClick={openStoreSwitcherModal}>
-              <span className="marketplace-sidebar__store-platform-label">{activeSidebarStore.platformLabel}</span>
-              <span className="marketplace-sidebar__store-site">{activeSidebarStore.sidebarName}</span>
-            </button>
+        <div className="marketplace-sidebar__store-wrapper" ref={sidebarStoreDropdownRef}>
+          <div
+            className={`marketplace-sidebar__store-block ${sidebarStoreDropdownOpen ? 'marketplace-sidebar__store-block--open' : ''}`}
+            onClick={() => {
+              if (stores.length === 0) {
+                setConnectEbayModalOpen(true);
+              } else {
+                setSidebarStoreDropdownOpen((prev) => !prev);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (stores.length === 0) {
+                  setConnectEbayModalOpen(true);
+                } else {
+                  setSidebarStoreDropdownOpen((prev) => !prev);
+                }
+              }
+            }}
+            aria-label="Select store"
+            aria-expanded={sidebarStoreDropdownOpen}
+            title={stores.length === 0 ? "Connect eBay Store" : "Switch eBay Store"}
+          >
+            <div className="marketplace-sidebar__store-avatar">
+              {activeSidebarStore.initials}
+            </div>
+
+            <div className="marketplace-sidebar__store-copy">
+              <div className="marketplace-sidebar__store-badge-row">
+                <span className="marketplace-sidebar__store-platform-label">
+                  {activeSidebarStore.siteDisplay || activeSidebarStore.platformDisplay || 'EBAY'}
+                </span>
+                {activeSidebarStore.isPrimary && (
+                  <span className="marketplace-sidebar__store-primary-dot" title="Primary Store" />
+                )}
+              </div>
+              <span className="marketplace-sidebar__store-site" title={activeSidebarStore.sidebarName}>
+                {activeSidebarStore.sidebarName}
+              </span>
+            </div>
+
+            <div className="marketplace-sidebar__store-dropdown-trigger" aria-hidden="true">
+              <LuChevronDown size={16} />
+            </div>
           </div>
-          <button type="button" className="marketplace-sidebar__edit-btn" aria-label="Edit store" onClick={openStoreSwitcherModal}>
-            <LuPencil />
-          </button>
+
+          {sidebarStoreDropdownOpen && (
+            <div className="marketplace-sidebar__store-dropdown" role="listbox">
+              <div className="marketplace-sidebar__store-dropdown-header">
+                <span>Select Store</span>
+                <span className="marketplace-sidebar__store-dropdown-count">
+                  {stores.length} connected
+                </span>
+              </div>
+
+              {/* All Stores option */}
+              <button
+                type="button"
+                className={`marketplace-sidebar__store-item ${sidebarStoreId === 'all' ? 'marketplace-sidebar__store-item--selected' : ''}`}
+                onClick={() => {
+                  setSidebarStoreId('all');
+                  setSidebarStoreDropdownOpen(false);
+                }}
+              >
+                <div className="marketplace-sidebar__store-item-avatar marketplace-sidebar__store-item-avatar--all">
+                  ALL
+                </div>
+                <div className="marketplace-sidebar__store-item-copy">
+                  <div className="marketplace-sidebar__store-item-name">
+                    All Stores
+                  </div>
+                  <div className="marketplace-sidebar__store-item-sub">
+                    View all {stores.length} connected store{stores.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                {sidebarStoreId === 'all' && (
+                  <LuCheck size={16} className="marketplace-sidebar__store-check-icon" />
+                )}
+              </button>
+
+              {stores.length > 0 && <div className="marketplace-sidebar__store-dropdown-divider" />}
+
+              {/* Individual connected stores */}
+              {stores.map((store) => {
+                const isSelected = (sidebarStoreId === store.id) || (!sidebarStoreId && store.isPrimary && sidebarStoreId !== 'all');
+                return (
+                  <button
+                    key={store.id}
+                    type="button"
+                    className={`marketplace-sidebar__store-item ${isSelected ? 'marketplace-sidebar__store-item--selected' : ''}`}
+                    onClick={() => {
+                      setSidebarStoreId(store.id);
+                      setSidebarStoreDropdownOpen(false);
+                    }}
+                  >
+                    <div className="marketplace-sidebar__store-item-avatar">
+                      {store.initials}
+                    </div>
+                    <div className="marketplace-sidebar__store-item-copy">
+                      <div className="marketplace-sidebar__store-item-title-row">
+                        <span className="marketplace-sidebar__store-item-name">
+                          {store.sidebarName}
+                        </span>
+                        {store.isPrimary && (
+                          <span className="marketplace-sidebar__store-badge marketplace-sidebar__store-badge--primary">
+                            PRIMARY
+                          </span>
+                        )}
+                        {store.country && store.country !== '—' && (
+                          <span className="marketplace-sidebar__store-badge marketplace-sidebar__store-badge--site">
+                            {store.country}
+                          </span>
+                        )}
+                      </div>
+                      <div className="marketplace-sidebar__store-item-sub">
+                        {store.siteDisplay || store.marketplace || 'eBay'} · {store.currency || 'USD'}
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <LuCheck size={16} className="marketplace-sidebar__store-check-icon" />
+                    )}
+                  </button>
+                );
+              })}
+
+              <div className="marketplace-sidebar__store-dropdown-divider" />
+
+              {/* Action buttons */}
+              <button
+                type="button"
+                className="marketplace-sidebar__store-action-btn marketplace-sidebar__store-action-btn--add"
+                onClick={() => {
+                  setSidebarStoreDropdownOpen(false);
+                  setConnectEbayModalOpen(true);
+                }}
+              >
+                <LuPlus size={15} />
+                <span>Add eBay Account</span>
+                {isStoresQuotaBreached && (
+                  <span
+                    className="marketplace-sidebar__store-limit-badge"
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    Max ({storesCount}/{storesLimit})
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="marketplace-sidebar__store-action-btn"
+                onClick={() => {
+                  setSidebarStoreDropdownOpen(false);
+                  openStoreSwitcherModal();
+                }}
+              >
+                <LuSettings2 size={15} />
+                <span>Manage Stores</span>
+              </button>
+            </div>
+          )}
         </div>
 
         <div
@@ -2120,10 +2359,17 @@ const MarketplaceDashboard = () => {
           <ConnectEbayModal
             open={connectEbayModalOpen}
             onClose={() => setConnectEbayModalOpen(false)}
-            onConnect={connectEbay}
+            onConnect={startEbayOAuthFlow}
             connecting={ebayConnecting}
             siteId={ebaySiteId}
             onSiteChange={setEbaySiteId}
+            storesLimit={storesLimit}
+            storesCount={storesCount}
+            quotaBreached={isStoresQuotaBreached}
+            onUpgrade={() => {
+              setConnectEbayModalOpen(false);
+              navigate("/plans");
+            }}
           />
 
           <AddProductModal
@@ -2176,22 +2422,32 @@ const MarketplaceDashboard = () => {
                 products={filteredPodProducts}
               />
             ) : activePage === "order-processing" ? (
-              <OrderProcessingContent />
+              <OrderProcessingContent selectedConnectionId={activeSidebarStore.connectionId ?? null} />
             ) : activePage === "calculations" ? (
-              <CalculationsContent searchQuery={searchAnything} />
+              <CalculationsContent
+                searchQuery={searchAnything}
+                selectedStoreName={activeSidebarStore.connectionId ? activeSidebarStore.storeName : null}
+                selectedConnectionId={activeSidebarStore.connectionId ?? null}
+                activeCurrencySymbol={activeCurrencySymbol}
+              />
             ) : activePage === "dashboard" ? (
-              <DashboardContent searchQuery={searchAnything} />
+              <DashboardContent searchQuery={searchAnything} selectedConnectionId={activeSidebarStore.connectionId ?? null} />
             ) : activePage === "orders" ? (
-              <OrdersContent searchQuery={searchAnything} />
+              <OrdersContent
+                searchQuery={searchAnything}
+                selectedConnectionId={activeSidebarStore.connectionId ?? null}
+                selectedStoreName={activeSidebarStore.connectionId ? activeSidebarStore.storeName : null}
+              />
             ) : activePage === "returns-disputes" ? (
-              <ReturnsDisputesContent searchQuery={searchAnything} />
+              <ReturnsDisputesContent searchQuery={searchAnything} selectedConnectionId={activeSidebarStore.connectionId ?? null} />
             ) : activePage === "sourcing-request" ? (
               <SourcingRequestContent searchQuery={searchAnything} />
             ) : activePage === "products" ? (
-              <ProductsContent searchQuery={searchAnything} />
+              <ProductsContent searchQuery={searchAnything} selectedConnectionId={activeSidebarStore.connectionId ?? null} />
             ) : activePage === "drafts" ? (
               <DraftsContent
                 searchQuery={searchAnything}
+                selectedConnectionId={activeSidebarStore.connectionId ?? null}
                 importBatchProgress={importBatchProgress}
                 onDismissImportBatch={() => {
                   setImportBatchProgress(null);
@@ -2388,6 +2644,8 @@ const MarketplaceDashboard = () => {
                       onResetView={resetMarketplaceView}
                       onImport={handleMarketplaceCardImport}
                       importingId={importingCardId}
+                      currency={currency}
+                      currencySymbol={activeCurrencySymbol}
                     />
                   )}
                 </div>

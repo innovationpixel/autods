@@ -144,7 +144,12 @@ function CopyIdButton({ value }) {
   );
 }
 
-function CalculationsContent({ searchQuery = "" }) {
+function CalculationsContent({
+  searchQuery = "",
+  selectedStoreName = undefined,
+  selectedConnectionId = undefined,
+  activeCurrencySymbol = "$",
+}) {
   const defaultFilters = useMemo(() => getDefaultOrderFilters(), []);
   const tableScrollRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -177,6 +182,16 @@ function CalculationsContent({ searchQuery = "" }) {
   const [buyerFilter, setBuyerFilter] = useState(defaultFilters.buyerFilter);
   const [orderIdFilter, setOrderIdFilter] = useState(defaultFilters.orderIdFilter);
   const [storeFilter, setStoreFilter] = useState(defaultFilters.storeFilter);
+
+  useEffect(() => {
+    if (selectedStoreName) {
+      setStoreFilter(selectedStoreName);
+      setCurrentPage(1);
+    } else if (selectedStoreName === null) {
+      setStoreFilter("All Stores");
+      setCurrentPage(1);
+    }
+  }, [selectedStoreName]);
   const [dateRangePreset, setDateRangePreset] = useState(defaultFilters.dateRangePreset);
   const [fromDate, setFromDate] = useState(defaultFilters.fromDate);
   const [toDate, setToDate] = useState(defaultFilters.toDate);
@@ -238,6 +253,10 @@ function CalculationsContent({ searchQuery = "" }) {
         params.to_date = toDate;
       }
 
+      if (selectedConnectionId) {
+        params.connection_id = selectedConnectionId;
+      }
+
       const res = await getOrders(params);
       setOrders(res.data?.data ?? []);
     } catch (err) {
@@ -250,7 +269,7 @@ function CalculationsContent({ searchQuery = "" }) {
 
   useEffect(() => {
     loadOrders();
-  }, [statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection]);
+  }, [statusFilter, buyerFilter, fromDate, toDate, showOnlyActive, sortDirection, selectedConnectionId]);
 
   const handleOpenSheet = () => {
     if (!sheetStatus.spreadsheet_url) {
@@ -731,7 +750,7 @@ function CalculationsContent({ searchQuery = "" }) {
       return formatCalculationRoi(totals.roi);
     }
 
-    return formatCalculationAmount(totals[key]);
+    return formatCalculationAmount(totals[key], activeCurrencySymbol);
   };
 
   const getCalculationCellClassName = (columnId) => {
@@ -775,7 +794,7 @@ function CalculationsContent({ searchQuery = "" }) {
       case "shipping":
       case "earn":
       case "profit":
-        return formatCalculationAmount(pageTotals[columnId]);
+        return formatCalculationAmount(pageTotals[columnId], activeCurrencySymbol);
       case "roi":
         return formatCalculationRoi(pageTotals.roi);
       default:
@@ -1043,7 +1062,7 @@ function CalculationsContent({ searchQuery = "" }) {
             onClick={() => handleStartFieldEdit(row, columnId)}
             title={titles[columnId]}
           >
-            <span>{formatCalculationAmount(row[columnId])}</span>
+            <span>{formatCalculationAmount(row[columnId], row.currency || activeCurrencySymbol)}</span>
             <LuPencil className="products-tracking-btn__icon" />
           </button>
         );
@@ -1052,7 +1071,7 @@ function CalculationsContent({ searchQuery = "" }) {
       case "afterTaxEbay":
       case "earn":
       case "profit":
-        return formatCalculationAmount(row[columnId]);
+        return formatCalculationAmount(row[columnId], row.currency || activeCurrencySymbol);
       case "roi":
         return formatCalculationRoi(row.roi);
       default:

@@ -18,6 +18,46 @@ export function ebaySiteToCountry(siteId) {
   return map[siteId] ?? siteId.replace(/^EBAY_/i, '').slice(0, 3).toUpperCase();
 }
 
+/** Map eBay site_id to standard currency code (e.g. EBAY_GB → GBP) */
+export function ebaySiteToCurrency(siteId) {
+  const map = {
+    EBAY_GB: 'GBP',
+    EBAY_UK: 'GBP',
+    EBAY_DE: 'EUR',
+    EBAY_FR: 'EUR',
+    EBAY_IT: 'EUR',
+    EBAY_ES: 'EUR',
+    EBAY_NL: 'EUR',
+    EBAY_IE: 'EUR',
+    EBAY_AT: 'EUR',
+    EBAY_BE: 'EUR',
+    EBAY_PL: 'EUR',
+    EBAY_AU: 'AUD',
+    EBAY_CA: 'CAD',
+    EBAY_US: 'USD',
+  };
+
+  if (!siteId) {
+    return 'USD';
+  }
+
+  return map[siteId] ?? 'USD';
+}
+
+/** Map eBay site_id to display currency symbol (e.g. EBAY_GB → £) */
+export function ebaySiteToCurrencySymbol(siteId) {
+  const currency = ebaySiteToCurrency(siteId);
+  const symbolMap = {
+    GBP: '£',
+    EUR: '€',
+    AUD: 'AU$',
+    CAD: 'CA$',
+    USD: '$',
+  };
+
+  return symbolMap[currency] ?? '$';
+}
+
 /** Sidebar / store label, e.g. EBAY_US → EBAY US */
 export function ebaySiteToDisplayLabel(siteId) {
   if (!siteId) {
@@ -66,6 +106,8 @@ export function mapEbayConnectionToStore(connection) {
   const isSitePlaceholder = !rawUsername || /^ebay[\s_-]*(us|uk|gb|au|de|ca|fr|it|es)?$/i.test(rawUsername);
   const siteId = connection.site_id ?? 'EBAY_US';
   const siteDisplay = ebaySiteToDisplayLabel(siteId);
+  const currency = connection.currency ?? ebaySiteToCurrency(siteId);
+  const currencySymbol = connection.currency_symbol ?? ebaySiteToCurrencySymbol(siteId);
 
   const storeName = !isSitePlaceholder
     ? rawUsername
@@ -84,6 +126,8 @@ export function mapEbayConnectionToStore(connection) {
     siteDisplay,
     initials: storeInitialsFromName(storeName),
     country: ebaySiteToCountry(siteId),
+    currency,
+    currencySymbol,
     marketplace: 'eBay',
     siteId,
     isPrimary: Boolean(connection.is_primary),

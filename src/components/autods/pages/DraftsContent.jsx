@@ -46,7 +46,7 @@ import {
   scheduleProducts,
   getImportHistory,
 } from "../../../services/ProductService";
-import { formatDisplayDateTime, getListingImageUrl } from "../helpers";
+import { formatCalculationAmount, formatDisplayDateTime, getListingImageUrl } from "../helpers";
 import {
   buildDraftFormState,
   serializeDraftFormForApi,
@@ -87,6 +87,7 @@ function DraftsContent({
   searchQuery,
   importBatchProgress: propBatchProgress,
   onDismissImportBatch: propDismissBatch,
+  selectedConnectionId = undefined,
 }) {
   const dispatch = useDispatch();
   const store = useStore();
@@ -109,6 +110,13 @@ function DraftsContent({
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
   const [filterStore, setFilterStore] = useState("");
+
+  useEffect(() => {
+    if (selectedConnectionId !== undefined) {
+      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
+      setCurrentPage(1);
+    }
+  }, [selectedConnectionId]);
   const [scheduleTargets, setScheduleTargets] = useState([]);
   const [scheduling, setScheduling] = useState(false);
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
@@ -1226,9 +1234,9 @@ function DraftsContent({
                     <div className="drafts-row__meta">
                       {item.source_product_id ? <span>Buy Item Id: {item.source_product_id}</span> : null}
                       {item.source_product_id ? <i aria-hidden="true" /> : null}
-                      <span>Profit: ${Number(item.profit ?? 0).toFixed(2)}</span>
+                      <span>Profit: {formatCalculationAmount(item.profit, item.currency)}</span>
                       <i aria-hidden="true" />
-                      <span>Price: ${Number(item.price ?? 0).toFixed(2)}</span>
+                      <span>Price: {formatCalculationAmount(item.price, item.currency)}</span>
                       <i aria-hidden="true" />
                       <span>Status: {statusLabel}</span>
                       {item.scheduled_at ? (

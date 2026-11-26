@@ -51,18 +51,26 @@ function ProductCard({ item, onImport, importing = false }) {
   };
 
   const formattedPrice = useMemo(() => {
+    const sym = item.currencySymbol || "$";
     if (item.price === undefined || item.price === null || item.price === "") {
-      return "$0.00";
+      return `${sym}0.00`;
     }
 
     const value = String(item.price).trim();
-    if (value.startsWith("$") || value.startsWith("€") || value.startsWith("£") || value.includes("-")) {
+    if (
+      value.startsWith("$") ||
+      value.startsWith("€") ||
+      value.startsWith("£") ||
+      value.startsWith("AU$") ||
+      value.startsWith("CA$") ||
+      value.includes(" - ")
+    ) {
       return value;
     }
 
-    const numericPrice = parseFloat(value);
-    return Number.isNaN(numericPrice) ? value : `$${numericPrice.toFixed(2)}`;
-  }, [item.price]);
+    const numericPrice = parseFloat(value.replace(/[^0-9.-]/g, ""));
+    return Number.isNaN(numericPrice) ? value : `${sym}${numericPrice.toFixed(2)}`;
+  }, [item.price, item.currencySymbol]);
 
   const shippingText = String(item.shipping ?? "").trim();
   const shippingLabel =

@@ -112,7 +112,7 @@ function _getEbayResolutionUrl(item) {
   return "https://www.ebay.com/sh/ord";
 }
 
-export default function ReturnsDisputesContent({ searchQuery = "" }) {
+export default function ReturnsDisputesContent({ searchQuery = "", selectedConnectionId = undefined }) {
   const ebayConnections = useSelector(selectEbayConnections) || [];
 
   const [items, setItems] = useState([]);
@@ -128,6 +128,13 @@ export default function ReturnsDisputesContent({ searchQuery = "" }) {
 
   const [activeTab, setActiveTab] = useState("all"); // 'all' | 'returns' | 'disputes' | 'action_needed' | 'closed'
   const [selectedStoreId, setSelectedStoreId] = useState("");
+
+  useEffect(() => {
+    if (selectedConnectionId !== undefined) {
+      setSelectedStoreId(selectedConnectionId ? String(selectedConnectionId) : "");
+      setPage(1);
+    }
+  }, [selectedConnectionId]);
   const [localSearch, setLocalSearch] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
