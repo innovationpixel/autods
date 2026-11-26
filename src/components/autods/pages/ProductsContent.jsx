@@ -236,13 +236,6 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   const [filterStore, setFilterStore] = useState("");
   const [filterSupplier, setFilterSupplier] = useState("");
   const [openMenuId, setOpenMenuId] = useState("");
-
-  useEffect(() => {
-    if (selectedConnectionId !== undefined) {
-      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
-      setCurrentPage(1);
-    }
-  }, [selectedConnectionId]);
   const [editingStockId, setEditingStockId] = useState("");
   const [stockDraft, setStockDraft] = useState("");
   const [savingStockId, setSavingStockId] = useState("");
@@ -274,6 +267,15 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   const isSyncingScroll = useRef(false);
   const [showStickyScroll, setShowStickyScroll] = useState(false);
   const [stickyScrollStyle, setStickyScrollStyle] = useState({});
+
+  const totalPages = meta?.last_page ?? 1;
+
+  useEffect(() => {
+    if (selectedConnectionId !== undefined) {
+      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
+      setCurrentPage(1);
+    }
+  }, [selectedConnectionId]);
 
   const visibleColumns = useMemo(
     () => resolveVisibleProductColumns(visibleColumnIds),
@@ -525,6 +527,16 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  useEffect(() => {
     if (connected) {
       loadListings();
     }
@@ -598,7 +610,6 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
   );
 
   const rows = useMemo(() => listings.map(mapListingRow), [listings]);
-  const totalPages = meta?.last_page ?? 1;
   const totalCount = meta?.total ?? rows.length;
   const allVisibleSelected = rows.length > 0 && rows.every((item) => selectedIds.includes(item.id));
   const paginationItems = buildPaginationItems(currentPage, totalPages);
@@ -893,8 +904,17 @@ function ProductsContent({ searchQuery, selectedConnectionId = undefined }) {
 
   const handleSyncNow = () => {
     const primary = connections.find((c) => c.is_primary) ?? connections[0];
-    if (primary) {
-      dispatch(syncEbayListingsAction(primary.id));
+    const targetConnId = filterStore || selectedConnectionId || primary?.id;
+    if (targetConnId) {
+      dispatch(
+        syncEbayListingsAction(targetConnId, {
+          page: currentPage,
+          limit: pageSize,
+          status: filterStatus === "All" ? "" : filterStatus.toLowerCase(),
+          supplier: filterSupplier,
+          q: searchQuery,
+        }),
+      );
     }
   };
 

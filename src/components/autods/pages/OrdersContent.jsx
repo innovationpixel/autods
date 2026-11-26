@@ -488,7 +488,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
         q: debouncedSearch.trim() || undefined,
         status: statusFilter !== "All Statuses" ? statusFilter : undefined,
         carrier: carrierFilter !== "All Carriers" ? carrierFilter : undefined,
-        store: storeFilter !== "All Stores" ? storeFilter : undefined,
+        store: !selectedConnectionId && storeFilter !== "All Stores" ? storeFilter : undefined,
         connection_id: selectedConnectionId || undefined,
         source: sourceFilter !== "All Sources" ? sourceFilter : undefined,
         buyer: buyerFilter.trim() || undefined,
@@ -552,15 +552,16 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
 
   const handleSyncOrders = async () => {
     setSyncing(true);
+    toast.info("Syncing orders from eBay…", { toastId: "orders-sync", autoClose: 5000 });
     try {
       const res = await syncOrders();
-      toast.success(res.data?.message ?? "Orders synced.");
+      toast.success(res.data?.message ?? "Orders synced.", { toastId: "orders-sync", autoClose: 5000 });
       triggerNotificationsRefresh();
       await loadOrders();
       dispatchNewOrdersCount(0);
       markOrdersSeen().catch(() => {});
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Order sync failed."));
+      toast.error(getApiErrorMessage(err, "Order sync failed."), { toastId: "orders-sync", autoClose: 8000 });
     } finally {
       setSyncing(false);
     }
@@ -568,11 +569,16 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
 
   const handleSyncAliExpress = async () => {
     setSyncingAliExpress(true);
+    toast.info("Checking AliExpress for updates…", { toastId: "ali-orders-sync", autoClose: 5000 });
     try {
       const res = await syncAliExpressOrders();
       const updated = res.data?.updated ?? 0;
       const shipped = res.data?.shipped ?? 0;
       const total = res.data?.synced ?? 0;
+      toast.success(
+        res.data?.message ?? `Checked ${total} order(s). ${updated} updated, ${shipped} shipped.`,
+        { toastId: "ali-orders-sync", autoClose: 5000 },
+      );
       toast.success(
         res.data?.message ??
           `AliExpress sync complete. Checked ${total} orders (${updated} updated, ${shipped} shipped).`
@@ -922,7 +928,11 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
         }
       }
 
-      if (storeFilter !== "All Stores" && order.storeName !== storeFilter) {
+      if (selectedConnectionId) {
+        if (order.connection?.id && Number(order.connection.id) !== Number(selectedConnectionId)) {
+          return false;
+        }
+      } else if (storeFilter !== "All Stores" && order.storeName !== storeFilter) {
         return false;
       }
 

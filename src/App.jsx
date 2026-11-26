@@ -50,11 +50,11 @@ function App() {
       <Markup />
       <ToastContainer
         position="top-right"
-        autoClose={10000}
+        autoClose={5000}
         hideProgressBar={false}
         newestOnTop={false}
-        closeOnClick={false}
-        pauseOnFocusLoss={true}
+        closeOnClick={true}
+        pauseOnFocusLoss={false}
         draggable={false}
         pauseOnHover={true}
         theme="colored"

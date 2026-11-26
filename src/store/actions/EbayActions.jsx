@@ -99,18 +99,19 @@ export const setEbayConnectionMarketplaceAction = (id, siteId) => (dispatch) => 
 
 // ─── Sync ─────────────────────────────────────────────────────────────────────
 
-export const syncEbayListingsAction = (connectionId) => (dispatch) => {
+export const syncEbayListingsAction = (connectionId, filterParams = {}) => (dispatch) => {
     dispatch({ type: EBAY_SYNC_REQUEST, payload: connectionId });
-    toast.info('Syncing listings from eBay…');
+    const toastId = `sync-ebay-${connectionId}`;
+    toast.info('Syncing listings from eBay…', { toastId, autoClose: 5000 });
     return syncEbayListings(connectionId)
         .then((res) => {
             dispatch({ type: EBAY_SYNC_SUCCESS, payload: connectionId });
-            dispatch(fetchEbayListings({ connection_id: connectionId }));
-            toast.success(res.data?.message ?? 'Listings synced from eBay.');
+            dispatch(fetchEbayListings({ connection_id: connectionId, ...filterParams }));
+            toast.success(res.data?.message ?? 'Listings synced from eBay.', { toastId, autoClose: 5000 });
         })
         .catch((err) => {
             dispatch({ type: EBAY_SYNC_FAILURE, payload: connectionId });
-            toast.error(err.response?.data?.error ?? 'eBay sync failed.');
+            toast.error(err.response?.data?.error ?? 'eBay sync failed.', { toastId, autoClose: 8000 });
         });
 };
 

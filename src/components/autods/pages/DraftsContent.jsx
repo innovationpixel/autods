@@ -6,6 +6,7 @@ import {
   LuCircleAlert,
   LuArrowLeft,
   LuCheck,
+  LuChevronLeft,
   LuChevronRight,
   LuClock3,
   LuEllipsisVertical,
@@ -46,7 +47,7 @@ import {
   scheduleProducts,
   getImportHistory,
 } from "../../../services/ProductService";
-import { formatCalculationAmount, formatDisplayDateTime, getListingImageUrl } from "../helpers";
+import { buildPaginationItems, formatCalculationAmount, formatDisplayDateTime, getListingImageUrl } from "../helpers";
 import {
   buildDraftFormState,
   serializeDraftFormForApi,
@@ -110,13 +111,8 @@ function DraftsContent({
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
   const [filterStore, setFilterStore] = useState("");
-
-  useEffect(() => {
-    if (selectedConnectionId !== undefined) {
-      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
-      setCurrentPage(1);
-    }
-  }, [selectedConnectionId]);
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
   const [scheduleTargets, setScheduleTargets] = useState([]);
   const [scheduling, setScheduling] = useState(false);
   const [bulkEditTargets, setBulkEditTargets] = useState([]);
@@ -127,7 +123,6 @@ function DraftsContent({
   const [publishingIds, setPublishingIds] = useState([]);
   const [scheduleBatches, setScheduleBatches] = useState([]);
   const [dismissedScheduleBatchIds, setDismissedScheduleBatchIds] = useState([]);
-
   const [activeImportBatch, setActiveImportBatch] = useState(() => {
     if (propBatchProgress) return propBatchProgress;
     try {
@@ -138,6 +133,27 @@ function DraftsContent({
     }
   });
   const [showFailuresModal, setShowFailuresModal] = useState(false);
+
+  const totalPages = meta?.last_page ?? 1;
+  const totalCount = meta?.total ?? drafts.length;
+  const paginationItems = buildPaginationItems(currentPage, totalPages);
+
+  useEffect(() => {
+    if (selectedConnectionId !== undefined) {
+      setFilterStore(selectedConnectionId ? String(selectedConnectionId) : "");
+      setCurrentPage(1);
+    }
+  }, [selectedConnectionId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeTab, filterStatus]);
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
 
   useEffect(() => {
     if (propBatchProgress) {
@@ -323,7 +339,11 @@ function DraftsContent({
   };
 
   const loadDrafts = () => {
-    const params = { q: searchQuery };
+    const params = {
+      q: searchQuery,
+      page: currentPage,
+      limit: pageSize,
+    };
     if (activeTab === "scheduled") params.tab = "scheduled";
     if (activeTab === "failed") params.tab = "failed";
     if (filterStatus) params.import_status = filterStatus;
@@ -335,6 +355,7 @@ function DraftsContent({
     setFilterStatus("");
     setFilterSource("");
     setFilterStore("");
+    setCurrentPage(1);
   };
 
   const hasDraftFilters = Boolean(filterStatus || filterSource || filterStore);
@@ -356,7 +377,7 @@ function DraftsContent({
         .then((res) => setAccountSettings(res.data?.settings ?? {}))
         .catch(() => {});
     }
-  }, [dispatch, connected, searchQuery, activeTab, filterStatus, filterStore]);
+  }, [dispatch, connected, searchQuery, activeTab, filterStatus, filterStore, currentPage, pageSize]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -1332,6 +1353,68 @@ function DraftsContent({
             <span>{emptyMessage}</span>
           </div>
         )}
+      </div>
+
+      <div className="orders-table-footer products-table-footer" style={{ marginTop: 16 }}>
+        <div className="orders-pagination">
+          <button
+            type="button"
+            className="orders-pagination__arrow"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+          >
+            <LuChevronLeft />
+          </button>
+
+          {paginationItems.map((page, index) =>
+            page === "..." ? (
+              <span className="products-pagination__ellipsis" key={`ellipsis-${index}`}>
+                ...
+              </span>
+            ) : (
+              <button
+                type="button"
+                className={page === currentPage ? "orders-pagination__page orders-pagination__page--active" : "orders-pagination__page"}
+                key={page}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </button>
+            ),
+          )}
+
+          <button
+            type="button"
+            className="orders-pagination__arrow"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+          >
+            <LuChevronRight />
+          </button>
+        </div>
+
+        <div className="orders-table-footer__right">
+          <div className="orders-table-footer__meta">
+            <label>
+              <span>Show</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                <option value={20}>20</option>
+                <option value={40}>40</option>
+                <option value={60}>60</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+            <span>
+              Drafts out of {totalCount}
+            </span>
+          </div>
+        </div>
       </div>
 
       <ScheduleListingModal
