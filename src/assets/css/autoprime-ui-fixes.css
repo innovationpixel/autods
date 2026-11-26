@@ -320,6 +320,7 @@
 .Toastify__toast-container {
   z-index: 99999 !important;
   width: min(440px, 94vw) !important;
+  pointer-events: auto !important;
 }
 
 .Toastify__toast {
@@ -332,6 +333,24 @@
 .Toastify__toast--error {
   font-weight: 500 !important;
   min-height: 52px !important;
+}
+
+/* Ensure React-Toastify progress-bar timer cannot be overridden or killed prematurely */
+.Toastify__progress-bar--animated {
+  animation-duration: inherit;
+  animation-name: Toastify__trackProgress !important;
+  animation-timing-function: linear !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .Toastify,
+  .Toastify *,
+  .Toastify__toast,
+  .Toastify__toast-container,
+  .Toastify__progress-bar,
+  .Toastify__progress-bar--animated {
+    animation-iteration-count: unset !important;
+  }
 }
 
 /* --------------------------------------------------------------------------

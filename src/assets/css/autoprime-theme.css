@@ -275,7 +275,9 @@ a.text-primary,
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *:not([class*="Toastify"]):not([class*="Toastify"] *),
+  *:not([class*="Toastify"]):not([class*="Toastify"] *)::before,
+  *:not([class*="Toastify"]):not([class*="Toastify"] *)::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
