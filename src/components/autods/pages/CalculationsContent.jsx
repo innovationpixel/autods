@@ -1105,10 +1105,10 @@ function CalculationsContent({
                 </span>
 
                 <div className="calculations-stat__copy">
-                  <div className="calculations-stat__value">{formatSummaryValue(item.key)}</div>
                   <div className="calculations-stat__label">
                     <span>{item.label}</span>
                   </div>
+                  <div className="calculations-stat__value">{formatSummaryValue(item.key)}</div>
                 </div>
               </article>
             );
@@ -1121,6 +1121,7 @@ function CalculationsContent({
           <button
             type="button"
             className={`orders-filter-toggle ${showFilters ? "orders-filter-toggle--active" : ""}`}
+            aria-expanded={showFilters}
             onClick={() => setShowFilters((current) => !current)}
           >
             <LuSlidersHorizontal />
@@ -1171,6 +1172,7 @@ function CalculationsContent({
                 key={preset.id}
                 type="button"
                 className={`orders-quick-filters__pill ${dateRangePreset === preset.id ? "orders-quick-filters__pill--active" : ""}`}
+                aria-pressed={dateRangePreset === preset.id}
                 onClick={() => applyDatePreset(preset.id)}
               >
                 {preset.label}
@@ -1197,6 +1199,7 @@ function CalculationsContent({
             <button
               type="button"
               className={`orders-quick-filters__pill ${sortDirection === "desc" ? "orders-quick-filters__pill--active" : ""}`}
+              aria-pressed={sortDirection === "desc"}
               onClick={() => setSortDirection("desc")}
             >
               Desc
@@ -1204,6 +1207,7 @@ function CalculationsContent({
             <button
               type="button"
               className={`orders-quick-filters__pill ${sortDirection === "asc" ? "orders-quick-filters__pill--active" : ""}`}
+              aria-pressed={sortDirection === "asc"}
               onClick={() => setSortDirection("asc")}
             >
               Asc
@@ -1284,7 +1288,12 @@ function CalculationsContent({
         </PageFilterPanel>
       ) : null}
 
-      <div className="orders-toolbar orders-toolbar--secondary calculations-sheet-toolbar">
+      <section className="calculations-sheet-panel" aria-label="Google Sheets export">
+        <div className="orders-toolbar orders-toolbar--secondary calculations-sheet-toolbar">
+          <div className="calculations-sheet-panel__heading">
+            <span className="calculations-sheet-panel__icon"><LuFileSpreadsheet aria-hidden="true" /></span>
+            <div><strong>Google Sheets</strong><small>Export and share your order calculations.</small></div>
+          </div>
         <div className="orders-toolbar__actions">
           <button
             type="button"
@@ -1331,6 +1340,8 @@ function CalculationsContent({
           </span>
         </div>
       ) : null}
+
+      </section>
 
       <InviteSheetMembersModal
         open={inviteModalOpen}
