@@ -206,19 +206,19 @@ function AdminListingsPage() {
         </div>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar admin-listings-filters">
         <label className="admin-filters-bar__field">
           <span>Search</span>
-          <div style={{ position: "relative" }}>
-            <LuSearch style={{ position: "absolute", left: 8, top: 9, color: "#9ca3af", fontSize: 14 }} />
+          <span className="admin-clients-page__search-input-wrap">
+            <LuSearch aria-hidden="true" />
             <input
               type="search"
-              style={{ paddingLeft: 26 }}
+              aria-label="Search by title, SKU or item ID"
               placeholder="Title, SKU, item ID"
               value={q}
               onChange={handleFilterChange(setQ)}
             />
-          </div>
+          </span>
         </label>
 
         <label className="admin-filters-bar__field">
@@ -260,7 +260,7 @@ function AdminListingsPage() {
           </select>
         </label>
 
-        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} listings</span>
+        <span className="admin-clients-page__count">{meta.total} listings</span>
       </div>
 
       {loading ? (

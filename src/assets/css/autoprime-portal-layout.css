@@ -960,3 +960,63 @@
   white-space: normal;
   text-align: left;
 }
+
+
+/* All Listings: flexible tracks and identical control sizing prevent
+   intrinsic input widths from overflowing into neighboring filters. */
+.autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)) !important;
+  align-items: end !important;
+  gap: 10px 14px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters > .admin-filters-bar__field {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters .admin-clients-page__search-input-wrap {
+  display: block !important;
+  position: relative;
+  width: 100%;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters .admin-filters-bar__field :is(input, select) {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: var(--clients-filter-height, 42px) !important;
+  min-height: var(--clients-filter-height, 42px) !important;
+  margin: 0 !important;
+  padding-inline: 10px !important;
+  border-radius: 9px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: normal !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters .admin-filters-bar__field select {
+  padding-inline-end: 24px !important;
+  text-overflow: ellipsis;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters .admin-clients-page__search-input-wrap > input {
+  padding-inline-start: 36px !important;
+}
+.autoprime-portal .super-admin-shell .admin-listings-filters > .admin-clients-page__count {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-height: 0 !important;
+  margin: 0 !important;
+  font-size: 12px;
+  line-height: 1.5;
+}
