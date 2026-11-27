@@ -3124,7 +3124,7 @@ export default function MarketplaceSettingsPage() {
         </header>
 
         {/* Live Usage & Quotas Dashboard */}
-        <div style={{ marginTop: "24px" }}>
+        <div className="settings-plan-usage" style={{ marginTop: "24px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
             <div>
               <h3 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#1e293b" }}>
@@ -3144,7 +3144,7 @@ export default function MarketplaceSettingsPage() {
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
+          <div className="settings-plan-quota-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "14px" }}>
             {/* Products / Listings Quota */}
             <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -3156,7 +3156,7 @@ export default function MarketplaceSettingsPage() {
                 </span>
               </div>
               <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
-                <div style={{ width: `${listingsPct}%`, height: "100%", background: listingsPct > 90 ? "#ef4444" : "#3b82f6", borderRadius: "999px" }} />
+                <div style={{ width: `${listingsPct}%`, height: "100%", background: listingsPct > 90 ? "#ef4444" : "var(--ap-purple, #6d28d9)", borderRadius: "999px" }} />
               </div>
               <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
                 {listingsLimit - listingsUsed > 0 ? `${listingsLimit - listingsUsed} units available` : "Quota reached (Upgrade to list more)"}
@@ -3174,7 +3174,7 @@ export default function MarketplaceSettingsPage() {
                 </span>
               </div>
               <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
-                <div style={{ width: `${ordersPct}%`, height: "100%", background: ordersPct > 90 ? "#ef4444" : "#10b981", borderRadius: "999px" }} />
+                <div style={{ width: `${ordersPct}%`, height: "100%", background: ordersPct > 90 ? "#ef4444" : "var(--ap-purple, #6d28d9)", borderRadius: "999px" }} />
               </div>
               <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
                 {ordersLimit - ordersUsed > 0 ? `${ordersLimit - ordersUsed} orders available` : "Quota reached"}
@@ -3192,7 +3192,7 @@ export default function MarketplaceSettingsPage() {
                 </span>
               </div>
               <div style={{ width: "100%", height: "6px", background: "#f1f5f9", borderRadius: "999px", overflow: "hidden" }}>
-                <div style={{ width: `${storesPct}%`, height: "100%", background: "#f59e0b", borderRadius: "999px" }} />
+                <div style={{ width: `${storesPct}%`, height: "100%", background: "var(--ap-purple, #6d28d9)", borderRadius: "999px" }} />
               </div>
               <span style={{ fontSize: "11px", color: "#64748b", marginTop: "6px", display: "block" }}>
                 {ebayConnected ? `${ebayConnections.length} eBay store linked` : "Connect an eBay store"}
@@ -3235,7 +3235,7 @@ export default function MarketplaceSettingsPage() {
         </div>
 
         {/* Platform Add-ons & Automation Power-ups */}
-        <div style={{ marginTop: "28px" }}>
+        <div className="settings-plan-addons" style={{ marginTop: "28px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -3274,7 +3274,7 @@ export default function MarketplaceSettingsPage() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "16px" }}>
             {/* Featured Research Add-ons: Trending Products & Hand-Picked Products */}
             {[
               {
@@ -4110,7 +4110,7 @@ export default function MarketplaceSettingsPage() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: "16px" }}>
             {/* eBay Active Integration Card */}
             <article className="plans-settings__integration plans-settings__integration--connected" style={{ padding: "18px", borderRadius: "12px", border: "1px solid #e2e8f0", background: "#ffffff" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
@@ -4808,7 +4808,7 @@ export default function MarketplaceSettingsPage() {
     return (
       <section className="vas-settings card-wrapper" style={{ padding: "28px" }}>
         {/* Header Hero */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }}>
+        <div className="settings-va-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "24px" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
               <span
@@ -4857,7 +4857,7 @@ export default function MarketplaceSettingsPage() {
         </div>
 
         {/* Stats Row */}
-        <div
+        <div className="settings-va-stats"
           style={{
             display: "flex",
             alignItems: "center",
@@ -4935,7 +4935,7 @@ export default function MarketplaceSettingsPage() {
             </button>
           </div>
         ) : (
-          <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "12px" }}>
+          <div className="settings-va-table-scroll" style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: "12px" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
@@ -5454,6 +5454,7 @@ export default function MarketplaceSettingsPage() {
             type="button"
             key={tab}
             className={`marketplace-settings__primary-tab ${activePrimaryTab === tab ? "marketplace-settings__primary-tab--active" : ""}`}
+            aria-pressed={activePrimaryTab === tab}
             onClick={() => setActivePrimaryTab(tab)}
           >
             {tab}
@@ -5471,6 +5472,8 @@ export default function MarketplaceSettingsPage() {
                   type="button"
                   key={tab}
                   className={`marketplace-settings__inner-tab ${activeInnerTab === tab ? "marketplace-settings__inner-tab--active" : ""}`}
+                  role="tab"
+                  aria-selected={activeInnerTab === tab}
                   onClick={() => setActiveInnerTab(tab)}
                 >
                   {tab}

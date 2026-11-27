@@ -506,3 +506,183 @@
   .marketplace-dashboard-page .help-center-page .support-tickets-list__row { grid-template-columns: minmax(0,1fr) auto; }
   .marketplace-dashboard-page .help-center-page .support-tickets-list__time { grid-column: 1/-1; text-align: left; }
 }
+
+
+/* Customer settings workspace — page-scoped redesign across all existing tabs. */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page {
+  --set-accent: var(--ap-purple,#6d28d9);
+  --set-deep: var(--ap-indigo,#32158c);
+  --set-ink: var(--ap-text,#171230);
+  --set-muted: var(--ap-muted,#67627a);
+  --set-line: var(--ap-border,#e9e4f2);
+  --set-soft: #f4effc;
+  --set-surface: #fff;
+  width: 100%; min-width: 0; max-width: 100%; gap: 14px !important;
+  padding: 0 0 16px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__primary-tabs {
+  display: flex !important; align-items: center !important; flex-wrap: nowrap !important;
+  gap: 5px !important; width: 100% !important; min-width: 0 !important; overflow-x: auto !important;
+  padding: 6px !important; margin: 0 !important; min-height: 0 !important;
+  border: 1px solid var(--set-line) !important; border-radius: 10px !important;
+  background: #fff !important; box-shadow: none !important; scrollbar-width: thin !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__primary-tabs button.marketplace-settings__primary-tab {
+  flex: 0 0 auto !important; min-height: 36px !important; height: 36px !important;
+  padding: 0 12px !important; border: 0 !important; border-radius: 7px !important;
+  background: transparent !important; color: var(--set-muted) !important;
+  font-size: 12px !important; font-weight: 600 !important; white-space: nowrap !important; box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__primary-tabs button.marketplace-settings__primary-tab--active,
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__primary-tabs button.marketplace-settings__primary-tab:hover {
+  background: var(--set-soft) !important; color: var(--set-accent) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__primary-tabs .marketplace-settings__primary-tab::after { display: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__panel,.marketplace-settings__store-settings,.plans-settings,.billing-settings,.templates-settings,.vas-settings,.marketplace-settings__placeholder) {
+  width: 100% !important; min-width: 0 !important; min-height: 0 !important; max-width: none !important;
+  padding: 16px !important; border: 1px solid var(--set-line) !important; border-radius: 10px !important;
+  background: #fff !important; box-shadow: none !important; gap: 14px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__panel { padding: 0 !important; gap: 0 !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(h2,h3,h4) { overflow-wrap: anywhere; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__section-title,.marketplace-settings__store-settings-header h3,.plans-settings__section-head h3,.billing-settings__card-title h3,.templates-settings__head h2) {
+  font-size: 15px !important; font-weight: 700 !important; color: var(--set-ink) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__workspace { display: grid !important; grid-template-columns: minmax(155px,200px) minmax(0,1fr) !important; gap: 12px !important; align-items: start !important; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__sidebar { min-width: 0; padding: 0 !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-label { color: var(--set-ink) !important; font-size: 12px !important; font-weight: 700 !important; margin: 0 0 8px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-list { padding: 5px !important; border: 1px solid var(--set-line) !important; border-radius: 9px !important; background: #fff !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-item { min-height: 36px !important; border-radius: 6px !important; background: transparent !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-item--active,
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-item:hover { background: var(--set-soft) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-main { min-width: 0; font-size: 12px !important; color: var(--set-muted) !important; gap: 6px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-item--active .marketplace-settings__supplier-main { color: var(--set-accent) !important; font-weight: 650; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__inner-tabs { display: flex !important; flex-wrap: wrap !important; gap: 10px !important; padding: 0 14px !important; min-height: 42px !important; border-bottom: 1px solid var(--set-line) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__inner-tab { min-height: 40px !important; padding: 0 10px !important; color: var(--set-muted) !important; font-size: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__inner-tab--active { color: var(--set-accent) !important; font-weight: 700 !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__inner-tab--active::after { background: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__panel-body { min-width: 0; padding: 14px !important; overflow: visible !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__tab-panel { gap: 14px !important; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__section { gap: 10px !important; min-width: 0; border: 0 !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__section + .marketplace-settings__section { padding-top: 14px !important; border-top: 1px solid var(--set-line) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__section--dual { grid-template-columns: minmax(0,1fr) minmax(0, .65fr) !important; gap: 14px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__grid,.marketplace-settings__advanced-grid,.billing-settings__fields) { gap: 10px 12px !important; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__field,.billing-settings__field,.templates-settings__field) { min-width: 0 !important; gap: 5px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__field-label { flex-wrap: wrap; font-size: 12px !important; font-weight: 600 !important; color: var(--set-ink) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(input.marketplace-settings__control,select.marketplace-settings__control,.marketplace-settings__inline-input,.marketplace-settings__textarea) {
+  min-width: 0 !important; max-width: 100% !important; border: 1px solid var(--set-line) !important;
+  border-radius: 7px !important; background-color: #fff !important; color: var(--set-ink) !important;
+  font-size: 12px !important; box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(input.marketplace-settings__control,select.marketplace-settings__control,input.marketplace-settings__inline-input) { height: 36px !important; min-height: 36px !important; padding-block: 6px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(textarea.marketplace-settings__control,.marketplace-settings__textarea) { min-height: 80px; resize: vertical; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__control,.marketplace-settings__inline-input,.marketplace-settings__textarea):focus { border-color: var(--set-accent) !important; box-shadow: 0 0 0 2px #6d28d91a !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__switch-row,.marketplace-settings__checkbox,.marketplace-settings__switch-copy) { font-size: 12px !important; color: var(--set-muted) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__switch--checked .marketplace-settings__switch-track,
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__checkbox-box--checked { background: var(--set-accent) !important; border-color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__monitoring-box,.marketplace-settings__pricing-summary,.marketplace-settings__pricing-example) { padding: 12px !important; border: 0 !important; border-radius: 8px !important; background: #faf8fd !important; box-shadow: none !important; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__pricing-segment--cost { background: #d8c7f1 !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__pricing-segment--profit { background: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__message-table { border: 1px solid var(--set-line) !important; border-radius: 8px !important; overflow: hidden; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__message-row { grid-template-columns: minmax(80px,112px) minmax(0,1fr) 28px 34px; padding: 9px !important; gap: 8px !important; background: #fff !important; border-color: var(--set-line) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__message-copy { overflow-wrap: anywhere; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__footer { padding: 12px 14px !important; gap: 10px !important; border-color: var(--set-line) !important; flex-wrap: wrap; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__footer-copy { flex: 1 1 180px; font-size: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__save-btn,.marketplace-settings__small-save,.marketplace-settings__ebay-btn--connect,.marketplace-settings__modal-btn--primary,.plans-settings__btn--primary,.billing-settings__btn--primary,.templates-settings__add-btn) {
+  min-height: 34px !important; height: auto !important; padding: 7px 13px !important; border: 0 !important;
+  border-radius: 7px !important; background: var(--set-accent) !important; color: #fff !important;
+  font-size: 12px !important; font-weight: 650 !important; box-shadow: none !important; transform: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__save-btn,.marketplace-settings__small-save,.marketplace-settings__ebay-btn--connect,.marketplace-settings__modal-btn--primary,.plans-settings__btn--primary,.billing-settings__btn--primary,.templates-settings__add-btn):hover:not(:disabled) { background: var(--set-deep) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__ghost-action,.plans-settings__ghost-btn,.billing-settings__btn--ghost,.marketplace-settings__modal-btn--secondary) {
+  min-height: 32px !important; padding: 6px 10px !important; border: 1px solid var(--set-line) !important;
+  border-radius: 7px !important; background: #fff !important; color: var(--set-accent) !important; font-size: 12px !important; box-shadow: none !important;
+}
+/* Store and buyer connections */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__store-settings-header { padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-header { gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__store-settings-header p { max-width: 800px !important; font-size: 12px !important; line-height: 1.55 !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-card { padding: 12px !important; border: 1px solid var(--set-line) !important; border-radius: 8px !important; gap: 10px !important; flex-wrap: wrap !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-info { min-width: 0; flex: 1 1 240px; overflow-wrap: anywhere; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-actions { flex-wrap: wrap !important; gap: 6px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-btn:not(.marketplace-settings__ebay-btn--connect) { min-height: 32px !important; border-radius: 7px !important; font-size: 12px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-empty { padding: 20px 12px !important; border: 0 !important; background: #faf8fd !important; border-radius: 8px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-empty-icon { width: 36px !important; height: 36px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__ebay-help { border-radius: 8px !important; padding: 12px !important; }
+/* Plans and usage */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero { flex-wrap: wrap !important; flex-direction: row !important; align-items: center !important; padding: 14px !important; gap: 12px !important; border: 0 !important; border-radius: 8px !important; background: #faf8fd !important; color: var(--set-ink) !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero > div:first-child { flex: 1 1 300px; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero h2 { font-size: 21px !important; color: var(--set-ink) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero p { color: var(--set-muted) !important; font-size: 12px !important; line-height: 1.5; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero > div:first-child > div > span { border: 0 !important; border-radius: 6px !important; background: var(--set-soft) !important; color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero > div:last-child button { min-height: 34px !important; padding: 7px 12px !important; border: 0 !important; border-radius: 7px !important; background: var(--set-accent) !important; color: #fff !important; font-size: 12px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__hero > div:last-child button:first-child { background: var(--set-soft) !important; color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.settings-plan-usage,.settings-plan-addons) { margin-top: 16px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-plan-usage > div:first-child { flex-wrap: wrap; gap: 8px; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-plan-quota-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,200px),1fr)) !important; gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-plan-quota-grid > div { padding: 12px !important; min-width: 0 !important; border: 1px solid var(--set-line) !important; border-radius: 8px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-plan-quota-grid > div > div:first-child { flex-wrap: wrap; gap: 6px; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-plan-quota-grid > div > div:first-child svg { color: var(--set-accent) !important; flex-shrink: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__link-btn { color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .plans-settings__integration { padding: 12px !important; border-color: var(--set-line) !important; border-radius: 8px !important; box-shadow: none !important; }
+/* Account and billing */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__hero { padding: 14px !important; gap: 12px !important; border: 0 !important; border-radius: 8px !important; background: #faf8fd !important; flex-wrap: wrap; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__hero-copy h2 { font-size: 20px !important; color: var(--set-ink) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__hero-copy p { font-size: 12px !important; color: var(--set-muted) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__hero-profile { min-width: 0; overflow-wrap: anywhere; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__stats { grid-template-columns: repeat(4,minmax(0,1fr)) !important; gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__stat { min-width: 0 !important; padding: 12px !important; border: 1px solid var(--set-line) !important; border-radius: 8px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.billing-settings__stat-icon,.billing-settings__card-icon,.billing-settings__avatar) { background: var(--set-soft) !important; color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__layout { grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr) !important; gap: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.billing-settings__main,.billing-settings__sidebar) { gap: 12px !important; min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.billing-settings__card,.billing-settings__plan-card) { min-width: 0 !important; border: 1px solid var(--set-line) !important; border-radius: 9px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__card-head { padding: 12px !important; gap: 8px !important; flex-wrap: wrap; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__card-title { min-width: 0; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__card-title p { font-size: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__fields { padding: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__card-foot { padding: 10px 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__method-copy { min-width: 0; overflow-wrap: anywhere; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__method-actions { flex-wrap: wrap; gap: 5px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__history { max-width: 100%; overflow-x: auto; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.billing-settings__history-head,.billing-settings__history-row) { gap: 8px !important; padding: 10px 12px !important; }
+/* Template library */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__head { flex-wrap: wrap; gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__grid { grid-template-columns: repeat(auto-fill,minmax(min(100%,220px),1fr)) !important; gap: 12px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__card { min-width: 0; border: 1px solid var(--set-line) !important; border-radius: 8px !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__card-body { padding: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__card-actions { gap: 5px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__card-actions button:not(.templates-settings__danger) { border-color: var(--set-line) !important; color: var(--set-accent) !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.templates-settings__tabs,.templates-settings__categories) { flex-wrap: wrap; gap: 6px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .templates-settings__empty,
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__placeholder { min-height: 140px !important; border: 0 !important; background: #faf8fd !important; box-shadow: none !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__placeholder h2 { font-size: 17px !important; }
+/* Virtual assistants */
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-header { margin-bottom: 14px !important; gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-header h2 { font-size: 19px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-header > div > div > span { background: var(--set-soft) !important; color: var(--set-accent) !important; border: 0 !important; border-radius: 6px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-stats { padding: 12px !important; margin-bottom: 14px !important; border: 0 !important; background: #faf8fd !important; border-radius: 8px !important; gap: 10px !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-table-scroll { max-width: 100%; border-color: var(--set-line) !important; border-radius: 8px !important; overflow-x: auto !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-table-scroll table { min-width: 720px; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-table-scroll table :is(th,td) { padding: 9px 10px !important; font-size: 12px !important; vertical-align: middle !important; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__modal-card,.marketplace-settings__modal-content,.templates-settings__editor-modal,.templates-settings__preview-modal) { border-radius: 12px !important; max-height: 90dvh; overflow-y: auto; }
+.autoprime-portal .marketplace-dashboard-page .marketplace-settings-page button:focus-visible { outline: 2px solid var(--set-accent) !important; outline-offset: 2px; }
+@media(max-width: 1200px) {
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__grid--4 { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__stats { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .billing-settings__layout { grid-template-columns: minmax(0,1fr) !important; }
+}
+@media(max-width: 850px) {
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__workspace { grid-template-columns: minmax(0,1fr) !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__section--dual { grid-template-columns: minmax(0,1fr) !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__supplier-list { display: grid !important; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); gap: 5px; }
+}
+@media(max-width: 600px) {
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__store-settings,.plans-settings,.billing-settings,.templates-settings,.vas-settings) { padding: 12px !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page :is(.marketplace-settings__grid--2,.marketplace-settings__grid--4,.marketplace-settings__advanced-grid,.billing-settings__fields--2,.billing-settings__stats) { grid-template-columns: minmax(0,1fr) !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__field--wide { grid-column: 1/-1 !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__message-row { grid-template-columns: minmax(0,1fr) 28px 34px !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__message-copy { grid-column: 1/-1; grid-row: 2; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__footer { align-items: flex-start; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .marketplace-settings__switch-row--compact { justify-self: start !important; }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings-page .settings-va-stats > div:last-child { margin-left: 0 !important; }
+}
