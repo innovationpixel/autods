@@ -1691,3 +1691,538 @@
   border-radius: 8px !important;
   box-shadow: none !important;
 }
+
+
+/* Platform Settings: one coherent light-theme layout, scoped to this page. */
+.autoprime-portal .super-admin-shell .admin-settings-page {
+  --settings-line: var(--ap-border, #e9e4f2);
+  --settings-surface: #fff;
+  --settings-soft: #faf8fd;
+  --settings-ink: #211a30;
+  --settings-muted: #70697d;
+  --settings-accent: #6d28d9;
+  --settings-accent-soft: #f4efff;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 16px !important;
+  min-width: 0;
+  container-type: inline-size;
+  container-name: platform-settings;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page > :is(.admin-page__hero, .admin-settings-page__section-nav, .admin-settings-page__card:not(.admin-settings-page__card--integration)) {
+  grid-column: 1 / -1;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__hero {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__hero h1 {
+  margin: 7px 0 5px !important;
+  font-size: clamp(22px, 2vw, 30px) !important;
+  color: var(--settings-ink) !important;
+  font-weight: 750 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__hero p {
+  font-size: 13px !important;
+  color: var(--settings-muted) !important;
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__section-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--settings-line);
+  border-radius: 12px;
+  background: var(--settings-surface);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__section-nav > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--settings-soft);
+  color: var(--settings-accent);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__section-nav > button:hover {
+  background: var(--settings-accent-soft);
+  border-color: var(--settings-line);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__section-nav svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-page__card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box;
+  padding: clamp(14px, 1.6vw, 22px) !important;
+  margin: 0 !important;
+  border: 1px solid var(--settings-line) !important;
+  border-radius: 13px !important;
+  background: var(--settings-surface) !important;
+  box-shadow: none !important;
+  scroll-margin-top: 90px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding: 0 0 14px !important;
+  margin: 0 0 16px !important;
+  border-bottom: 1px solid var(--settings-line);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card-head > div:last-child {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card-head h2 {
+  font-size: 16px !important;
+  font-weight: 750 !important;
+  color: var(--settings-ink) !important;
+  line-height: 1.35 !important;
+  margin: 0 0 5px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card-head p {
+  max-width: none !important;
+  font-size: 12px !important;
+  line-height: 1.55 !important;
+  color: var(--settings-muted) !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-page__icon-wrap, .admin-settings-addon__icon) {
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  border-radius: 9px !important;
+  background: var(--settings-accent-soft) !important;
+  color: var(--settings-accent) !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-page__icon-wrap, .admin-settings-addon__icon) svg {
+  width: 20px;
+  height: 20px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-page__status {
+  display: grid !important;
+  gap: 12px !important;
+  min-width: 0;
+  flex: 1;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-page__status-row {
+  display: flex !important;
+  gap: 9px !important;
+  padding: 11px 12px !important;
+  margin: 0 !important;
+  border: 1px solid var(--settings-line);
+  border-radius: 8px;
+  background: var(--settings-soft);
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__status-row > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin-top: 2px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__status-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__status-row strong {
+  font-size: 13px;
+  color: var(--settings-ink) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-page__meta, .admin-settings-page__status-row span) {
+  font-size: 12px !important;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card--integration .admin-settings-page__status > button {
+  justify-self: start;
+  align-self: end;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-page__loading {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--settings-muted);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-page__alert {
+  font-size: 12px !important;
+  overflow-wrap: anywhere;
+  margin: 0 0 12px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__body {
+  min-width: 0;
+  padding: 0 !important;
+  display: grid;
+  gap: 14px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-form, .admin-settings-ai-field) {
+  display: grid !important;
+  align-content: start !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-form {
+  gap: 14px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-field {
+  gap: 6px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-grid, .admin-settings-addon__grid) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  align-items: start !important;
+  gap: 14px !important;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page__card--addons .admin-settings-addon__grid > .admin-settings-ai-field:only-child,
+.autoprime-portal .super-admin-shell .admin-settings-page__card--addons .admin-settings-addon__grid > .admin-settings-ai-field:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-label-row {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center !important;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-label {
+  display: block !important;
+  margin: 0 !important;
+  color: var(--settings-ink) !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 1.4;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-help {
+  font-size: 11.5px !important;
+  line-height: 1.5 !important;
+  color: var(--settings-muted) !important;
+  margin: 0 !important;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-input-wrap, .admin-settings-ai-select-wrap) {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  width: 100%;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-input, .admin-settings-ai-select, #legal-doc-content) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border: 1px solid var(--settings-line) !important;
+  border-radius: 8px !important;
+  background: var(--settings-surface) !important;
+  color: var(--settings-ink) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-input, .admin-settings-ai-select) {
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 12px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap > input {
+  padding-inline-start: 36px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap > input#openai-key-input {
+  padding-inline-end: 40px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-select {
+  appearance: none;
+  padding-inline-end: 32px !important;
+  text-overflow: ellipsis;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-input-icon, .admin-settings-ai-select-arrow) {
+  position: absolute !important;
+  inset-block-start: 50% !important;
+  transform: translateY(-50%) !important;
+  display: grid !important;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 !important;
+  color: var(--settings-accent) !important;
+  pointer-events: none;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-icon { inset-inline-start: 11px !important; }
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-select-arrow { inset-inline-end: 10px !important; }
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-icon svg {
+  color: var(--settings-accent) !important;
+  width: 16px;
+  height: 16px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-eye-btn {
+  position: absolute !important;
+  inset-inline-end: 5px !important;
+  inset-block-start: 5px !important;
+  transform: none !important;
+  display: grid !important;
+  place-items: center;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--settings-muted) !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap:has(> .admin-settings-ai-unit) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 !important;
+  border: 1px solid var(--settings-line);
+  border-radius: 8px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap:has(> .admin-settings-ai-unit) > input {
+  border: 0 !important;
+  border-radius: 8px 0 0 8px !important;
+  padding-inline-end: 4px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-unit {
+  position: static !important;
+  display: block;
+  margin-inline-end: 6px;
+  padding: 4px 7px;
+  background: var(--settings-accent-soft);
+  color: var(--settings-accent);
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap:focus-within {
+  outline: 2px solid #c7b2ed;
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-input, .admin-settings-ai-select, #legal-doc-content, button, a):focus-visible {
+  outline: 2px solid #b99be8 !important;
+  outline-offset: 2px;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-input-wrap:has(> .admin-settings-ai-unit) > input:focus-visible {
+  outline: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-preview > div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 12px;
+  min-width: 0;
+  border: 1px solid var(--settings-line);
+  border-radius: 8px;
+  background: var(--settings-soft);
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-preview strong {
+  color: var(--settings-accent) !important;
+  font-size: 16px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  min-width: 0;
+  border: 1px solid var(--settings-line);
+  border-radius: 10px;
+  background: var(--settings-soft);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--settings-line);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__title > div:last-child {
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__title h3 {
+  color: var(--settings-ink) !important;
+  font-size: 14px !important;
+  line-height: 1.4;
+  margin: 0 0 3px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__title span {
+  color: var(--settings-muted) !important;
+  font-size: 11.5px !important;
+  line-height: 1.5;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--settings-line);
+  background: #fff;
+  color: var(--settings-ink);
+  font-size: 11.5px;
+  font-weight: 650;
+  cursor: pointer;
+  max-width: 100%;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-addon__toggle > input {
+  width: 16px !important;
+  min-width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  accent-color: var(--settings-accent) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  border-top: 1px solid var(--settings-line);
+  padding: 14px 0 0 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 40px !important;
+  height: auto !important;
+  gap: 7px !important;
+  padding: 9px 14px !important;
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  line-height: 1.4 !important;
+  white-space: normal !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn--primary {
+  background: var(--settings-accent) !important;
+  color: #fff !important;
+  border: 1px solid var(--settings-accent) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn--ghost {
+  background: #fff !important;
+  border: 1px solid var(--settings-line) !important;
+  color: var(--settings-ink) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn--danger {
+  color: #b42336 !important;
+  background: #fff5f6 !important;
+  border: 1px solid #f2cdd3 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-page__btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-legal__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-legal__tabs, .admin-settings-legal__tools) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-legal__tabs {
+  padding: 4px;
+  border-radius: 9px;
+  background: var(--settings-soft);
+  border: 1px solid var(--settings-line);
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-legal__tabs .admin-page__btn {
+  min-height: 34px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--settings-muted) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-legal__tabs .admin-page__btn[aria-pressed="true"] {
+  background: var(--settings-accent-soft) !important;
+  color: var(--settings-accent) !important;
+  border-color: var(--settings-line) !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page #legal-doc-content {
+  min-height: 320px !important;
+  padding: 14px !important;
+  line-height: 1.65 !important;
+}
+@container platform-settings (max-width: 620px) {
+  .autoprime-portal .super-admin-shell .admin-settings-page__card--integration {
+    grid-column: 1 / -1;
+  }
+  .autoprime-portal .super-admin-shell .admin-settings-page__section-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .autoprime-portal .super-admin-shell .admin-settings-page :is(.admin-settings-ai-grid, .admin-settings-addon__grid, .admin-settings-ai-preview) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-actions {
+    justify-content: stretch !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-settings-page .admin-settings-ai-actions > button {
+    flex: 1 1 140px;
+  }
+}

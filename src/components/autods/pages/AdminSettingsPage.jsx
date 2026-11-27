@@ -551,10 +551,22 @@ function AdminSettingsPage() {
       <header className="admin-page__hero">
         <span className="admin-page__eyebrow"><LuSettings2 /> Settings</span>
         <h1>Platform Settings</h1>
-        <p>Configure integrations used across all client accounts.</p>
+        <p>Manage platform integrations, AI credits, add-on pricing and legal agreements.</p>
       </header>
+      <nav className="admin-settings-page__section-nav" aria-label="Settings sections">
+        {[
+          ["aliexpress", LuPlug, "Integrations"],
+          ["ai", LuSparkles, "AI & Credits"],
+          ["addons", LuBoxes, "Add-on Pricing"],
+          ["legal", LuFileText, "Legal Agreements"],
+        ].map(([id, Icon, label]) => (
+          <button key={id} type="button" onClick={() => document.getElementById(`platform-settings-${id}`)?.scrollIntoView({ block: "start" })}>
+            <Icon aria-hidden="true" /><span>{label}</span>
+          </button>
+        ))}
+      </nav>
 
-      <div className="admin-settings-page__card card-wrapper">
+      <div id="platform-settings-aliexpress" className="admin-settings-page__card card-wrapper admin-settings-page__card--aliexpress admin-settings-page__card--integration">
         <div className="admin-settings-page__card-head">
           <div className="admin-settings-page__icon-wrap">
             <LuPlug />
@@ -627,7 +639,7 @@ function AdminSettingsPage() {
         )}
       </div>
 
-      <div className="admin-settings-page__card card-wrapper">
+      <div id="platform-settings-google" className="admin-settings-page__card card-wrapper admin-settings-page__card--google admin-settings-page__card--integration">
         <div className="admin-settings-page__card-head">
           <div className="admin-settings-page__icon-wrap">
             <LuSheet />
@@ -691,7 +703,7 @@ function AdminSettingsPage() {
         )}
       </div>
 
-      <div className="admin-settings-page__card card-wrapper">
+      <div id="platform-settings-ai" className="admin-settings-page__card card-wrapper admin-settings-page__card--ai">
         <div className="admin-settings-page__card-head">
           <div className="admin-settings-page__icon-wrap">
             <LuSparkles />
@@ -841,19 +853,7 @@ function AdminSettingsPage() {
                     placeholder="0.02"
                     style={{ paddingRight: 112 }}
                   />
-                  <span
-                    style={{
-                      position: "absolute",
-                      right: 12,
-                      fontSize: 12,
-                      fontWeight: 650,
-                      color: "#065f46",
-                      backgroundColor: "#ecfdf5",
-                      border: "1px solid #a7f3d0",
-                      padding: "4px 8px",
-                      borderRadius: 6,
-                    }}
-                  >
+                  <span className="admin-settings-ai-unit">
                     USD / credit
                   </span>
                 </div>
@@ -885,18 +885,7 @@ function AdminSettingsPage() {
                       placeholder="1"
                       style={{ paddingRight: 102 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#64748b",
-                        backgroundColor: "#f1f5f9",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       Credits / img
                     </span>
                   </div>
@@ -925,18 +914,7 @@ function AdminSettingsPage() {
                       placeholder="0.02"
                       style={{ paddingRight: 88 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#4338ca",
-                        backgroundColor: "#eef2ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       USD / img
                     </span>
                   </div>
@@ -972,18 +950,7 @@ function AdminSettingsPage() {
                       placeholder="1"
                       style={{ paddingRight: 108 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#64748b",
-                        backgroundColor: "#f1f5f9",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       Credits / title
                     </span>
                   </div>
@@ -1012,18 +979,7 @@ function AdminSettingsPage() {
                       placeholder="0.02"
                       style={{ paddingRight: 94 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#4338ca",
-                        backgroundColor: "#eef2ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       USD / title
                     </span>
                   </div>
@@ -1039,17 +995,7 @@ function AdminSettingsPage() {
               </div>
 
               {/* User Pricing Preview Banner */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-                  gap: 12,
-                  padding: "14px 16px",
-                  borderRadius: 10,
-                  backgroundColor: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                }}
-              >
+              <div className="admin-settings-ai-preview">
                 <div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", display: "block" }}>
                     Rate Per AI Credit
@@ -1115,7 +1061,7 @@ function AdminSettingsPage() {
       </div>
 
       {/* Platform Add-ons & Automation Pricing Card */}
-      <div className="admin-settings-page__card card-wrapper" style={{ marginTop: "24px" }}>
+      <div id="platform-settings-addons" className="admin-settings-page__card card-wrapper admin-settings-page__card--addons">
         <div className="admin-settings-page__card-head">
           <div className="admin-settings-page__icon-wrap" style={{ background: "#ecfdf5", color: "#059669" }}>
             <LuBoxes />
@@ -1142,32 +1088,12 @@ function AdminSettingsPage() {
             <span>Loading add-on configurations…</span>
           </div>
         ) : (
-          <div style={{ padding: "0 24px 24px 24px" }}>
+          <div className="admin-settings-page__body">
             {/* 1. Order Processing Section */}
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                marginBottom: "20px",
-                background: "#f8fafc",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "8px",
-                      background: "#e0f2fe",
-                      color: "#0284c7",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
+            <div className="admin-settings-addon">
+              <div className="admin-settings-addon__head">
+                <div className="admin-settings-addon__title">
+                  <div className="admin-settings-addon__icon">
                     <LuShoppingCart />
                   </div>
                   <div>
@@ -1180,7 +1106,7 @@ function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                <label className="admin-settings-addon__toggle">
                   <input
                     type="checkbox"
                     checked={addonStatus.order_processing?.enabled ?? true}
@@ -1199,7 +1125,7 @@ function AdminSettingsPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+              <div className="admin-settings-addon__grid">
                 {/* Per-Order Fee */}
                 <div className="admin-settings-ai-field">
                   <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
@@ -1227,18 +1153,7 @@ function AdminSettingsPage() {
                       placeholder="0.30"
                       style={{ paddingRight: 80 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#0284c7",
-                        backgroundColor: "#e0f2fe",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / order
                     </span>
                   </div>
@@ -1274,18 +1189,7 @@ function AdminSettingsPage() {
                       placeholder="29.99"
                       style={{ paddingRight: 80 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#0284c7",
-                        backgroundColor: "#e0f2fe",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / month
                     </span>
                   </div>
@@ -1321,18 +1225,7 @@ function AdminSettingsPage() {
                       placeholder="0"
                       style={{ paddingRight: 80 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#64748b",
-                        backgroundColor: "#f1f5f9",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       Orders / mo
                     </span>
                   </div>
@@ -1344,30 +1237,10 @@ function AdminSettingsPage() {
             </div>
 
             {/* 2. Sourcing Requests Section */}
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                marginBottom: "20px",
-                background: "#f8fafc",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "8px",
-                      background: "#fdf4ff",
-                      color: "#c026d3",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
+            <div className="admin-settings-addon">
+              <div className="admin-settings-addon__head">
+                <div className="admin-settings-addon__title">
+                  <div className="admin-settings-addon__icon">
                     <LuSearch />
                   </div>
                   <div>
@@ -1380,7 +1253,7 @@ function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                <label className="admin-settings-addon__toggle">
                   <input
                     type="checkbox"
                     checked={addonStatus.sourcing_requests?.enabled ?? true}
@@ -1399,7 +1272,7 @@ function AdminSettingsPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+              <div className="admin-settings-addon__grid">
                 {/* Per-Request Fee */}
                 <div className="admin-settings-ai-field">
                   <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
@@ -1427,18 +1300,7 @@ function AdminSettingsPage() {
                       placeholder="1.50"
                       style={{ paddingRight: 86 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#c026d3",
-                        backgroundColor: "#fdf4ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / request
                     </span>
                   </div>
@@ -1474,18 +1336,7 @@ function AdminSettingsPage() {
                       placeholder="5"
                       style={{ paddingRight: 80 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#64748b",
-                        backgroundColor: "#f1f5f9",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       Req / mo
                     </span>
                   </div>
@@ -1521,18 +1372,7 @@ function AdminSettingsPage() {
                       placeholder="6.00"
                       style={{ paddingRight: 86 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#c026d3",
-                        backgroundColor: "#fdf4ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / 5-pack
                     </span>
                   </div>
@@ -1568,18 +1408,7 @@ function AdminSettingsPage() {
                       placeholder="10.00"
                       style={{ paddingRight: 86 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#c026d3",
-                        backgroundColor: "#fdf4ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / 10-pack
                     </span>
                   </div>
@@ -1591,30 +1420,10 @@ function AdminSettingsPage() {
             </div>
 
             {/* 3. Auto-Tracking & Carrier Updates */}
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                marginBottom: "24px",
-                background: "#f8fafc",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "8px",
-                      background: "#f0fdf4",
-                      color: "#16a34a",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
+            <div className="admin-settings-addon">
+              <div className="admin-settings-addon__head">
+                <div className="admin-settings-addon__title">
+                  <div className="admin-settings-addon__icon">
                     <LuTruck />
                   </div>
                   <div>
@@ -1627,7 +1436,7 @@ function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                <label className="admin-settings-addon__toggle">
                   <input
                     type="checkbox"
                     checked={addonStatus.auto_tracking?.enabled ?? true}
@@ -1646,7 +1455,7 @@ function AdminSettingsPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
+              <div className="admin-settings-addon__grid">
                 <div className="admin-settings-ai-field">
                   <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
                     Fee Per Tracking Number Sync ($)
@@ -1673,18 +1482,7 @@ function AdminSettingsPage() {
                       placeholder="0.05"
                       style={{ paddingRight: 80 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#16a34a",
-                        backgroundColor: "#f0fdf4",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       / order
                     </span>
                   </div>
@@ -1696,30 +1494,10 @@ function AdminSettingsPage() {
             </div>
 
             {/* 4. Trending Products Add-on */}
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                marginBottom: "20px",
-                background: "#f8fafc",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "8px",
-                      background: "#fff7ed",
-                      color: "#ea580c",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
+            <div className="admin-settings-addon">
+              <div className="admin-settings-addon__head">
+                <div className="admin-settings-addon__title">
+                  <div className="admin-settings-addon__icon">
                     <LuChartLine />
                   </div>
                   <div>
@@ -1732,7 +1510,7 @@ function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                <label className="admin-settings-addon__toggle">
                   <input
                     type="checkbox"
                     checked={addonStatus.trending_products?.enabled ?? true}
@@ -1751,7 +1529,7 @@ function AdminSettingsPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+              <div className="admin-settings-addon__grid">
                 <div className="admin-settings-ai-field">
                   <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
                     Add-on Price ($)
@@ -1778,18 +1556,7 @@ function AdminSettingsPage() {
                       placeholder="14.99"
                       style={{ paddingRight: 88 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#ea580c",
-                        backgroundColor: "#ffedd5",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       {addonStatus.trending_products?.billing_mode === "one_time" ? "one-time" : "/ month"}
                     </span>
                   </div>
@@ -1857,30 +1624,10 @@ function AdminSettingsPage() {
             </div>
 
             {/* 5. Hand-Picked Products Add-on */}
-            <div
-              style={{
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
-                padding: "20px",
-                marginBottom: "24px",
-                background: "#f8fafc",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div
-                    style={{
-                      width: "38px",
-                      height: "38px",
-                      borderRadius: "8px",
-                      background: "#eef2ff",
-                      color: "#4f46e5",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "20px",
-                    }}
-                  >
+            <div className="admin-settings-addon">
+              <div className="admin-settings-addon__head">
+                <div className="admin-settings-addon__title">
+                  <div className="admin-settings-addon__icon">
                     <LuBadgeCheck />
                   </div>
                   <div>
@@ -1893,7 +1640,7 @@ function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: 600, fontSize: "13px", color: "#334155" }}>
+                <label className="admin-settings-addon__toggle">
                   <input
                     type="checkbox"
                     checked={addonStatus.hand_picked_products?.enabled ?? true}
@@ -1912,7 +1659,7 @@ function AdminSettingsPage() {
                 </label>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+              <div className="admin-settings-addon__grid">
                 <div className="admin-settings-ai-field">
                   <label className="admin-settings-ai-label" style={{ fontWeight: 650 }}>
                     Add-on Price ($)
@@ -1939,18 +1686,7 @@ function AdminSettingsPage() {
                       placeholder="19.99"
                       style={{ paddingRight: 88 }}
                     />
-                    <span
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        fontSize: 12,
-                        fontWeight: 650,
-                        color: "#4f46e5",
-                        backgroundColor: "#e0e7ff",
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                      }}
-                    >
+                    <span className="admin-settings-ai-unit">
                       {addonStatus.hand_picked_products?.billing_mode === "one_time" ? "one-time" : "/ month"}
                     </span>
                   </div>
@@ -2045,7 +1781,7 @@ function AdminSettingsPage() {
       </div>
 
       {/* Legal Agreements (Terms & Conditions & Privacy Policy) Card */}
-      <div className="admin-settings-page__card card-wrapper" style={{ marginTop: "24px" }}>
+      <div id="platform-settings-legal" className="admin-settings-page__card card-wrapper admin-settings-page__card--legal">
         <div className="admin-settings-page__card-head">
           <div className="admin-settings-page__icon-wrap" style={{ background: "#ede9fe", color: "#5b21b6" }}>
             <LuFileText />
@@ -2072,18 +1808,9 @@ function AdminSettingsPage() {
             <span>Loading legal templates…</span>
           </div>
         ) : (
-          <div style={{ padding: "0 24px 24px 24px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "12px",
-                marginBottom: "18px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+          <div className="admin-settings-page__body">
+            <div className="admin-settings-legal__toolbar">
+              <div className="admin-settings-legal__tabs" role="group" aria-label="Legal document">
                 <button
                   type="button"
                   className={`admin-page__btn ${
@@ -2091,6 +1818,7 @@ function AdminSettingsPage() {
                       ? "admin-page__btn--primary"
                       : "admin-page__btn--ghost"
                   }`}
+                  aria-pressed={legalActiveTab === "terms_and_conditions"}
                   onClick={() => setLegalActiveTab("terms_and_conditions")}
                   style={{ minHeight: 38, padding: "0 16px" }}
                 >
@@ -2105,6 +1833,7 @@ function AdminSettingsPage() {
                       ? "admin-page__btn--primary"
                       : "admin-page__btn--ghost"
                   }`}
+                  aria-pressed={legalActiveTab === "privacy_policy"}
                   onClick={() => setLegalActiveTab("privacy_policy")}
                   style={{ minHeight: 38, padding: "0 16px" }}
                 >
@@ -2113,7 +1842,7 @@ function AdminSettingsPage() {
                 </button>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <div className="admin-settings-legal__tools">
                 <button
                   type="button"
                   className="admin-page__btn admin-page__btn--ghost"
