@@ -352,7 +352,7 @@ function AdminHandPickedProductsPage() {
         <div>
           <span className="admin-page__eyebrow"><LuBadgeCheck /> Hand-Picked Products</span>
           <h1>Manage Hand-Picked Products</h1>
-          <p>Paste an AliExpress product link, target a category and country, and it will show up in users' Hand-Picked Products feed for that marketplace.</p>
+          <p>Add AliExpress products to the Hand-Picked Products feed by category and country.</p>
         </div>
         <button type="button" className="admin-page__btn admin-page__btn--primary" onClick={openCreate}>
           <LuPlus />

@@ -1291,3 +1291,138 @@
   white-space: normal !important;
   overflow-wrap: anywhere;
 }
+
+
+/* Curated product tables: reserve space for product thumbnails and names,
+   and keep metadata columns compact. Shared by Trending and Hand-Picked. */
+.autoprime-portal .super-admin-shell .admin-curated-page .admin-page__hero {
+  align-items: center !important;
+  gap: 12px 20px !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-page .admin-page__hero > div {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-curated-page .admin-page__hero p {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  max-width: none !important;
+  color: var(--ap-muted, #67627a) !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-page .admin-clients-page__table {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow-x: auto !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table {
+  width: 100% !important;
+  min-width: 790px !important;
+  table-layout: fixed !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th, td) {
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+  padding: 10px 12px !important;
+  border-radius: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-product, td.admin-curated-table__cell-product) {
+  width: auto !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-category, td.admin-curated-table__cell-category) {
+  width: 110px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-country, td.admin-curated-table__cell-country) {
+  width: 85px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-price, td.admin-curated-table__cell-price) {
+  width: 110px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-sort, td.admin-curated-table__cell-sort) {
+  width: 65px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-status, td.admin-curated-table__cell-status) {
+  width: 100px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table :is(th.admin-curated-table__col-actions, td.admin-curated-table__cell-actions) {
+  width: 96px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-curated-page__product {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-curated-page__product > .admin-curated-page__product-img-link {
+  display: block !important;
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  height: 52px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden;
+  border-radius: 7px !important;
+  line-height: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-curated-page__product img {
+  display: block !important;
+  flex: 0 0 52px !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  border-radius: 7px !important;
+  background: #f8f7fb !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-curated-page__product > :is(.admin-curated-page__product-title, .admin-curated-page__product-link) {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  white-space: normal !important;
+  word-break: normal !important;
+  line-break: auto !important;
+  overflow-wrap: anywhere !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-curated-table__text-wrap {
+  word-break: normal !important;
+  line-break: auto !important;
+  overflow-wrap: anywhere !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-clients-page__actions {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: flex-end !important;
+  gap: 5px !important;
+}
+.autoprime-portal .super-admin-shell .admin-curated-table .admin-clients-page__actions > button {
+  flex: 0 0 30px !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+}
