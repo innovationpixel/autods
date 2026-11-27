@@ -943,3 +943,20 @@
     flex-basis: 125px;
   }
 }
+
+
+/* Keep the plan details shortcut content aligned with the modal fields. */
+.autoprime-portal .super-admin-shell .admin-clients-modal__plan-shortcut > .admin-page__btn {
+  justify-content: flex-start !important;
+  text-align: left !important;
+  gap: 8px !important;
+  padding-inline: 14px !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-modal__plan-shortcut > .admin-page__btn > svg {
+  flex-shrink: 0;
+}
+.autoprime-portal .super-admin-shell .admin-clients-modal__plan-shortcut > .admin-page__btn > span {
+  min-width: 0;
+  white-space: normal;
+  text-align: left;
+}
