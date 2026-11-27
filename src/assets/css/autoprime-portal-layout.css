@@ -966,7 +966,7 @@
    intrinsic input widths from overflowing into neighboring filters. */
 .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
   display: grid !important;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)) !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
   align-items: end !important;
   gap: 10px 14px !important;
   min-width: 0 !important;
@@ -1019,4 +1019,27 @@
   margin: 0 !important;
   font-size: 12px;
   line-height: 1.5;
+}
+
+
+/* Use the actual available portal width, not the browser viewport:
+   six filters on desktop, balanced rows on smaller layouts. */
+.autoprime-portal .super-admin-shell .admin-clients-page:has(> .admin-listings-filters) {
+  container-type: inline-size;
+  container-name: admin-listings-layout;
+}
+@container admin-listings-layout (max-width: 860px) {
+  .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@container admin-listings-layout (max-width: 530px) {
+  .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@container admin-listings-layout (max-width: 340px) {
+  .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
