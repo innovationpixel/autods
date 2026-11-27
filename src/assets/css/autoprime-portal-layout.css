@@ -355,3 +355,32 @@
 .autoprime-portal .admin-modal:has(> .ap-portal-dialog-close) > :is(h3, .admin-plan-details-modal__header) {
   padding-inline-end: 40px;
 }
+
+
+/* Keep the dedicated custom package checkbox beside its label, including
+   when the text wraps on narrower modal widths. */
+.autoprime-portal .admin-plan-details-modal__custom-pkg-box > label.admin-modal__checkbox {
+  display: grid !important;
+  grid-template-columns: 16px minmax(0, 1fr) !important;
+  align-items: center !important;
+  justify-items: start;
+  gap: 10px !important;
+  margin: 0 !important;
+  text-align: left;
+  cursor: pointer;
+}
+.autoprime-portal .admin-plan-details-modal__custom-pkg-box > label.admin-modal__checkbox > input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  justify-self: start;
+  accent-color: var(--ap-accent, #6d28d9);
+}
+.autoprime-portal .admin-plan-details-modal__custom-pkg-box > label.admin-modal__checkbox > span {
+  min-width: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
