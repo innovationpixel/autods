@@ -585,7 +585,7 @@ function DashboardContent({ searchQuery, selectedConnectionId = null }) {
           )}
         </article>
 
-        <article className="ebay-card ebay-activity-card">
+        <article className="ebay-card ebay-activity-card customer-recent-activity">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
               <span className="ebay-purple-icon"><LuRefreshCw /></span>
@@ -605,8 +605,14 @@ function DashboardContent({ searchQuery, selectedConnectionId = null }) {
                   const Icon = activity.icon;
                   return (
                     <button className="ebay-activity-row" type="button" key={`${activity.title}-${index}`} onClick={() => openPage(activity.type === "order" ? "orders" : "products")}>
-                      <span className="ebay-activity-icon"><Icon /></span>
-                      <span><strong>{activity.title}</strong><span>{activity.text}</span><small>{activity.time}</small></span>
+                      <span className="ebay-activity-icon" aria-hidden="true"><Icon /></span>
+                      <span className="customer-recent-activity__content">
+                        <span className="customer-recent-activity__heading">
+                          <strong>{activity.title}</strong>
+                          <small>{activity.time}</small>
+                        </span>
+                        <span className="customer-recent-activity__description" title={activity.text}>{activity.text}</span>
+                      </span>
                     </button>
                   );
                 })

@@ -2307,3 +2307,154 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+
+/* Customer dashboard recent activity: compact, aligned event list.
+   Keep the admin signups and activity-mix cards untouched. */
+.autoprime-portal .ebay-dashboard .customer-recent-activity {
+  min-height: 0 !important;
+  min-width: 0 !important;
+  align-self: start;
+  container-type: inline-size;
+  container-name: recent-activity;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity > .ebay-card__header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap;
+  gap: 10px !important;
+  padding: 16px !important;
+  border-bottom: 1px solid var(--ap-border, #e9e4f2) !important;
+  margin: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-card__title-row {
+  flex: 1 1 170px;
+  min-width: 0;
+  gap: 10px !important;
+  align-items: center !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-card__title-row > div {
+  min-width: 0;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-card__title-row h2 {
+  font-size: 16px !important;
+  line-height: 1.3 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-card__title-row p {
+  font-size: 11.5px !important;
+  line-height: 1.4 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-view-all {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 6px 9px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-view-all:hover {
+  background: var(--ap-ui-purple-soft, #f4efff) !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-list {
+  padding: 0 12px 8px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-row {
+  display: grid !important;
+  grid-template-columns: 32px minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 12px 4px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--ap-border, #eeeaf4) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-row:last-child {
+  border-bottom: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-row::after {
+  content: none !important;
+  display: none !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-row:hover {
+  background: #faf8fd !important;
+  border-radius: 6px !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  background: var(--ap-ui-purple-soft, #f4efff) !important;
+  color: var(--ap-ui-purple, #6d28d9) !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .ebay-activity-icon svg {
+  width: 15px !important;
+  height: 15px !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__content {
+  display: grid !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__heading {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 3px 10px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__heading strong {
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  color: var(--ap-ui-text, #272132) !important;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__heading small {
+  font-size: 10.5px !important;
+  line-height: 1.4 !important;
+  color: #746e82 !important;
+  margin: 0 !important;
+  white-space: nowrap;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__description {
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden !important;
+  overflow-wrap: anywhere;
+  word-break: normal !important;
+  white-space: normal !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+  color: #696577 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .ebay-dashboard .customer-recent-activity :is(.ebay-activity-row, .ebay-view-all):focus-visible {
+  outline: 2px solid var(--ap-ui-purple, #6d28d9) !important;
+  outline-offset: -2px;
+}
+@container recent-activity (max-width: 300px) {
+  .autoprime-portal .ebay-dashboard .customer-recent-activity > .ebay-card__header {
+    padding: 12px !important;
+  }
+  .autoprime-portal .ebay-dashboard .customer-recent-activity .customer-recent-activity__heading {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+}
