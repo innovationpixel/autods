@@ -118,6 +118,7 @@ function AdminDashboardPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [showAllSignups, setShowAllSignups] = useState(false);
 
   useEffect(() => {
     if (role && role !== "super_admin") {
@@ -595,7 +596,7 @@ function AdminDashboardPage() {
             RECENT SIGNUPS
             ================================================= */}
 
-        <article className="ebay-card ebay-orders-card">
+        <article className="ebay-card ebay-orders-card admin-recent-signups">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
               <span className="ebay-purple-icon">
@@ -614,9 +615,9 @@ function AdminDashboardPage() {
             </button>
           </div>
 
-          <div className="ebay-activity-list">
+          <div className="ebay-activity-list" id="admin-recent-signups-list">
             {recentUsers.length ? (
-              recentUsers.map((user) => (
+              (showAllSignups ? recentUsers : recentUsers.slice(0, 3)).map((user) => (
                 <div className="ebay-activity-row" key={user.id}>
                   <span className="ebay-activity-icon">
                     {user.name?.slice(0, 1)?.toUpperCase() || "?"}
@@ -637,6 +638,20 @@ function AdminDashboardPage() {
               <p className="admin-page__muted">No users yet.</p>
             )}
           </div>
+          {recentUsers.length > 3 ? (
+            <div className="admin-recent-signups__footer">
+              <button
+                type="button"
+                className="admin-recent-signups__toggle"
+                aria-expanded={showAllSignups}
+                aria-controls="admin-recent-signups-list"
+                onClick={() => setShowAllSignups((current) => !current)}
+              >
+                {showAllSignups ? "See Less" : "See More"}
+                <LuChevronDown aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
         </article>
 
         {/* =================================================

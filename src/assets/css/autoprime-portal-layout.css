@@ -504,3 +504,43 @@
     flex-basis: 100%;
   }
 }
+
+
+/* Keep recent signups compact until the admin explicitly expands the list. */
+.autoprime-portal .super-admin-shell .admin-recent-signups {
+  min-height: 0 !important;
+  align-self: start;
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__footer {
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px 16px;
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--ap-border, #e8e5ef);
+  border-radius: 8px;
+  color: var(--ap-accent, #6d28d9);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__toggle:hover {
+  background: var(--ap-accent-soft, #f5f1ff);
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__toggle:focus-visible {
+  outline: 2px solid var(--ap-accent, #6d28d9);
+  outline-offset: 2px;
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__toggle svg {
+  width: 14px;
+  height: 14px;
+}
+.autoprime-portal .super-admin-shell .admin-recent-signups__toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
