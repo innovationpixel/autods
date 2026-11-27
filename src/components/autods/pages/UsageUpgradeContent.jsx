@@ -52,6 +52,7 @@ const CURATED_ADDONS_META = [
 
 export default function UsageUpgradeContent({ onNavigateToPlans }) {
   const navigate = useNavigate();
+  const openPlans = () => typeof onNavigateToPlans === "function" ? onNavigateToPlans() : navigate("/plans");
   const authUser = useSelector(selectUser);
   const [data, setData] = useState(null);
   const [addonCatalog, setAddonCatalog] = useState(null);
@@ -210,10 +211,10 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
       ];
 
   return (
-    <div className="usage-upgrade-page" style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="usage-upgrade-page usage-workspace">
       {/* Hero / Plan Summary Card */}
       <div
-        className="card-wrapper"
+        className="card-wrapper usage-plan-hero"
         style={{
           padding: "32px",
           background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
@@ -319,7 +320,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
 
         <button
           type="button"
-          onClick={onNavigateToPlans}
+          onClick={openPlans}
           style={{
             background: "linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)",
             color: "#fff",
@@ -345,7 +346,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
       </div>
 
       {/* Quota Progress Cards */}
-      <div
+      <div className="usage-quota-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
@@ -353,7 +354,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         }}
       >
         {/* Listings Quota */}
-        <div className="card-wrapper" style={{ padding: "20px", borderRadius: 12 }}>
+        <div className="card-wrapper usage-quota-card" style={{ padding: "20px", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
               <LuPackage style={{ color: "#3b82f6" }} /> Products & Variations Quota
@@ -367,7 +368,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
               style={{
                 width: `${listingsPct}%`,
                 height: "100%",
-                background: listingsPct > 90 ? "#ef4444" : "#3b82f6",
+                background: listingsPct > 90 ? "#ef4444" : "var(--ap-purple, #6d28d9)",
                 borderRadius: 999,
                 transition: "width 0.4s ease",
               }}
@@ -381,7 +382,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         </div>
 
         {/* Orders Quota */}
-        <div className="card-wrapper" style={{ padding: "20px", borderRadius: 12 }}>
+        <div className="card-wrapper usage-quota-card" style={{ padding: "20px", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
               <LuShoppingCart style={{ color: "#10b981" }} /> Auto-Orders
@@ -395,7 +396,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
               style={{
                 width: `${ordersPct}%`,
                 height: "100%",
-                background: ordersPct > 90 ? "#ef4444" : "#10b981",
+                background: ordersPct > 90 ? "#ef4444" : "var(--ap-purple, #6d28d9)",
                 borderRadius: 999,
                 transition: "width 0.4s ease",
               }}
@@ -409,7 +410,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         </div>
 
         {/* Connected Stores */}
-        <div className="card-wrapper" style={{ padding: "20px", borderRadius: 12 }}>
+        <div className="card-wrapper usage-quota-card" style={{ padding: "20px", borderRadius: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
               <LuStore style={{ color: "#f59e0b" }} /> Connected Stores
@@ -423,7 +424,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
               style={{
                 width: `${storesPct}%`,
                 height: "100%",
-                background: storesPct > 90 ? "#ef4444" : "#f59e0b",
+                background: storesPct > 90 ? "#ef4444" : "var(--ap-purple, #6d28d9)",
                 borderRadius: 999,
                 transition: "width 0.4s ease",
               }}
@@ -437,7 +438,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
         </div>
 
         {/* AI Studio Credits */}
-        <div className="card-wrapper" style={{ padding: "20px", borderRadius: 12, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 10 }}>
+        <div className="card-wrapper usage-quota-card" style={{ padding: "20px", borderRadius: 12, display: "flex", flexDirection: "column", justifyContent: "space-between", gap: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#475569", display: "flex", alignItems: "center", gap: 6 }}>
               <LuSparkles style={{ color: "#8b5cf6" }} /> AI Studio Credits
@@ -479,7 +480,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
       </div>
 
       {/* Curated Marketplace Research Add-ons */}
-      <div className="card-wrapper" style={{ padding: "24px 28px", borderRadius: 12 }}>
+      <div className="card-wrapper usage-addons" style={{ padding: "24px 28px", borderRadius: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
           <div>
             <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px 0", color: "#1e293b" }}>
@@ -511,7 +512,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
           </button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 16 }}>
+        <div className="usage-addons-grid">
           {CURATED_ADDONS_META.map((meta) => {
             const Icon = meta.icon;
             const cfg = addonCatalog?.[meta.key] ?? {};
@@ -557,6 +558,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
             return (
               <div
                 key={meta.key}
+                className="usage-addon-card"
                 style={{
                   padding: 18,
                   borderRadius: 12,
@@ -576,7 +578,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
                           width: 38,
                           height: 38,
                           borderRadius: 9,
-                          background: meta.iconGradient,
+                          background: "var(--ap-purple, #6d28d9)",
                           color: "#ffffff",
                           display: "flex",
                           alignItems: "center",
@@ -695,14 +697,14 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
       </div>
 
       {/* Plan Features Checklist */}
-      <div className="card-wrapper" style={{ padding: "28px", borderRadius: 12 }}>
+      <div className="card-wrapper usage-features" style={{ padding: "28px", borderRadius: 12 }}>
         <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 16px 0", color: "#1e293b" }}>
           What's Included In Your Plan
         </h3>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
             gap: 12,
           }}
         >
@@ -740,7 +742,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
           ))}
         </div>
 
-        <div
+        <div className="usage-upgrade-callout"
           style={{
             marginTop: 24,
             padding: "16px 20px",
@@ -762,7 +764,7 @@ export default function UsageUpgradeContent({ onNavigateToPlans }) {
           </div>
           <button
             type="button"
-            onClick={onNavigateToPlans}
+            onClick={openPlans}
             style={{
               background: "#2563eb",
               color: "#fff",

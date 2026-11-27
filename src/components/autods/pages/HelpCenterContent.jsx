@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   LuCheck,
   LuChevronRight,
@@ -136,6 +137,7 @@ function TicketThread({ ticket, onReply, replying }) {
 }
 
 function HelpCenterContent() {
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [loadingTickets, setLoadingTickets] = useState(true);
   const [newTicketOpen, setNewTicketOpen] = useState(false);
@@ -259,26 +261,35 @@ function HelpCenterContent() {
     }
   };
 
+  // Only expose external resources when the deployment provides a real HTTPS URL.
+  const resourceUrl = (value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" ? url.href : null;
+    } catch { return null; }
+  };
+  const blogUrl = resourceUrl(import.meta.env.VITE_SUPPORT_BLOG_URL);
+  const helpUrl = resourceUrl(import.meta.env.VITE_SUPPORT_HELP_URL);
+  const openNewTicket = (type = "technical_support", initialSubject = "") => {
+    setTicketType(type);
+    setTicketPriority("medium");
+    setSubject(initialSubject);
+    setMessage("");
+    setNewTicketOpen(true);
+  };
   const helpCards = [
-    {
-      title: "Help center",
-      subtitle: "Technical information",
-      icon: LuHeadphones,
-      tone: "mint",
-    },
-    {
-      title: "Feature Request",
-      subtitle: "",
-      icon: LuMessageCircleMore,
-      tone: "aqua",
-    },
-    {
-      title: "From our blog",
-      subtitle: "",
-      icon: LuFilePenLine,
-      tone: "rose",
-    },
+    { title: "Help center", subtitle: "Technical information & assistance", icon: LuHeadphones, tone: "mint", url: helpUrl, action: () => openNewTicket("technical_support") },
+    { title: "Feature Request", subtitle: "Suggest a new feature", icon: LuMessageCircleMore, tone: "aqua", action: () => openNewTicket("sales", "Feature request: ") },
+    blogUrl
+      ? { title: "From our blog", subtitle: "Guides and updates", icon: LuFilePenLine, tone: "rose", url: blogUrl }
+      : { title: "Plans & billing", subtitle: "Manage your subscription", icon: LuFilePenLine, tone: "rose", action: () => navigate("/settings?tab=plans") },
   ];
+  const externalLinks = [
+    { label: "YouTube Channel", icon: LuPlay, url: resourceUrl(import.meta.env.VITE_SUPPORT_YOUTUBE_URL) },
+    { label: "Facebook community", icon: LuMessageCircleMore, url: resourceUrl(import.meta.env.VITE_SUPPORT_FACEBOOK_URL) },
+    { label: "Telegram group", icon: LuExternalLink, url: resourceUrl(import.meta.env.VITE_SUPPORT_TELEGRAM_URL) },
+    { label: "System status", icon: LuCheck, url: resourceUrl(import.meta.env.VITE_SUPPORT_STATUS_URL) },
+  ].filter((item) => item.url);
 
   return (
     <section className="help-center-page">
@@ -286,8 +297,10 @@ function HelpCenterContent() {
         {helpCards.map((card) => {
           const Icon = card.icon;
 
+          const Tag = card.url ? "a" : "button";
+          const linkProps = card.url ? { href: card.url, target: "_blank", rel: "noopener noreferrer" } : { type: "button", onClick: card.action };
           return (
-            <button type="button" className="help-center-card" key={card.title}>
+            <Tag className="help-center-card" key={card.title} {...linkProps}>
               <span className={`help-center-card__icon help-center-card__icon--${card.tone}`}>
                 <Icon />
               </span>
@@ -296,7 +309,7 @@ function HelpCenterContent() {
                 {card.subtitle ? <span>{card.subtitle}</span> : null}
               </span>
               <LuChevronRight className="help-center-card__arrow" />
-            </button>
+            </Tag>
           );
         })}
       </div>
@@ -309,20 +322,21 @@ function HelpCenterContent() {
               Open a ticket for Sales, Billing, or Technical Support. Chat continuously with our team until resolved.
             </p>
           </div>
-          <button type="button" className="button-base button-primary" onClick={() => setNewTicketOpen(true)}>
+          <button type="button" className="button-base button-primary" onClick={() => openNewTicket()}>
             <LuPlus />
             <span>New Ticket</span>
           </button>
         </div>
 
         {/* Filter Toolbar */}
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", marginBottom: 16 }}>
+        <div className="support-ticket-filters">
           <div className="support-status-filter" style={{ margin: 0 }}>
             {["All", "open", "answered", "closed"].map((st) => (
               <button
                 type="button"
                 key={st}
                 className={`support-status-filter__btn ${statusFilter === st ? "support-status-filter__btn--active" : ""}`}
+                aria-pressed={statusFilter === st}
                 onClick={() => setStatusFilter(st)}
               >
                 {st === "All" ? "All Statuses" : st.charAt(0).toUpperCase() + st.slice(1)}
@@ -330,11 +344,12 @@ function HelpCenterContent() {
             ))}
           </div>
 
-          <div style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="support-ticket-type-filter">
             <span style={{ fontSize: 12, color: "#64748b", fontWeight: 600 }}>Type:</span>
             <select
               className="marketplace-settings__control"
               value={typeFilter}
+              aria-label="Filter ticket type"
               onChange={(e) => setTypeFilter(e.target.value)}
               style={{ padding: "6px 12px", fontSize: 13, height: "auto", minWidth: 140 }}
             >
@@ -377,35 +392,30 @@ function HelpCenterContent() {
         ) : (
           <div className="support-tickets-panel__empty">
             <LuInbox style={{ fontSize: 24 }} />
-            <span>No support tickets found. Click "New Ticket" if you need help with Sales, Billing, or Technical Support.</span>
+            <strong>{statusFilter !== "All" || typeFilter !== "All" ? "No matching tickets" : "No support tickets yet"}</strong>
+            <span>{statusFilter !== "All" || typeFilter !== "All" ? "Try changing your filters." : "Need help with sales, billing or technical support? Start a conversation."}</span>
+            {statusFilter !== "All" || typeFilter !== "All" ? (
+              <button type="button" className="support-empty-action" onClick={() => { setStatusFilter("All"); setTypeFilter("All"); }}>Clear filters</button>
+            ) : (
+              <button type="button" className="support-empty-action" onClick={() => openNewTicket()}><LuPlus /> New Ticket</button>
+            )}
           </div>
         )}
       </section>
 
-      <div className="help-center-links">
-        <button type="button">
-          <LuPlay />
-          <span>YouTube Channel</span>
-        </button>
-        <button type="button">
-          <LuMessageCircleMore />
-          <span>Facebook community</span>
-        </button>
-        <button type="button">
-          <LuExternalLink />
-          <span>Telegram group</span>
-        </button>
-        <button type="button">
-          <LuCheck />
-          <span>System status</span>
-        </button>
-      </div>
+      {externalLinks.length > 0 && (
+        <div className="help-center-links">
+          {externalLinks.map(({ label, icon: Icon, url }) => (
+            <a key={label} href={url} target="_blank" rel="noopener noreferrer"><Icon /><span>{label}</span><LuExternalLink /></a>
+          ))}
+        </div>
+      )}
 
       {/* New Ticket Modal */}
       {newTicketOpen ? (
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setNewTicketOpen(false)} />
-          <div className="orders-modal__card admin-modal">
+          <div className="orders-modal__card admin-modal support-ticket-create" role="dialog" aria-modal="true" aria-label="New support ticket">
             <button
               type="button"
               className="balance-modal__close"
@@ -416,7 +426,7 @@ function HelpCenterContent() {
             </button>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 18, fontWeight: 700 }}>New Support Ticket</h3>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+            <div className="support-ticket-form-grid">
               <label className="marketplace-settings__field" style={{ margin: 0 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Ticket Type</span>
                 <select
@@ -490,7 +500,7 @@ function HelpCenterContent() {
       {activeTicket ? (
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setActiveTicket(null)} />
-          <div className="orders-modal__card admin-modal support-ticket-modal">
+          <div className="orders-modal__card admin-modal support-ticket-modal" role="dialog" aria-modal="true" aria-label="Support ticket conversation">
             <button
               type="button"
               className="balance-modal__close"
