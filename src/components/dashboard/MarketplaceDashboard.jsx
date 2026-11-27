@@ -2447,7 +2447,7 @@ const MarketplaceDashboard = () => {
               <PlansPage />
             ) : (
               <>
-                <section className="marketplace-search-panel card-wrapper">
+                <section className="marketplace-search-panel card-wrapper marketplace-finder-layout">
                   <div className="marketplace-search-panel__top-row">
                     <Search
                       className="marketplace-ant-search"
@@ -2521,6 +2521,7 @@ const MarketplaceDashboard = () => {
                           type="button"
                           key={category.key}
                           className={`marketplace-category-item ${isActive ? "marketplace-category-item--active" : ""}`}
+                          aria-pressed={isActive}
                           onClick={() => selectCategory(category)}
                         >
                           <span className="marketplace-category-item__icon">
@@ -2553,7 +2554,7 @@ const MarketplaceDashboard = () => {
                   ) : null}
                 </section>
 
-                <section className="marketplace-toolbar">
+                <section className="marketplace-toolbar marketplace-finder-toolbar">
                   <div className="marketplace-toolbar__left">
                     {filterPills.map((item) => {
                       const Icon = item.icon;
@@ -2578,7 +2579,7 @@ const MarketplaceDashboard = () => {
                   <div className="marketplace-toolbar__right">
                     <span className="marketplace-toolbar__sort-label">Sort By:</span>
                     <div className="marketplace-toolbar__sort-control">
-                      <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+                      <select aria-label="Sort marketplace products" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
                         {filterOptions.sortBy.map((option) => (
                           <option key={option} value={option}>
                             {option}
