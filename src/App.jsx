@@ -42,6 +42,7 @@ import "./assets/css/autoprime-calculations-polish.css";
 import "./assets/css/autoprime-orders-hover-actions.css";
 import "./assets/css/autoprime-table-scroll-area.css";
 import "./assets/css/autoprime-notifications-v2.css";
+import "./assets/css/autoprime-portal-layout.css";
 
 function App() {
   return (

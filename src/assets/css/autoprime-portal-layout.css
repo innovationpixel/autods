@@ -1,0 +1,316 @@
+/* Portal layout foundations: customer and super-admin shells only.
+   Keep existing theme, controls, data and page-specific table sizing. */
+.autoprime-portal .marketplace-dashboard-page {
+  --ap-portal-gutter: clamp(12px, 1.6vw, 28px);
+  --ap-portal-dialog-gutter: clamp(12px, 3vw, 24px);
+  --ap-portal-layer-content: 0;
+  --ap-portal-layer-header: 12;
+  --ap-portal-layer-navigation: 24;
+  --ap-portal-layer-dialog: 60;
+  min-width: 0;
+}
+
+.autoprime-portal .marketplace-dashboard-page .marketplace-main,
+.autoprime-portal .marketplace-dashboard-page .marketplace-main__scroll {
+  min-width: 0 !important;
+  max-width: 100%;
+}
+
+/* One shared gutter, no arbitrary 1440px or 1560px page cap.
+   Do not change max-widths of nested text, cards or individual dialog panels. */
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  padding: var(--ap-portal-gutter) var(--ap-portal-gutter) 32px !important;
+  margin: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper > * {
+  min-width: 0;
+  max-width: none;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper > :is(
+  section, .usage-upgrade-page, .customer-support-content, .sourcing-request-content
+) {
+  margin-inline: 0;
+}
+.autoprime-portal .marketplace-dashboard-page .ebay-dashboard {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 0 12px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .help-center-page {
+  max-width: none !important;
+  margin-inline: 0 !important;
+}
+
+/* Keep normal dropdowns above page content but below navigation and dialogs.
+   A fixed descendant of a backdrop-filtered header would be positioned
+   relative to the header rather than the viewport. The opaque surface stays. */
+.autoprime-portal .marketplace-dashboard-page .marketplace-header {
+  z-index: var(--ap-portal-layer-header) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-header__controls,
+.autoprime-portal .marketplace-dashboard-page .marketplace-header__profile-wrap {
+  z-index: 2 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .profile-dropdown {
+  z-index: 3 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-sidebar {
+  z-index: var(--ap-portal-layer-navigation) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper {
+  position: relative;
+  z-index: var(--ap-portal-layer-content) !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .marketplace-settings, .marketplace-settings__content
+) {
+  z-index: auto !important;
+}
+
+/* Existing dialogs are rendered in their owning page rather than all through
+   a shared React portal. Elevate that page only while a dialog is mounted.
+   Keep individual modal z-index values so nested confirmations still win. */
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper:has(
+  :is(.orders-modal, .marketplace-settings__modal, .marketplace-settings__plan-modal-layer,
+      .rd-modal-backdrop, .ai-image-popup-backdrop, .ai-bundle-modal-backdrop,
+      .support-modal-overlay, .notification-modal-layer, .modal.show,
+      [class$="-modal-layer"], [class*="-modal-layer "],
+      [role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"])
+) {
+  z-index: var(--ap-portal-layer-dialog) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-header:has(.notification-modal-layer) {
+  z-index: calc(var(--ap-portal-layer-dialog) + 10) !important;
+}
+
+/* Local scroll containers keep sticky table headings and action menus
+   from competing with the shell or modal stacking layers. */
+.autoprime-portal .marketplace-dashboard-page :is(
+  .orders-table-shell, .products-table-shell, .rd-table-wrapper,
+  .sourcing-table-shell, .support-table-shell, .ebay-orders-table,
+  .calculations-table-scroll, .orders-table-scroll, .products-table-scroll,
+  .support-table-scroll
+) {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .orders-table-scroll, .products-table-scroll, .calculations-table-scroll,
+  .support-table-scroll, .rd-table-wrapper, .ebay-orders-table
+) {
+  overflow-x: auto !important;
+  isolation: isolate;
+  overscroll-behavior-inline: contain;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper
+  :is([class$="-table-wrap"], [class$="-table-wrapper"], [class$="-table-container"]):has(> table) {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .orders-table-scroll, .calculations-table-scroll
+) {
+  min-height: min(320px, 50dvh) !important;
+}
+
+/* Centre the legacy fixed layers, retain per-dialog width limits, and
+   scroll long content inside the card instead of cutting off its footer. */
+.autoprime-portal .marketplace-dashboard-page :is(
+  .orders-modal, .add-product-modal-layer, .store-switcher-modal-layer,
+  .connect-ebay-modal-layer, .schedule-modal-layer, .quick-edit-modal-layer,
+  .bulk-edit-modal-layer, .invite-sheet-modal-layer,
+  .marketplace-settings__modal, .marketplace-settings__plan-modal-layer
+) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: var(--ap-portal-dialog-gutter) !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .orders-modal__card, .add-product-modal, .store-switcher-modal,
+  .connect-ebay-modal, .schedule-modal, .quick-edit-modal, .bulk-edit-modal,
+  .invite-sheet-modal, .marketplace-settings__modal-card,
+  .marketplace-settings__plan-modal
+) {
+  margin: 0 !important;
+  min-width: 0 !important;
+  max-inline-size: 100%;
+  max-height: calc(100vh - 2 * var(--ap-portal-dialog-gutter)) !important;
+  max-height: calc(100dvh - 2 * var(--ap-portal-dialog-gutter)) !important;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.autoprime-portal .marketplace-dashboard-page .product-editor-modal-layer {
+  padding: var(--ap-portal-dialog-gutter) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .product-editor-modal {
+  max-inline-size: 100%;
+  min-width: 0;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.ai-image-popup-modal, .ai-bundle-modal, .rd-modal) {
+  max-inline-size: 100%;
+  max-height: calc(100dvh - 2 * var(--ap-portal-dialog-gutter)) !important;
+}
+
+/* Fluid card grids and filter rows. Preserve table column minima and
+   the existing dense desktop layouts; never squeeze text into tiny cards. */
+.autoprime-portal .marketplace-dashboard-page :is(
+  .marketplace-expanded-products__grid, .pod-products-grid,
+  .ai-gen-hub .ai-gen-hub__gallery-grid, .ai-my-images-grid,
+  .ai-bundle-images-grid, .admin-wallet-deposits__grid, .admin-plans-page__grid
+) {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)) !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .ebay-kpi-grid, .admin-dash__kpi-grid, .admin-dash__mini-stats
+) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)) !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .page-filter-panel__grid--auto, .page-filter-panel__grid--wide,
+  .page-filter-panel__grid--drafts
+) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)) !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .ebay-kpi-grid, .admin-dash__kpi-grid, .admin-dash__mini-stats,
+  .marketplace-expanded-products__grid, .pod-products-grid,
+  .ai-gen-hub__gallery-grid, .ai-my-images-grid, .admin-plans-page__grid,
+  .page-filter-panel__grid--auto, .page-filter-panel__grid--wide,
+  .page-filter-panel__grid--drafts
+) > * {
+  min-width: 0;
+}
+.autoprime-portal .marketplace-dashboard-page :is(
+  .marketplace-toolbar__left, .marketplace-toolbar__right,
+  .orders-toolbar__left, .orders-toolbar__actions,
+  .orders-summary-row__actions, .admin-dashboard-page__toolbar,
+  .admin-plans-page__toolbar-right
+) {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+/* Use the same mobile breakpoint for sidebar, main offset and menu toggle.
+   The old rules switched the main offset at 900px but the drawer at 760px. */
+.autoprime-portal .marketplace-dashboard-page.super-admin-shell .marketplace-header {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+}
+@media (max-width: 1180px) {
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    height: auto !important;
+    min-height: var(--ap-topbar-h, 64px) !important;
+    padding: 10px var(--ap-portal-gutter) !important;
+    gap: 8px 12px !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__title-group {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page .page-filter-panel__grid--orders {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)) !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page .ai-gen-hub .ai-gen-hub__layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+@media (max-width: 900px) {
+  .autoprime-portal .marketplace-dashboard-page .marketplace-main {
+    margin-left: 0 !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0;
+    width: min(284px, 86vw) !important;
+    min-width: 0 !important;
+    height: 100vh;
+    height: 100dvh;
+    transform: translateX(-100%);
+    transition: transform .24s ease;
+    visibility: hidden;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-sidebar--mobile-open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    display: block;
+    z-index: 18;
+    border: 0;
+    background: rgba(8, 12, 26, .42);
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-header__menu-toggle {
+    display: inline-flex !important;
+    flex: 0 0 auto;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-sidebar__nav {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+@media (max-width: 700px) {
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__controls {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page:not(.super-admin-shell) .marketplace-header__search {
+    grid-row: 3;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-header__profile-wrap {
+    margin-left: auto;
+  }
+  .autoprime-portal .marketplace-dashboard-page .profile-dropdown {
+    left: auto !important;
+    right: 0 !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page :is(
+    .ebay-kpi-grid, .admin-dash__kpi-grid, .admin-dash__mini-stats
+  ) {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)) !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page :is(
+    .orders-modal__card, .marketplace-settings__modal-card
+  ) {
+    padding: 20px 16px !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page .marketplace-settings__primary-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .autoprime-portal .marketplace-dashboard-page .marketplace-sidebar {
+    transition: none;
+  }
+}
