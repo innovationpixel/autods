@@ -1530,21 +1530,13 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
               </p>
             </div>
 
-            <div className="order-processing-hero__spotlight">
-              <span>Waiting to be processed</span>
-              <strong>{orders.length}</strong>
-              <em>{formatMoney(totalValue)} in order value</em>
-            </div>
-          </header>
-
-          <div className="order-processing-hero__actions">
-            <button type="button" className="order-processing-btn order-processing-btn--primary" onClick={handleSync} disabled={syncing || syncingAliExpress}>
+            <div className="order-processing-sync-actions" role="group" aria-label="Order synchronization">
+            <button type="button" className="order-processing-btn order-processing-btn--primary" onClick={handleSync} disabled={syncing || syncingAliExpress} title="Pull eBay orders and sync AliExpress">
               <span className="order-processing-btn__icon">
                 {syncing ? <LuLoader className="spin-icon" /> : <LuRefreshCcw />}
               </span>
               <span className="order-processing-btn__copy">
                 <strong>{syncing ? "Syncing…" : "Sync Orders"}</strong>
-                <small>Pull eBay & sync AliExpress</small>
               </span>
             </button>
 
@@ -1560,9 +1552,17 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
               </span>
               <span className="order-processing-btn__copy">
                 <strong>{syncingAliExpress ? "Checking…" : "Sync AliExpress"}</strong>
-                <small>Update paid & tracking status</small>
               </span>
             </button>
+            </div>
+          </header>
+
+          <div className="order-processing-hero__actions">
+            <div className="order-processing-hero__spotlight">
+              <span>Waiting to be processed</span>
+              <strong>{orders.length}</strong>
+              <em>{formatMoney(totalValue)} in order value</em>
+            </div>
 
             <div className="order-processing-method-control">
               <span className="order-processing-method-control__label">Processing method</span>
