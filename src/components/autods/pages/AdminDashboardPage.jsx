@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
@@ -20,6 +20,7 @@ import {
   LuUserRound,
   LuUsers,
   LuWalletCards,
+  LuX,
 } from "react-icons/lu";
 import {
   Area,
@@ -117,6 +118,12 @@ function AdminDashboardPage() {
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [customRangeOpen, setCustomRangeOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo, setDraftTo] = useState("");
+  const customRangeDialogRef = useRef(null);
+  const dateFilterButtonRef = useRef(null);
+  const requestIdRef = useRef(0);
   const [refreshing, setRefreshing] = useState(false);
   const [showAllSignups, setShowAllSignups] = useState(false);
   const [showAllTopClients, setShowAllTopClients] = useState(false);
@@ -128,7 +135,8 @@ function AdminDashboardPage() {
   }, [role, navigate]);
 
   const loadDashboard = useCallback(
-    (preset = datePreset, from = customFrom, to = customTo) => {
+    (preset = "30d", from = "", to = "") => {
+      const requestId = ++requestIdRef.current;
       setRefreshing(true);
       const params = { preset };
       if (preset === "custom") {
@@ -137,14 +145,20 @@ function AdminDashboardPage() {
       }
 
       getAdminDashboard(params)
-        .then((res) => setDashboard(res.data))
-        .catch(() => toast.error("Failed to load admin dashboard."))
+        .then((res) => {
+          if (requestId === requestIdRef.current) setDashboard(res.data);
+        })
+        .catch(() => {
+          if (requestId === requestIdRef.current) toast.error("Failed to load admin dashboard.");
+        })
         .finally(() => {
-          setLoading(false);
-          setRefreshing(false);
+          if (requestId === requestIdRef.current) {
+            setLoading(false);
+            setRefreshing(false);
+          }
         });
     },
-    [datePreset, customFrom, customTo],
+    [],
   );
 
   useEffect(() => {
@@ -152,20 +166,44 @@ function AdminDashboardPage() {
     loadDashboard("30d");
   }, [role, loadDashboard]);
 
-  const handleSelectPreset = (presetVal) => {
-    setDatePreset(presetVal);
-    setDateDropdownOpen(false);
-    if (presetVal !== "custom") {
-      loadDashboard(presetVal);
+  useEffect(() => {
+    const dialog = customRangeDialogRef.current;
+    if (!dialog) return;
+    if (customRangeOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!customRangeOpen && dialog.open) {
+      dialog.close();
+      dateFilterButtonRef.current?.focus();
     }
+  }, [customRangeOpen]);
+
+  const handleSelectPreset = (presetVal) => {
+    setDateDropdownOpen(false);
+    if (presetVal === "custom") {
+      setDraftFrom(customFrom);
+      setDraftTo(customTo);
+      setCustomRangeOpen(true);
+      return;
+    }
+    setDatePreset(presetVal);
+    loadDashboard(presetVal);
   };
 
-  const handleApplyCustom = () => {
-    if (!customFrom || !customTo) {
+  const handleApplyCustom = (event) => {
+    event.preventDefault();
+    if (!draftFrom || !draftTo) {
       toast.error("Please specify both a start and end date.");
       return;
     }
-    loadDashboard("custom", customFrom, customTo);
+    if (draftFrom > draftTo) {
+      toast.error("End date must be on or after the start date.");
+      return;
+    }
+    setCustomFrom(draftFrom);
+    setCustomTo(draftTo);
+    setDatePreset("custom");
+    setCustomRangeOpen(false);
+    loadDashboard("custom", draftFrom, draftTo);
   };
 
   const activePreset = DATE_PRESETS.find((p) => p.value === datePreset) || DATE_PRESETS[2];
@@ -281,6 +319,7 @@ function AdminDashboardPage() {
             <button
               type="button"
               className="ebay-date-button"
+              ref={dateFilterButtonRef}
               onClick={() => setDateDropdownOpen((prev) => !prev)}
               aria-expanded={dateDropdownOpen}
               title="Filter statistics by date range"
@@ -306,37 +345,6 @@ function AdminDashboardPage() {
               </div>
             )}
           </div>
-
-          {/* CUSTOM RANGE PICKERS */}
-          {datePreset === "custom" && (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-              <input
-                type="date"
-                value={customFrom}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="ebay-small-select"
-                style={{ height: 38, padding: "0 8px", fontSize: 12 }}
-                title="Start date"
-              />
-              <span style={{ fontSize: 12, color: "#64748b" }}>to</span>
-              <input
-                type="date"
-                value={customTo}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="ebay-small-select"
-                style={{ height: 38, padding: "0 8px", fontSize: 12 }}
-                title="End date"
-              />
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ height: 38, padding: "0 14px", fontSize: 12, borderRadius: 8 }}
-                onClick={handleApplyCustom}
-              >
-                Apply
-              </button>
-            </div>
-          )}
 
           <button
             type="button"
@@ -368,6 +376,48 @@ function AdminDashboardPage() {
           </button>
         </div>
       </header>
+
+      <dialog
+        ref={customRangeDialogRef}
+        className="admin-date-range-dialog"
+        aria-labelledby="admin-date-range-title"
+        onCancel={(event) => {
+          event.preventDefault();
+          setCustomRangeOpen(false);
+        }}
+      >
+        <form onSubmit={handleApplyCustom}>
+          <div className="admin-date-range-dialog__head">
+            <span className="admin-date-range-dialog__icon"><LuCalendarDays aria-hidden="true" /></span>
+            <div>
+              <h2 id="admin-date-range-title">Custom Date Range</h2>
+              <p>Select the start and end dates for your dashboard.</p>
+            </div>
+            <button
+              type="button"
+              className="admin-date-range-dialog__close"
+              aria-label="Close date range"
+              onClick={() => setCustomRangeOpen(false)}
+            >
+              <LuX aria-hidden="true" />
+            </button>
+          </div>
+          <div className="admin-date-range-dialog__fields">
+            <label>
+              <span>Start date</span>
+              <input type="date" required value={draftFrom} onChange={(event) => setDraftFrom(event.target.value)} />
+            </label>
+            <label>
+              <span>End date</span>
+              <input type="date" required min={draftFrom || undefined} value={draftTo} onChange={(event) => setDraftTo(event.target.value)} />
+            </label>
+          </div>
+          <div className="admin-date-range-dialog__actions">
+            <button type="button" className="admin-date-range-dialog__cancel" onClick={() => setCustomRangeOpen(false)}>Cancel</button>
+            <button type="submit" className="admin-date-range-dialog__apply">Apply</button>
+          </div>
+        </form>
+      </dialog>
 
       {/* ===================================================
           KPI CARDS

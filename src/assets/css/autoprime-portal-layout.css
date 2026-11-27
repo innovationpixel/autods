@@ -686,3 +686,175 @@
     width: min(340px, calc(100vw - 24px)) !important;
   }
 }
+
+
+/* Keep the admin heading readable regardless of the active date filter. */
+.autoprime-portal .super-admin-shell .ebay-dashboard__header {
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 14px 22px !important;
+}
+.autoprime-portal .super-admin-shell .ebay-dashboard__welcome {
+  flex: 1 1 280px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .ebay-dashboard__header-right {
+  flex: 0 1 auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+}
+.autoprime-portal .super-admin-shell .ebay-dashboard__header-right .ebay-date-filter {
+  max-width: 100%;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .ebay-dashboard__header-right .ebay-date-button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.autoprime-portal .super-admin-shell .ebay-dashboard__header-right .ebay-date-button {
+  max-width: 100%;
+}
+
+/* Native dialog uses the browser top layer, above the portal header and sidebar. */
+.autoprime-portal .super-admin-shell .admin-date-range-dialog {
+  position: fixed;
+  inset: 0;
+  width: min(480px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--ap-border, #e9e4f2);
+  border-radius: 14px;
+  background: var(--ap-surface, #fff);
+  color: var(--ap-text, #171230);
+  box-shadow: none;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog:not([open]) {
+  display: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog::backdrop {
+  background: rgba(23, 18, 48, .38);
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog form {
+  margin: 0;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 32px;
+  align-items: start;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--ap-border, #e9e4f2);
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--ap-accent-soft, #f5f1ff);
+  color: var(--ap-accent, #6d28d9);
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__icon svg {
+  width: 20px;
+  height: 20px;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__head h2 {
+  margin: 0 0 5px;
+  font-size: 17px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__head p {
+  margin: 0;
+  color: var(--ap-muted, #67627a);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--ap-border, #e9e4f2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ap-muted, #67627a);
+  box-shadow: none !important;
+  cursor: pointer;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__close svg {
+  width: 16px;
+  height: 16px;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 175px), 1fr));
+  gap: 16px;
+  padding: 20px;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__fields label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 650;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__fields input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--ap-border-strong, #ddd3ec);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ap-text, #171230);
+  color-scheme: light;
+  font: inherit;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--ap-border, #e9e4f2);
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__actions button {
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__cancel {
+  border: 1px solid var(--ap-border-strong, #ddd3ec);
+  background: #fff;
+  color: var(--ap-text, #171230);
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog__apply {
+  border: 1px solid transparent;
+  background: var(--ap-accent, #6d28d9);
+  color: #fff;
+}
+.autoprime-portal .super-admin-shell .admin-date-range-dialog :is(button, input):focus-visible {
+  outline: 2px solid var(--ap-accent, #6d28d9);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .autoprime-portal .super-admin-shell .ebay-dashboard__welcome {
+    flex: 0 1 auto !important;
+    width: 100%;
+  }
+}
