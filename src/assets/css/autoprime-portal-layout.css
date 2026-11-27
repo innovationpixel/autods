@@ -858,3 +858,88 @@
     width: 100%;
   }
 }
+
+
+/* Clients filters: shared field baseline and search icon inside the input. */
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar.admin-filters-bar {
+  --clients-filter-height: 42px;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-end !important;
+  gap: 12px 16px !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__search {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  flex: 2 1 240px !important;
+  min-width: min(100%, 200px) !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-filters-bar__field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  flex: 1 1 140px;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar :is(.admin-clients-page__search-label, .admin-filters-bar__field > span) {
+  color: var(--ap-muted, #67627a) !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap {
+  display: block;
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  z-index: 1;
+  color: var(--ap-muted, #67627a);
+  pointer-events: none;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar :is(.admin-clients-page__search-input-wrap > input, .admin-filters-bar__field > select) {
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: var(--clients-filter-height) !important;
+  min-height: var(--clients-filter-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  border-radius: 9px !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap > input {
+  padding-left: 36px !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__count {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--clients-filter-height);
+  flex: 0 0 auto;
+  margin: 0 0 0 auto !important;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__search {
+    flex-basis: 100% !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-filters-bar__field {
+    flex-basis: 125px;
+  }
+}
