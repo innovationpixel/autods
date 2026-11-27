@@ -1061,3 +1061,196 @@
     grid-column: 1 / -1;
   }
 }
+
+
+/* Plans management: aligned header actions, flat tabs, compact summary. */
+.autoprime-portal .super-admin-shell .admin-plans-page--ref {
+  container-type: inline-size;
+  container-name: admin-plans-layout;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-shell {
+  gap: 16px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-head {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 16px 24px !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__ref-head > div:first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__header-actions {
+  display: flex !important;
+  flex: 0 1 auto;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__header-actions > .admin-page__btn {
+  min-height: 40px !important;
+  height: auto !important;
+  padding: 9px 14px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  border-radius: 9px !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+  box-shadow: none !important;
+  max-width: 100%;
+  white-space: normal !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__header-actions > .admin-page__btn--ghost {
+  border: 1px solid var(--ap-border-strong, #ddd3ec) !important;
+  background: var(--ap-surface, #fff) !important;
+  color: var(--ap-text, #171230) !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__header-actions > .admin-page__btn--primary {
+  background: var(--ap-accent, #6d28d9) !important;
+  color: #fff !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch !important;
+  gap: 12px !important;
+  padding: 12px !important;
+  border: 1px solid var(--ap-border, #e9e4f2) !important;
+  border-radius: 12px !important;
+  background: var(--ap-surface, #fff) !important;
+  box-shadow: none !important;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tabs {
+  display: grid !important;
+  grid-template-columns: .65fr 1.4fr 1.25fr 1.1fr;
+  gap: 6px !important;
+  min-width: 0;
+  padding: 4px;
+  border: 1px solid var(--ap-border, #e9e4f2);
+  border-radius: 9px;
+  background: var(--ap-bg-soft, #faf9ff);
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tab {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  height: auto !important;
+  padding: 8px 10px !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  color: var(--ap-muted, #67627a) !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+  text-align: center;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tab.is-active {
+  background: var(--ap-accent-soft, #f1ebff) !important;
+  color: var(--ap-accent, #6d28d9) !important;
+  border-color: var(--ap-border-strong, #ddd3ec) !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tab:hover:not(.is-active) {
+  background: var(--ap-surface, #fff) !important;
+  color: var(--ap-text, #171230) !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref :is(.admin-plans-page__tab, .admin-page__btn) > svg {
+  flex-shrink: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__toolbar-right {
+  display: block !important;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-stats {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.8fr);
+  align-items: stretch !important;
+  gap: 8px !important;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__stat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 9px 12px;
+  min-width: 0;
+  background: var(--ap-bg-soft, #faf9ff);
+  border: 1px solid var(--ap-border, #e9e4f2);
+  border-radius: 8px;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__stat > span {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ap-muted, #67627a);
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__stat > strong {
+  font-size: 18px !important;
+  line-height: 1.15;
+  font-weight: 750 !important;
+  font-variant-numeric: tabular-nums;
+  color: var(--ap-text, #171230) !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__signfree-note {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 7px !important;
+  min-width: 0;
+  padding: 10px 12px !important;
+  border-radius: 8px !important;
+  font-size: 11.5px !important;
+  line-height: 1.4;
+  white-space: normal !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__signfree-note > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page__signfree-note > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tab:focus-visible,
+.autoprime-portal .super-admin-shell .admin-plans-page__header-actions > button:focus-visible {
+  outline: 2px solid var(--ap-accent, #6d28d9) !important;
+  outline-offset: 2px;
+}
+@container admin-plans-layout (max-width: 760px) {
+  .autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__signfree-note {
+    grid-column: 1 / -1;
+  }
+}
+@container admin-plans-layout (max-width: 520px) {
+  .autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__tabs,
+  .autoprime-portal .super-admin-shell .admin-plans-page--ref .admin-plans-page__ref-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .autoprime-portal .super-admin-shell .admin-plans-page__header-actions {
+    width: 100%;
+  }
+  .autoprime-portal .super-admin-shell .admin-plans-page__header-actions > .admin-page__btn {
+    flex: 1 1 auto;
+  }
+}

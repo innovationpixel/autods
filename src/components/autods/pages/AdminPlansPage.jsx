@@ -649,10 +649,11 @@ function AdminPlansPage() {
         </header>
 
         <div className="admin-plans-page__ref-toolbar">
-          <div className="admin-plans-page__tabs">
+          <div className="admin-plans-page__tabs" role="group" aria-label="Filter plans by type">
             <button
               type="button"
               className={`admin-plans-page__tab ${typeFilter === "all" ? "is-active" : ""}`}
+              aria-pressed={typeFilter === "all"}
               onClick={() => setTypeFilter("all")}
             >
               All ({plans.length})
@@ -660,6 +661,7 @@ function AdminPlansPage() {
             <button
               type="button"
               className={`admin-plans-page__tab ${typeFilter === "standard" ? "is-active" : ""}`}
+              aria-pressed={typeFilter === "standard"}
               onClick={() => setTypeFilter("standard")}
             >
               Standard Public Plans ({standardPlansCount})
@@ -667,6 +669,7 @@ function AdminPlansPage() {
             <button
               type="button"
               className={`admin-plans-page__tab ${typeFilter === "custom" ? "is-active" : ""}`}
+              aria-pressed={typeFilter === "custom"}
               onClick={() => setTypeFilter("custom")}
             >
               <LuLock />
@@ -675,6 +678,7 @@ function AdminPlansPage() {
             <button
               type="button"
               className={`admin-plans-page__tab ${typeFilter === "one_time" ? "is-active" : ""}`}
+              aria-pressed={typeFilter === "one_time"}
               onClick={() => setTypeFilter("one_time")}
             >
               <LuClock />
@@ -683,19 +687,20 @@ function AdminPlansPage() {
           </div>
 
           <div className="admin-plans-page__toolbar-right">
-            <div className="admin-plans-page__ref-stats">
-              <span><strong>{activeCount}</strong> Active</span>
-              <span><strong>{standardPlansCount}</strong> Public</span>
-              <span><strong>{customPlansCount}</strong> Custom</span>
-              <span><strong>{oneTimePlansCount}</strong> One-Time</span>
+            <div className="admin-plans-page__ref-stats" aria-label="Plan summary">
+              <div className="admin-plans-page__stat"><span>Active</span><strong>{activeCount}</strong></div>
+              <div className="admin-plans-page__stat"><span>Public</span><strong>{standardPlansCount}</strong></div>
+              <div className="admin-plans-page__stat"><span>Custom</span><strong>{customPlansCount}</strong></div>
+              <div className="admin-plans-page__stat"><span>One-Time</span><strong>{oneTimePlansCount}</strong></div>
               <span
                 className={`admin-plans-page__signfree-note ${
                   activeSignFreePlan ? "is-configured" : "is-missing"
                 }`}
               >
-                {activeSignFreePlan
+                <LuCircleAlert aria-hidden="true" />
+                <span>{activeSignFreePlan
                   ? `Sign Free: ${activeSignFreePlan.title}`
-                  : "No Sign Free (Auto-Deactivate)"}
+                  : "No Sign Free (Auto-Deactivate)"}</span>
               </span>
             </div>
           </div>
