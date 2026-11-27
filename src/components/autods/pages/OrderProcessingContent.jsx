@@ -1526,7 +1526,7 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
               </span>
               <h2 className="order-processing-hero__title">Process Orders</h2>
               <p className="order-processing-hero__subtitle">
-                Choose how to process orders, then click "Process the order" to auto-purchase and ship straight to the buyer.
+                Choose a processing method to purchase and ship orders directly to buyers.
               </p>
             </div>
 
@@ -1550,12 +1550,7 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
 
             <button
               type="button"
-              className="order-processing-btn"
-              style={{
-                background: "linear-gradient(135deg, #f97316 0%, #ea580c 100%)",
-                borderColor: "#ea580c",
-                color: "#fff",
-              }}
+              className="order-processing-btn order-processing-btn--secondary"
               onClick={handleSyncAliExpress}
               disabled={syncing || syncingAliExpress}
               title="Check AliExpress directly for payment confirmation & tracking updates"
@@ -1569,28 +1564,35 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
               </span>
             </button>
 
-            <div className="order-processing-method-toggle" role="group" aria-label="Processing method">
+            <div className="order-processing-method-control">
+              <span className="order-processing-method-control__label">Processing method</span>
+              <div className="order-processing-method-toggle" role="group" aria-label="Processing method">
               <button
                 type="button"
                 className={`order-processing-method-toggle__btn ${processingMethod === "autods" ? "order-processing-method-toggle__btn--active" : ""}`}
                 onClick={() => setProcessingMethod("autods")}
+                aria-pressed={processingMethod === "autods"}
+                title="Process using the platform account"
               >
                 <LuZap />
-                <span>Auto DS</span>
+                <span>Platform</span>
               </button>
               <button
                 type="button"
                 className={`order-processing-method-toggle__btn ${processingMethod === "buyer" ? "order-processing-method-toggle__btn--active" : ""}`}
                 onClick={() => setProcessingMethod("buyer")}
+                aria-pressed={processingMethod === "buyer"}
+                title="Process using your buyer account"
               >
                 <LuUserRound />
                 <span>Buyer</span>
               </button>
+              </div>
             </div>
 
             {processingMethod === "buyer" ? (
               buyerAccountsError ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div className="order-processing-buyer-controls">
                   <span className="order-processing-buyer-hint order-processing-buyer-hint--error">
                     Could not load buyer accounts: {buyerAccountsError}
                   </span>
@@ -1611,7 +1613,7 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
                   </button>
                 </div>
               ) : buyerAccounts.length ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div className="order-processing-buyer-controls">
                   <select
                     className="order-processing-buyer-select"
                     value={selectedBuyerAccountId}
@@ -1655,7 +1657,7 @@ function OrderProcessingContent({ selectedConnectionId = undefined }) {
                   ) : null}
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div className="order-processing-buyer-controls">
                   <span className="order-processing-buyer-hint" style={{ color: "#d97706", fontWeight: 500 }}>
                     No AliExpress buyer accounts connected
                   </span>
