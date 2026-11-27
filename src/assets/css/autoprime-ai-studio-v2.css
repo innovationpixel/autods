@@ -2722,3 +2722,269 @@
   color: #e11d48;
   border-color: #fecdd3;
 }
+
+
+/* Customer AI Image Studio — compact workspace.
+   Route-only scope: admin template editors reuse .ai-gen-hub without the hero. */
+.ai-gen-hub:has(> .ai-gen-hub__hero) {
+  --ai-purple: var(--ap-purple, #6d28d9);
+  --ai-purple-deep: var(--ap-indigo, #32158c);
+  --ai-text: var(--ap-text, #171230);
+  --ai-muted: var(--ap-muted, #67627a);
+  --ai-line: var(--ap-border, #e9e4f2);
+  --ai-line-strong: var(--ap-border-strong, #ddd3ec);
+  --ai-purple-soft: #f4effc;
+  padding: 0 0 20px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) > .ai-gen-hub__hero {
+  padding: 0 0 14px !important;
+  margin: 0 0 12px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__eyebrow {
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 0 6px !important;
+  border: 0 !important;
+  background: transparent !important;
+  font-size: 11px !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__hero h1 { font-size: clamp(21px, 2vw, 27px) !important; line-height: 1.25 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__hero p { margin: 5px 0 0 !important; font-size: 13px !important; line-height: 1.5 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) > .ai-gen-hub__tabs {
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  gap: 24px !important;
+  padding: 0 !important;
+  margin: 0 0 16px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--ai-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tab {
+  width: auto !important;
+  min-height: 42px !important;
+  padding: 0 3px !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: normal !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tab--active,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tab--active:hover {
+  border-bottom-color: var(--ai-purple) !important;
+  color: var(--ai-purple) !important;
+  background: transparent !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tab .ai-my-images-badge-count { position: static !important; margin: 0 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-background-banner {
+  margin: 0 0 12px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  flex-wrap: wrap !important;
+  background: var(--ai-purple-soft) !important;
+  color: var(--ai-purple-deep) !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-background-banner__info { min-width: 0 !important; flex: 1 1 220px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-background-banner__btn { color: var(--ai-purple-deep) !important; background: #fff !important; }
+
+/* Shared workspace headings and actions */
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-section { width: 100% !important; min-width: 0 !important; gap: 14px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 0 !important;
+  margin: 0 0 14px !important;
+  border: 0 !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child { display: contents !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:first-child,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:first-child { min-width: 0 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top h2,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top h2,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-header__copy h2 { font-size: 18px !important; font-weight: 700 !important; margin: 0 0 4px !important; line-height: 1.35 !important; color: var(--ai-text) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top p,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top p,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-header__copy p { font-size: 12.5px !important; margin: 0 !important; line-height: 1.5 !important; color: var(--ai-muted) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > div:first-child,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:last-child > div:first-child {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  padding: 6px 8px 6px 11px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: var(--ai-purple-soft) !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > div:first-child > span,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:last-child > div:first-child > span {
+  flex-wrap: wrap !important;
+  color: var(--ai-purple-deep) !important;
+  font-size: 12px !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > div:first-child > span > svg,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:last-child > div:first-child > span > svg { color: var(--ai-purple) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > div:first-child > button,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:last-child > div:first-child > button {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  background: var(--ai-purple) !important;
+  color: white !important;
+  font-size: 11.5px !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__btn-my-images,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__back-btn {
+  min-height: 38px !important;
+  padding: 6px 12px !important;
+  border: 1px solid var(--ai-line-strong) !important;
+  border-radius: 8px !important;
+  background: white !important;
+  color: var(--ai-purple-deep) !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__btn-my-images > span:last-child:not(:first-of-type) { background: var(--ai-purple) !important; }
+
+/* Search and category controls have their own row, aligned to the left. */
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-tools {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-search { width: min(100%, 320px) !important; height: 38px !important; border-radius: 8px !important; border-color: var(--ai-line-strong) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-tools select { min-width: 145px !important; min-height: 38px !important; height: 38px !important; border-radius: 8px !important; font-weight: 600 !important; border-color: var(--ai-line-strong) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-chips { display: flex !important; flex-wrap: wrap !important; gap: 7px !important; margin: 0 0 14px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-chip { min-height: 32px !important; padding: 0 12px !important; border-radius: 7px !important; border-color: transparent !important; background: #fff !important; font-size: 12px !important; box-shadow: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-chip--active,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-chip--active:hover { background: var(--ai-purple-soft) !important; border-color: transparent !important; color: var(--ai-purple) !important; box-shadow: none !important; }
+
+/* Template cards: smaller consistent covers, compact metadata, equal actions. */
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-grid,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr)) !important; gap: 14px !important; align-items: stretch !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-card {
+  min-width: 0 !important;
+  justify-content: flex-start !important;
+  padding: 9px !important;
+  border: 1px solid var(--ai-line) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-card:hover { transform: none !important; border-color: var(--ai-line-strong) !important; box-shadow: 0 4px 16px rgba(50,21,140,.06) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-cover { height: auto !important; aspect-ratio: 16 / 10 !important; margin-bottom: 10px !important; border-radius: 8px !important; background: #f5f2fa !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-cover-main { object-fit: cover !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-meta { padding: 0 3px !important; margin-bottom: 10px !important; gap: 6px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-meta strong { min-height: 0 !important; font-size: 14px !important; overflow-wrap: anywhere !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-meta-row { justify-content: flex-start !important; padding-top: 0 !important; border: 0 !important; gap: 5px 9px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-meta-row span { font-size: 11.5px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-meta-row span:nth-child(2) { color: var(--ai-purple) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-actions { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) !important; gap: 6px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__tpl-actions .ai-gen-hub__btn { height: auto !important; min-height: 36px !important; padding: 6px !important; font-size: 11.5px !important; white-space: normal !important; line-height: 1.25 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__btn--primary { background: var(--ai-purple) !important; border-color: var(--ai-purple) !important; box-shadow: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__btn--primary:hover:not(:disabled) { background: var(--ai-purple-deep) !important; transform: none !important; box-shadow: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__btn--ghost { border-color: var(--ai-line-strong) !important; color: var(--ai-purple-deep) !important; border-radius: 8px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__empty,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-empty { min-height: 155px !important; padding: 24px 12px !important; border: 0 !important; border-radius: 10px !important; background: #fff !important; box-shadow: none !important; }
+
+/* Generator: balanced responsive settings, prompts and output panels. */
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  padding: 0 0 10px !important;
+  border: 0 !important;
+}
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__generator-top > div:last-child { gap: 8px !important; min-width: 0 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template > .ai-gen-hub__template-row:not(.ai-gen-hub__template-row--split) { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 12px !important; align-items: start !important; margin-bottom: 12px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template > .ai-gen-hub__template-row:not(.ai-gen-hub__template-row--split) > .ai-gen-hub__card:nth-child(3) { grid-column: auto !important; display: flex !important; flex-direction: column !important; gap: 8px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template-row--split { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) !important; align-items: start !important; gap: 12px !important; margin-bottom: 12px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__card,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__result { border: 1px solid var(--ai-line) !important; border-radius: 12px !important; padding: 13px !important; box-shadow: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__section-head { align-items: flex-start !important; margin-bottom: 12px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__section-head h3 { font-size: 14px !important; margin-top: 1px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__section-head p { font-size: 12px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__section-badge,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-number { box-shadow: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__dropzone,
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__upload-drop { min-height: 92px !important; border-radius: 8px !important; background: #faf8fe !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__aspect-chip { height: auto !important; min-height: 42px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__size-row input { min-height: 36px !important; height: 36px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__size-row .ai-gen-hub__link-btn { height: 36px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row { grid-template-columns: 26px minmax(0, 1fr) auto 34px !important; gap: 6px !important; padding: 7px 0 !important; border: 0 !important; background: transparent !important; align-items: start !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row--no-delete { grid-template-columns: 26px minmax(0, 1fr) auto !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row--ref-error { background: #fff5f5 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row textarea { height: 66px !important; min-height: 66px !important; padding: 8px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-delete { width: 34px !important; height: 36px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__preview-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 125px), 1fr)) !important; gap: 8px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__preview-item { background: #f7f4fb !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__preview-item > img { object-fit: contain !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__action-bar { position: static !important; bottom: auto !important; padding: 10px 0 0 !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__action-bar .ai-gen-hub__btn--primary { height: auto !important; min-height: 42px !important; min-width: 0 !important; max-width: 100% !important; padding: 9px 16px !important; white-space: normal !important; }
+
+/* Saved images gallery */
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-header { border: 0 !important; padding: 0 !important; gap: 12px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-toolbar { justify-content: flex-start !important; gap: 10px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-search { width: min(100%, 320px) !important; min-width: 0 !important; height: 38px !important; border-color: var(--ai-line-strong) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-search input[type="text"],
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-search input { border: 0 !important; padding: 0 !important; min-height: 0 !important; box-shadow: none !important; background: transparent !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-filters { flex-wrap: wrap !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-filter-pill { border: 0 !important; border-radius: 7px !important; min-height: 32px !important; background: white !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-filter-pill--active { background: var(--ai-purple-soft) !important; color: var(--ai-purple-deep) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card { border: 1px solid var(--ai-line) !important; border-radius: 12px !important; box-shadow: none !important; min-width: 0 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card--new { border-color: var(--ai-purple) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card--bundle::before { display: none !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card:hover { transform: none !important; box-shadow: 0 4px 16px rgba(50,21,140,.06) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card__footer { flex-wrap: wrap !important; gap: 8px !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-btn--secondary { background: #fff !important; color: var(--ai-purple-deep) !important; border-color: var(--ai-line-strong) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-btn--primary { background: var(--ai-purple) !important; border-color: var(--ai-purple) !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-image-card__media:focus-within .ai-my-image-card__overlay { opacity: 1 !important; }
+.ai-gen-hub:has(> .ai-gen-hub__hero) button:focus-visible { outline: 2px solid var(--ai-purple) !important; outline-offset: 2px !important; }
+
+@media (max-width: 1250px) {
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top { grid-template-columns: minmax(0, 1fr) auto !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:first-child { grid-column: 1 / -1 !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > div:first-child { justify-self: start !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template > .ai-gen-hub__template-row:not(.ai-gen-hub__template-row--split) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template > .ai-gen-hub__template-row:not(.ai-gen-hub__template-row--split) > .ai-gen-hub__card:nth-child(3) { grid-column: 1 / -1 !important; }
+}
+@media (max-width: 900px) {
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template-row--split { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 640px) {
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top { grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-top > div:last-child > .ai-gen-hub__btn-my-images { justify-self: start !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-search { flex: 1 1 100% !important; width: 100% !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__gallery-tools select { width: 100% !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__template > .ai-gen-hub__template-row:not(.ai-gen-hub__template-row--split) { grid-template-columns: minmax(0, 1fr) !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row { grid-template-columns: 26px minmax(0, 1fr) 34px !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-row--no-delete { grid-template-columns: 26px minmax(0, 1fr) !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-reference { grid-column: 2 / 3 !important; grid-row: 2 !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__prompt-delete { grid-column: 3 !important; grid-row: 1 !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-gen-hub__action-bar .ai-gen-hub__btn--primary { width: 100% !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-my-images-search { width: 100% !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-bundle-modal__header { flex-wrap: wrap !important; padding: 12px !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-bundle-modal__actions { flex-wrap: wrap !important; max-width: 100% !important; }
+  .ai-gen-hub:has(> .ai-gen-hub__hero) .ai-bundle-modal__body { padding: 12px !important; }
+}
