@@ -1289,15 +1289,29 @@ function CalculationsContent({
       ) : null}
 
       <section className="calculations-sheet-panel" aria-label="Google Sheets export">
-        <div className="orders-toolbar orders-toolbar--secondary calculations-sheet-toolbar">
-          <div className="calculations-sheet-panel__heading">
-            <span className="calculations-sheet-panel__icon"><LuFileSpreadsheet aria-hidden="true" /></span>
-            <div><strong>Google Sheets</strong><small>Export and share your order calculations.</small></div>
+        <div className="calculations-sheet-panel__heading">
+          <span className="calculations-sheet-panel__icon"><LuFileSpreadsheet aria-hidden="true" /></span>
+          <div className="calculations-sheet-panel__copy">
+            <strong>Google Sheets</strong>
+            {!sheetStatus.configured ? (
+              <span className="calculations-sheet-panel__status" role="status">
+                <span className="calculations-sheet-panel__status-dot" aria-hidden="true" />
+                Export is not configured on the server yet.
+              </span>
+            ) : (
+              <span className="calculations-sheet-panel__status calculations-sheet-panel__status--ready">
+                <span className="calculations-sheet-panel__status-dot" aria-hidden="true" />
+                {sheetStatus.last_synced_at
+                  ? `Last synced: ${formatDisplayDate(sheetStatus.last_synced_at.slice(0, 10))}`
+                  : "Export configured"}
+              </span>
+            )}
           </div>
-        <div className="orders-toolbar__actions">
+        </div>
+        <div className="calculations-sheet-panel__actions">
           <button
             type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            className="calculations-sheet-panel__button"
             onClick={handleOpenSheet}
             disabled={!sheetStatus.spreadsheet_url}
           >
@@ -1306,7 +1320,7 @@ function CalculationsContent({
           </button>
           <button
             type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            className="calculations-sheet-panel__button"
             onClick={() => setInviteModalOpen(true)}
             disabled={!sheetStatus.spreadsheet_url || sheetInviting}
           >
@@ -1315,7 +1329,7 @@ function CalculationsContent({
           </button>
           <button
             type="button"
-            className="dashboard-secondary-btn dashboard-secondary-btn--orders"
+            className="calculations-sheet-panel__button"
             onClick={handleSyncToSheet}
             disabled={sheetSyncing || !sheetStatus.configured}
           >
@@ -1323,24 +1337,9 @@ function CalculationsContent({
             <span>{sheetSyncing ? "Syncing sheet…" : "Sync to Sheet"}</span>
           </button>
         </div>
-      </div>
-
-      {!sheetStatus.configured ? (
-        <div className="orders-inline-note">
-          <LuFileSpreadsheet />
-          <span>Google Sheets export is not configured on the server yet.</span>
-        </div>
-      ) : null}
-
-      {sheetStatus.configured && sheetStatus.last_synced_at ? (
-        <div className="orders-inline-note">
-          <LuFileSpreadsheet />
-          <span>
-            Google Sheet last updated: {formatDisplayDate(sheetStatus.last_synced_at.slice(0, 10))}. Sheets are view-only and public by default.
-          </span>
-        </div>
-      ) : null}
-
+        {sheetStatus.configured && sheetStatus.last_synced_at ? (
+          <p className="calculations-sheet-panel__note">Sheets are view-only and public by default.</p>
+        ) : null}
       </section>
 
       <InviteSheetMembersModal
