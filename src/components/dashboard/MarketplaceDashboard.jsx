@@ -42,7 +42,6 @@ import {
   LuTruck,
   LuUmbrella,
   LuUpload,
-  LuUserRound,
   LuVolume2,
   LuWallet,
   LuChartLine,
@@ -2038,9 +2037,7 @@ const MarketplaceDashboard = () => {
                   }}
                 >
                   <span>{profileShortName}</span>
-                  <span className="marketplace-header__avatar">
-                    <LuUserRound />
-                  </span>
+                  <span className="marketplace-header__avatar" aria-hidden="true">{Array.from(String(profileFullName || profileEmail || "U").trim() || "U")[0].toUpperCase()}</span>
                   <LuChevronDown className={profileMenuOpen ? "marketplace-header__profile-chevron marketplace-header__profile-chevron--open" : "marketplace-header__profile-chevron"} />
                 </button>
 
@@ -2048,8 +2045,8 @@ const MarketplaceDashboard = () => {
                   <div className="profile-dropdown" role="menu">
                     <div className="profile-dropdown__card">
                       <div className="profile-dropdown__identity">
-                        <span className="profile-dropdown__avatar">
-                          <LuUserRound />
+                        <span className="profile-dropdown__avatar" aria-hidden="true">
+                          {Array.from(String(profileFullName || profileEmail || "U").trim() || "U")[0].toUpperCase()}
                         </span>
                         <div>
                           <strong>{profileFullName}</strong>
