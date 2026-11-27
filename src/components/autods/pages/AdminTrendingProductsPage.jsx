@@ -486,18 +486,19 @@ function AdminTrendingProductsPage() {
       {modalOpen ? (
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
-          <div className="orders-modal__card admin-modal">
+          <div className="orders-modal__card admin-modal admin-curated-modal">
             <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={saving} onClick={() => setModalOpen(false)}>
               <LuX aria-hidden="true" />
             </button>
             <h3>{editingId ? "Edit Trending Product" : "Add Trending Products"}</h3>
 
             <div className="admin-modal__grid">
-              <label className="marketplace-settings__field admin-modal__full">
-                <span>{editingId ? "AliExpress product link or ID" : "AliExpress product links or IDs (one per line)"}</span>
+              <div className="marketplace-settings__field admin-modal__full admin-curated-modal__source">
+                <label htmlFor="trending-product-source">{editingId ? "AliExpress product link or ID" : "AliExpress product links or IDs (one per line)"}</label>
                 <div className="admin-curated-page__resolve-row">
                   {editingId ? (
                     <input
+                      id="trending-product-source"
                       className="marketplace-settings__control"
                       value={form.url_or_id}
                       onChange={(e) => setForm({ ...form, url_or_id: e.target.value })}
@@ -505,6 +506,7 @@ function AdminTrendingProductsPage() {
                     />
                   ) : (
                     <textarea
+                      id="trending-product-source"
                       className="marketplace-settings__control"
                       rows={4}
                       value={multiUrls}
@@ -522,7 +524,7 @@ function AdminTrendingProductsPage() {
                     <span>Fetch</span>
                   </button>
                 </div>
-              </label>
+              </div>
 
               {previews.length ? (
                 <div className="admin-curated-page__preview-list admin-modal__full">
@@ -562,7 +564,7 @@ function AdminTrendingProductsPage() {
                 </select>
               </label>
 
-              <label className="marketplace-settings__field">
+              <label className="marketplace-settings__field admin-modal__full">
                 <span>Sort Order</span>
                 <input type="number" min="0" className="marketplace-settings__control" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
               </label>
