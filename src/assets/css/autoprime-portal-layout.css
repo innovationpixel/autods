@@ -384,3 +384,123 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+
+
+/* Admin dashboard activity breakdown: compact, responsive chart + legend. */
+.autoprime-portal .super-admin-shell .admin-activity-mix {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  container-type: inline-size;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 12px 18px 20px;
+  min-width: 0;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__chart {
+  position: relative;
+  flex: 0 0 168px;
+  width: 168px;
+  height: 168px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__total {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  text-align: center;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__total strong {
+  color: var(--ap-text, #171521);
+  font-size: clamp(20px, 5cqi, 28px);
+  font-weight: 750;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  max-width: 104px;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__total span {
+  color: var(--ap-muted, #6f7280);
+  font-size: 11px;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__empty-ring {
+  position: absolute;
+  inset: 8px;
+  border: 17px solid var(--ap-border, #e8e5ef);
+  border-radius: 50%;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__legend {
+  flex: 1 1 176px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 11px;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__row {
+  display: grid;
+  grid-template-columns: 9px minmax(0, 1fr) max-content 44px;
+  align-items: center;
+  gap: 8px;
+  color: var(--ap-text, #171521);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 550;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__row strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__share {
+  text-align: right;
+  font-size: 11px;
+  color: var(--ap-muted, #6f7280);
+  font-variant-numeric: tabular-nums;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__track {
+  height: 4px;
+  margin: 5px 0 0 17px;
+  background: var(--ap-border, #e8e5ef);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+.autoprime-portal .super-admin-shell .admin-activity-mix__empty {
+  color: var(--ap-muted, #6f7280);
+  text-align: center;
+  font-size: 12px;
+}
+@container (max-width: 420px) {
+  .autoprime-portal .super-admin-shell .admin-activity-mix__body {
+    gap: 14px;
+    padding: 8px 16px 18px;
+  }
+  .autoprime-portal .super-admin-shell .admin-activity-mix__legend {
+    flex-basis: 100%;
+  }
+}

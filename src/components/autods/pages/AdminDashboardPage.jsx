@@ -694,54 +694,74 @@ function AdminDashboardPage() {
             ACTIVITY MIX
             ================================================= */}
 
-        <article className="ebay-card ebay-activity-card">
+        <article className="ebay-card ebay-activity-card admin-activity-mix">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
               <span className="ebay-purple-icon">
                 <LuRefreshCw />
               </span>
-
-              <h2>Activity Mix</h2>
+              <div>
+                <h2>Activity Mix</h2>
+                <p>Activity breakdown · {activeLabel}</p>
+              </div>
             </div>
           </div>
 
-          <div style={{ padding: "0 13px 14px" }}>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie
-                  data={activityMix}
-                  dataKey="value"
-                  nameKey="label"
-                  innerRadius={44}
-                  outerRadius={64}
-                  paddingAngle={3}
-                >
-                  {activityMix.map((entry) => (
-                    <Cell key={entry.label} fill={entry.color} />
-                  ))}
-                </Pie>
+          <div className="admin-activity-mix__body">
+            <div className="admin-activity-mix__chart" role="img" aria-label={`${activityTotal.toLocaleString()} total activities`}>
+              {activityTotal > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={activityMix}
+                      dataKey="value"
+                      nameKey="label"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="71%"
+                      outerRadius="94%"
+                      paddingAngle={3}
+                      stroke="none"
+                      cornerRadius={3}
+                    >
+                      {activityMix.map((entry) => (
+                        <Cell key={entry.label} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="admin-activity-mix__empty-ring" aria-hidden="true" />
+              )}
+              <div className="admin-activity-mix__total">
+                <strong>{activityTotal.toLocaleString()}</strong>
+                <span>Total activity</span>
+              </div>
+            </div>
 
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-
-            <ul className="admin-dash__legend">
-              {activityMix.map((item) => (
-                <li key={item.label}>
-                  <span style={{ backgroundColor: item.color }} />
-
-                  <div>
-                    <strong>{item.value}</strong>
-
-                    <span>{item.label}</span>
-                  </div>
-                </li>
-              ))}
+            <ul className="admin-activity-mix__legend" aria-label="Activity breakdown">
+              {activityMix.map((item) => {
+                const value = Number(item.value ?? 0);
+                const share = activityTotal > 0 ? (value / activityTotal) * 100 : 0;
+                return (
+                  <li key={item.label}>
+                    <div className="admin-activity-mix__row">
+                      <span className="admin-activity-mix__dot" style={{ backgroundColor: item.color }} aria-hidden="true" />
+                      <span className="admin-activity-mix__label">{item.label}</span>
+                      <strong>{value.toLocaleString()}</strong>
+                      <span className="admin-activity-mix__share">{share.toFixed(1)}%</span>
+                    </div>
+                    <div className="admin-activity-mix__track" aria-hidden="true">
+                      <span style={{ width: `${Math.max(0, Math.min(100, share))}%`, backgroundColor: item.color }} />
+                    </div>
+                  </li>
+                );
+              })}
+              {!activityMix.length ? (
+                <li className="admin-activity-mix__empty">No activity in this period.</li>
+              ) : null}
             </ul>
-
-            {!activityMix.length ? (
-              <p className="admin-page__muted">{activityTotal} events tracked.</p>
-            ) : null}
           </div>
         </article>
       </section>
