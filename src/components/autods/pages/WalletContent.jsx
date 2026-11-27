@@ -13,7 +13,6 @@ import {
   LuPlus,
   LuSettings,
   LuShield,
-  LuSparkles,
   LuUpload,
   LuWallet,
 } from "react-icons/lu";
@@ -275,21 +274,31 @@ function WalletContent() {
     <section className="wallet-hub card-wrapper">
       <header className="wallet-hub__hero">
         <div className="wallet-hub__hero-copy">
-          <span className="wallet-hub__eyebrow"><LuSparkles /> AutoDS Wallet</span>
-          <h1>Fund your account balance</h1>
+          <h1>Wallet overview</h1>
           <p>
-            Top up your wallet to pay for order processing, subscriptions, and add-ons
-            without interrupting your workflow.
+            Manage your balance, add funds and track wallet transactions.
           </p>
         </div>
-        <div className="wallet-hub__balance-card">
-          <span className="wallet-hub__balance-label">Available balance</span>
-          <strong>{formatMoney(summary?.balance ?? 0, currency)}</strong>
-          <span className="wallet-hub__balance-meta">{currency} · Instant for deposits</span>
-        </div>
+        <button
+          type="button"
+          className="wallet-hub__settings-link"
+          onClick={() => navigate("/settings?tab=billing")}
+        >
+          <LuSettings />
+          <span>Manage payment methods</span>
+          <LuArrowUpRight />
+        </button>
       </header>
 
       <div className="wallet-hub__stats">
+        <article className="wallet-hub__stat wallet-hub__balance-card">
+          <span className="wallet-hub__stat-icon"><LuWallet aria-hidden="true" /></span>
+          <div>
+            <span className="wallet-hub__stat-label wallet-hub__balance-label">Available balance</span>
+            <strong>{formatMoney(summary?.balance ?? 0, currency)}</strong>
+            <span className="wallet-hub__balance-meta">{currency}</span>
+          </div>
+        </article>
         <article className="wallet-hub__stat">
           <span className="wallet-hub__stat-icon wallet-hub__stat-icon--deposit"><LuArrowDownLeft /></span>
           <div>
@@ -327,17 +336,19 @@ function WalletContent() {
               <span className="wallet-hub__card-icon"><LuPlus /></span>
               <div>
                 <h2>Add funds</h2>
-                <p>Select an amount and pay securely with Stripe or PayPal.</p>
+                <p>Choose an amount, then select a payment method.</p>
               </div>
             </div>
           </div>
 
-          <div className="wallet-hub__amount-grid">
+          <div className="wallet-hub__field-label">Deposit amount</div>
+          <div className="wallet-hub__amount-grid" role="group" aria-label="Preset deposit amounts">
             {loadBalanceAmounts.map((amount) => (
               <button
                 type="button"
                 key={amount}
                 className={`wallet-hub__amount-chip ${selectedAmount === amount && !customAmount ? "wallet-hub__amount-chip--active" : ""}`}
+                aria-pressed={selectedAmount === amount && !customAmount}
                 onClick={() => {
                   setSelectedAmount(amount);
                   setCustomAmount("");
@@ -369,6 +380,7 @@ function WalletContent() {
             <strong>{formatMoney(depositAmount, currency)}</strong>
           </div>
 
+          <div className="wallet-hub__field-label">Payment method</div>
           <div className="wallet-hub__checkout-actions">
             <button
               type="button"
@@ -381,7 +393,7 @@ function WalletContent() {
               ) : (
                 <LuCreditCard />
               )}
-              <span>{checkoutId === `stripe-${depositAmount}` ? "Redirecting…" : "Pay with Credit Card/Debit Cards"}</span>
+              <span>{checkoutId === `stripe-${depositAmount}` ? "Redirecting…" : "Pay by credit or debit card"}</span>
             </button>
             <button
               type="button"
@@ -398,6 +410,7 @@ function WalletContent() {
             <button
               type="button"
               className="wallet-hub__btn wallet-hub__btn--ghost"
+              aria-expanded={showWireForm}
               onClick={() => setShowWireForm((current) => !current)}
             >
               <LuBanknote />
@@ -456,24 +469,16 @@ function WalletContent() {
               <span className="wallet-hub__card-icon wallet-hub__card-icon--info"><LuWallet /></span>
               <div>
                 <h2>How it works</h2>
-                <p>Use your wallet balance across AutoDS services.</p>
+                <p>Manage funds for orders, plans and add-ons.</p>
               </div>
             </div>
             <ul className="wallet-hub__tips">
-              <li><LuCheck /> Deposit anytime with Stripe or PayPal</li>
+              <li><LuCheck /> Deposit using card, PayPal or bank transfer</li>
               <li><LuCheck /> Balance updates after payment is confirmed</li>
               <li><LuCheck /> Use funds for orders, plans, and add-ons</li>
               <li><LuCheck /> Full transaction history below</li>
             </ul>
-            <button
-              type="button"
-              className="wallet-hub__settings-link"
-              onClick={() => navigate("/settings?tab=billing")}
-            >
-              <LuSettings />
-              <span>Manage payment methods</span>
-              <LuArrowUpRight />
-            </button>
+
           </article>
         </aside>
       </div>
@@ -532,7 +537,7 @@ function WalletContent() {
                       <span>{sendingInvoiceId === tx.id ? "Sending…" : "Email Invoice"}</span>
                     </button>
                   ) : (
-                    <span style={{ color: "#9ca3af", fontSize: "11px" }}>—</span>
+                    <span className="wallet-hub__no-invoice">—</span>
                   )}
                 </span>
               </div>
