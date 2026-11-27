@@ -3077,7 +3077,7 @@
   min-width: 0 !important;
   padding: 12px !important;
   margin: 0 !important;
-  border: 1px solid #e6dfee !important;
+  border: 0 !important;
   border-radius: 9px !important;
   background: #fff !important;
   box-shadow: none !important;
@@ -3177,7 +3177,7 @@
   box-sizing: border-box !important;
   padding: 0 10px !important;
   margin: 0 !important;
-  border: 1px solid #e1d7ed !important;
+  border: 0 !important;
   border-radius: 7px !important;
   background: #fff !important;
   color: #51455f !important;
@@ -3196,18 +3196,15 @@
 }
 .autoprime-portal .calculations-page-content .calculations-sheet-panel__button:hover:not(:disabled) {
   background: #f4efff !important;
-  border-color: #d3c1ed !important;
   color: #6d28d9 !important;
 }
 .autoprime-portal .calculations-page-content .calculations-sheet-panel__button:last-child:not(:disabled) {
   background: #6d28d9 !important;
-  border-color: #6d28d9 !important;
   color: #fff !important;
 }
 .autoprime-portal .calculations-page-content .calculations-sheet-panel__button:disabled {
   opacity: 1 !important;
   background: #f7f5f9 !important;
-  border-color: #eae5ef !important;
   color: #938c9e !important;
   cursor: not-allowed !important;
 }
@@ -3215,7 +3212,7 @@
   flex: 1 0 100% !important;
   margin: 0 !important;
   padding: 8px 0 0 !important;
-  border-top: 1px solid #eeeaf4;
+  border: 0 !important;
   color: #70697d !important;
   font-size: 11px !important;
   line-height: 1.4;
@@ -3228,6 +3225,25 @@
   .autoprime-portal .calculations-page-content .calculations-sheet-panel .calculations-sheet-panel__button {
     flex: 1 1 120px;
   }
+}
+
+/* The sheet toolbar is flat: suppress legacy wrapper/pill outlines. */
+.autoprime-portal .calculations-page-content > .calculations-sheet-panel :is(.calculations-sheet-panel__heading, .calculations-sheet-panel__copy, .calculations-sheet-panel__actions, .calculations-sheet-panel__status, .calculations-sheet-panel__status-dot, .calculations-sheet-panel__icon, .calculations-sheet-panel__button, .calculations-sheet-panel__note) {
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .calculations-page-content > .calculations-sheet-panel :is(.calculations-sheet-panel__actions, .calculations-sheet-panel__status) {
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  outline: none !important;
+}
+.autoprime-portal .calculations-page-content > .calculations-sheet-panel .calculations-sheet-panel__button:not(:disabled):not(:last-child) {
+  background: #f4efff !important;
+  color: #6d28d9 !important;
+}
+.autoprime-portal .calculations-page-content > .calculations-sheet-panel .calculations-sheet-panel__button:not(:disabled):not(:last-child):hover {
+  background: #eae0ff !important;
 }
 .autoprime-portal .calculations-page-content :is(.orders-toolbar--primary, .orders-quick-filters, .calculations-sheet-panel) :is(button, select):focus-visible {
   outline: 2px solid #a78bfa !important;
