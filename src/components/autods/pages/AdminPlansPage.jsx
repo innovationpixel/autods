@@ -786,6 +786,9 @@ function AdminPlansPage() {
             onClick={() => setModalOpen(false)}
           />
           <div className="orders-modal__card admin-modal admin-modal--wide">
+            <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={saving} onClick={() => setModalOpen(false)}>
+              <LuX aria-hidden="true" />
+            </button>
             <h3>
               {editingId
                 ? form.is_custom

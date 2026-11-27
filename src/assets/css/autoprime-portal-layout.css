@@ -314,3 +314,44 @@
     transition: none;
   }
 }
+
+
+/* Shared top-right dismiss action for admin dialogs that formerly only
+   provided a footer Cancel button. Keep title text clear of the control. */
+.autoprime-portal .ap-portal-dialog-close {
+  position: absolute;
+  inset-block-start: 12px;
+  inset-inline-end: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--ap-border, #e6dff0);
+  border-radius: 8px;
+  background: var(--ap-surface, #fff);
+  color: var(--ap-text, #30283c);
+  cursor: pointer;
+}
+.autoprime-portal .ap-portal-dialog-close svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.autoprime-portal .ap-portal-dialog-close:hover:not(:disabled) {
+  background: var(--ap-accent-soft, #f5f1ff);
+  color: var(--ap-accent, #6d28d9);
+}
+.autoprime-portal .ap-portal-dialog-close:focus-visible {
+  outline: 2px solid var(--ap-accent, #6d28d9);
+  outline-offset: 2px;
+}
+.autoprime-portal .ap-portal-dialog-close:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.autoprime-portal .admin-modal:has(> .ap-portal-dialog-close) > :is(h3, .admin-plan-details-modal__header) {
+  padding-inline-end: 40px;
+}

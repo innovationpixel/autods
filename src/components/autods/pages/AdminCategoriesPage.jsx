@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuLoader, LuLayers, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
+import { LuLoader, LuLayers, LuPencil, LuPlus, LuTrash2, LuX } from "react-icons/lu";
 import { selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { toast } from "../../../utils/toast";
 import ConfirmModal from "../ConfirmModal";
@@ -255,6 +255,9 @@ function AdminCategoriesPage() {
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
           <div className="orders-modal__card admin-modal">
+            <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={saving} onClick={() => setModalOpen(false)}>
+              <LuX aria-hidden="true" />
+            </button>
             <h3>{editingId ? "Edit Category" : "Create Category"}</h3>
 
             <div className="admin-modal__grid">

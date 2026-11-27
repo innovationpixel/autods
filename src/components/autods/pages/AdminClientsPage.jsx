@@ -998,6 +998,9 @@ function AdminClientsPage() {
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
           <div className="orders-modal__card admin-modal">
+            <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={saving} onClick={() => setModalOpen(false)}>
+              <LuX aria-hidden="true" />
+            </button>
             <h3>{editingId ? "Edit User / Client" : "Add User / Client"}</h3>
 
             <div className="admin-modal__grid">
@@ -1135,6 +1138,9 @@ function AdminClientsPage() {
             onClick={() => !savingPlanDetails && setPlanModalClient(null)}
           />
           <div className="orders-modal__card admin-modal admin-modal--wide">
+            <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={savingPlanDetails} onClick={() => setPlanModalClient(null)}>
+              <LuX aria-hidden="true" />
+            </button>
             <div className="admin-plan-details-modal__header">
               <div>
                 <span className="admin-page__eyebrow">

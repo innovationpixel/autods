@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { LuLoader, LuPencil, LuPlus, LuSearch, LuShieldCheck, LuTrash2 } from "react-icons/lu";
+import { LuLoader, LuPencil, LuPlus, LuSearch, LuShieldCheck, LuTrash2, LuX } from "react-icons/lu";
 import { selectUser, selectUserRole } from "../../../store/selectors/AuthSelectors";
 import { getStoredUser } from "../../../services/AuthService";
 import { toast } from "../../../utils/toast";
@@ -392,6 +392,9 @@ function AdminUsersPage() {
         <div className="orders-modal">
           <div className="orders-modal__backdrop" onClick={() => setModalOpen(false)} />
           <div className="orders-modal__card admin-modal">
+            <button type="button" className="ap-portal-dialog-close" aria-label="Close dialog" title="Close" disabled={saving} onClick={() => setModalOpen(false)}>
+              <LuX aria-hidden="true" />
+            </button>
             <h3>{editingId ? "Edit Admin User" : "Create Admin User"}</h3>
 
             <div className="admin-modal__grid">
