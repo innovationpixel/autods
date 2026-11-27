@@ -237,6 +237,8 @@ function ImageTemplateSections({
                 type="button"
                 className={`ai-gen-hub__link-btn ${sizeLinked ? "ai-gen-hub__link-btn--active" : ""}`}
                 title={sizeLinked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                aria-label={sizeLinked ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                aria-pressed={sizeLinked}
                 onClick={() => setSizeLinked((prev) => !prev)}
               >
                 <LuLink />
@@ -285,9 +287,8 @@ function ImageTemplateSections({
 
               return (
                 <div
-                  className={`ai-gen-hub__prompt-row ${!allowAddDeletePrompts ? "ai-gen-hub__prompt-row--no-delete" : ""} ${hasRefError ? "ai-gen-hub__prompt-row--ref-error" : ""}`}
+                  className={`ai-gen-hub__prompt-row ${!allowDeletePrompt ? "ai-gen-hub__prompt-row--no-delete" : ""} ${hasRefError ? "ai-gen-hub__prompt-row--ref-error" : ""}`}
                   key={index}
-                  style={!allowAddDeletePrompts ? { gridTemplateColumns: "32px minmax(0, 1fr) auto" } : undefined}
                 >
                   <span className="ai-gen-hub__prompt-number">{index + 1}</span>
                   <textarea
@@ -300,6 +301,7 @@ function ImageTemplateSections({
                     value={prompt}
                     onChange={(event) => handlePromptChange(index, event.target.value)}
                   />
+                  <div className="ai-gen-hub__prompt-reference">
                   {sendAllReferencesWithEachPrompt ? (
                     <div
                       title={
@@ -368,10 +370,13 @@ function ImageTemplateSections({
                       }}
                     />
                   )}
+                  </div>
                 {allowDeletePrompt && (
                   <button
                     type="button"
                     className="ai-gen-hub__prompt-delete"
+                    aria-label={`Remove prompt ${index + 1}`}
+                    title={`Remove prompt ${index + 1}`}
                     disabled={prompts.length <= 1}
                     onClick={() => removePromptRow(index)}
                   >

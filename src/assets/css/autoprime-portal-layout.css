@@ -1521,3 +1521,173 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+
+/* AI template editor: explicit prompt slots and equal dimension controls.
+   Shared by admin template editing and customer image generation. */
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-table {
+  container-type: inline-size;
+  container-name: ai-prompt-layout;
+  min-width: 0 !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row {
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) max-content 34px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row--no-delete {
+  grid-template-columns: 28px minmax(0, 1fr) max-content !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row > .ai-gen-hub__prompt-number {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center !important;
+  margin: 0 !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row > textarea {
+  grid-column: 2;
+  grid-row: 1;
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  margin: 0 !important;
+  padding: 8px 10px !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  border-radius: 8px !important;
+  resize: vertical !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-reference {
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  max-width: 100%;
+  align-self: center;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-reference > .ai-gen-hub__ref-picker {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+  margin: 0 !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-reference .ai-gen-hub__ref-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  white-space: nowrap !important;
+  font-size: 11px !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__ref-trigger > :is(svg, img) {
+  flex-shrink: 0;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row > .ai-gen-hub__prompt-delete {
+  grid-column: 4 !important;
+  grid-row: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-delete svg {
+  width: 15px;
+  height: 15px;
+}
+@container ai-prompt-layout (max-width: 365px) {
+  .autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row {
+    grid-template-columns: 28px minmax(0, 1fr) 34px !important;
+  }
+  .autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row--no-delete {
+    grid-template-columns: 28px minmax(0, 1fr) !important;
+  }
+  .autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-reference {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+  }
+  .autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-row > .ai-gen-hub__prompt-delete {
+    grid-column: 3 !important;
+  }
+  .autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__prompt-reference .ai-gen-hub__ref-menu {
+    right: auto;
+    left: 0;
+  }
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__size-row {
+  --ai-dimension-control-height: 40px;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
+  align-items: end !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__size-row > label {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-self: end !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__size-row > label > span {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 15px !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__size-row > label > input {
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: var(--ai-dimension-control-height) !important;
+  min-height: var(--ai-dimension-control-height) !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
+}
+.autoprime-portal .ai-gen-hub .ai-gen-hub__template .ai-gen-hub__size-row > .ai-gen-hub__link-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: end !important;
+  box-sizing: border-box !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  height: var(--ai-dimension-control-height) !important;
+  min-height: var(--ai-dimension-control-height) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
