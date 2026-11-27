@@ -271,7 +271,7 @@ function AdminCategoriesPage() {
                 <input className="marketplace-settings__control" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
               </label>
 
-              <label className="marketplace-settings__field">
+              <label className="marketplace-settings__field admin-modal__full">
                 <span>Sort Order</span>
                 <input type="number" min="0" className="marketplace-settings__control" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
               </label>
