@@ -738,7 +738,7 @@ function AdminClientsPage() {
         </button>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar admin-clients-filters">
         <label className="admin-clients-page__search">
           <span className="admin-clients-page__search-label">Search</span>
           <span className="admin-clients-page__search-input-wrap">

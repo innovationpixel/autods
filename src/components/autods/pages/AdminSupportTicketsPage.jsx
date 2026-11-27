@@ -281,20 +281,23 @@ function AdminSupportTicketsPage() {
       </header>
 
       {/* Toolbar & Filters */}
-      <div className="admin-clients-page__toolbar card-wrapper" style={{ flexWrap: "wrap", gap: 12 }}>
-        <label className="admin-clients-page__search" style={{ minWidth: 260 }}>
-          <LuSearch />
-          <input
-            type="search"
-            className="marketplace-settings__control"
-            placeholder="Search by subject, name or email..."
-            value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-          />
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar admin-support-filters">
+        <label className="admin-clients-page__search">
+          <span className="admin-clients-page__search-label">Search</span>
+          <span className="admin-clients-page__search-input-wrap">
+            <LuSearch aria-hidden="true" />
+            <input
+              type="search"
+              className="marketplace-settings__control"
+              placeholder="Search by subject, name or email..."
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+            />
+          </span>
         </label>
 
         {/* Status Pills */}
-        <div className="support-status-filter" style={{ margin: 0 }}>
+        <div className="support-status-filter" role="group" aria-label="Ticket status">
           {statusFilters.map((status) => (
             <button
               type="button"
@@ -308,36 +311,40 @@ function AdminSupportTicketsPage() {
         </div>
 
         {/* Type Dropdown */}
-        <select
-          className="marketplace-settings__control"
-          value={typeFilter}
-          onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-          style={{ width: "auto", minWidth: 140, padding: "6px 12px", fontSize: 13, height: "auto" }}
-        >
-          <option value="All">All Types</option>
-          {TICKET_TYPES.map((t) => (
-            <option key={t.value} value={t.value}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <label className="admin-filters-bar__field">
+          <span>Type</span>
+          <select
+            className="marketplace-settings__control"
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
+          >
+            <option value="All">All Types</option>
+            {TICKET_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {/* Priority Dropdown */}
-        <select
-          className="marketplace-settings__control"
-          value={priorityFilter}
-          onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}
-          style={{ width: "auto", minWidth: 130, padding: "6px 12px", fontSize: 13, height: "auto" }}
-        >
-          <option value="All">All Priorities</option>
-          {TICKET_PRIORITIES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+        <label className="admin-filters-bar__field">
+          <span>Priority</span>
+          <select
+            className="marketplace-settings__control"
+            value={priorityFilter}
+            onChange={(e) => { setPriorityFilter(e.target.value); setPage(1); }}
+          >
+            <option value="All">All Priorities</option>
+            {TICKET_PRIORITIES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
-        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>
+        <span className="admin-clients-page__count">
           {meta.total} tickets
         </span>
       </div>

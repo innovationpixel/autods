@@ -124,7 +124,7 @@ function AdminWalletDepositsPage() {
         </div>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar admin-deposits-filters">
         <label className="admin-filters-bar__field">
           <span>Status</span>
           <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }}>
@@ -133,7 +133,7 @@ function AdminWalletDepositsPage() {
             ))}
           </select>
         </label>
-        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} deposits</span>
+        <span className="admin-clients-page__count">{meta.total} deposits</span>
       </div>
 
       {loading ? (

@@ -259,16 +259,19 @@ function AdminUsersPage() {
         </button>
       </header>
 
-      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar">
+      <div className="admin-clients-page__toolbar card-wrapper admin-filters-bar admin-users-filters">
         <label className="admin-clients-page__search">
-          <LuSearch />
-          <input
-            type="search"
-            className="marketplace-settings__control"
-            placeholder="Search by name or email..."
-            value={search}
-            onChange={(event) => { setSearch(event.target.value); setPage(1); }}
-          />
+          <span className="admin-clients-page__search-label">Search</span>
+          <span className="admin-clients-page__search-input-wrap">
+            <LuSearch aria-hidden="true" />
+            <input
+              type="search"
+              className="marketplace-settings__control"
+              placeholder="Search by name or email..."
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
+            />
+          </span>
         </label>
 
         <label className="admin-filters-bar__field">
@@ -280,7 +283,7 @@ function AdminUsersPage() {
           </select>
         </label>
 
-        <span className="admin-clients-page__count" style={{ marginLeft: "auto" }}>{meta.total} admin users</span>
+        <span className="admin-clients-page__count">{meta.total} admin users</span>
       </div>
 
       {loading ? (

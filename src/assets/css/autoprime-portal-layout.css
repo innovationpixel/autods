@@ -860,91 +860,6 @@
 }
 
 
-/* Clients filters: shared field baseline and search icon inside the input. */
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar.admin-filters-bar {
-  --clients-filter-height: 42px;
-  display: flex !important;
-  flex-wrap: wrap !important;
-  align-items: flex-end !important;
-  gap: 12px 16px !important;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__search {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 6px !important;
-  flex: 2 1 240px !important;
-  min-width: min(100%, 200px) !important;
-  max-width: none !important;
-  margin: 0 !important;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-filters-bar__field {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 6px !important;
-  flex: 1 1 140px;
-  min-width: 0 !important;
-  margin: 0 !important;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar :is(.admin-clients-page__search-label, .admin-filters-bar__field > span) {
-  color: var(--ap-muted, #67627a) !important;
-  font-size: 11px !important;
-  line-height: 16px !important;
-  font-weight: 700 !important;
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap {
-  display: block;
-  position: relative;
-  min-width: 0;
-  width: 100%;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap > svg {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 16px;
-  height: 16px;
-  z-index: 1;
-  color: var(--ap-muted, #67627a);
-  pointer-events: none;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar :is(.admin-clients-page__search-input-wrap > input, .admin-filters-bar__field > select) {
-  display: block !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  height: var(--clients-filter-height) !important;
-  min-height: var(--clients-filter-height) !important;
-  box-sizing: border-box !important;
-  margin: 0 !important;
-  border-radius: 9px !important;
-  font-size: 13px !important;
-  box-shadow: none !important;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__search-input-wrap > input {
-  padding-left: 36px !important;
-}
-.autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__count {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: var(--clients-filter-height);
-  flex: 0 0 auto;
-  margin: 0 0 0 auto !important;
-  white-space: nowrap;
-}
-@media (max-width: 640px) {
-  .autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-clients-page__search {
-    flex-basis: 100% !important;
-  }
-  .autoprime-portal .super-admin-shell .admin-clients-page__toolbar .admin-filters-bar__field {
-    flex-basis: 125px;
-  }
-}
-
-
 /* Keep the plan details shortcut content aligned with the modal fields. */
 .autoprime-portal .super-admin-shell .admin-clients-modal__plan-shortcut > .admin-page__btn {
   justify-content: flex-start !important;
@@ -962,39 +877,67 @@
 }
 
 
-/* All Listings: flexible tracks and identical control sizing prevent
-   intrinsic input widths from overflowing into neighboring filters. */
-.autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
-  display: grid !important;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
-  align-items: end !important;
-  gap: 10px 14px !important;
-  min-width: 0 !important;
+/* Shared Super Admin filters. Every field has a bounded track, identical
+   control height and the same inset search icon. Counts never occupy a filter
+   column; wide rows collapse to balanced groups based on actual page width. */
+.autoprime-portal .super-admin-shell .admin-page:has(> .admin-filters-bar) {
+  container-type: inline-size;
+  container-name: admin-filter-layout;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters > .admin-filters-bar__field {
+.autoprime-portal .super-admin-shell .admin-clients-page__toolbar.admin-filters-bar {
+  --admin-filter-height: 42px;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  align-items: end !important;
+  gap: 12px 14px !important;
+  min-width: 0 !important;
+  padding: 16px 18px !important;
+}
+.autoprime-portal .super-admin-shell .admin-filters-bar > :is(.admin-filters-bar__field, .admin-clients-page__search) {
   display: flex !important;
   flex-direction: column !important;
   align-items: stretch !important;
   gap: 6px !important;
-  min-width: 0 !important;
   width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
   margin: 0 !important;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters .admin-clients-page__search-input-wrap {
+.autoprime-portal .super-admin-shell .admin-filters-bar :is(.admin-clients-page__search-label, .admin-filters-bar__field > span:not(.admin-clients-page__search-input-wrap)) {
+  color: var(--ap-muted, #67627a) !important;
+  font-size: 11px !important;
+  line-height: 16px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.autoprime-portal .super-admin-shell .admin-filters-bar .admin-clients-page__search-input-wrap {
   display: block !important;
   position: relative;
   width: 100%;
   min-width: 0 !important;
+  max-width: 100% !important;
   margin: 0 !important;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters .admin-filters-bar__field :is(input, select) {
+.autoprime-portal .super-admin-shell .admin-filters-bar .admin-clients-page__search-input-wrap > svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  z-index: 1;
+  color: var(--ap-muted, #67627a);
+  pointer-events: none;
+}
+.autoprime-portal .super-admin-shell .admin-filters-bar :is(.admin-filters-bar__field, .admin-clients-page__search) :is(input, select) {
   display: block !important;
   box-sizing: border-box !important;
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  height: var(--clients-filter-height, 42px) !important;
-  min-height: var(--clients-filter-height, 42px) !important;
+  height: var(--admin-filter-height, 42px) !important;
+  min-height: var(--admin-filter-height, 42px) !important;
   margin: 0 !important;
   padding-inline: 10px !important;
   border-radius: 9px !important;
@@ -1005,41 +948,116 @@
   letter-spacing: normal !important;
   box-shadow: none !important;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters .admin-filters-bar__field select {
+.autoprime-portal .super-admin-shell .admin-filters-bar .admin-filters-bar__field select {
   padding-inline-end: 24px !important;
   text-overflow: ellipsis;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters .admin-clients-page__search-input-wrap > input {
+.autoprime-portal .super-admin-shell .admin-filters-bar .admin-clients-page__search-input-wrap > input {
   padding-inline-start: 36px !important;
 }
-.autoprime-portal .super-admin-shell .admin-listings-filters > .admin-clients-page__count {
+.autoprime-portal .super-admin-shell .admin-filters-bar > .admin-clients-page__count {
   grid-column: 1 / -1;
   justify-self: end;
   min-height: 0 !important;
   margin: 0 !important;
   font-size: 12px;
   line-height: 1.5;
+  white-space: nowrap;
 }
-
-
-/* Use the actual available portal width, not the browser viewport:
-   six filters on desktop, balanced rows on smaller layouts. */
-.autoprime-portal .super-admin-shell .admin-clients-page:has(> .admin-listings-filters) {
-  container-type: inline-size;
-  container-name: admin-listings-layout;
+.autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
 }
-@container admin-listings-layout (max-width: 860px) {
+.autoprime-portal .super-admin-shell .admin-orders-filters.admin-filters-bar {
+  grid-template-columns: minmax(0, 1.2fr) repeat(4, minmax(0, 1fr)) repeat(2, minmax(0, 1.05fr)) !important;
+}
+.autoprime-portal .super-admin-shell .admin-clients-filters.admin-filters-bar {
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) !important;
+}
+.autoprime-portal .super-admin-shell .admin-users-filters.admin-filters-bar {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) !important;
+}
+.autoprime-portal .super-admin-shell .admin-deposits-filters.admin-filters-bar {
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr) !important;
+}
+.autoprime-portal .super-admin-shell .admin-deposits-filters > .admin-clients-page__count {
+  grid-column: auto;
+  align-self: end;
+  padding-bottom: 10px;
+}
+.autoprime-portal .super-admin-shell .admin-support-filters.admin-filters-bar {
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr)) !important;
+}
+.autoprime-portal .super-admin-shell .admin-support-filters > .support-status-filter {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px;
+  margin: 0 !important;
+  min-width: 0;
+}
+@container admin-filter-layout (max-width: 1180px) {
+  .autoprime-portal .super-admin-shell .admin-orders-filters.admin-filters-bar {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field {
+    grid-column: span 3;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field:nth-child(n+5) {
+    grid-column: span 4;
+  }
+}
+@container admin-filter-layout (max-width: 860px) {
   .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   }
-}
-@container admin-listings-layout (max-width: 530px) {
-  .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+  .autoprime-portal .super-admin-shell .admin-clients-filters.admin-filters-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
-@container admin-listings-layout (max-width: 340px) {
+@container admin-filter-layout (max-width: 690px) {
+  .autoprime-portal .super-admin-shell .admin-orders-filters.admin-filters-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field {
+    grid-column: span 3;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field:nth-child(n+6) {
+    grid-column: span 3;
+  }
+  .autoprime-portal .super-admin-shell .admin-support-filters.admin-filters-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-support-filters > .admin-clients-page__search {
+    grid-column: 1 / -1;
+  }
+  .autoprime-portal .super-admin-shell .admin-support-filters > .support-status-filter {
+    grid-row: auto;
+    order: 1;
+  }
+  .autoprime-portal .super-admin-shell .admin-support-filters > .admin-clients-page__count {
+    order: 2;
+  }
+}
+@container admin-filter-layout (max-width: 530px) {
   .autoprime-portal .super-admin-shell .admin-listings-filters.admin-filters-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-users-filters.admin-filters-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+@container admin-filter-layout (max-width: 340px) {
+  .autoprime-portal .super-admin-shell .admin-clients-page__toolbar.admin-filters-bar:is(
+    .admin-clients-filters, .admin-listings-filters, .admin-orders-filters,
+    .admin-users-filters, .admin-deposits-filters, .admin-support-filters
+  ) {
     grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .autoprime-portal .super-admin-shell .admin-orders-filters > .admin-filters-bar__field:nth-child(n) {
+    grid-column: 1 / -1;
   }
 }
