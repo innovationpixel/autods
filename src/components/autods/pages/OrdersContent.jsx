@@ -1828,7 +1828,6 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
           <button
             type="button"
             className="dashboard-secondary-btn dashboard-secondary-btn--orders"
-            style={{ borderColor: "#ea580c", color: "#ea580c" }}
             onClick={handleSyncAliExpress}
             disabled={syncing || syncingAliExpress}
             title="Check AliExpress directly for payment confirmation & tracking updates"
@@ -1840,6 +1839,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
           <button
             type="button"
             className={`orders-filter-toggle ${showFilters ? "orders-filter-toggle--active" : ""}`}
+            aria-expanded={showFilters}
             onClick={() => setShowFilters((current) => !current)}
           >
             <LuSlidersHorizontal />
@@ -1953,12 +1953,6 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
             <LuRefreshCcw className={ordersLoading ? "spin-icon" : ""} />
           </button>
           <OrderColumnManager visibleColumnIds={visibleColumnIds} onChange={handleVisibleColumnsChange} />
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("left")} aria-label="Scroll grid left" title="Scroll left">
-            <LuChevronLeft />
-          </button>
-          <button type="button" className="orders-icon-btn" onClick={() => scrollTable("right")} aria-label="Scroll grid right" title="Scroll right">
-            <LuChevronRight />
-          </button>
         </div>
       </div>
 
@@ -1985,6 +1979,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
                   key={opt}
                   type="button"
                   className={`orders-quick-filters__pill ${isActive ? "orders-quick-filters__pill--active" : ""}`}
+                  aria-pressed={isActive}
                   onClick={() => setStatusFilter(opt)}
                 >
                   <span>{label}</span>
@@ -2057,6 +2052,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
                 key={preset.id}
                 type="button"
                 className={`orders-quick-filters__pill ${dateRangePreset === preset.id ? "orders-quick-filters__pill--active" : ""}`}
+                aria-pressed={dateRangePreset === preset.id}
                 onClick={() => applyDatePreset(preset.id)}
               >
                 {preset.label}
@@ -2083,6 +2079,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
             <button
               type="button"
               className={`orders-quick-filters__pill ${sortDirection === "desc" ? "orders-quick-filters__pill--active" : ""}`}
+              aria-pressed={sortDirection === "desc"}
               onClick={() => setSortDirection("desc")}
             >
               Desc
@@ -2090,6 +2087,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
             <button
               type="button"
               className={`orders-quick-filters__pill ${sortDirection === "asc" ? "orders-quick-filters__pill--active" : ""}`}
+              aria-pressed={sortDirection === "asc"}
               onClick={() => setSortDirection("asc")}
             >
               Asc
@@ -2101,6 +2099,7 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
           <button
             type="button"
             className={`orders-quick-filters__pill ${showOnlyActive ? "orders-quick-filters__pill--active" : ""}`}
+            aria-pressed={showOnlyActive}
             onClick={() => setShowOnlyActive((c) => !c)}
             title={showOnlyActive ? "Canceled orders are hidden" : "Canceled orders are included"}
           >
@@ -2110,8 +2109,8 @@ function OrdersContent({ searchQuery: parentSearchQuery = "", selectedConnection
       </div>
 
       {activeFilterChips.length ? (
-        <div className="orders-filter-chips" style={{ margin: "0 0 14px", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#8b7f97", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <div className="orders-filter-chips orders-filter-chips--summary">
+          <span className="orders-filter-chips__label">
             Active filters:
           </span>
           {activeFilterChips.map((chip) => (

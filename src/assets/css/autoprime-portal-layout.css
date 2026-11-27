@@ -3253,3 +3253,456 @@
   .autoprime-portal .calculations-page-content > .orders-toolbar--primary .orders-toolbar__actions--search { justify-content: flex-start !important; }
   .autoprime-portal .calculations-page-content > .orders-toolbar--primary .calculations-search { flex-basis: 100% !important; max-width: none !important; }
 }
+
+
+/* Customer list-page controls: shared density, palette and wrapping.
+   Keep table cells, dialog controls and public website out of this scope. */
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) {
+  --customer-control-height: 34px;
+  --customer-control-accent: #6d28d9;
+  --customer-control-line: #e4dced;
+  --customer-control-soft: #f3edff;
+  min-width: 0 !important;
+  gap: 10px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  gap: 8px 12px !important;
+  margin: 0 !important;
+  padding: 9px 12px !important;
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-toolbar__left,.orders-toolbar__actions,.orders-summary-row__actions,.products-toolbar__actions,.products-selection-row__left,.products-selection-row__right,.drafts-selection-row__left,.drafts-selection-row__right,.products-bulk-actions,.drafts-bulk-actions,.rd-toolbar__left,.rd-toolbar__right,.rd-tabs,.sourcing-toolbar__left) {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 0 !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.dashboard-secondary-btn--orders,.orders-filter-toggle,.orders-toolbar-action,.orders-icon-btn,.orders-column-manager__trigger,.products-history-btn,.drafts-history-btn,.rd-tab-btn,.sourcing-status-pill,.sourcing-refresh-btn),
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.products-bulk-actions,.drafts-bulk-actions,.drafts-selection-row__right) > button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  flex: 0 0 auto;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: var(--customer-control-height) !important;
+  height: auto !important;
+  padding: 7px 10px !important;
+  margin: 0 !important;
+  gap: 6px !important;
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  color: #51465e !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  white-space: normal !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.dashboard-secondary-btn--orders,.orders-filter-toggle,.orders-toolbar-action,.orders-icon-btn,.orders-column-manager__trigger,.products-history-btn,.drafts-history-btn,.rd-tab-btn,.sourcing-status-pill,.sourcing-refresh-btn) > svg {
+  flex: 0 0 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.dashboard-secondary-btn--orders,.orders-filter-toggle,.orders-toolbar-action,.orders-icon-btn,.orders-column-manager__trigger,.products-history-btn,.drafts-history-btn,.rd-tab-btn,.sourcing-status-pill,.sourcing-refresh-btn):hover:not(:disabled),
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-filter-toggle--active,.orders-toolbar-action--active,.orders-column-manager__trigger--open,.products-history-btn--active,.drafts-history-btn--active,.rd-tab-btn--active,.sourcing-status-pill--active) {
+  background: var(--customer-control-soft) !important;
+  border-color: #d5c2ef !important;
+  color: var(--customer-control-accent) !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.dashboard-secondary-btn--orders,.orders-filter-toggle,.orders-toolbar-action,.orders-icon-btn,.orders-column-manager__trigger,.products-history-btn,.drafts-history-btn,.rd-tab-btn,.sourcing-status-pill,.sourcing-refresh-btn):disabled {
+  background: #f6f4f8 !important;
+  border-color: #ede8f1 !important;
+  color: #938b9e !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.dashboard-secondary-btn--orders,.orders-filter-toggle,.orders-toolbar-action,.orders-icon-btn,.orders-column-manager__trigger,.products-history-btn,.drafts-history-btn,.rd-tab-btn,.sourcing-status-pill,.sourcing-refresh-btn):disabled > * {
+  color: inherit !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) .orders-icon-btn {
+  width: var(--customer-control-height) !important;
+  min-width: var(--customer-control-height) !important;
+  height: var(--customer-control-height) !important;
+  padding: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) .orders-column-manager {
+  flex: 0 1 auto;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 8px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary > .orders-toolbar__left {
+  justify-content: flex-start !important;
+  width: 100% !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary > .orders-toolbar__actions--search {
+  justify-content: flex-end !important;
+  width: 100% !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary > .orders-toolbar__left > .dashboard-secondary-btn--orders:first-child {
+  background: var(--customer-control-accent) !important;
+  border-color: var(--customer-control-accent) !important;
+  color: #fff !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary > .orders-toolbar__left > .dashboard-secondary-btn--orders:first-child:disabled {
+  background: #f6f4f8 !important;
+  border-color: #ede8f1 !important;
+  color: #938b9e !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary .orders-toolbar-dropdown {
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary .orders-toolbar-dropdown__menu {
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 8px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-search-bar,.calculations-search,.rd-search-box) {
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  flex: 1 1 220px !important;
+  min-width: min(100%, 160px) !important;
+  max-width: none !important;
+  width: auto !important;
+  height: var(--customer-control-height) !important;
+  min-height: var(--customer-control-height) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-search-bar,.calculations-search,.rd-search-box) input {
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  font-size: 12px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content .orders-search-bar__input {
+  padding: 0 30px 0 32px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content .orders-search-bar__icon {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content .orders-search-bar__clear {
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  min-height: 18px !important;
+  height: 18px !important;
+  padding: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-search-bar,.calculations-search,.rd-search-box):focus-within {
+  outline: 2px solid #cdb7f1 !important;
+  outline-offset: 1px;
+}
+.autoprime-portal .marketplace-dashboard-page .returns-disputes-page .rd-toolbar__right {
+  flex: 1 1 240px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > .orders-quick-filters {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px 14px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__group {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__group--status,
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__group:has(> .orders-quick-filters__pills) {
+  flex: 1 1 390px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) :is(.orders-quick-filters__pills,.orders-quick-filters__controls) {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  gap: 5px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__label {
+  min-width: 0 !important;
+  margin: 0 3px 0 0 !important;
+  color: #70697d !important;
+  font-size: 10.5px !important;
+  font-weight: 650 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) :is(.orders-quick-filters__pill,.orders-quick-filters__select,.rd-filter-select) {
+  box-sizing: border-box !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 9px !important;
+  border: 1px solid var(--customer-control-line) !important;
+  border-radius: 6px !important;
+  background: #fff !important;
+  color: #51465e !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) :is(.orders-quick-filters__select,.rd-filter-select) {
+  padding-inline-end: 24px !important;
+  text-overflow: ellipsis;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__pill.orders-quick-filters__pill--active,
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__pill.orders-quick-filters__pill--active:hover,
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__pill:hover {
+  background: var(--customer-control-soft) !important;
+  border-color: #d5c2ef !important;
+  color: var(--customer-control-accent) !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-quick-filters__pill > span {
+  color: inherit !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-filter-chips--summary {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  padding: 0 2px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content .orders-filter-chips__label {
+  font-size: 10.5px;
+  font-weight: 650;
+  color: #70697d;
+  text-transform: uppercase;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) .orders-filter-chip {
+  min-height: 26px !important;
+  max-width: 100% !important;
+  border-radius: 6px !important;
+  background: #f4efff !important;
+  border-color: #e5d9f4 !important;
+  color: #6d28d9 !important;
+  box-shadow: none !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+.autoprime-portal .marketplace-dashboard-page .orders-page-content .orders-filter-chips__clear-all {
+  background: transparent !important;
+  border: 0 !important;
+  color: #6d28d9 !important;
+  box-shadow: none !important;
+  font-size: 11px !important;
+  text-decoration: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) .orders-select-all {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  gap: 7px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) .orders-select-all > input[type="checkbox"] {
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  min-height: 15px !important;
+  flex: 0 0 15px !important;
+  margin: 0 !important;
+  accent-color: #6d28d9 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) .drafts-selection-row__right > span[aria-hidden="true"] {
+  display: none !important;
+}
+/* PageFilterPanel and FilterField are shared across customer list pages. */
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel {
+  min-width: 0 !important;
+  margin: 0 !important;
+  border: 1px solid #e4dced !important;
+  border-radius: 9px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel__head {
+  padding: 8px 12px !important;
+  min-height: 0 !important;
+  border-bottom: 1px solid #eee9f4 !important;
+  background: #faf8fd !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel__title,
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel__title svg {
+  color: #6d28d9 !important;
+  font-size: 12px !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel__clear {
+  padding: 5px 9px !important;
+  min-height: 28px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #6d28d9 !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel__grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,170px),1fr)) !important;
+  align-items: end !important;
+  gap: 10px 12px !important;
+  padding: 12px !important;
+  min-width: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field:not(.filter-field--checkbox) {
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) !important;
+  gap: 5px !important;
+  margin: 0 !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field__label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: #70697d !important;
+  margin: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field__control {
+  position: relative !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field__input {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 0 10px !important;
+  border: 1px solid #e4dced !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel select.filter-field__input {
+  padding-inline-end: 28px !important;
+  appearance: none;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field__chevron {
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  transform: translateY(-50%) !important;
+  pointer-events: none;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field--checkbox {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 7px !important;
+  min-height: 36px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel .filter-field__checkbox {
+  flex: 0 0 15px !important;
+  width: 15px !important;
+  height: 15px !important;
+  min-width: 15px !important;
+  margin: 0 !important;
+  accent-color: #6d28d9 !important;
+}
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(button,select):focus-visible,
+.autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > .orders-quick-filters :is(button,select):focus-visible,
+.autoprime-portal .marketplace-dashboard-page .marketplace-content-wrapper .page-filter-panel :is(button,input,select):focus-visible {
+  outline: 2px solid #a78bfa !important;
+  outline-offset: 2px;
+}
+@media (max-width: 560px) {
+  .autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) {
+    padding: 8px !important;
+    justify-content: flex-start !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page .orders-page-content > .orders-toolbar--primary > .orders-toolbar__actions--search {
+    justify-content: flex-start !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > :is(.orders-toolbar--primary,.products-toolbar,.drafts-toolbar,.rd-toolbar,.sourcing-toolbar,.orders-summary-row,.products-selection-row,.drafts-selection-row) :is(.orders-search-bar,.calculations-search,.rd-search-box) {
+    flex-basis: 100% !important;
+  }
+  .autoprime-portal .marketplace-dashboard-page :is(.orders-page-content,.calculations-page-content,.products-page-content,.drafts-page-content,.returns-disputes-page,.sourcing-request-content) > .orders-quick-filters { padding: 8px !important; }
+}
