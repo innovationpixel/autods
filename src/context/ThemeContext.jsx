@@ -3,19 +3,8 @@ import { createContext, useEffect, useState } from "react";
 export const ThemeContext = createContext();
 const THEME_STORAGE_KEY = "autods-theme-version";
 
-const getInitialBackground = () => {
-  if (typeof window === "undefined") {
-    return { value: "light", label: "Light" };
-  }
-
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-
-  if (storedTheme === "dark") {
-    return { value: "dark", label: "Dark" };
-  }
-
-  return { value: "light", label: "Light" };
-};
+// The portal uses one light theme. Ignore legacy saved dark preferences.
+const LIGHT_BACKGROUND = { value: "light", label: "Light" };
 
 const ThemeContextProvider = (props) => {
   const [sideBarStyle, setSideBarStyle] = useState({ value: "full", label: "Full", });
@@ -26,7 +15,7 @@ const ThemeContextProvider = (props) => {
   const [iconHover, setIconHover] = useState(false);
   const [sidebariconHover, setSidebariconHover] = useState(false);
   const [menuToggle, setMenuToggle] = useState(false);
-  const [background, setBackground] = useState(getInitialBackground);
+  const background = LIGHT_BACKGROUND;
   const [containerPosition_, setcontainerPosition_] = useState({ value: "wide-boxed", label: "Wide Boxed", });
   const body = document.querySelector("body");
   const [windowWidth, setWindowWidth] = useState(0);
@@ -90,8 +79,9 @@ const ThemeContextProvider = (props) => {
       : setMenuToggle(false);
   };
 
-  const changeBackground = (name) => {
-    setBackground(name);
+  // Retain the context API for legacy consumers without enabling dark mode.
+  const changeBackground = () => {
+    body.setAttribute("data-theme-version", "light");
   };
 
   const changeContainerPosition = (name) => {
@@ -119,7 +109,11 @@ const ThemeContextProvider = (props) => {
 
   useEffect(() => {
     body.setAttribute("data-theme-version", background.value);
-    window.localStorage.setItem(THEME_STORAGE_KEY, background.value);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+    } catch {
+      // The portal remains light even when storage is unavailable.
+    }
   }, [background, body]);
 
   return (

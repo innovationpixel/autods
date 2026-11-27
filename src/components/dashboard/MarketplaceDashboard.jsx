@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -25,7 +25,6 @@ import {
   LuLogOut,
   LuMenu,
   LuMessageCircleMore,
-  LuMoon,
   LuPackage2,
   LuPackageSearch,
   LuPawPrint,
@@ -37,7 +36,6 @@ import {
   LuShirt,
   LuSlidersHorizontal,
   LuStore,
-  LuSun,
   LuTabletSmartphone,
   LuTruck,
   LuUmbrella,
@@ -54,7 +52,6 @@ import {
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
 import "../../assets/css/autoprime-theme.css";
-import { ThemeContext } from "../../context/ThemeContext";
 import MarketplaceSettingsPage from "./MarketplaceSettingsPage";
 import CustomerSupportContent from "./CustomerSupportPage";
 import SourcingRequestContent from '../autods/pages/SourcingRequestContent';
@@ -245,7 +242,6 @@ function formatHeaderWalletBalance(amount, currency = "USD") {
 }
 
 const MarketplaceDashboard = () => {
-  const { background, changeBackground } = useContext(ThemeContext);
   const dispatch   = useDispatch();
   const aliItems        = useSelector(selectAliItems);
   const aliLoading      = useSelector(selectAliLoading);
@@ -914,8 +910,6 @@ const MarketplaceDashboard = () => {
   }, [activeCategory, activeSubfilter, selectedPill, sortBy, priceRange, shipsTo, currency, keywordSearch]);
 
   const currentSubfilters = subfilterOptions[activeCategory] || [];
-  const profileTheme = background.value;
-  const isDarkTheme = profileTheme === "dark";
   const activeSidebarStore = useMemo(() => {
     if (stores.length === 0) {
       return {
@@ -1600,7 +1594,7 @@ const MarketplaceDashboard = () => {
   );
 
   return (
-    <div className={isDarkTheme ? "marketplace-dashboard-page marketplace-dashboard-page--dark" : "marketplace-dashboard-page"}>
+    <div className="marketplace-dashboard-page">
       {sidebarMobileOpen ? (
         <button
           type="button"
@@ -2097,24 +2091,6 @@ const MarketplaceDashboard = () => {
                       })}
                     </div>
 
-                    {/* <div className="profile-dropdown__theme" aria-label="Theme preference">
-                      <button
-                        type="button"
-                        className={profileTheme === "light" ? "profile-dropdown__theme-btn profile-dropdown__theme-btn--active" : "profile-dropdown__theme-btn"}
-                        onClick={() => changeBackground({ value: "light", label: "Light" })}
-                      >
-                        <LuSun />
-                        <span>Light</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={profileTheme === "dark" ? "profile-dropdown__theme-btn profile-dropdown__theme-btn--active" : "profile-dropdown__theme-btn"}
-                        onClick={() => changeBackground({ value: "dark", label: "Dark" })}
-                      >
-                        <LuMoon />
-                        <span>Dark</span>
-                      </button>
-                    </div> */}
                   </div>
                 ) : null}
               </div>

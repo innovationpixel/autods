@@ -1,17 +1,14 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   LuChevronDown,
   LuLogOut,
   LuMenu,
-  LuMoon,
-  LuSun,
 } from "react-icons/lu";
 import "../../assets/css/marketplace-utilities.css";
 import "../../assets/css/marketplace-dashboard.css";
 import "../../assets/css/autoprime-theme.css";
-import { ThemeContext } from "../../context/ThemeContext";
 import { adminPageModuleMap, adminPages, adminSidebarItems } from "../autods/menu";
 import SidebarLink from "../autods/SidebarLink";
 import AdminDashboardPage from "../autods/pages/AdminDashboardPage";
@@ -36,14 +33,12 @@ function SuperAdminShell() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const authUser = useSelector(selectUser);
-  const { background, changeBackground } = useContext(ThemeContext);
 
   const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
 
   const activePage = pathname === "/" ? "admin" : pathname.slice(1);
-  const isDarkTheme = background.value === "dark";
 
   const profileShortName = useMemo(() => getUserShortName(authUser), [authUser]);
   const profileFullName = useMemo(() => getUserFullName(authUser), [authUser]);
@@ -137,7 +132,7 @@ function SuperAdminShell() {
   }
 
   return (
-    <div className={isDarkTheme ? "marketplace-dashboard-page marketplace-dashboard-page--dark super-admin-shell" : "marketplace-dashboard-page super-admin-shell"}>
+    <div className="marketplace-dashboard-page super-admin-shell">
       {sidebarMobileOpen ? (
         <button
           type="button"
@@ -228,24 +223,6 @@ function SuperAdminShell() {
                       </div>
                     </div>
 
-                    <div className="profile-dropdown__theme" aria-label="Theme preference">
-                      <button
-                        type="button"
-                        className={background.value === "light" ? "profile-dropdown__theme-btn profile-dropdown__theme-btn--active" : "profile-dropdown__theme-btn"}
-                        onClick={() => changeBackground({ value: "light", label: "Light" })}
-                      >
-                        <LuSun />
-                        <span>Light</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={background.value === "dark" ? "profile-dropdown__theme-btn profile-dropdown__theme-btn--active" : "profile-dropdown__theme-btn"}
-                        onClick={() => changeBackground({ value: "dark", label: "Dark" })}
-                      >
-                        <LuMoon />
-                        <span>Dark</span>
-                      </button>
-                    </div>
 
                     <div className="profile-dropdown__menu">
                       <button
