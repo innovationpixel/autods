@@ -119,6 +119,7 @@ function AdminDashboardPage() {
   const [customTo, setCustomTo] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [showAllSignups, setShowAllSignups] = useState(false);
+  const [showAllTopClients, setShowAllTopClients] = useState(false);
 
   useEffect(() => {
     if (role && role !== "super_admin") {
@@ -658,7 +659,7 @@ function AdminDashboardPage() {
             TOP CLIENTS
             ================================================= */}
 
-        <article className="ebay-card ebay-products-card">
+        <article className="ebay-card ebay-products-card admin-top-clients">
           <div className="ebay-card__header">
             <div className="ebay-card__title-row">
               <span className="ebay-purple-icon">
@@ -669,9 +670,9 @@ function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="ebay-products-list">
+          <div className="ebay-products-list" id="admin-top-clients-list">
             {topClients.length ? (
-              topClients.map((client, index) => (
+              (showAllTopClients ? topClients : topClients.slice(0, 3)).map((client, index) => (
                 <div className="ebay-product-row" key={client.id}>
                   <span className="ebay-product-rank">{index + 1}</span>
 
@@ -703,6 +704,20 @@ function AdminDashboardPage() {
               <p className="admin-page__muted">No client activity yet.</p>
             )}
           </div>
+          {topClients.length > 3 ? (
+            <div className="admin-top-clients__footer">
+              <button
+                type="button"
+                className="admin-top-clients__toggle"
+                aria-expanded={showAllTopClients}
+                aria-controls="admin-top-clients-list"
+                onClick={() => setShowAllTopClients((current) => !current)}
+              >
+                {showAllTopClients ? "See Less" : "See More"}
+                <LuChevronDown aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
         </article>
 
         {/* =================================================

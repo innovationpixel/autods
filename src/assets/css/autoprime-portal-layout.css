@@ -506,17 +506,17 @@
 }
 
 
-/* Keep recent signups compact until the admin explicitly expands the list. */
-.autoprime-portal .super-admin-shell .admin-recent-signups {
+/* Keep dashboard lists compact until the admin explicitly expands them. */
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups, .admin-top-clients) {
   min-height: 0 !important;
   align-self: start;
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__footer {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__footer, .admin-top-clients__footer) {
   display: flex;
   justify-content: center;
   padding: 10px 16px 16px;
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__toggle {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__toggle, .admin-top-clients__toggle) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -530,17 +530,17 @@
   font-weight: 650;
   cursor: pointer;
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__toggle:hover {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__toggle, .admin-top-clients__toggle):hover {
   background: var(--ap-accent-soft, #f5f1ff);
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__toggle:focus-visible {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__toggle, .admin-top-clients__toggle):focus-visible {
   outline: 2px solid var(--ap-accent, #6d28d9);
   outline-offset: 2px;
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__toggle svg {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__toggle, .admin-top-clients__toggle) svg {
   width: 14px;
   height: 14px;
 }
-.autoprime-portal .super-admin-shell .admin-recent-signups__toggle[aria-expanded="true"] svg {
+.autoprime-portal .super-admin-shell :is(.admin-recent-signups__toggle, .admin-top-clients__toggle)[aria-expanded="true"] svg {
   transform: rotate(180deg);
 }
