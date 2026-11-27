@@ -233,6 +233,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
           <button
             type="button"
             className={`support-view-btn ${unreadOnly ? "support-view-btn--active" : ""}`}
+            aria-pressed={unreadOnly}
             onClick={() => setUnreadOnly((current) => !current)}
           >
             {unreadOnly ? "Unread only" : "All conversations"}
@@ -240,6 +241,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
           <button
             type="button"
             className={`support-filter-btn ${showFilters ? "support-filter-btn--active" : ""}`}
+            aria-expanded={showFilters}
             onClick={() => setShowFilters((current) => !current)}
           >
             <LuFilter aria-hidden="true" />
@@ -277,8 +279,12 @@ function CustomerSupportContent({ searchQuery = "" }) {
         </PageFilterPanel>
       ) : null}
 
+      <div className="support-inbox-meta">
+        <strong>Conversations ({totalCount})</strong>
+        {selectedRows.length > 0 && <span>{selectedRows.length} selected</span>}
+      </div>
       <main className="support-table-shell">
-        <div className="support-table-scroll">
+        <div className="support-table-scroll" role="region" aria-label="Conversation list" tabIndex={0}>
           <table className="support-table">
             <colgroup>
               <col className="support-col-check" />
@@ -369,26 +375,32 @@ function CustomerSupportContent({ searchQuery = "" }) {
                       </td>
                       <td>
                         <div className="support-message">
-                          {row.unread ? <span className="support-message__dot" aria-hidden="true" /> : null}
+                          <span className={`support-message__dot ${row.unread ? "" : "support-message__dot--read"}`} aria-hidden="true" />
                           {row.message_icon === "calendar" ? (
                             <span className="support-message__mini-icon" aria-hidden="true">
                               <LuCalendar />
                             </span>
                           ) : null}
-                          <span className={`support-message__text ${row.unread ? "support-message__text--unread" : ""}`}>
+                          <button
+                            type="button"
+                            className={`support-message__text ${row.unread ? "support-message__text--unread" : ""}`}
+                            title={row.message}
+                            aria-label={`${row.unread ? "Unread: " : ""}${row.message || "Open conversation"}`}
+                            onClick={(e) => { e.stopPropagation(); openConversation(row); }}
+                          >
                             {row.message}
-                          </span>
+                          </button>
                         </div>
                       </td>
-                      <td className="support-table__buyer">{row.buyer}</td>
+                      <td className="support-table__buyer" title={row.buyer}>{row.buyer}</td>
                       <td>
                         <span className="support-status-badge">{row.status}</span>
                       </td>
                       <td>
-                        <span className="support-type-badge">{row.type}</span>
+                        <span className="support-type-badge" title={row.type}>{row.type}</span>
                       </td>
-                      <td className="support-table__time">{row.time}</td>
-                      <td className="support-table__store">{row.store ?? "—"}</td>
+                      <td className="support-table__time" title={row.time}>{row.time}</td>
+                      <td className="support-table__store" title={row.store}>{row.store ?? "—"}</td>
                     </tr>
                   );
                 })
@@ -461,10 +473,10 @@ function CustomerSupportContent({ searchQuery = "" }) {
 
       {activeConversation && (
         <div className="support-modal-overlay" onClick={() => setActiveConversation(null)}>
-          <div className="support-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="support-modal" role="dialog" aria-modal="true" aria-labelledby="support-conversation-title" onClick={(e) => e.stopPropagation()}>
             <header className="support-modal__header">
               <div className="support-modal__title-area">
-                <h3 className="support-modal__title">
+                <h3 className="support-modal__title" id="support-conversation-title">
                   <LuUser style={{ color: "var(--support-primary)" }} />
                   <span>{activeConversation.buyer || "eBay Buyer"}</span>
                   <span className="support-status-badge">{activeConversation.status || "Read"}</span>
@@ -477,6 +489,7 @@ function CustomerSupportContent({ searchQuery = "" }) {
                   ) : null}
                   {activeConversation.type ? ` • ${activeConversation.type}` : ""}
                 </div>
+                {activeConversation.message && <p className="support-modal__subject">{activeConversation.message}</p>}
               </div>
               <button
                 type="button"
