@@ -1254,3 +1254,40 @@
     flex: 1 1 auto;
   }
 }
+
+
+/* Shared admin checkbox rows: never let the form field grid separate the
+   checkbox from its label. Keep longer descriptions wrapped alongside it. */
+.autoprime-portal .super-admin-shell label.admin-modal__checkbox:has(> input[type="checkbox"]) {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 9px !important;
+  min-width: 0 !important;
+  text-align: left !important;
+  cursor: pointer;
+}
+.autoprime-portal .super-admin-shell label.admin-modal__checkbox > input[type="checkbox"] {
+  position: static !important;
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  align-self: center !important;
+  accent-color: var(--ap-accent, #6d28d9);
+  cursor: pointer;
+}
+.autoprime-portal .super-admin-shell label.admin-modal__checkbox > span {
+  display: block !important;
+  min-width: 0;
+  margin: 0 !important;
+  text-align: left !important;
+  line-height: 1.45 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
