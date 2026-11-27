@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import {
   LuArrowDownRight,
-  LuArrowUpRight,
   LuBadgeCheck,
   LuCalendarDays,
   LuChevronDown,
@@ -397,32 +396,6 @@ function AdminDashboardPage() {
           );
         })}
 
-        {/* PROMO */}
-
-        <article className="ebay-pro-card">
-          <div className="ebay-pro-card__icon">
-            <LuShield />
-          </div>
-
-          <h3>
-            Keep The
-            <br />
-            Platform Secure
-          </h3>
-
-          <p>
-            Review connections,
-            <br />
-            plans and admin
-            <br />
-            access in Settings.
-          </p>
-
-          <button type="button" onClick={() => navigate("/admin/settings")}>
-            Open Settings
-            <LuArrowUpRight />
-          </button>
-        </article>
       </section>
 
       {/* ===================================================
