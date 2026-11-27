@@ -2226,3 +2226,84 @@
     flex: 1 1 140px;
   }
 }
+
+
+/* Settings form width: legacy form constraints must not leave a blank
+   column inside the full-width AI and legal cards. */
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) > :is(.admin-settings-page__status, .admin-settings-page__body),
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-form {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+  justify-items: stretch !important;
+  margin-inline: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-form > *,
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-grid > .admin-settings-ai-field {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  justify-self: stretch !important;
+  margin-inline: 0 !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 14px 16px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-field {
+  justify-items: stretch !important;
+  align-content: start !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-label-row {
+  width: 100% !important;
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page #platform-settings-legal :is(#legal-doc-title, #legal-doc-content) {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  justify-self: stretch !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page #platform-settings-legal .admin-settings-ai-help {
+  max-width: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-addons) .admin-settings-ai-input-wrap:has(> .admin-settings-ai-unit) {
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  border: 1px solid var(--settings-line) !important;
+  border-radius: 8px !important;
+  align-items: center !important;
+  box-shadow: none !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-addons) .admin-settings-ai-input-wrap:has(> .admin-settings-ai-unit) > input.admin-settings-ai-input {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  min-width: 0 !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding-inline: 36px 6px !important;
+}
+.autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-addons) .admin-settings-ai-input-wrap > .admin-settings-ai-unit {
+  align-self: center !important;
+  justify-self: end !important;
+  margin: 0 7px 0 0 !important;
+  white-space: nowrap;
+}
+@container platform-settings (max-width: 620px) {
+  .autoprime-portal .super-admin-shell .admin-settings-page :is(#platform-settings-ai, #platform-settings-legal) .admin-settings-ai-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
